@@ -6,11 +6,11 @@
 (use jw32/errhandlingapi)
 (use jw32/util)
 
+(use ./resource)
+
 
 (def notify-icon-id 1)
 (def notify-icon-callback-msg (+ WM_APP 1))
-
-(def ID_MENU_EXIT (int/u64 90001))
 
 
 (defn show-error-and-exit [msg exit-code]
@@ -38,11 +38,7 @@
      (break)
 
      -1
-     (do (MessageBox nil
-                     "GetMessage() failed"
-                     "Error"
-                     (bor MB_ICONEXCLAMATION MB_OK))
-         (break))
+     (show-error-and-exit "GetMessage() failed" 1)
 
      (do
        (print "---- New message!")
