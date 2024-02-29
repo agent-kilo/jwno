@@ -5,6 +5,7 @@
 (use jw32/combaseapi)
 (use jw32/uiautomation)
 (use jw32/errhandlingapi)
+(use jw32/consoleapi)
 (use jw32/util)
 
 (use ./resource)
@@ -34,6 +35,9 @@
   (def msg (MSG))
 
   (forever
+   # XXX: The Janet event loop will not have a chance to run as long as
+   # the thread is blocked by GetMessage. We have to find a way around this,
+   # or even the garbage collector can't work as intended.
    (case (GetMessage msg nil 0 0)
      0
      (break)
@@ -44,8 +48,7 @@
      (do
        (print "---- New message!")
        (TranslateMessage msg)
-       (DispatchMessage msg)
-       (buffer/new (* 1024 1024))))))
+       (DispatchMessage msg)))))
 
 
 (defn create-notify-icon-menu []
@@ -68,13 +71,19 @@
   (DestroyMenu hMenu))
 
 
-(defn create-notify-icon [hinst hwnd]
+(defn create-notify-icon [hinst hwnd argv0]
   (def hIcon
     (try
       (LoadIconMetric hinst IDI_LOGO LIM_SMALL)
       ((err fib)
-       # TODO: We may be running from the source tree, find the standalone ico file
-       (LoadIcon nil IDI_QUESTION))))
+       # Are we running from the source tree?
+       (if (or (string/has-suffix? "/main.janet" argv0)
+               (string/has-suffix? "\\main.janet" argv0))
+         (let [ico-path (string
+                         (string/slice argv0 0 (+ 1 (- (length argv0) (length "/main.janet"))))
+                         "../res/jwno.ico")]
+           (LoadImage nil ico-path IMAGE_ICON 0 0 (bor LR_DEFAULTSIZE LR_LOADFROMFILE)))
+         (LoadIcon nil IDI_QUESTION)))))
   (def nid
     (NOTIFYICONDATA
      :hWnd hwnd
@@ -174,6 +183,9 @@
 
 
 (defn main [&]
+  (pp (dyn :args))
+  #(FreeConsole)
+
   (def hInstance (GetModuleHandle nil))
 
   (def hwnd
@@ -183,7 +195,7 @@
        (show-error-and-exit err 1))))
 
   (try
-    (create-notify-icon hInstance hwnd)
+    (create-notify-icon hInstance hwnd (in (dyn :args) 0))
     ((err fib)
      (show-error-and-exit err 1)))
 
