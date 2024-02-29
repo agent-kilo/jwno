@@ -36,29 +36,25 @@
   (string (find-build-dir) name))
 
 
-(let [target (generated "resource.h")]
-  (rule target ["src/resource.janet"]
-    (ensure-dir (find-build-dir))
-    (generate-resource-header (dofile "src/resource.janet") target)
-    (printf "Generated %s" target)))
+(defmacro gen-rule [target deps & body]
+  ~(let [_target ,target
+         _deps   ,deps]
+     (rule _target [;_deps]
+       (ensure-dir (find-build-dir))
+       ,;body
+       (printf "Generated %s" _target))))
 
 
-(let [target (generated "resource.res")]
-  (rule target [(generated "resource.h")]
-    (ensure-dir (find-build-dir))
-    (def rc-out
-      (spawn-and-wait "rc.exe" "/I" (find-build-dir) "/fo" target "res/jwno.rc"))
-    (print rc-out)
-    (printf "Generated %s" target)))
+(gen-rule (generated "resource.h") ["src/resource.janet"]
+  (generate-resource-header (dofile "src/resource.janet") _target))
 
 
-(let [target (generated "resource.obj")]
-  (rule target [(generated "resource.res")]
-    (ensure-dir (find-build-dir))
-    (def cvtres-out
-      (spawn-and-wait "cvtres.exe" "/machine:x64" (string "/out:" target) (generated "resource.res")))
-    (print cvtres-out)
-    (printf "Generated %s" target)))
+(gen-rule (generated "resource.res") [(generated "resource.h")]
+  (spawn-and-wait "rc.exe" "/I" (find-build-dir) "/fo" _target "res/jwno.rc"))
+
+
+(gen-rule (generated "resource.obj") [(generated "resource.res")]
+  (spawn-and-wait "cvtres.exe" "/machine:x64" (string "/out:" _target) (_deps 0)))
 
 
 (declare-executable
