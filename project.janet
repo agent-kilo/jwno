@@ -57,6 +57,13 @@
   (spawn-and-wait "cvtres.exe" "/machine:x64" (string "/out:" _target) (_deps 0)))
 
 
+(task "embed-manifest" [(generated "jwno.exe")]
+  (let [manifest "manifest/jwno.manifest"
+        exe-file (generated "jwno.exe")]
+    (spawn-and-wait "mt.exe" "-manifest" manifest (string "-outputresource:" exe-file ";#1"))
+    (printf "Embedded %s into %s" manifest exe-file)))
+
+
 (declare-executable
  :name "jwno"
  :entry "src/main.janet"
@@ -64,4 +71,15 @@
               (filter |(string/has-suffix? ".janet" $))
               (map |(string "src/" $)))
         (generated "resource.obj")]
- :ldflags [(generated "resource.obj")])
+
+ # Cannot embed the manifest directly when linking, or there'll be this warning
+ #   warning LNK4078: multiple '.rsrc' sections found with different attributes
+ # And the built binary would fail to launch. We put the manifest in with mt.exe
+ # after the binary is built. See the embed-manifest task.
+
+ #:lflags ["/nologo"
+ #         "/manifest:embed"
+ #         "/manifestinput:manifest/jwno.manifest"]
+
+ :ldflags [(generated "resource.obj")]
+ )
