@@ -1,5 +1,6 @@
 (use jw32/winuser)
 (use jw32/shellapi)
+(use jw32/commctrl)
 (use jw32/libloaderapi)
 (use jw32/combaseapi)
 (use jw32/uiautomation)
@@ -67,14 +68,20 @@
   (DestroyMenu hMenu))
 
 
-(defn create-notify-icon [hwnd]
+(defn create-notify-icon [hinst hwnd]
+  (def hIcon
+    (try
+      (LoadIconMetric hinst IDI_LOGO LIM_SMALL)
+      ((err fib)
+       # TODO: We may be running from the source tree, find the standalone ico file
+       (LoadIcon nil IDI_QUESTION))))
   (def nid
     (NOTIFYICONDATA
      :hWnd hwnd
      :uID notify-icon-id
      :uFlags (bor NIF_MESSAGE NIF_ICON NIF_TIP NIF_SHOWTIP)
      :uCallbackMessage notify-icon-callback-msg
-     :hIcon (LoadIcon nil IDI_QUESTION)
+     :hIcon hIcon
      :szTip "Jwno"
      :uVersion NOTIFYICON_VERSION_4))
   (when (not= TRUE (Shell_NotifyIcon NIM_ADD nid))
@@ -176,7 +183,7 @@
        (show-error-and-exit err 1))))
 
   (try
-    (create-notify-icon hwnd)
+    (create-notify-icon hInstance hwnd)
     ((err fib)
      (show-error-and-exit err 1)))
 
