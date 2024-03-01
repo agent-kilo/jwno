@@ -10,6 +10,8 @@
 
 (use ./resource)
 
+(import ./log)
+
 
 (def notify-icon-id 1)
 (def notify-icon-callback-msg (+ WM_APP 1))
@@ -24,10 +26,10 @@
 
 
 (defn win-hook-proc [code wparam lparam]
-  (print "################## win-hook-proc ##################")
-  (printf "code = %p" code)
-  (printf "wparam = %p" wparam)
-  (printf "lparam = %p" lparam)
+  (log/debug "################## win-hook-proc ##################")
+  (log/debug "code = %p" code)
+  (log/debug "wparam = %p" wparam)
+  (log/debug "lparam = %p" lparam)
   (CallNextHookEx nil code wparam lparam))
 
 
@@ -46,7 +48,7 @@
      (show-error-and-exit "GetMessage() failed" 1)
 
      (do
-       (print "---- New message!")
+       (log/debug "---- New message!")
        (TranslateMessage msg)
        (DispatchMessage msg)))))
 
@@ -59,7 +61,7 @@
 
 (defn show-notify-icon-menu [hwnd x y]
   (def hMenu (create-notify-icon-menu))
-  (printf ".... hMenu = %p" hMenu)
+  (log/debug ".... hMenu = %p" hMenu)
   (SetForegroundWindow hwnd)
   (var uFlags TPM_RIGHTBUTTON)
   (if (not= (GetSystemMetrics SM_MENUDROPALIGNMENT) 0)
@@ -67,7 +69,7 @@
     (set uFlags (bor uFlags TPM_LEFTALIGN)))
   (def tpm-ret
     (TrackPopupMenuEx hMenu uFlags x y hwnd nil))
-  (printf ".... tpm-ret = %p" tpm-ret)
+  (log/debug ".... tpm-ret = %p" tpm-ret)
   (DestroyMenu hMenu))
 
 
@@ -109,11 +111,11 @@
 
 
 (defn wndproc [hwnd msg wparam lparam]
-  (print "################## wndproc ##################")
-  (printf "hwnd = %p" hwnd)
-  (printf "msg = %p" msg)
-  (printf "wparam = %p" wparam)
-  (printf "lparam = %p" lparam)
+  (log/debug "################## wndproc ##################")
+  (log/debug "hwnd = %p" hwnd)
+  (log/debug "msg = %p" msg)
+  (log/debug "wparam = %p" wparam)
+  (log/debug "lparam = %p" lparam)
 
   (case msg
 
@@ -123,11 +125,11 @@
       (def notif-icon-id (HIWORD lparam))
       (def anchor-x (GET_X_LPARAM wparam))
       (def anchor-y (GET_Y_LPARAM wparam))
-      (print "================== notify icon callback ==================")
-      (printf "notif-event = %p" notif-event)
-      (printf "notif-icon-id = %p" notif-icon-id)
-      (printf "anchor-x = %p" anchor-x)
-      (printf "anchor-y = %p" anchor-y)
+      (log/debug "================== notify icon callback ==================")
+      (log/debug "notif-event = %p" notif-event)
+      (log/debug "notif-icon-id = %p" notif-icon-id)
+      (log/debug "anchor-x = %p" anchor-x)
+      (log/debug "anchor-y = %p" anchor-y)
 
       (case (int/u64 notif-event)
         WM_CONTEXTMENU
@@ -183,6 +185,8 @@
 
 
 (defn main [&]
+  (log/init :debug)
+  (log/debug "in main")
   (pp (dyn :args))
   #(FreeConsole)
 
@@ -223,16 +227,16 @@
        scope
        cr
        (fn [sender event-id]
-         (printf "#################### Automation Event ####################")
-         (printf "++++ sender: %p" (:get_CachedName sender))
-         (printf "++++ class: %p" (:get_CachedClassName sender))
-         (printf "++++ event-id: %d" event-id)
+         (log/debug "#################### Automation Event ####################")
+         (log/debug "++++ sender: %p" (:get_CachedName sender))
+         (log/debug "++++ class: %p" (:get_CachedClassName sender))
+         (log/debug "++++ event-id: %d" event-id)
          #(error "lalala")
          (def name (:get_CachedName sender))
          (def class-name (:get_CachedClassName sender))
          (when (and (= name "File Explorer") (= class-name "CabinetWClass"))
            (def pat (:GetCurrentPatternAs sender UIA_TransformPatternId IUIAutomationTransformPattern))
-           (printf "++++ pat = %p" pat)
+           (log/debug "++++ pat = %p" pat)
            (when pat
              (:Move pat -5 0)
              (:Resize pat 800 800))
@@ -240,6 +244,8 @@
          S_OK)))
 
   (def hook-id (SetWindowsHookEx WH_KEYBOARD_LL win-hook-proc nil 0))
-  (printf "---- hook-id = %p" hook-id)
+  (log/debug "---- hook-id = %p" hook-id)
 
-  (msg-loop))
+  (msg-loop)
+
+  (log/deinit))
