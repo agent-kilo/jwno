@@ -174,13 +174,28 @@
   hwnd)
 
 
-(defn- keyboard-hook-proc [code wparam lparam chan]
+(defn- keyboard-hook-proc [code wparam hook-struct chan]
   (log/debug "################## keyboard-hook-proc ##################")
   (log/debug "code = %p" code)
   (log/debug "wparam = %p" wparam)
-  (log/debug "lparam = %p" lparam)
-  (ev/give chan [:ui/hook-keyboard-ll code wparam lparam])
-  (CallNextHookEx nil code wparam lparam))
+  (log/debug "hook-struct = %p" hook-struct)
+
+  (when (< code 0)
+    (break (CallNextHookEx nil code wparam (hook-struct :address))))
+
+  (def hook-struct-tbl
+    @{:vkCode (hook-struct :vkCode)
+      :scanCode (hook-struct :scanCode)
+      :extended (hook-struct :flags.extended)
+      :lower_il_injected (hook-struct :flags.lower_il_injected)
+      :injected (hook-struct :flags.injected)
+      :altdown (hook-struct :flags.altdown)
+      :up (hook-struct :flags.up)
+      :time (hook-struct :time)
+      :dwExtraInfo (hook-struct :dwExtraInfo)})
+
+  (ev/give chan [:ui/hook-keyboard-ll wparam hook-struct-tbl])
+  (CallNextHookEx nil code wparam (hook-struct :address)))
 
 
 (defn- init-timer []
@@ -208,8 +223,8 @@
 
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
-                      (fn [code wparam lparam]
-                        (keyboard-hook-proc code wparam lparam chan))
+                      (fn [code wparam hook-struct]
+                        (keyboard-hook-proc code wparam hook-struct chan))
                       nil
                       0))
   (when (null? hook-id)
