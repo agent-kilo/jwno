@@ -174,11 +174,12 @@
   hwnd)
 
 
-(defn- keyboard-hook-proc [code wparam lparam]
+(defn- keyboard-hook-proc [code wparam lparam chan]
   (log/debug "################## keyboard-hook-proc ##################")
   (log/debug "code = %p" code)
   (log/debug "wparam = %p" wparam)
   (log/debug "lparam = %p" lparam)
+  (ev/give chan [:ui/hook-keyboard-ll code wparam lparam])
   (CallNextHookEx nil code wparam lparam))
 
 
@@ -205,8 +206,12 @@
     ((err fib)
      (show-error-and-exit err 1)))
 
-  (def hook-id (SetWindowsHookEx WH_KEYBOARD_LL keyboard-hook-proc nil 0))
-  (log/debug "hook-id = %p" hook-id)
+  (def hook-id
+    (SetWindowsHookEx WH_KEYBOARD_LL
+                      (fn [code wparam lparam]
+                        (keyboard-hook-proc code wparam lparam chan))
+                      nil
+                      0))
   (when (null? hook-id)
     (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
 
