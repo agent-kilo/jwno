@@ -36,7 +36,7 @@
 
   (forever
     (def event (ev/select uia-chan ui-chan))
-    (log/debug "event = %p" event)
+    #(log/debug "event = %p" event)
 
     (match event
       [:take chan msg]
@@ -58,9 +58,9 @@
               (:Resize pat 900 900))))
         
         _
-        (log/warning "Unknown message: %p" msg))
+        (log/warning "Unknown message: %n" msg))
       _
-      (log/warning "Unhandled ev/select event: %p" event)))
+      (log/warning "Unhandled ev/select event: %n" event)))
 
   (uia/uia-deinit uia uia-deinit-fns)
 
