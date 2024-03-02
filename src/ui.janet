@@ -221,4 +221,4 @@
 
   (deinit-timer)
   (UnhookWindowsHookEx hook-id)
-  (ev/give chan :done))
+  (ev/give chan :ui/exit))

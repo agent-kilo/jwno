@@ -1,16 +1,17 @@
 (use jw32/winuser)
-(use jw32/shellapi)
-(use jw32/commctrl)
 (use jw32/libloaderapi)
+(use jw32/consoleapi)
 (use jw32/combaseapi)
 (use jw32/uiautomation)
-(use jw32/errhandlingapi)
-(use jw32/consoleapi)
 
 (use ./util)
 
 (import ./ui)
+(import ./uia)
 (import ./log)
+
+
+(def DEFAULT-CHAN-LIMIT 65536)
 
 
 (defn main [& args]
@@ -19,8 +20,15 @@
   #(FreeConsole)
 
   (def hInstance (GetModuleHandle nil))
-  (def ui-chan (ev/thread-chan))
 
+  (def uia-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
+  (def [uia uia-deinit-fns]
+    (try
+      (uia/uia-init uia-chan)
+      ((err fib)
+       (show-error-and-exit err 1))))
+
+  (def ui-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
   (ev/spawn-thread
    (ui/ui-thread hInstance (args 0) ui-chan))
 
@@ -28,48 +36,31 @@
     (show-error-and-exit "UI thread initialization failed" 1))
   (ev/give ui-chan :ok)
 
-  (CoInitializeEx nil COINIT_MULTITHREADED)
-  (def uia (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
-  (def root (:GetRootElement uia))
+  (forever
+    (def event (ev/select uia-chan ui-chan))
+    (log/debug "event = %p" event)
 
-  (def cr (:CreateCacheRequest uia))
-  (:AddProperty cr UIA_NamePropertyId)
-  (:AddProperty cr UIA_ClassNamePropertyId)
-  (:AddProperty cr UIA_BoundingRectanglePropertyId)
-  (:AddProperty cr UIA_NativeWindowHandlePropertyId)
-  (:AddPattern cr UIA_TransformPatternId)
+    (match event
+      [:take chan msg]
+      (match msg
+        :ui/exit
+        (break)
 
-  (def scope
-    #(bor TreeScope_Element TreeScope_Children)
-    TreeScope_Subtree
-    )
+        [:uia/window-opened win]
+        (do
+          (when (and (= (win :name) "File Explorer")
+                     (= (win :class-name) "CabinetWClass"))
+            (def uia-win (:ElementFromHandle uia (win :native-window-handle)))
+            (def pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern))
+            (when pat
+              (:Move pat 0 0)
+              (:Resize pat 900 900))))
+        
+        _
+        (log/warning "Unknown message: %p" msg))
+      _
+      (log/warning "Unhandled ev/select event: %p" event)))
 
-  (def win-open-handler
-    (:AddAutomationEventHandler
-       uia
-       UIA_Window_WindowOpenedEventId
-       root
-       scope
-       cr
-       (fn [sender event-id]
-         (log/debug "#################### Automation Event ####################")
-         (log/debug "++++ sender: %p" (:get_CachedName sender))
-         (log/debug "++++ class: %p" (:get_CachedClassName sender))
-         (log/debug "++++ event-id: %d" event-id)
-         #(error "lalala")
-         (def name (:get_CachedName sender))
-         (def class-name (:get_CachedClassName sender))
-         (when (and (= name "File Explorer") (= class-name "CabinetWClass"))
-           (def pat (:GetCurrentPatternAs sender UIA_TransformPatternId IUIAutomationTransformPattern))
-           (log/debug "++++ pat = %p" pat)
-           (when pat
-             (:Move pat -5 0)
-             (:Resize pat 800 800))
-           )
-         S_OK)))
-
-  (let [msg (ev/take ui-chan)]
-    (when (not= msg :done)
-      (log/debug "Unknown message from UI channel: %p" msg)))
+  (uia/uia-deinit uia uia-deinit-fns)
 
   (log/deinit))
