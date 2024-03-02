@@ -32,9 +32,7 @@
   (ev/spawn-thread
    (ui/ui-thread hInstance (args 0) ui-chan))
 
-  (when (not= (ev/take ui-chan) :ok)
-    (show-error-and-exit "UI thread initialization failed" 1))
-  (ev/give ui-chan :ok)
+  (var ui-thread nil)
 
   (forever
     (def event (ev/select uia-chan ui-chan))
@@ -43,6 +41,9 @@
     (match event
       [:take chan msg]
       (match msg
+        [:ui/initialized thread-id]
+        (set ui-thread thread-id)
+
         :ui/exit
         (break)
 

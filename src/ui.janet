@@ -2,6 +2,7 @@
 (use jw32/shellapi)
 (use jw32/commctrl)
 (use jw32/errhandlingapi)
+(use jw32/processthreadsapi)
 (use jw32/util)
 
 (use ./resource)
@@ -209,13 +210,9 @@
   (when (null? hook-id)
     (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
 
-  (ev/give chan :ok)
-  (let [msg (ev/take chan)]
-    (when (not= msg :ok)
-      (log/debug "Unknown message from channel: %p" msg)
-      (break)))
-
   (init-timer)
+
+  (ev/give chan [:ui/initialized (GetCurrentThreadId)])
 
   (msg-loop chan)
 
