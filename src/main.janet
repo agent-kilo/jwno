@@ -1,6 +1,5 @@
 (use jw32/winuser)
 (use jw32/libloaderapi)
-(use jw32/consoleapi)
 (use jw32/combaseapi)
 (use jw32/uiautomation)
 
@@ -17,7 +16,6 @@
 (defn main [& args]
   (log/init :debug)
   (log/debug "in main")
-  #(FreeConsole)
 
   (def hInstance (GetModuleHandle nil))
 

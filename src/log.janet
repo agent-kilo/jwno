@@ -1,3 +1,6 @@
+(use jw32/consoleapi)
+
+
 (defn log-thread [chan output-fn]
   (forever
    (def msg (ev/take chan))
@@ -6,10 +9,22 @@
 
 
 (var log-chan nil)
+(var log-level :quiet)
+(def log-levels
+  {:quiet 0
+   :error 1
+   :warning 2
+   :info 3
+   :debug 4})
 
 
 (defn init [level &opt output-fn]
   (default output-fn print)
+  (set log-level level)
+  (when (<= (in log-levels level) (in log-levels :quiet))
+    # No log at all, detach from the console
+    (FreeConsole)
+    (break))
   # XXX: If this channel is full, log functions called in win32 callbacks would
   # try to trap into the Janet event loop, and break the callback control flow.
   # Have to make it large enough so that it's not easily filled up.
@@ -19,7 +34,8 @@
 
 
 (defn deinit []
-  (ev/give log-chan nil))
+  (when log-chan
+    (ev/give log-chan nil)))
 
 
 (defn- format-log-msg [level fmt args]
@@ -30,21 +46,27 @@
                  ;args))
 
 
-(defn debug [fmt & args]
-  (ev/give log-chan
-           (format-log-msg :debug fmt args)))
+(defn check-log-level [level]
+  (<= (in log-levels level) (in log-levels log-level)))
 
 
-(defn info [fmt & args]
-  (ev/give log-chan
-           (format-log-msg :info fmt args)))
+(defn send-log [level fmt & args]
+  (when (check-log-level level)
+    (ev/give log-chan
+             (format-log-msg level fmt args))))
 
 
-(defn warning [fmt & args]
-  (ev/give log-chan
-           (format-log-msg :warning fmt args)))
+(defmacro debug [fmt & args]
+  ~(,send-log :debug ,fmt ,;args))
 
 
-(defn error [fmt & args]
-  (ev/give log-chan
-           (format-log-msg :error fmt args)))
+(defmacro info [fmt & args]
+  ~(,send-log :info ,fmt ,;args))
+
+
+(defmacro warning [fmt & args]
+  ~(,send-log :warning ,fmt ,;args))
+
+
+(defmacro error [fmt & args]
+  ~(,send-log :error ,fmt ,;args))
