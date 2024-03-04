@@ -3,6 +3,7 @@
 (use jw32/combaseapi)
 (use jw32/uiautomation)
 
+(use ./key)
 (use ./util)
 
 (import ./ui)
@@ -27,8 +28,12 @@
        (show-error-and-exit err 1))))
 
   (def ui-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
+  (def keymap
+    @{(key-struct (ascii-key "F") @[:lctrl :lalt]) "dummy command"
+      (key-struct VK_LWIN) "dummy LWIN command"})
+  (log/debug "keymap = %n" keymap)
   (ev/spawn-thread
-   (ui/ui-thread hInstance (args 0) ui-chan))
+   (ui/ui-thread hInstance (args 0) keymap ui-chan))
 
   (var ui-thread nil)
 

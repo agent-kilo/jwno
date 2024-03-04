@@ -5,6 +5,7 @@
 (use jw32/processthreadsapi)
 (use jw32/util)
 
+(use ./key)
 (use ./resource)
 (use ./util)
 
@@ -174,7 +175,7 @@
   hwnd)
 
 
-(defn- keyboard-hook-proc [code wparam hook-struct chan]
+(defn- keyboard-hook-proc [code wparam hook-struct keymap chan]
   (log/debug "################## keyboard-hook-proc ##################")
   (log/debug "code = %p" code)
   (log/debug "wparam = %p" wparam)
@@ -183,19 +184,18 @@
   (when (< code 0)
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
-  (def hook-struct-tbl
-    @{:vkCode (hook-struct :vkCode)
-      :scanCode (hook-struct :scanCode)
-      :extended (hook-struct :flags.extended)
-      :lower_il_injected (hook-struct :flags.lower_il_injected)
-      :injected (hook-struct :flags.injected)
-      :altdown (hook-struct :flags.altdown)
-      :up (hook-struct :flags.up)
-      :time (hook-struct :time)
-      :dwExtraInfo (hook-struct :dwExtraInfo)})
+  # Don't handle events injected by us
+  (when (hook-struct :flags.injected)
+    (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
-  (ev/give chan [:ui/hook-keyboard-ll wparam hook-struct-tbl])
-  (CallNextHookEx nil code wparam (hook-struct :address)))
+  (def key-struct (key-states-to-key-struct hook-struct))
+  (log/debug "key-struct = %n" key-struct)
+  (if-let [key-binding (get-key-binding keymap key-struct)]
+    (do
+      (ev/give chan [:ui/hook-keyboard-ll key-struct key-binding])
+      # Tell the OS we processed this event
+      1)
+    (CallNextHookEx nil code wparam (hook-struct :address))))
 
 
 (defn- init-timer []
@@ -210,7 +210,7 @@
     (KillTimer nil GC-TIMER-ID)))
 
 
-(defn ui-thread [hInstance argv0 chan]
+(defn ui-thread [hInstance argv0 keymap chan]
   (def msg-hwnd
     (try
       (create-msg-window hInstance)
@@ -224,7 +224,7 @@
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
                       (fn [code wparam hook-struct]
-                        (keyboard-hook-proc code wparam hook-struct chan))
+                        (keyboard-hook-proc code wparam hook-struct keymap chan))
                       nil
                       0))
   (when (null? hook-id)
