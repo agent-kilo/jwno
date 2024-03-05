@@ -17,6 +17,8 @@
 (def NOTIFY-ICON-ID 1)
 (def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
 
+(var current-keymap nil)
+
 
 (defn- msg-loop [&]
   (def msg (MSG))
@@ -175,7 +177,7 @@
   hwnd)
 
 
-(defn- keyboard-hook-proc [code wparam hook-struct keymap chan]
+(defn- keyboard-hook-proc [code wparam hook-struct chan]
   (log/debug "################## keyboard-hook-proc ##################")
   (log/debug "code = %p" code)
   (log/debug "wparam = %p" wparam)
@@ -188,13 +190,12 @@
   (when (hook-struct :flags.injected)
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
-  (def key-struct (key-states-to-key-struct hook-struct))
-  (log/debug "key-struct = %n" key-struct)
-  (if-let [key-binding (get-key-binding keymap key-struct)]
-    (do
-      (ev/give chan [:ui/hook-keyboard-ll key-struct key-binding])
-      # Tell the OS we processed this event
-      1)
+  (def [handled new-keymap] (handle-key-event current-keymap hook-struct chan))
+  (log/debug "handled = %n" handled)
+  (log/debug "new-keymap = %n" new-keymap)
+  (set current-keymap new-keymap)
+  (if handled
+    1 # Tell the OS we processed this event
     (CallNextHookEx nil code wparam (hook-struct :address))))
 
 
@@ -221,10 +222,12 @@
     ((err fib)
      (show-error-and-exit err 1)))
 
+  (set current-keymap keymap)
+
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
                       (fn [code wparam hook-struct]
-                        (keyboard-hook-proc code wparam hook-struct keymap chan))
+                        (keyboard-hook-proc code wparam hook-struct chan))
                       nil
                       0))
   (when (null? hook-id)

@@ -28,10 +28,27 @@
        (show-error-and-exit err 1))))
 
   (def ui-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
-  (def keymap
-    @{(key-struct (ascii-key "F") @[:lctrl :lalt]) "dummy command"
-      (key-struct VK_LWIN) "dummy LWIN command"})
+
+  (def keymap (define-keymap))
+  (define-key keymap
+    [(key-struct (ascii-key "F") @[:lctrl :lalt])]
+    "Ctrl+Alt+f")
+  (define-key keymap
+    [(key-struct (ascii-key "T") @[:lctrl :lalt])
+     (key-struct VK_LWIN)]
+    "Ctrl+Alt+t LWin")
+  (define-key keymap
+    [(key-struct (ascii-key "T") @[:lwin])
+     (key-struct (ascii-key "N") @[:lwin])]
+    "LWin+t LWin+n")
+  (define-key keymap
+    # This would block all keys using the :lwin modifier. Is this acceptable?
+    [(key-struct VK_LCONTROL)
+     (key-struct (ascii-key "T"))]
+    "LWin t")
+
   (log/debug "keymap = %n" keymap)
+
   (ev/spawn-thread
    (ui/ui-thread hInstance (args 0) keymap ui-chan))
 
