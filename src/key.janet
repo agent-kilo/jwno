@@ -32,17 +32,15 @@
    (int/u64 VK_RWIN) :rwin})
 
 
-(defn key-states-to-key-struct [hook-struct]
-  (def modifiers @[])
+(defn key-states-to-key-struct [hook-struct key-states]
+  (def modifiers (keys (in key-states :tracked-modifiers @{})))
   (each key-code
       [VK_LSHIFT
        VK_RSHIFT
        VK_LCONTROL
        VK_RCONTROL
        VK_LMENU
-       VK_RMENU
-       VK_LWIN
-       VK_RWIN]
+       VK_RMENU]
     (when (async-key-state-down? key-code)
       (array/push modifiers (in MODIFIER-KEYS (int/u64 key-code)))))
   (kbdllhs-to-key-struct hook-struct modifiers))
@@ -89,12 +87,36 @@
     keymap))
 
 
-(defn handle-key-event [keymap hook-struct chan]
-  (def key-struct (key-states-to-key-struct hook-struct))
+# If the keymap used Win key as a modifier, don't tell the OS
+# about Win key events, or the Start menu would spontaneously pop up
+(defn inhibit-win-key? [keymap]
+  (var inhibit false)
+  (each ks (keys keymap)
+    (when (find |(or (= $ :lwin) (= $ :rwin)) (in ks :modifiers))
+      (set inhibit true)
+      (break)))
+  inhibit)
+
+
+(defn track-modifiers [key-code up key-states]
+  (let [tracked-modifiers (in key-states :tracked-modifiers @{})
+        mod-key-sym (in MODIFIER-KEYS key-code)]
+    (if up
+      (put tracked-modifiers mod-key-sym nil)
+      (put tracked-modifiers mod-key-sym true))
+    (put key-states :tracked-modifiers tracked-modifiers)))
+
+
+(defn handle-key-event [keymap hook-struct chan inhibit-win-key key-states]
+  (def key-struct (key-states-to-key-struct hook-struct key-states))
+  (def key-code (key-struct :key))
+  (def key-up (hook-struct :flags.up))
+
   (log/debug "key-struct = %n" key-struct)
+  (log/debug "key-states = %n" key-states)
 
   (if-let [key-binding (get-key-binding keymap key-struct)]
-    (if (hook-struct :flags.up)
+    (if key-up
       (if (table? key-binding)
         [true key-binding]
         [true (get-root-keymap keymap)])
@@ -104,7 +126,15 @@
         [true keymap]))
 
     (cond
-      (has-key? MODIFIER-KEYS (hook-struct :vkCode))
+      (and inhibit-win-key
+           (or (= (int/u64 VK_LWIN) key-code)
+               (= (int/u64 VK_RWIN) key-code)))
+      (do
+        (track-modifiers key-code key-up key-states)
+        (log/debug "new key-states = %n" key-states)
+        [true keymap])
+
+      (has-key? MODIFIER-KEYS key-code)
       [false keymap]
 
       (nil? (in keymap :parent))
@@ -112,6 +142,6 @@
 
       true
       # Not a modifier key, and not using the root keymap
-      [true (if (hook-struct :flags.up)
+      [true (if key-up
               (get-root-keymap keymap)
               keymap)])))

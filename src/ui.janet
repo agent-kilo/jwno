@@ -188,10 +188,15 @@
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
   (def current-keymap (in state :current-keymap))
+  (def key-states (in state :key-states))
+  (def inhibit-win-key (in state :inhibit-win-key))
 
-  (def [handled new-keymap] (handle-key-event current-keymap hook-struct chan))
+  # key-states are modified in-place
+  (def [handled new-keymap]
+    (handle-key-event current-keymap hook-struct chan inhibit-win-key key-states))
   (log/debug "handled = %n" handled)
   (log/debug "new-keymap = %n" new-keymap)
+
   (put state :current-keymap new-keymap)
 
   (if handled
@@ -224,7 +229,11 @@
      (show-error-and-exit err 1)))
 
   (def keyboard-hook-state
-       @{:current-keymap keymap})
+    @{:current-keymap keymap
+      :key-states @{}
+      :inhibit-win-key (inhibit-win-key? keymap)})
+
+  (log/debug "inhibit-win-key = %n" (in keyboard-hook-state :inhibit-win-key))
 
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
