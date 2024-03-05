@@ -11,16 +11,13 @@
 
 (import ./log)
 
-(var GC-TIMER-ID (int/u64 0))
 (def GC-TIMER-INTERVAL 5000)    # in milliseconds
 
 (def NOTIFY-ICON-ID 1)
 (def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
 
-(var current-keymap nil)
 
-
-(defn- msg-loop [&]
+(defn- msg-loop [chan gc-timer-id keyboard-hook-state]
   (def msg (MSG))
 
   (forever
@@ -36,7 +33,7 @@
        (case (msg :message)
          WM_TIMER
          (case (msg :wParam)
-           GC-TIMER-ID
+           gc-timer-id
            # This timer is used to break out from GetMessage, so that
            # the garbage collector has a chance to run.
            (do
@@ -177,7 +174,7 @@
   hwnd)
 
 
-(defn- keyboard-hook-proc [code wparam hook-struct chan]
+(defn- keyboard-hook-proc [code wparam hook-struct chan state]
   (log/debug "################## keyboard-hook-proc ##################")
   (log/debug "code = %p" code)
   (log/debug "wparam = %p" wparam)
@@ -190,25 +187,29 @@
   (when (hook-struct :flags.injected)
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
+  (def current-keymap (in state :current-keymap))
+
   (def [handled new-keymap] (handle-key-event current-keymap hook-struct chan))
   (log/debug "handled = %n" handled)
   (log/debug "new-keymap = %n" new-keymap)
-  (set current-keymap new-keymap)
+  (put state :current-keymap new-keymap)
+
   (if handled
     1 # Tell the OS we processed this event
     (CallNextHookEx nil code wparam (hook-struct :address))))
 
 
 (defn- init-timer []
-  (set GC-TIMER-ID (SetTimer nil 0 GC-TIMER-INTERVAL nil))
-  (log/debug "GC-TIMER-ID = %p" GC-TIMER-ID)
-  (when (= GC-TIMER-ID (int/u64 0))
-    (log/warning "Failed to create GC timer")))
+  (def timer-id (SetTimer nil 0 GC-TIMER-INTERVAL nil))
+  (log/debug "timer-id = %n" timer-id)
+  (when (= timer-id (int/u64 0))
+    (log/warning "Failed to create GC timer"))
+  timer-id)
 
 
-(defn- deinit-timer []
-  (when (> GC-TIMER-ID (int/u64 0))
-    (KillTimer nil GC-TIMER-ID)))
+(defn- deinit-timer [timer-id]
+  (when (> timer-id (int/u64 0))
+    (KillTimer nil timer-id)))
 
 
 (defn ui-thread [hInstance argv0 keymap chan]
@@ -222,23 +223,28 @@
     ((err fib)
      (show-error-and-exit err 1)))
 
-  (set current-keymap keymap)
+  (def keyboard-hook-state
+       @{:current-keymap keymap})
 
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
                       (fn [code wparam hook-struct]
-                        (keyboard-hook-proc code wparam hook-struct chan))
+                        (keyboard-hook-proc code
+                                            wparam
+                                            hook-struct
+                                            chan
+                                            keyboard-hook-state))
                       nil
                       0))
   (when (null? hook-id)
     (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
 
-  (init-timer)
+  (def gc-timer-id (init-timer))
 
   (ev/give chan [:ui/initialized (GetCurrentThreadId)])
 
-  (msg-loop chan)
+  (msg-loop chan gc-timer-id keyboard-hook-state)
 
-  (deinit-timer)
+  (deinit-timer gc-timer-id)
   (UnhookWindowsHookEx hook-id)
   (ev/give chan :ui/exit))
