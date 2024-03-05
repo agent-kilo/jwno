@@ -41,11 +41,11 @@
     [(key-struct (ascii-key "T") @[:lwin])
      (key-struct (ascii-key "N") @[:lwin])]
     "LWin+t LWin+n")
-  (define-key keymap
-    # This would block all keys using the :lwin modifier. Is this acceptable?
-    [(key-struct VK_LCONTROL)
-     (key-struct (ascii-key "T"))]
-    "LWin t")
+  #(define-key keymap
+  #  # This would block all keys using the :lwin modifier. Is this acceptable?
+  #  [(key-struct VK_LWIN)
+  #   (key-struct (ascii-key "T"))]
+  #  "LWin t")
 
   (log/debug "keymap = %n" keymap)
 
