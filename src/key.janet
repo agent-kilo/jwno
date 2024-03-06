@@ -1,20 +1,22 @@
 (use jw32/winuser)
 
+(use ./cmd)
+
 (import ./log)
 
 
-(defn ascii-key [ascii-str]
+(defn ascii [ascii-str]
   (in ascii-str 0))
 
 
-(defn key-struct [key &opt modifiers]
+(defn key [key &opt modifiers]
   (default modifiers @[])
   {:key (int/u64 key)
    :modifiers [;(sort modifiers)]})
 
 
 (defn kbdllhs-to-key-struct [hook-struct modifiers]
-  (key-struct (hook-struct :vkCode) modifiers))
+  (key (hook-struct :vkCode) modifiers))
 
 
 (defmacro- async-key-state-down? [vkey-code]
@@ -107,7 +109,7 @@
     (put key-states :tracked-modifiers tracked-modifiers)))
 
 
-(defn handle-key-event [keymap hook-struct chan inhibit-win-key key-states]
+(defn dispatch-key-event [keymap hook-struct chan inhibit-win-key key-states]
   (def key-struct (key-states-to-key-struct hook-struct key-states))
   (def key-code (key-struct :key))
   (def key-up (hook-struct :flags.up))
@@ -145,3 +147,10 @@
       [true (if key-up
               (get-root-keymap keymap)
               keymap)])))
+
+
+(defn process-key-event [key cmd]
+  (log/debug "################## process-key-event ##################")
+  (log/debug "key = %n" key)
+  (log/debug "cmd = %n" cmd)
+  (dispatch-command cmd))

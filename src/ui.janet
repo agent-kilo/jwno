@@ -185,6 +185,9 @@
 
   # Don't handle events injected by us
   (when (hook-struct :flags.injected)
+    (log/debug "Injected event, skipping...")
+    (log/debug "vkCode = %n" (hook-struct :vkCode))
+    (log/debug "up = %n" (hook-struct :flags.up))
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
   (def current-keymap (in state :current-keymap))
@@ -193,7 +196,7 @@
 
   # key-states are modified in-place
   (def [handled new-keymap]
-    (handle-key-event current-keymap hook-struct chan inhibit-win-key key-states))
+    (dispatch-key-event current-keymap hook-struct chan inhibit-win-key key-states))
   (log/debug "handled = %n" handled)
   (log/debug "new-keymap = %n" new-keymap)
 

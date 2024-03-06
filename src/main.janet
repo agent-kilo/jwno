@@ -31,21 +31,20 @@
 
   (def keymap (define-keymap))
   (define-key keymap
-    [(key-struct (ascii-key "F") @[:lctrl :lalt])]
-    "Ctrl+Alt+f")
+    [(key VK_LWIN @[:lctrl])]
+    [:send-keys [VK_LCONTROL :up] VK_LWIN])
   (define-key keymap
-    [(key-struct (ascii-key "T") @[:lctrl :lalt])
-     (key-struct VK_LWIN)]
-    "Ctrl+Alt+t LWin")
+    [(key (ascii "T") @[:lctrl :lalt])
+     (key VK_LWIN)]
+    [:send-keys (ascii "A") (ascii "B") (ascii "C") (ascii "D")])
   (define-key keymap
-    [(key-struct (ascii-key "T") @[:lwin])
-     (key-struct (ascii-key "N") @[:lwin])]
+    [(key (ascii "T") @[:lwin])
+     (key (ascii "N") @[:lwin])]
     "LWin+t LWin+n")
   #(define-key keymap
   #  # This would block all keys using the :lwin modifier. Is this acceptable?
-  #  [(key-struct VK_LWIN)
-  #   (key-struct (ascii-key "T"))]
-  #  "LWin t")
+  #  [(key VK_LWIN)]
+  #  [:send-keys VK_LWIN])
 
   (log/debug "keymap = %n" keymap)
 
@@ -76,7 +75,10 @@
             (when pat
               (:Move pat 0 0)
               (:Resize pat 900 900))))
-        
+
+        [:key/key-event key cmd]
+        (process-key-event key cmd)
+
         _
         (log/warning "Unknown message: %n" msg))
       _
