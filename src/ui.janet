@@ -253,7 +253,7 @@
 
   (def gc-timer-id (init-timer))
 
-  (ev/give chan [:ui/initialized (GetCurrentThreadId)])
+  (ev/give chan [:ui/initialized (GetCurrentThreadId) msg-hwnd])
 
   (msg-loop chan gc-timer-id keyboard-hook-state)
 

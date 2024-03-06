@@ -14,6 +14,40 @@
 (def DEFAULT-CHAN-LIMIT 65536)
 
 
+(defn main-loop [context]
+  (forever
+   (def event (ev/select ;(in context :event-sources)))
+
+   (match event
+     [:take chan msg]
+     (match msg
+       [:ui/initialized thread-id msg-hwnd]
+       (do
+         (put context :ui-thread thread-id)
+         (put context :msg-hwnd msg-hwnd))
+
+       :ui/exit
+       (break)
+
+       [:uia/window-opened win]
+       (do
+         (when (and (= (win :name) "File Explorer")
+                    (= (win :class-name) "CabinetWClass"))
+           (def uia-win (:ElementFromHandle (in context :uia) (win :native-window-handle)))
+           (def pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern))
+           (when pat
+             (:Move pat 0 0)
+             (:Resize pat 900 900))))
+
+       [:key/key-event key cmd]
+       (process-key-event key cmd context)
+
+       _
+       (log/warning "Unknown message: %n" msg))
+     _
+     (log/warning "Unhandled ev/select event: %n" event))))
+
+
 (defn main [& args]
   (log/init :debug)
   (log/debug "in main")
@@ -30,6 +64,10 @@
   (def ui-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
 
   (def keymap (define-keymap))
+
+  (define-key keymap
+    [(key (ascii "Q") @[:lwin])]
+    :quit)
 
   (define-key keymap
     [(key (ascii "V") @[:rwin])
@@ -61,6 +99,13 @@
      (ascii "D")])
 
   (define-key keymap
+    [(key VK_RMENU @[:lctrl])]
+    [:send-keys
+     [VK_LCONTROL :up]
+     #[VK_RMENU :up]
+     VK_LWIN])
+
+  (define-key keymap
     [(key (ascii "T") @[:lwin])
      (key (ascii "N") @[:lwin])]
     "LWin+t LWin+n")
@@ -75,38 +120,14 @@
   (ev/spawn-thread
    (ui/ui-thread hInstance (args 0) keymap ui-chan))
 
-  (var ui-thread nil)
+  (def context
+    @{:hInstance hInstance
+      :uia uia
+      :event-sources [uia-chan ui-chan]
+      :ui-thread nil
+      :msg-hwnd nil})
 
-  (forever
-    (def event (ev/select uia-chan ui-chan))
-    #(log/debug "event = %p" event)
-
-    (match event
-      [:take chan msg]
-      (match msg
-        [:ui/initialized thread-id]
-        (set ui-thread thread-id)
-
-        :ui/exit
-        (break)
-
-        [:uia/window-opened win]
-        (do
-          (when (and (= (win :name) "File Explorer")
-                     (= (win :class-name) "CabinetWClass"))
-            (def uia-win (:ElementFromHandle uia (win :native-window-handle)))
-            (def pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern))
-            (when pat
-              (:Move pat 0 0)
-              (:Resize pat 900 900))))
-
-        [:key/key-event key cmd]
-        (process-key-event key cmd)
-
-        _
-        (log/warning "Unknown message: %n" msg))
-      _
-      (log/warning "Unhandled ev/select event: %n" event)))
+  (main-loop context)
 
   (uia/uia-deinit uia uia-deinit-fns)
 

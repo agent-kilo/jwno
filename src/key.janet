@@ -146,8 +146,8 @@
               keymap)])))
 
 
-(defn process-key-event [key cmd]
+(defn process-key-event [key cmd context]
   (log/debug "################## process-key-event ##################")
   (log/debug "key = %n" key)
   (log/debug "cmd = %n" cmd)
-  (dispatch-command cmd))
+  (dispatch-command cmd context))
