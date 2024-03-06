@@ -73,7 +73,7 @@
       (set-key-def keymap
                    cur-key
                    (define-key
-                     (define-keymap)
+                     sub-keymap
                      rest-keys
                      command-or-keymap))
       keymap)))
