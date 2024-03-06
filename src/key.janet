@@ -118,10 +118,12 @@
     (if key-up
       (if (table? key-binding)
         [true key-binding]
-        [true (get-root-keymap keymap)])
+        (do
+          (ev/give chan [:key/key-event key-struct :up key-binding])
+          [true (get-root-keymap keymap)]))
       (do
         (if-not (table? key-binding)
-          (ev/give chan [:key/key-event key-struct key-binding]))
+          (ev/give chan [:key/key-event key-struct :down key-binding]))
         [true keymap]))
 
     (cond
@@ -146,8 +148,9 @@
               keymap)])))
 
 
-(defn process-key-event [key cmd context]
+(defn process-key-event [key state cmd context]
   (log/debug "################## process-key-event ##################")
   (log/debug "key = %n" key)
+  (log/debug "state = %n" state)
   (log/debug "cmd = %n" cmd)
-  (dispatch-command cmd context))
+  (dispatch-command cmd state context))

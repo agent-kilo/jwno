@@ -42,13 +42,15 @@
     (SendInput inputs)))
 
 
-(defn dispatch-command [cmd context]
+(defn dispatch-command [cmd key-state context]
   (match cmd
     :quit
-    (cmd-quit context)
+    (when (= key-state :down)
+      (cmd-quit context))
 
     [:send-keys & keys]
-    (cmd-send-keys keys context)
+    (when (= key-state :down)
+      (cmd-send-keys keys context))
 
     _
     (log/warning "Unknown command: %n" cmd)))
