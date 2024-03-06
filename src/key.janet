@@ -11,12 +11,8 @@
 
 (defn key [key &opt modifiers]
   (default modifiers @[])
-  {:key (int/u64 key)
+  {:key key
    :modifiers [;(sort modifiers)]})
-
-
-(defn kbdllhs-to-key-struct [hook-struct modifiers]
-  (key (hook-struct :vkCode) modifiers))
 
 
 (defmacro- async-key-state-down? [vkey-code]
@@ -24,28 +20,24 @@
 
 
 (def MODIFIER-KEYS
-  {(int/u64 VK_LSHIFT) :lshift
-   (int/u64 VK_RSHIFT) :rshift
-   (int/u64 VK_LCONTROL) :lctrl
-   (int/u64 VK_RCONTROL) :rctrl
-   (int/u64 VK_LMENU) :lalt
-   (int/u64 VK_RMENU) :ralt
-   (int/u64 VK_LWIN) :lwin
-   (int/u64 VK_RWIN) :rwin})
+  {VK_LSHIFT :lshift
+   VK_RSHIFT :rshift
+   VK_LCONTROL :lctrl
+   VK_RCONTROL :rctrl
+   VK_LMENU :lalt
+   VK_RMENU :ralt
+   VK_LWIN :lwin
+   VK_RWIN :rwin})
 
 
-(defn key-states-to-key-struct [hook-struct key-states]
+(defn key-states-to-key-struct [hook-struct key-states mods-to-check]
   (def modifiers (keys (in key-states :tracked-modifiers @{})))
-  (each key-code
-      [VK_LSHIFT
-       VK_RSHIFT
-       VK_LCONTROL
-       VK_RCONTROL
-       VK_LMENU
-       VK_RMENU]
-    (when (async-key-state-down? key-code)
-      (array/push modifiers (in MODIFIER-KEYS (int/u64 key-code)))))
-  (kbdllhs-to-key-struct hook-struct modifiers))
+  (def ev-key-code (hook-struct :vkCode))
+  (each key-code mods-to-check
+    (when (and (not= ev-key-code key-code)
+               (async-key-state-down? key-code))
+      (array/push modifiers (in MODIFIER-KEYS key-code))))
+  (key ev-key-code modifiers))
 
 
 (defn define-keymap []
@@ -110,7 +102,12 @@
 
 
 (defn dispatch-key-event [keymap hook-struct chan inhibit-win-key key-states]
-  (def key-struct (key-states-to-key-struct hook-struct key-states))
+  (def mods-to-check
+    (if inhibit-win-key
+      (filter |(not (or (= $ VK_LWIN) (= $ VK_RWIN)))
+              (keys MODIFIER-KEYS))
+      (keys MODIFIER-KEYS)))
+  (def key-struct (key-states-to-key-struct hook-struct key-states mods-to-check))
   (def key-code (key-struct :key))
   (def key-up (hook-struct :flags.up))
 
@@ -129,8 +126,8 @@
 
     (cond
       (and inhibit-win-key
-           (or (= (int/u64 VK_LWIN) key-code)
-               (= (int/u64 VK_RWIN) key-code)))
+           (or (= VK_LWIN key-code)
+               (= VK_RWIN key-code)))
       (do
         (track-modifiers key-code key-up key-states)
         (log/debug "new key-states = %n" key-states)
