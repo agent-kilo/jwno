@@ -30,17 +30,41 @@
   (def ui-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
 
   (def keymap (define-keymap))
+
+  (define-key keymap
+    [(key (ascii "V") @[:rwin])
+     (key VK_LWIN)]
+    [:send-keys
+     VK_LWIN])
+
+  (define-key keymap
+    [(key (ascii "V") @[:rwin])
+     (key (ascii "R") @[:rwin])]
+    [:send-keys
+     [VK_LWIN :down]
+     (ascii "R")
+     [VK_LWIN :up]])
+
   (define-key keymap
     [(key VK_LWIN @[:lctrl])]
-    [:send-keys [VK_LCONTROL :up] VK_LWIN])
+    [:send-keys
+     [VK_LCONTROL :up]
+     VK_LWIN])
+
   (define-key keymap
     [(key (ascii "T") @[:lctrl :lalt])
-     (key VK_LWIN)]
-    [:send-keys (ascii "A") (ascii "B") (ascii "C") (ascii "D")])
+     (key VK_LCONTROL)]
+    [:send-keys
+     (ascii "A")
+     (ascii "B")
+     (ascii "C")
+     (ascii "D")])
+
   (define-key keymap
     [(key (ascii "T") @[:lwin])
      (key (ascii "N") @[:lwin])]
     "LWin+t LWin+n")
+
   #(define-key keymap
   #  # This would block all keys using the :lwin modifier. Is this acceptable?
   #  [(key VK_LWIN)]
