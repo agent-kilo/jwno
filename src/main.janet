@@ -39,8 +39,8 @@
              (:Move pat 0 0)
              (:Resize pat 900 900))))
 
-       [:key/key-event state key cmd]
-       (process-key-event state key cmd context)
+       [:key/key-event key state cmd]
+       (process-key-event key state cmd context)
 
        _
        (log/warning "Unknown message: %n" msg))
@@ -102,8 +102,21 @@
     [(key VK_RMENU @[:lctrl])]
     [:send-keys
      [VK_LCONTROL :up]
-     #[VK_RMENU :up]
-     VK_LWIN])
+     [VK_LMENU :up]
+     [VK_LWIN :down]
+     (ascii "R")
+     [VK_LWIN :up]
+     [:wait 0.5]
+     (ascii "N")
+     (ascii "O")
+     (ascii "T")
+     (ascii "E")
+     (ascii "P")
+     (ascii "A")
+     (ascii "D")
+     [:wait 0.5]
+     VK_RETURN
+    ])
 
   (define-key keymap
     [(key (ascii "T") @[:lwin])

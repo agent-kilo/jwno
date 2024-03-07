@@ -12,11 +12,19 @@
 
 
 (defn cmd-send-keys [keys context]
-  (let [inputs @[]]
+  (let [input-seqs @[]]
+    (var cur-inputs @[])
+    (array/push input-seqs cur-inputs)
     (each k keys
       (match k
+        [:wait duration]
+        (do
+          (array/push input-seqs duration)
+          (set cur-inputs @[])
+          (array/push input-seqs cur-inputs))
+
         [key-code key-state]
-        (array/push inputs
+        (array/push cur-inputs
                     (INPUT :type INPUT_KEYBOARD
                            :ki.wVk key-code
                            :ki.dwFlags (if (= key-state :up)
@@ -26,12 +34,12 @@
         key-code
         (do
           # Down event
-          (array/push inputs
+          (array/push cur-inputs
                       (INPUT :type INPUT_KEYBOARD
                              :ki.wVk key-code
                              :ki.dwFlags 0))
           # Up event
-          (array/push inputs
+          (array/push cur-inputs
                       (INPUT :type INPUT_KEYBOARD
                              :ki.wVk key-code
                              :ki.dwFlags KEYEVENTF_KEYUP)))
@@ -39,7 +47,12 @@
         _
         (log/warning "Unknown key spec: %n" k)))
 
-    (SendInput inputs)))
+    (log/debug "input-seqs = %n" input-seqs)
+
+    (each seq input-seqs
+      (if (number? seq)
+        (ev/sleep seq)
+        (SendInput seq)))))
 
 
 (defn dispatch-command [cmd key-state context]

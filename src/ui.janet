@@ -176,9 +176,10 @@
 
 (defn- keyboard-hook-proc [code wparam hook-struct chan state]
   (log/debug "################## keyboard-hook-proc ##################")
-  (log/debug "code = %p" code)
-  (log/debug "wparam = %p" wparam)
-  (log/debug "hook-struct = %p" hook-struct)
+  (log/debug "code = %n" code)
+  (log/debug "wparam = %n" wparam)
+  (log/debug "vkCode = %n" (hook-struct :vkCode))
+  (log/debug "flags.up = %n" (hook-struct :flags.up))
 
   (when (< code 0)
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
@@ -186,8 +187,6 @@
   # Don't handle events injected by us
   (when (hook-struct :flags.injected)
     (log/debug "Injected event, skipping...")
-    (log/debug "vkCode = %n" (hook-struct :vkCode))
-    (log/debug "up = %n" (hook-struct :flags.up))
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
   (def current-keymap (in state :current-keymap))
