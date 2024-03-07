@@ -39,8 +39,11 @@
              (:Move pat 0 0)
              (:Resize pat 900 900))))
 
-       [:key/key-event key state cmd]
-       (process-key-event key state cmd context)
+       [:key/key-event key key-state cmd]
+       (process-key-event key key-state cmd context)
+
+       [:key/raw-key-event key-code key-state]
+       (process-raw-key-event key-code key-state context)
 
        _
        (log/warning "Unknown message: %n" msg))

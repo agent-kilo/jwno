@@ -105,6 +105,12 @@
     (put key-states :tracked-modifiers tracked-modifiers)))
 
 
+(defn dispatch-raw-key-event [hook-struct chan]
+  (ev/give chan [:key/raw-key-event
+                 (hook-struct :vkCode)
+                 (if (hook-struct :flags.up) :up :down)]))
+
+
 (defn dispatch-key-event [keymap hook-struct chan inhibit-win-key key-states]
   (def mods-to-check
     (if inhibit-win-key
@@ -152,9 +158,16 @@
               keymap)])))
 
 
-(defn process-key-event [key state cmd context]
+(defn process-key-event [key key-state cmd context]
   (log/debug "################## process-key-event ##################")
   (log/debug "key = %n" key)
-  (log/debug "state = %n" state)
+  (log/debug "key-state = %n" key-state)
   (log/debug "cmd = %n" cmd)
-  (dispatch-command cmd state context))
+  (dispatch-command cmd key-state context))
+
+
+(defn process-raw-key-event [key-code key-state context]
+  (log/debug "################## process-raw-key-event ##################")
+  (log/debug "key-code = %n" key-code)
+  (log/debug "key-state = %n" key-state)
+  (dispatch-command [:map-to key-code] key-state context))

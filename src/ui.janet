@@ -189,6 +189,13 @@
     (log/debug "Injected event, skipping...")
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
+  (when (in state :raw-event-mode)
+    (dispatch-raw-key-event hook-struct chan)
+    # Treat all events as handled. The raw event handling code
+    # will take over from the main thread, and forward key events
+    # with SendInput()
+    (break 1))
+
   (def current-keymap (in state :current-keymap))
   (def key-states (in state :key-states))
   (def inhibit-win-key (in state :inhibit-win-key))
@@ -233,7 +240,9 @@
   (def keyboard-hook-state
     @{:current-keymap keymap
       :key-states @{}
-      :inhibit-win-key (inhibit-win-key? keymap)})
+      :inhibit-win-key (inhibit-win-key? keymap)
+      # TODO
+      :raw-event-mode true})
 
   (log/debug "inhibit-win-key = %n" (in keyboard-hook-state :inhibit-win-key))
 
