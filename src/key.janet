@@ -54,9 +54,13 @@
 
 
 (defn define-key [keymap key-seq command-or-keymap]
+  (if-not (indexed? key-seq)
+    (break (define-key keymap [key-seq] command-or-keymap)))
+
   (def cur-key (in key-seq 0))
   (def rest-keys (slice key-seq 1))
   (def cur-def (get keymap cur-key))
+
   (if (<= (length rest-keys) 0)
     (set-key-def keymap cur-key command-or-keymap)
     (let [sub-keymap (if (table? cur-def)

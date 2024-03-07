@@ -11,6 +11,16 @@
     (os/exit 0)))
 
 
+(defn cmd-map-to [key-code state]
+  (def input
+    (INPUT :type INPUT_KEYBOARD
+           :ki.wVk key-code
+           :ki.dwFlags (case state
+                         :up KEYEVENTF_KEYUP
+                         :down 0)))
+  (SendInput [input]))
+
+
 (defn cmd-send-keys [keys context]
   (let [input-seqs @[]]
     (var cur-inputs @[])
@@ -60,6 +70,9 @@
     :quit
     (when (= key-state :down)
       (cmd-quit context))
+
+    [:map-to key-code]
+    (cmd-map-to key-code key-state)
 
     [:send-keys & keys]
     (when (= key-state :down)

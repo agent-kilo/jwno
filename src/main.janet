@@ -66,7 +66,7 @@
   (def keymap (define-keymap))
 
   (define-key keymap
-    [(key (ascii "Q") @[:lwin])]
+    (key (ascii "Q") @[:lwin])
     :quit)
 
   (define-key keymap
@@ -99,7 +99,7 @@
      (ascii "D")])
 
   (define-key keymap
-    [(key VK_RMENU @[:lctrl])]
+    (key VK_RMENU @[:lctrl])
     [:send-keys
      [VK_LCONTROL :up]
      [VK_LMENU :up]
@@ -117,6 +117,13 @@
      [:wait 0.5]
      VK_RETURN
     ])
+
+  # XXX: The argument of :map-to command can only be VK_*WIN or other
+  # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
+  # that modifier would be stuck in the :down state.
+  (define-key keymap
+    (key VK_RMENU)
+    [:map-to VK_RWIN])
 
   (define-key keymap
     [(key (ascii "T") @[:lwin])
