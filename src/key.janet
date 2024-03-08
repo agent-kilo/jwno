@@ -199,11 +199,17 @@
       :up
       (if (table? key-binding)
         [nil key-binding]
-        [key-binding (get-root-keymap keymap)])
+        (if (in key-states :keymap-triggered false)
+          (do
+            (put key-states :keymap-triggered false)
+            [key-binding (get-root-keymap keymap)])
+          [key-binding keymap]))
 
       :down
       (if-not (table? key-binding)
-        [key-binding keymap]
+        (do
+          (put key-states :keymap-triggered true)
+          [key-binding keymap])
         [nil keymap]))
 
     (cond

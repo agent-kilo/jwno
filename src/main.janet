@@ -107,13 +107,12 @@
      [:wait 0.1]
      [VK_LCONTROL :down]])
 
-  # XXX: In a key sequence, when the keys coming later contains
-  # the modifiers used in the previous key, the current keymap would
-  # get reset to the root keymap before the associated command can fire
+  # works
   (define-key keymap
     [(key (ascii "T") @[:lctrl :lalt])
      (key VK_LCONTROL)]
     [:send-keys
+     [VK_LCONTROL :up]
      (ascii "A")
      (ascii "B")
      (ascii "C")
