@@ -90,7 +90,9 @@
     [(key VK_LWIN @[:lctrl])]
     [:send-keys
      [VK_LCONTROL :up]
-     VK_LWIN])
+     VK_LWIN
+     [:wait 0.1]
+     [VK_LCONTROL :down]])
 
   (define-key keymap
     [(key (ascii "T") @[:lctrl :lalt])
@@ -105,7 +107,7 @@
     (key VK_RMENU @[:lctrl])
     [:send-keys
      [VK_LCONTROL :up]
-     [VK_LMENU :up]
+     [VK_RMENU :up]
      [VK_LWIN :down]
      (ascii "R")
      [VK_LWIN :up]
@@ -147,6 +149,11 @@
     @{:hInstance hInstance
       :uia uia
       :event-sources [uia-chan ui-chan]
+
+      :current-keymap keymap
+      :inhibit-win-key (inhibit-win-key? keymap)
+      :key-states @{}
+
       :ui-thread nil
       :msg-hwnd nil})
 

@@ -170,4 +170,53 @@
   (log/debug "################## process-raw-key-event ##################")
   (log/debug "key-code = %n" key-code)
   (log/debug "key-state = %n" key-state)
-  (dispatch-command [:map-to key-code] key-state context))
+
+  (def keymap (in context :current-keymap))
+  (def key-states (in context :key-states))
+  (def inhibit-win-key (in context :inhibit-win-key))
+  (def mods-to-check
+    (if inhibit-win-key
+      (filter |(not (or (= $ VK_LWIN) (= $ VK_RWIN)))
+              (keys MODIFIER-KEYS))
+      (keys MODIFIER-KEYS)))
+  (def modifiers (keys (in key-states :tracked-modifiers @{})))
+  (each mod-kc mods-to-check
+    (when (and (not= key-code mod-kc)
+               # XXX: Should use our own cached key states
+               (async-key-state-down? mod-kc))
+      (array/push modifiers (in MODIFIER-KEYS mod-kc))))
+  (def key-struct (key key-code modifiers))
+
+  (log/debug "key-struct = %n" key-struct)
+
+  (if-let [key-binding (get-key-binding keymap key-struct)]
+    (case key-state
+      :up
+      (if (table? key-binding)
+        (put context :current-keymap key-binding)
+        (do
+          (dispatch-command key-binding key-state context)
+          (put context :current-keymap (get-root-keymap keymap))))
+
+      :down
+      (if-not (table? key-binding)
+        (dispatch-command key-binding key-state context)))
+
+    (cond
+      (and inhibit-win-key
+           (or (= VK_LWIN key-code)
+               (= VK_RWIN key-code)))
+      (do
+        (track-modifiers key-code (case key-state :up true :down false) key-states)
+        (log/debug "new key-states = %n" key-states))
+
+      (has-key? MODIFIER-KEYS key-code)
+      (dispatch-command [:map-to key-code] key-state context)
+
+      (nil? (in keymap :parent))
+      (dispatch-command [:map-to key-code] key-state context)
+
+      true
+      # Not a modifier key, and not using the root keymap
+      (when (= key-state :up)
+        (put context :current-keymap (get-root-keymap keymap))))))
