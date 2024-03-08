@@ -47,11 +47,11 @@
        (let [keymap (in context :current-keymap)
              key-states (in context :key-states)
              inhibit-win-key (in context :inhibit-win-key)]
-         (def [cmd new-keymap]
+         (def [key-struct cmd new-keymap]
            (process-raw-key-event key-code key-state keymap key-states inhibit-win-key))
          (log/debug "new-keymap after process-raw-key-event: %n" new-keymap)
          (if-not (nil? cmd)
-           (dispatch-command cmd key-state context))
+           (dispatch-command cmd key-struct key-state context))
          (put context :current-keymap new-keymap))
 
        _

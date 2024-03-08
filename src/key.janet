@@ -158,12 +158,12 @@
               keymap)])))
 
 
-(defn process-key-event [key key-state cmd context]
+(defn process-key-event [key-struct key-state cmd context]
   (log/debug "################## process-key-event ##################")
-  (log/debug "key = %n" key)
+  (log/debug "key-struct = %n" key-struct)
   (log/debug "key-state = %n" key-state)
   (log/debug "cmd = %n" cmd)
-  (dispatch-command cmd key-state context))
+  (dispatch-command cmd key-struct key-state context))
 
 
 (defn process-raw-key-event [key-code key-state keymap key-states inhibit-win-key]
@@ -194,41 +194,44 @@
 
   (log/debug "key-struct = %n" key-struct)
 
-  (if-let [key-binding (get-key-binding keymap key-struct)]
-    (case key-state
-      :up
-      (if (table? key-binding)
-        [nil key-binding]
-        (if (in key-states :keymap-triggered false)
+  (def [ret-cmd ret-keymap]
+    (if-let [key-binding (get-key-binding keymap key-struct)]
+      (case key-state
+        :up
+        (if (table? key-binding)
+          [nil key-binding]
+          (if (in key-states :keymap-triggered false)
+            (do
+              (put key-states :keymap-triggered false)
+              [key-binding (get-root-keymap keymap)])
+            [key-binding keymap]))
+
+        :down
+        (if-not (table? key-binding)
           (do
-            (put key-states :keymap-triggered false)
-            [key-binding (get-root-keymap keymap)])
-          [key-binding keymap]))
+            (put key-states :keymap-triggered true)
+            [key-binding keymap])
+          [nil keymap]))
 
-      :down
-      (if-not (table? key-binding)
+      (cond
+        (and inhibit-win-key
+             (or (= VK_LWIN key-code)
+                 (= VK_RWIN key-code)))
         (do
-          (put key-states :keymap-triggered true)
-          [key-binding keymap])
-        [nil keymap]))
+          (track-modifiers key-code (case key-state :up true :down false) key-states)
+          (log/debug "new key-states = %n" key-states)
+          [nil keymap])
 
-    (cond
-      (and inhibit-win-key
-           (or (= VK_LWIN key-code)
-               (= VK_RWIN key-code)))
-      (do
-        (track-modifiers key-code (case key-state :up true :down false) key-states)
-        (log/debug "new key-states = %n" key-states)
-        [nil keymap])
+        (has-key? MODIFIER-KEYS key-code)
+        [[:map-to key-code] keymap]
 
-      (has-key? MODIFIER-KEYS key-code)
-      [[:map-to key-code] keymap]
+        (nil? (in keymap :parent))
+        [[:map-to key-code] keymap]
 
-      (nil? (in keymap :parent))
-      [[:map-to key-code] keymap]
+        true
+        # Not a modifier key, and not using the root keymap
+        (if (= key-state :up)
+          [nil (get-root-keymap keymap)]
+          [nil keymap]))))
 
-      true
-      # Not a modifier key, and not using the root keymap
-      (if (= key-state :up)
-        [nil (get-root-keymap keymap)]
-        [nil keymap]))))
+  [key-struct ret-cmd ret-keymap])

@@ -11,11 +11,11 @@
     (os/exit 0)))
 
 
-(defn cmd-map-to [key-code state]
+(defn cmd-map-to [key-code key-state]
   (def input
     (INPUT :type INPUT_KEYBOARD
            :ki.wVk key-code
-           :ki.dwFlags (case state
+           :ki.dwFlags (case key-state
                          :up KEYEVENTF_KEYUP
                          :down 0)))
   (SendInput [input]))
@@ -65,7 +65,7 @@
         (SendInput seq)))))
 
 
-(defn dispatch-command [cmd key-state context]
+(defn dispatch-command [cmd key-struct key-state context]
   (match cmd
     :quit
     (when (= key-state :down)
