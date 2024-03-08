@@ -166,14 +166,20 @@
   (dispatch-command cmd key-state context))
 
 
-(defn process-raw-key-event [key-code key-state context]
+(defn process-raw-key-event [key-code key-state keymap key-states inhibit-win-key]
   (log/debug "################## process-raw-key-event ##################")
   (log/debug "key-code = %n" key-code)
   (log/debug "key-state = %n" key-state)
 
-  (def keymap (in context :current-keymap))
-  (def key-states (in context :key-states))
-  (def inhibit-win-key (in context :inhibit-win-key))
+  (def keys-down (in key-states :down @{}))
+  (case key-state
+    :up
+    (put keys-down key-code nil)
+    :down
+    (put keys-down key-code true))
+  (put key-states :down keys-down)
+  (log/debug "keys-down = %n" keys-down)
+
   (def mods-to-check
     (if inhibit-win-key
       (filter |(not (or (= $ VK_LWIN) (= $ VK_RWIN)))
@@ -182,8 +188,7 @@
   (def modifiers (keys (in key-states :tracked-modifiers @{})))
   (each mod-kc mods-to-check
     (when (and (not= key-code mod-kc)
-               # XXX: Should use our own cached key states
-               (async-key-state-down? mod-kc))
+               (in keys-down mod-kc))
       (array/push modifiers (in MODIFIER-KEYS mod-kc))))
   (def key-struct (key key-code modifiers))
 
@@ -193,14 +198,13 @@
     (case key-state
       :up
       (if (table? key-binding)
-        (put context :current-keymap key-binding)
-        (do
-          (dispatch-command key-binding key-state context)
-          (put context :current-keymap (get-root-keymap keymap))))
+        [nil key-binding]
+        [key-binding (get-root-keymap keymap)])
 
       :down
       (if-not (table? key-binding)
-        (dispatch-command key-binding key-state context)))
+        [key-binding keymap]
+        [nil keymap]))
 
     (cond
       (and inhibit-win-key
@@ -208,15 +212,17 @@
                (= VK_RWIN key-code)))
       (do
         (track-modifiers key-code (case key-state :up true :down false) key-states)
-        (log/debug "new key-states = %n" key-states))
+        (log/debug "new key-states = %n" key-states)
+        [nil keymap])
 
       (has-key? MODIFIER-KEYS key-code)
-      (dispatch-command [:map-to key-code] key-state context)
+      [[:map-to key-code] keymap]
 
       (nil? (in keymap :parent))
-      (dispatch-command [:map-to key-code] key-state context)
+      [[:map-to key-code] keymap]
 
       true
       # Not a modifier key, and not using the root keymap
-      (when (= key-state :up)
-        (put context :current-keymap (get-root-keymap keymap))))))
+      (if (= key-state :up)
+        [nil (get-root-keymap keymap)]
+        [nil keymap]))))

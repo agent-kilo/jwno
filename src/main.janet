@@ -4,6 +4,7 @@
 (use jw32/uiautomation)
 
 (use ./key)
+(use ./cmd)
 (use ./util)
 
 (import ./ui)
@@ -43,7 +44,15 @@
        (process-key-event key key-state cmd context)
 
        [:key/raw-key-event key-code key-state]
-       (process-raw-key-event key-code key-state context)
+       (let [keymap (in context :current-keymap)
+             key-states (in context :key-states)
+             inhibit-win-key (in context :inhibit-win-key)]
+         (def [cmd new-keymap]
+           (process-raw-key-event key-code key-state keymap key-states inhibit-win-key))
+         (log/debug "new-keymap after process-raw-key-event: %n" new-keymap)
+         (if-not (nil? cmd)
+           (dispatch-command cmd key-state context))
+         (put context :current-keymap new-keymap))
 
        _
        (log/warning "Unknown message: %n" msg))
@@ -68,16 +77,19 @@
 
   (def keymap (define-keymap))
 
+  # works
   (define-key keymap
     (key (ascii "Q") @[:lwin])
     :quit)
 
+  # works
   (define-key keymap
     [(key (ascii "V") @[:rwin])
      (key VK_LWIN)]
     [:send-keys
      VK_LWIN])
 
+  # works
   (define-key keymap
     [(key (ascii "V") @[:rwin])
      (key (ascii "R") @[:rwin])]
@@ -86,6 +98,7 @@
      (ascii "R")
      [VK_LWIN :up]])
 
+  # works
   (define-key keymap
     [(key VK_LWIN @[:lctrl])]
     [:send-keys
@@ -94,6 +107,9 @@
      [:wait 0.1]
      [VK_LCONTROL :down]])
 
+  # XXX: In a key sequence, when the keys coming later contains
+  # the modifiers used in the previous key, the current keymap would
+  # get reset to the root keymap before the associated command can fire
   (define-key keymap
     [(key (ascii "T") @[:lctrl :lalt])
      (key VK_LCONTROL)]
@@ -103,6 +119,7 @@
      (ascii "C")
      (ascii "D")])
 
+  # works
   (define-key keymap
     (key VK_RMENU @[:lctrl])
     [:send-keys
@@ -130,6 +147,7 @@
     (key VK_RMENU)
     [:map-to VK_RWIN])
 
+  # works
   (define-key keymap
     [(key (ascii "T") @[:lwin])
      (key (ascii "N") @[:lwin])]
