@@ -9,6 +9,7 @@
 
 (import ./ui)
 (import ./uia)
+(import ./repl)
 (import ./log)
 
 
@@ -174,8 +175,10 @@
       :ui-thread nil
       :msg-hwnd nil})
 
+  (def repl-server (repl/start-server context))
+
   (main-loop context)
 
+  (repl/stop-server repl-server)
   (uia/uia-deinit uia uia-deinit-fns)
-
   (log/deinit))
