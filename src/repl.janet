@@ -4,7 +4,7 @@
 
 (def- repl-env (make-env))
 (merge-module repl-env (require "jw32/winuser"))
-(merge-module repl-env (require "./log"))
+(merge-module repl-env (require "./log") "log/")
 
 
 (defn make-repl-env [name stream server]
