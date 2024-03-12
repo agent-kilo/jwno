@@ -35,12 +35,12 @@
        (do
          (when (and (= (win :name) "File Explorer")
                     (= (win :class-name) "CabinetWClass"))
-           (def uia-win (:ElementFromHandle (in context :uia) (win :native-window-handle)))
-           (defer
-             (:Release uia-win)
-             (def pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern))
-             (defer
-               (:Release pat)
+           (with [uia-win
+                  (:ElementFromHandle (in context :uia) (win :native-window-handle))
+                  (uia-win :Release)]
+             (with [pat
+                    (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
+                    (fn [pat] (when pat (:Release pat)))]
                (when pat
                  (:Move pat 0 0)
                  (:Resize pat 900 900))))))
