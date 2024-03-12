@@ -1,6 +1,7 @@
 (use jw32/combaseapi)
 (use jw32/uiautomation)
 (use jw32/errhandlingapi)
+(use jw32/util)
 
 (import ./log)
 
@@ -14,6 +15,20 @@
                  :class-name (:get_CachedClassName sender)
                  :native-window-handle (:get_CachedNativeWindowHandle sender)})
   (ev/give chan [:uia/window-opened win-obj])
+  S_OK)
+
+
+(defn- handle-focus-changed-event [sender chan]
+  (log/debug "#################### handle-focus-changed-event ####################")
+  (log/debug "++++ sender: %n" (:get_CachedName sender))
+  (log/debug "++++ class: %n" (:get_CachedClassName sender))
+  (def native-hwnd (:get_CachedNativeWindowHandle sender))
+  (log/debug "++++ native-hwnd: %n" native-hwnd)
+  (when (not (null? native-hwnd))
+    (def win-obj @{:name (:get_CachedName sender)
+                   :class-name (:get_CachedClassName sender)
+                   :native-window-handle native-hwnd})
+    (ev/give chan [:uia/focus-changed win-obj]))
   S_OK)
 
 
@@ -43,6 +58,13 @@
        (fn [sender event-id]
          (handle-window-opened-event sender event-id chan))))
 
+  (def focus-changed-handler
+    (:AddFocusChangedEventHandler
+       uia
+       cr
+       (fn [sender]
+         (handle-focus-changed-event sender chan))))
+
   (:Release cr)
 
   [uia [(fn []
@@ -51,6 +73,10 @@
              UIA_Window_WindowOpenedEventId
              root
              window-opened-handler))
+        (fn []
+          (:RemoveFocusChangedEventHandler
+             uia
+             focus-changed-handler))
         (fn []
           (:Release root))]])
 
