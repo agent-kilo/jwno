@@ -19,7 +19,7 @@
 
 (defn uia-init [chan]
   (CoInitializeEx nil COINIT_MULTITHREADED)
-  (def uia (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
+  (def uia (CoCreateInstance CLSID_CUIAutomation nil CLSCTX_INPROC_SERVER IUIAutomation))
   (def root (:GetRootElement uia))
 
   (def cr (:CreateCacheRequest uia))
@@ -43,14 +43,20 @@
        (fn [sender event-id]
          (handle-window-opened-event sender event-id chan))))
 
+  (:Release cr)
+
   [uia [(fn []
           (:RemoveAutomationEventHandler
              uia
              UIA_Window_WindowOpenedEventId
              root
-             window-opened-handler))]])
+             window-opened-handler))
+        (fn []
+          (:Release root))]])
 
 
 (defn uia-deinit [uia deinit-fns]
   (each df deinit-fns
-    (df)))
+    (df))
+  (:Release uia)
+  (CoUninitialize))
