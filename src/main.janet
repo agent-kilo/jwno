@@ -36,10 +36,14 @@
          (when (and (= (win :name) "File Explorer")
                     (= (win :class-name) "CabinetWClass"))
            (def uia-win (:ElementFromHandle (in context :uia) (win :native-window-handle)))
-           (def pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern))
-           (when pat
-             (:Move pat 0 0)
-             (:Resize pat 900 900))))
+           (defer
+             (:Release uia-win)
+             (def pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern))
+             (defer
+               (:Release pat)
+               (when pat
+                 (:Move pat 0 0)
+                 (:Resize pat 900 900))))))
 
        [:key/key-event key key-state cmd]
        (process-key-event key key-state cmd context)
