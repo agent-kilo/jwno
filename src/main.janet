@@ -36,7 +36,8 @@
          (when (and (= (win :name) "File Explorer")
                     (= (win :class-name) "CabinetWClass"))
            (with [uia-win
-                  (:ElementFromHandle (in context :uia) (win :native-window-handle))
+                  (:ElementFromHandle (get-in context [:uia-context :uia])
+                                      (win :native-window-handle))
                   (uia-win :Release)]
              (with [pat
                     (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
@@ -44,6 +45,13 @@
                (when pat
                  (:Move pat 0 0)
                  (:Resize pat 900 900))))))
+
+       :uia/focus-changed
+       (let [uia-context (in context :uia-context)
+             uia-win (uia/get-focused-window uia-context)]
+         (if uia-win
+           (log/debug "uia-win hwnd = %n" (:get_CachedNativeWindowHandle uia-win))
+           (log/debug "uia-win = %n" uia-win)))
 
        [:key/key-event key key-state cmd]
        (process-key-event key key-state cmd context)
@@ -66,13 +74,13 @@
 
 
 (defn main [& args]
-  (log/init :debug)
+  (def log-chan (log/init :debug))
   (log/debug "in main")
 
   (def hInstance (GetModuleHandle nil))
 
   (def uia-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
-  (def [uia uia-deinit-fns]
+  (def uia-context
     (try
       (uia/uia-init uia-chan)
       ((err fib)
@@ -169,8 +177,8 @@
 
   (def context
     @{:hInstance hInstance
-      :uia uia
-      :event-sources [uia-chan ui-chan]
+      :uia-context uia-context
+      :event-sources [ui-chan uia-chan]
 
       :current-keymap keymap
       :inhibit-win-key (inhibit-win-key? keymap)
@@ -184,5 +192,5 @@
   (main-loop context)
 
   (repl/stop-server repl-server)
-  (uia/uia-deinit uia uia-deinit-fns)
+  (uia/uia-deinit uia-context)
   (log/deinit))

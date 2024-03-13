@@ -20,69 +20,120 @@
 
 (defn- handle-focus-changed-event [sender chan]
   (log/debug "#################### handle-focus-changed-event ####################")
-  (log/debug "++++ sender: %n" (:get_CachedName sender))
-  (log/debug "++++ class: %n" (:get_CachedClassName sender))
-  (def native-hwnd (:get_CachedNativeWindowHandle sender))
-  (log/debug "++++ native-hwnd: %n" native-hwnd)
-  (when (not (null? native-hwnd))
-    (def win-obj @{:name (:get_CachedName sender)
-                   :class-name (:get_CachedClassName sender)
-                   :native-window-handle native-hwnd})
-    (ev/give chan [:uia/focus-changed win-obj]))
+  (ev/give chan :uia/focus-changed)
   S_OK)
 
 
-(defn uia-init [chan]
-  (CoInitializeEx nil COINIT_MULTITHREADED)
-  (def uia (CoCreateInstance CLSID_CUIAutomation nil CLSCTX_INPROC_SERVER IUIAutomation))
-  (def root (:GetRootElement uia))
-
-  (def cr (:CreateCacheRequest uia))
-  (:AddProperty cr UIA_NamePropertyId)
-  (:AddProperty cr UIA_ClassNamePropertyId)
-  (:AddProperty cr UIA_BoundingRectanglePropertyId)
-  (:AddProperty cr UIA_NativeWindowHandlePropertyId)
-
-  (def scope
-    #(bor TreeScope_Element TreeScope_Children)
-    TreeScope_Subtree
-    )
-
+(defn uia-init-event-handlers [uia element chan]
   (def window-opened-handler
-    (:AddAutomationEventHandler
-       uia
-       UIA_Window_WindowOpenedEventId
-       root
-       scope
-       cr
-       (fn [sender event-id]
-         (handle-window-opened-event sender event-id chan))))
+    # Can't use `with` here, or there will be a "can't marshal alive fiber" error
+    (let [cr (:CreateCacheRequest uia)]
+      (:AddProperty cr UIA_NamePropertyId)
+      (:AddProperty cr UIA_ClassNamePropertyId)
+      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
+      (def handler
+        (:AddAutomationEventHandler
+           uia
+           UIA_Window_WindowOpenedEventId
+           element
+           TreeScope_Subtree
+           cr
+           (fn [sender event-id]
+             (handle-window-opened-event sender event-id chan))))
+      (:Release cr)
+      handler))
 
   (def focus-changed-handler
     (:AddFocusChangedEventHandler
        uia
-       cr
+       nil
        (fn [sender]
          (handle-focus-changed-event sender chan))))
 
-  (:Release cr)
-
-  [uia [(fn []
-          (:RemoveAutomationEventHandler
-             uia
-             UIA_Window_WindowOpenedEventId
-             root
-             window-opened-handler))
-        (fn []
-          (:RemoveFocusChangedEventHandler
-             uia
-             focus-changed-handler))
-        (fn []
-          (:Release root))]])
+  [(fn []
+     (:RemoveAutomationEventHandler
+        uia
+        UIA_Window_WindowOpenedEventId
+        element
+        window-opened-handler))
+   (fn []
+     (:RemoveFocusChangedEventHandler
+        uia
+        focus-changed-handler))])
 
 
-(defn uia-deinit [uia deinit-fns]
+(defn uia-init [chan]
+  (CoInitializeEx nil COINIT_MULTITHREADED)
+  (def uia
+    (CoCreateInstance CLSID_CUIAutomation nil CLSCTX_INPROC_SERVER IUIAutomation))
+  (def root
+    (with [cr (:CreateCacheRequest uia) (cr :Release)]
+      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
+      (:GetRootElementBuildCache uia cr)))
+  (def deinit-fns
+    (uia-init-event-handlers uia root chan))
+  (def focus-cr
+    (:CreateCacheRequest uia))
+  (:AddProperty focus-cr UIA_NativeWindowHandlePropertyId)
+  (:AddProperty focus-cr UIA_IsTransformPatternAvailablePropertyId)
+  (:AddProperty focus-cr UIA_IsWindowPatternAvailablePropertyId)
+  (def control-view-walker (:get_ControlViewWalker uia))
+  @{:uia uia
+    :root root
+    :deinit-fns deinit-fns
+    :focus-cr focus-cr
+    :control-view-walker control-view-walker})
+
+
+(defn uia-deinit [uia-context]
+  (def {:uia uia
+        :root root
+        :deinit-fns deinit-fns
+        :focus-cr focus-cr
+        :control-view-walker control-view-walker}
+    uia-context)
   (each df deinit-fns
     (df))
+  (:Release control-view-walker)
+  (:Release focus-cr)
+  (:Release root)
   (:Release uia)
   (CoUninitialize))
+
+
+(defn get-focused-window [uia-context]
+  (def {:uia uia
+        :root root
+        :focus-cr focus-cr
+        :control-view-walker walker}
+    uia-context)
+  (def root-hwnd (:get_CachedNativeWindowHandle root))
+  (let [focused (:GetFocusedElementBuildCache uia focus-cr)]
+    (if-not focused
+      (break nil))
+    (var ret nil)
+    (var cur focused)
+    (var parent (:GetParentElementBuildCache walker cur focus-cr))
+    (while (and parent
+                (not= root-hwnd (:get_CachedNativeWindowHandle parent)))
+      (:Release cur)
+      (set cur parent)
+      (set parent (:GetParentElementBuildCache walker cur focus-cr))
+      (if parent
+        (log/debug "Next parent: %n" (:get_CachedNativeWindowHandle parent))
+        (log/debug "Next parent: %n" parent)))
+    (if-not parent
+      (break nil))
+    (let [trans-pat-available (:GetCachedPropertyValue cur UIA_IsTransformPatternAvailablePropertyId)
+          win-pat-available (:GetCachedPropertyValue cur UIA_IsWindowPatternAvailablePropertyId)]
+      (log/debug "IsTransformPatternAvailable = %n" trans-pat-available)
+      (log/debug "IsWindowPatternAvailable = %n" win-pat-available)
+      (if (and (not= trans-pat-available 0)
+               (not= win-pat-available 0))
+        # It's a window that can be resized
+        cur
+        # Something else we don't care about
+        # XXX: Maybe we should care about these, e.g. Save As dialogs?
+        (do
+          (:Release cur)
+          nil)))))
