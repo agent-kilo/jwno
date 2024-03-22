@@ -5,6 +5,7 @@
 
 (use ./key)
 (use ./cmd)
+(use ./win)
 (use ./util)
 
 (import ./ui)
@@ -50,7 +51,9 @@
        (let [uia-context (in context :uia-context)
              uia-win (uia/get-focused-window uia-context)]
          (if uia-win
-           (log/debug "uia-win hwnd = %n" (:get_CachedNativeWindowHandle uia-win))
+           (do
+             (log/debug "uia-win hwnd = %n" (:get_CachedNativeWindowHandle uia-win))
+             (:focus-changed (in context :wm) (:get_CachedNativeWindowHandle uia-win)))
            (log/debug "uia-win = %n" uia-win)))
 
        [:key/key-event key key-state cmd]
@@ -183,6 +186,8 @@
       :current-keymap keymap
       :inhibit-win-key (inhibit-win-key? keymap)
       :key-states @{}
+
+      :wm (window-manager)
 
       :ui-thread nil
       :msg-hwnd nil})
