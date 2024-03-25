@@ -13,6 +13,7 @@
 
 (defn test-frame-add-child []
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-frame2 (frame {:top 10 :left 110 :bottom 110 :right 210}))
 
   (def dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
   (def dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
@@ -24,6 +25,13 @@
   (:add-child dummy-frame dummy-sub-frame2)
   (assert (= (in dummy-sub-frame2 :parent) dummy-frame))
   (assert (= (length (in dummy-frame :children)) 2))
+
+  (:add-child dummy-frame2 dummy-sub-frame2)
+  (assert (= (in dummy-sub-frame2 :parent) dummy-frame2))
+  (assert (= (length (in dummy-frame2 :children)) 1))
+  (assert (= (get-in dummy-frame2 [:children 0]) dummy-sub-frame2))
+  (assert (= (length (in dummy-frame :children)) 1))
+  (assert (= (get-in dummy-frame [:children 0]) dummy-sub-frame1))
 
   (def dummy-window1 (window :dummy-hwnd))
   (def dummy-window2 (window :dummy-hwnd))

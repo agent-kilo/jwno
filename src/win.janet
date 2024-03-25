@@ -39,7 +39,8 @@
 
 
 (defn frame-add-child [self child]
-  (let [children (in self :children)]
+  (let [children (in self :children)
+        old-parent (in child :parent)]
     (cond
       (empty? children)
       (do
@@ -58,7 +59,13 @@
         (do
           (put child :parent self)
           (array/push children child))
-        (error "cannot mix frames and windows"))))
+        (error "cannot mix frames and windows")))
+
+    # Do the removal after a successful insertion, so
+    # that we won't end up in an inconsistent state
+    (when old-parent
+      (put old-parent :children
+         (filter |(not= $ child) (in old-parent :children)))))
   self)
 
 
@@ -145,7 +152,9 @@
     (table/setproto node frame-proto)))
 
 
-(defn wm-handle-focus-changed [self hwnd]
+######### Window manager object #########
+
+(defn wm-focus-changed [self hwnd]
   (if-not (get-in self [:managed-windows hwnd])
     # new window
     (do
@@ -154,7 +163,7 @@
 
 
 (def- wm-proto
-  @{:focus-changed wm-handle-focus-changed})
+  @{:focus-changed wm-focus-changed})
 
 
 (defn window-manager []
