@@ -82,6 +82,12 @@
 
   (def hInstance (GetModuleHandle nil))
 
+  (def wm
+    (try
+      (window-manager)
+      ((err fib)
+       (show-error-and-exit err 1))))
+
   (def uia-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
   (def uia-context
     (try
@@ -187,7 +193,7 @@
       :inhibit-win-key (inhibit-win-key? keymap)
       :key-states @{}
 
-      :wm (window-manager)
+      :wm wm
 
       :ui-thread nil
       :msg-hwnd nil})

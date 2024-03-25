@@ -1,3 +1,6 @@
+(use jw32/winuser)
+(use jw32/util)
+
 (import ./log)
 
 
@@ -183,7 +186,17 @@
 
 
 (defn window-manager []
+  (def toplevel-frames @[])
+  (EnumDisplayMonitors
+   nil nil
+   (fn [hmon hmdc rect]
+     (array/push toplevel-frames (frame rect))
+     TRUE))
+  (log/debug "toplevel-frames = %n" toplevel-frames)
+  (when (empty? toplevel-frames)
+    (error "no monitor found"))
   (table/setproto
-   @{:frame-tree @[]
+   @{:frame-tree @{:toplevels toplevel-frames
+                   :current-toplevel (in toplevel-frames 0)}
      :managed-windows @{}}
    wm-proto))
