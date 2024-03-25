@@ -3,8 +3,18 @@
 
 ######### Generic tree node #########
 
+(defn tree-node-activate [self]
+  (var child self)
+  (var parent (in self :parent))
+  (while parent
+    (put parent :current-child child)
+    (set child parent)
+    (set parent (in parent :parent)))
+  self)
+
+
 (def- tree-node-proto
-  @{})
+  @{:activate tree-node-activate})
 
 
 (defn tree-node [parent children &keys extra-fields]
@@ -103,6 +113,8 @@
           (if (>= i (length full-ratios)) # Is this the last sub-frame?
             (- (+ width left) current-left)
             (math/floor (* width (in full-ratios i)))))
+        (if (<= current-width 0)
+          (error "cannot create zero-width frames"))
         (array/push new-frames
                     (frame {:top current-top
                             :left current-left
@@ -117,6 +129,8 @@
           (if (>= i (length full-ratios)) # Is this the last sub-frame?
             (- (+ height top) current-top)
             (math/floor (* height (in full-ratios i)))))
+        (if (<= current-height 0)
+          (error "cannot create zero-height frames"))
         (array/push new-frames
                     (frame {:top current-top
                             :left current-left
@@ -126,11 +140,13 @@
         (+= current-top current-height)))
 
     (def old-children (in self :children))
+    (def old-active-child (in self :current-child))
     (put self :children new-frames)
     (def first-sub-frame (in new-frames 0))
-    # Move all window children to the first sub-frame
+    # XXX: Move all window children to the first sub-frame
     (each win old-children
-      (:add-child first-sub-frame win)))
+      (:add-child first-sub-frame win))
+    (put first-sub-frame :current-child old-active-child))
 
   self)
 

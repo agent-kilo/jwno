@@ -158,10 +158,51 @@
   (assert (= (get-in dummy-frame [:children 0 :children 0 :type]) :window))
   (assert (= (get-in dummy-frame [:children 0 :children 1 :type]) :window))
 
-  (assert (= (length (get-in dummy-frame [:children 1 :children])) 0)))
+  (assert (= (length (get-in dummy-frame [:children 1 :children])) 0))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 11 :right 11}))
+  (try
+    (:split dummy-frame :horizontal 2 [0.5])
+    ((err fib)
+     (assert (= err "cannot create zero-width frames"))))
+  (assert (= (length (in dummy-frame :children)) 0))
+  (try
+    (:split dummy-frame :vertical 2 [0.5])
+    ((err fib)
+     (assert (= err "cannot create zero-height frames"))))
+  (assert (= (length (in dummy-frame :children)) 0)))
+
+
+(defn test-tree-node-activate []
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
+  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
+  (var dummy-window1 (window :dummy-hwnd))
+  (var dummy-window2 (window :dummy-hwnd))
+
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+
+  (:add-child dummy-sub-frame1 dummy-window1)
+  (:add-child dummy-sub-frame2 dummy-window2)
+
+  (:activate dummy-window1)
+  (assert (= (in dummy-sub-frame1 :current-child) dummy-window1))
+  (assert (= (in dummy-frame :current-child) dummy-sub-frame1))
+
+  (:activate dummy-sub-frame2)
+  (assert (= (in dummy-frame :current-child) dummy-sub-frame2))
+  (assert (nil? (in dummy-sub-frame2 :current-child)))
+  (assert (= (in dummy-sub-frame1 :current-child) dummy-window1)))
 
 
 (defn main [&]
+  (test-tree-node-activate)
   (test-frame-constructor)
   (test-frame-add-child)
   (test-frame-split))
