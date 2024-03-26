@@ -82,16 +82,16 @@
 
   (def hInstance (GetModuleHandle nil))
 
-  (def wm
-    (try
-      (window-manager)
-      ((err fib)
-       (show-error-and-exit err 1))))
-
   (def uia-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
   (def uia-context
     (try
       (uia/uia-init uia-chan)
+      ((err fib)
+       (show-error-and-exit err 1))))
+
+  (def wm
+    (try
+      (window-manager uia-context)
       ((err fib)
        (show-error-and-exit err 1))))
 

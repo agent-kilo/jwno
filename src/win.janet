@@ -1,4 +1,6 @@
 (use jw32/winuser)
+(use jw32/combaseapi)
+(use jw32/uiautomation)
 (use jw32/util)
 
 (import ./log)
@@ -32,16 +34,35 @@
 
 ######### Window object #########
 
+(defn window-transform [self rect]
+  (log/debug "transforming window: %n, rect = %n" (in self :hwnd) rect)
+  (let [uia (get-in self [:wm :uia-context :uia])]
+    (with [uia-win
+           (:ElementFromHandle uia (in self :hwnd))
+           (in uia-win :Release)]
+      (with [pat
+             (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
+             (fn [pat] (when pat (:Release pat)))]
+        # TODO: restore maximized windows first
+        (:Move pat (in rect :left) (in rect :top))
+        (:Resize pat
+                 (- (in rect :right) (in rect :left))
+                 (- (in rect :bottom) (in rect :top))))))
+  self)
+
+
 (def- window-proto
   (table/setproto
-   @{}
+   @{:transform window-transform
+     :patterns @{}}
    tree-node-proto))
 
 
-(defn window [hwnd &opt parent]
+(defn window [hwnd wm &opt parent]
   (let [node (tree-node parent nil
                         :type :window
-                        :hwnd hwnd)]
+                        :hwnd hwnd
+                        :wm wm)]
     (table/setproto node window-proto)))
 
 
@@ -145,6 +166,8 @@
     (def old-children (in self :children))
     (def old-active-child (in self :current-child))
     (put self :children new-frames)
+    # The caller should decide which sub-frame to activate after the split
+    (put self :current-child nil)
     (def first-sub-frame (in new-frames 0))
     # XXX: Move all window children to the first sub-frame
     (each win old-children
@@ -154,10 +177,44 @@
   self)
 
 
+(defn frame-find-window [self hwnd]
+  (var found nil)
+  (each child (in self :children)
+    (cond
+      (and (= :window (in child :type))
+           (= hwnd (in child :hwnd)))
+      (do
+        (set found child)
+        (break))
+
+      (= :frame (in child :type))
+      (do
+        (set found (frame-find-window child hwnd))
+        (if found (break)))))
+  found)
+
+
+(defn frame-find-frame-for-window [self win]
+  (cond
+    (empty? (in self :children))
+    self
+
+    (= :window (get-in self [:children 0 :type]))
+    self
+
+    (in self :current-child)
+    (frame-find-frame-for-window (in self :current-child) win)
+
+    true
+    (error "inconsistent states for frame tree")))
+
+
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
-     :split frame-split}
+     :split frame-split
+     :find-window frame-find-window
+     :find-frame-for-window frame-find-frame-for-window}
    tree-node-proto))
 
 
@@ -174,29 +231,54 @@
 ######### Window manager object #########
 
 (defn wm-focus-changed [self hwnd]
-  (if-not (get-in self [:managed-windows hwnd])
-    # new window
-    (do
-      (log/debug "new window: %n" hwnd)
-      (put (self :managed-windows) hwnd true))))
+  (var win nil)
+  (each f (get-in self [:frame-tree :toplevels])
+    (set win (:find-window f hwnd))
+    (if win (break)))
+  (if win (break))
+
+  # new window
+  (log/debug "new window: %n" hwnd)
+  (def new-win (window hwnd self))
+  (def frame-found
+    (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) new-win))
+  (try
+    (:transform new-win (in frame-found :rect))
+    ((err fib)
+     # XXX: Don't manage a window which cannot be transformed?
+     (log/error "window transformation failed")))
+  (:add-child frame-found new-win)
+  (:activate new-win))
 
 
 (def- wm-proto
   @{:focus-changed wm-focus-changed})
 
 
-(defn window-manager []
+(defn window-manager [uia-context]
   (def toplevel-frames @[])
-  (EnumDisplayMonitors
-   nil nil
-   (fn [hmon hmdc rect]
-     (array/push toplevel-frames (frame rect))
-     TRUE))
+  (def monitor-info (MONITORINFOEX))
+  (var main-frame nil)
+  (def enum-ret
+    (EnumDisplayMonitors
+     nil nil
+     (fn [hmon hmdc rect]
+       (def ret (GetMonitorInfo hmon monitor-info))
+       (if (= FALSE ret)
+         (error (string/format "GetMonitorInfo failed for monitor %n" hmon)))
+       (def new-frame (frame (in monitor-info :rcWork)))
+       (array/push toplevel-frames new-frame)
+       (if (> (band (in monitor-info :dwFlags) MONITORINFOF_PRIMARY) (int/u64 0))
+         (set main-frame new-frame))
+       TRUE)))
+  (if (= FALSE enum-ret)
+    (error "EnumDisplayMonitors failed"))
   (log/debug "toplevel-frames = %n" toplevel-frames)
+  (log/debug "main-frame = %n" main-frame)
   (when (empty? toplevel-frames)
     (error "no monitor found"))
   (table/setproto
    @{:frame-tree @{:toplevels toplevel-frames
-                   :current-toplevel (in toplevel-frames 0)}
-     :managed-windows @{}}
+                   :current-toplevel main-frame}
+     :uia-context uia-context}
    wm-proto))

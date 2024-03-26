@@ -33,8 +33,8 @@
   (assert (= (length (in dummy-frame :children)) 1))
   (assert (= (get-in dummy-frame [:children 0]) dummy-sub-frame1))
 
-  (def dummy-window1 (window :dummy-hwnd))
-  (def dummy-window2 (window :dummy-hwnd))
+  (def dummy-window1 (window :dummy-hwnd nil))
+  (def dummy-window2 (window :dummy-hwnd nil))
 
   (try
     (:add-child dummy-frame dummy-window1)
@@ -146,10 +146,15 @@
   (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (:add-child dummy-frame (window :dummy-hwnd1))
-  (:add-child dummy-frame (window :dummy-hwnd2))
+  (def dummy-window1 (window :dummy-hwnd1 nil))
+  (def dummy-window2 (window :dummy-hwnd2 nil))
+  (:add-child dummy-frame dummy-window1)
+  (:add-child dummy-frame dummy-window2)
+  (:activate dummy-window1)
 
   (:split dummy-frame :horizontal)
+
+  (assert (nil? (in dummy-frame :current-child)))
 
   (assert (= (get-in dummy-frame [:children 0 :type]) :frame))
   (assert (= (get-in dummy-frame [:children 1 :type]) :frame))
@@ -182,8 +187,8 @@
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
   (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd))
-  (var dummy-window2 (window :dummy-hwnd))
+  (var dummy-window1 (window :dummy-hwnd nil))
+  (var dummy-window2 (window :dummy-hwnd nil))
 
   (:add-child dummy-frame dummy-sub-frame1)
   (:add-child dummy-frame dummy-sub-frame2)
@@ -201,8 +206,69 @@
   (assert (= (in dummy-sub-frame1 :current-child) dummy-window1)))
 
 
+(defn test-frame-find-window []
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
+  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
+  (var dummy-window1 (window :dummy-hwnd1 nil))
+  (var dummy-window2 (window :dummy-hwnd2 nil))
+
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+
+  (:add-child dummy-sub-frame1 dummy-window1)
+  (:add-child dummy-sub-frame2 dummy-window2)
+
+  (:activate dummy-window1)
+
+  (assert (= dummy-window1 (:find-window dummy-frame :dummy-hwnd1)))
+  (assert (= dummy-window2 (:find-window dummy-frame :dummy-hwnd2)))
+  (assert (nil? (:find-window dummy-frame :dummy-hwnd3)))
+  )
+
+
+(defn test-frame-find-frame-for-window []
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
+  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
+  (var dummy-window1 (window :dummy-hwnd1 nil))
+  (var dummy-window2 (window :dummy-hwnd2 nil))
+  (var dummy-window3 (window :dummy-hwnd3 nil))
+
+  (assert (= dummy-frame (:find-frame-for-window dummy-frame dummy-window3)))
+
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+
+  (:add-child dummy-sub-frame1 dummy-window1)
+  (:add-child dummy-sub-frame2 dummy-window2)
+
+  (try
+    (:find-frame-for-window dummy-frame dummy-window3)
+    ((err fib)
+     (assert (= err "inconsistent states for frame tree"))))
+
+  (:activate dummy-window1)
+  (assert (= dummy-sub-frame1 (:find-frame-for-window dummy-frame dummy-window3)))
+
+  (:activate dummy-window2)
+  (assert (= dummy-sub-frame2 (:find-frame-for-window dummy-frame dummy-window3))))
+
+
 (defn main [&]
   (test-tree-node-activate)
   (test-frame-constructor)
   (test-frame-add-child)
-  (test-frame-split))
+  (test-frame-split)
+  (test-frame-find-window)
+  (test-frame-find-frame-for-window))
