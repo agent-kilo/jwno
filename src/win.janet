@@ -44,16 +44,22 @@
              (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
              (fn [pat] (when pat (:Release pat)))]
         # TODO: restore maximized windows first
-        (:Move pat (in rect :left) (in rect :top))
-        (:Resize pat
-                 (- (in rect :right) (in rect :left))
-                 (- (in rect :bottom) (in rect :top))))))
+        (when pat
+          (:Move pat (in rect :left) (in rect :top))
+          (:Resize pat
+                   (- (in rect :right) (in rect :left))
+                   (- (in rect :bottom) (in rect :top)))))))
   self)
+
+
+(defn window-alive? [self]
+  (not= FALSE (IsWindow (in self :hwnd))))
 
 
 (def- window-proto
   (table/setproto
    @{:transform window-transform
+     :alive? window-alive?
      :patterns @{}}
    tree-node-proto))
 
@@ -209,12 +215,50 @@
     (error "inconsistent states for frame tree")))
 
 
+(defn frame-purge-windows [self]
+  (cond
+    (empty? (in self :children))
+    @[]
+
+    (= :frame (get-in self [:children 0 :type]))
+    (let [dead @[]]
+      (each f (in self :children)
+        (array/push dead ;(frame-purge-windows f)))
+      dead)
+
+    (= :window (get-in self [:children 0 :type]))
+    (let [[alive dead] 
+          (reduce
+            (fn [[a d] w]
+              (if (:alive? w)
+                (array/push a w)
+                (array/push d w))
+              [a d])
+            [@[] @[]]
+            (in self :children))]
+      (put self :children alive)
+      (cond
+        (empty? alive)
+        (put self :current-child nil)
+
+        (in self :current-child)
+        (each dw dead
+          (when (= dw (in self :current-child))
+            # The previous active child is dead, fill in a new one
+            (put self :current-child (in alive 0))))
+
+        true # There are children, but none of them is active
+        (error "inconsistent states for frame tree"))
+      dead)))
+
+
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
      :split frame-split
      :find-window frame-find-window
-     :find-frame-for-window frame-find-frame-for-window}
+     :find-frame-for-window frame-find-frame-for-window
+     :purge-windows frame-purge-windows}
    tree-node-proto))
 
 
@@ -230,12 +274,21 @@
 
 ######### Window manager object #########
 
+(defn wm-purge-windows [self]
+  (def dead @[])
+  (each f (get-in self [:frame-tree :toplevels])
+    (array/push dead ;(:purge-windows f)))
+  dead)
+
+
 (defn wm-focus-changed [self hwnd]
   (var win nil)
   (each f (get-in self [:frame-tree :toplevels])
     (set win (:find-window f hwnd))
     (if win (break)))
-  (if win (break))
+  (when win
+    (:activate win)
+    (break self))
 
   # new window
   (log/debug "new window: %n" hwnd)
@@ -248,11 +301,13 @@
      # XXX: Don't manage a window which cannot be transformed?
      (log/error "window transformation failed")))
   (:add-child frame-found new-win)
-  (:activate new-win))
+  (:activate new-win)
+  self)
 
 
 (def- wm-proto
-  @{:focus-changed wm-focus-changed})
+  @{:focus-changed wm-focus-changed
+    :purge-windows wm-purge-windows})
 
 
 (defn window-manager [uia-context]
