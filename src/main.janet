@@ -32,20 +32,8 @@
        :ui/exit
        (break)
 
-       [:uia/window-opened win]
-       (do
-         (when (and (= (win :name) "File Explorer")
-                    (= (win :class-name) "CabinetWClass"))
-           (with [uia-win
-                  (:ElementFromHandle (get-in context [:uia-context :uia])
-                                      (win :native-window-handle))
-                  (uia-win :Release)]
-             (with [pat
-                    (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
-                    (fn [pat] (when pat (:Release pat)))]
-               (when pat
-                 (:Move pat 0 0)
-                 (:Resize pat 900 900))))))
+       [:uia/window-opened hwnd]
+       (:window-opened (in context :wm) hwnd)
 
        :uia/focus-changed
        (let [uia-context (in context :uia-context)

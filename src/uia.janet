@@ -14,7 +14,7 @@
   (def win-obj @{:name (:get_CachedName sender)
                  :class-name (:get_CachedClassName sender)
                  :native-window-handle (:get_CachedNativeWindowHandle sender)})
-  (ev/give chan [:uia/window-opened win-obj])
+  (ev/give chan [:uia/window-opened (:get_CachedNativeWindowHandle sender)])
   S_OK)
 
 
@@ -25,23 +25,23 @@
 
 
 (defn uia-init-event-handlers [uia element chan]
-  #(def window-opened-handler
-  #  # Can't use `with` here, or there will be a "can't marshal alive fiber" error
-  #  (let [cr (:CreateCacheRequest uia)]
-  #    (:AddProperty cr UIA_NamePropertyId)
-  #    (:AddProperty cr UIA_ClassNamePropertyId)
-  #    (:AddProperty cr UIA_NativeWindowHandlePropertyId)
-  #    (def handler
-  #      (:AddAutomationEventHandler
-  #         uia
-  #         UIA_Window_WindowOpenedEventId
-  #         element
-  #         TreeScope_Subtree
-  #         cr
-  #         (fn [sender event-id]
-  #           (handle-window-opened-event sender event-id chan))))
-  #    (:Release cr)
-  #    handler))
+  (def window-opened-handler
+    # Can't use `with` here, or there will be a "can't marshal alive fiber" error
+    (let [cr (:CreateCacheRequest uia)]
+      (:AddProperty cr UIA_NamePropertyId)
+      (:AddProperty cr UIA_ClassNamePropertyId)
+      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
+      (def handler
+        (:AddAutomationEventHandler
+           uia
+           UIA_Window_WindowOpenedEventId
+           element
+           TreeScope_Subtree
+           cr
+           (fn [sender event-id]
+             (handle-window-opened-event sender event-id chan))))
+      (:Release cr)
+      handler))
 
   (def focus-changed-handler
     (:AddFocusChangedEventHandler
@@ -50,12 +50,12 @@
        (fn [sender]
          (handle-focus-changed-event sender chan))))
 
-  [#(fn []
-   #  (:RemoveAutomationEventHandler
-   #     uia
-   #     UIA_Window_WindowOpenedEventId
-   #     element
-   #     window-opened-handler))
+  [(fn []
+     (:RemoveAutomationEventHandler
+        uia
+        UIA_Window_WindowOpenedEventId
+        element
+        window-opened-handler))
    (fn []
      (:RemoveFocusChangedEventHandler
         uia

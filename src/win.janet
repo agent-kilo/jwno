@@ -278,19 +278,19 @@
   (def dead @[])
   (each f (get-in self [:frame-tree :toplevels])
     (array/push dead ;(:purge-windows f)))
+  (log/debug "purged %n dead windows" (length dead))
   dead)
 
 
-(defn wm-focus-changed [self hwnd]
+(defn wm-find-window [self hwnd]
   (var win nil)
   (each f (get-in self [:frame-tree :toplevels])
     (set win (:find-window f hwnd))
     (if win (break)))
-  (when win
-    (:activate win)
-    (break self))
+  win)
 
-  # new window
+
+(defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
   (def new-win (window hwnd self))
   (def frame-found
@@ -301,13 +301,37 @@
      # XXX: Don't manage a window which cannot be transformed?
      (log/error "window transformation failed")))
   (:add-child frame-found new-win)
-  (:activate new-win)
+  new-win)
+
+
+(defn wm-focus-changed [self hwnd]
+  (wm-purge-windows self)
+
+  (when-let [win (wm-find-window self hwnd)]
+    (:activate win)
+    (break self))
+
+  # TODO: window open/close events
+  (:activate (wm-add-window self hwnd))
+  self)
+
+
+(defn wm-window-opened [self hwnd]
+  (when-let [win (wm-find-window self hwnd)]
+    (log/debug "window-opened event for managed window: %n" hwnd)
+    (break self))
+
+  # TODO: window open events
+  (:activate (wm-add-window self hwnd))
   self)
 
 
 (def- wm-proto
   @{:focus-changed wm-focus-changed
-    :purge-windows wm-purge-windows})
+    :window-opened wm-window-opened
+    :purge-windows wm-purge-windows
+    :find-window wm-find-window
+    :add-window wm-add-window})
 
 
 (defn window-manager [uia-context]
