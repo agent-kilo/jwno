@@ -36,13 +36,13 @@
        (:window-opened (in context :wm) hwnd)
 
        :uia/focus-changed
-       (let [uia-context (in context :uia-context)
-             uia-win (uia/get-focused-window uia-context)]
-         (if uia-win
-           (do
+       (let [uia-context (in context :uia-context)]
+         (with [uia-win
+                (uia/get-focused-window uia-context)
+                (fn [uia-win] (when uia-win (:Release uia-win)))]
+           (when uia-win
              (log/debug "uia-win hwnd = %n" (:get_CachedNativeWindowHandle uia-win))
-             (:focus-changed (in context :wm) (:get_CachedNativeWindowHandle uia-win)))
-           (log/debug "uia-win = %n" uia-win)))
+             (:focus-changed (in context :wm) (:get_CachedNativeWindowHandle uia-win)))))
 
        [:key/key-event key key-state cmd]
        (process-key-event key key-state cmd context)
