@@ -298,7 +298,7 @@
     (:transform new-win (in frame-found :rect))
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
-     (log/error "window transformation failed")))
+     (log/error "window transformation failed: %n" err)))
   (:add-child frame-found new-win)
   new-win)
 

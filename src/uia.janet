@@ -120,7 +120,9 @@
     (var cur focused)
     (var parent (:GetParentElementBuildCache walker cur focus-cr))
     (while (and parent
-                (not= root-hwnd (:get_CachedNativeWindowHandle parent)))
+                (not= root-hwnd (:get_CachedNativeWindowHandle parent))
+                (or (= 0 (:GetCachedPropertyValue cur UIA_IsTransformPatternAvailablePropertyId))
+                    (= 0 (:GetCachedPropertyValue cur UIA_IsWindowPatternAvailablePropertyId))))
       (:Release cur)
       (set cur parent)
       (set parent (:GetParentElementBuildCache walker cur focus-cr))
