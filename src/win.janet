@@ -59,8 +59,7 @@
 (def- window-proto
   (table/setproto
    @{:transform window-transform
-     :alive? window-alive?
-     :patterns @{}}
+     :alive? window-alive?}
    tree-node-proto))
 
 
@@ -305,6 +304,9 @@
 
 
 (defn wm-focus-changed [self hwnd]
+  # XXX: If the focus change is caused by a closing window, that
+  # window may still be alive, so it won't be purged immediately.
+  # Maybe I shoud check the hwnds everytime a window is manipulated?
   (wm-purge-windows self)
 
   (when-let [win (wm-find-window self hwnd)]
