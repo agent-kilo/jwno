@@ -283,6 +283,16 @@
       (:retile f))))
 
 
+(defn frame-get-current-window [self]
+  (var parent self)
+  (var cur-child (in parent :current-child))
+  (while (and cur-child
+              (not= :window (in cur-child :type)))
+    (set parent cur-child)
+    (set cur-child (in parent :current-child)))
+  cur-child)
+
+
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
@@ -290,7 +300,8 @@
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows
-     :retile frame-retile}
+     :retile frame-retile
+     :get-current-window frame-get-current-window}
    tree-node-proto))
 
 
@@ -361,14 +372,29 @@
   self)
 
 
-(defn wm-retile [self]
-  (each f (get-in self [:frame-tree :toplevels])
-    (:retile f))
-  self)
-
-
 (defn wm-get-current-frame [self]
   (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) nil))
+
+
+(defn wm-activate [self node]
+  (:activate node)
+  (cond
+    (= :window (in node :type))
+    (SetForegroundWindow (in node :hwnd))
+
+    (= :frame (in node :type))
+    (if-let [cur-win (:get-current-window node)]
+      (SetForegroundWindow (in cur-win :hwnd))
+      (SetForegroundWindow (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))))))
+
+
+(defn wm-retile [self]
+  (def cur-win (:get-current-window (wm-get-current-frame self)))
+  (each f (get-in self [:frame-tree :toplevels])
+    (:retile f))
+  (when cur-win
+    (wm-activate self cur-win))
+  self)
 
 
 (def- wm-proto
@@ -378,7 +404,8 @@
     :find-window wm-find-window
     :add-window wm-add-window
     :retile wm-retile
-    :get-current-frame wm-get-current-frame})
+    :get-current-frame wm-get-current-frame
+    :activate wm-activate})
 
 
 (defn window-manager [uia-context]
