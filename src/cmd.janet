@@ -65,6 +65,17 @@
         (SendInput seq)))))
 
 
+(defn cmd-retile [context]
+  (:retile (in context :wm)))
+
+
+(defn cmd-hsplit [context]
+  (def cur-frame (:get-current-frame (in context :wm)))
+  (:split cur-frame :horizontal 2 [0.5])
+  (:activate (get-in cur-frame [:children 0]))
+  (:retile (in context :wm)))
+
+
 (defn dispatch-command [cmd key-struct key-state context]
   (match cmd
     :quit
@@ -77,6 +88,14 @@
     [:send-keys & keys]
     (when (= key-state :down)
       (cmd-send-keys keys context))
+
+    :retile
+    (when (= key-state :down)
+      (cmd-retile context))
+
+    :hsplit
+    (when (= key-state :down)
+      (cmd-hsplit context))
 
     _
     (log/warning "Unknown command: %n" cmd)))

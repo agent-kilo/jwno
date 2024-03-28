@@ -87,67 +87,17 @@
 
   (def keymap (define-keymap))
 
-  # works
   (define-key keymap
     (key (ascii "Q") @[:lwin])
     :quit)
 
-  # works
   (define-key keymap
-    [(key (ascii "V") @[:rwin])
-     (key VK_LWIN)]
-    [:send-keys
-     VK_LWIN])
+    (key (ascii "R") @[:lwin])
+    :retile)
 
-  # works
   (define-key keymap
-    [(key (ascii "V") @[:rwin])
-     (key (ascii "R") @[:rwin])]
-    [:send-keys
-     [VK_LWIN :down]
-     (ascii "R")
-     [VK_LWIN :up]])
-
-  # works
-  (define-key keymap
-    [(key VK_LWIN @[:lctrl])]
-    [:send-keys
-     [VK_LCONTROL :up]
-     VK_LWIN
-     [:wait 0.1]
-     [VK_LCONTROL :down]])
-
-  # works
-  (define-key keymap
-    [(key (ascii "T") @[:lctrl :lalt])
-     (key VK_LCONTROL)]
-    [:send-keys
-     [VK_LCONTROL :up]
-     (ascii "A")
-     (ascii "B")
-     (ascii "C")
-     (ascii "D")])
-
-  # works
-  (define-key keymap
-    (key VK_RMENU @[:lctrl])
-    [:send-keys
-     [VK_LCONTROL :up]
-     [VK_RMENU :up]
-     [VK_LWIN :down]
-     (ascii "R")
-     [VK_LWIN :up]
-     [:wait 0.5]
-     (ascii "N")
-     (ascii "O")
-     (ascii "T")
-     (ascii "E")
-     (ascii "P")
-     (ascii "A")
-     (ascii "D")
-     [:wait 0.5]
-     VK_RETURN
-    ])
+    (key VK_OEM_COMMA @[:lwin])
+    :hsplit)
 
   # XXX: The argument of :map-to command can only be VK_*WIN or other
   # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
@@ -155,17 +105,6 @@
   (define-key keymap
     (key VK_RMENU)
     [:map-to VK_RWIN])
-
-  # works
-  (define-key keymap
-    [(key (ascii "T") @[:lwin])
-     (key (ascii "N") @[:lwin])]
-    "LWin+t LWin+n")
-
-  #(define-key keymap
-  #  # This would block all keys using the :lwin modifier. Is this acceptable?
-  #  [(key VK_LWIN)]
-  #  [:send-keys VK_LWIN])
 
   (log/debug "keymap = %n" keymap)
 

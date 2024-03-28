@@ -251,13 +251,31 @@
       dead)))
 
 
+(defn frame-retile [self]
+  (cond
+    (empty? (in self :children))
+    nil
+
+    (= :window (get-in self [:children 0 :type]))
+    (each w (in self :children)
+      (try
+        (:transform w (in self :rect))
+        ((err fib)
+         (log/error "window transformation failed for %n: %n" (in w :hwnd) err))))
+
+    (= :frame (get-in self [:children 0 :type]))
+    (each f (in self :children)
+      (:retile f))))
+
+
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
      :split frame-split
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
-     :purge-windows frame-purge-windows}
+     :purge-windows frame-purge-windows
+     :retile frame-retile}
    tree-node-proto))
 
 
@@ -298,7 +316,7 @@
     (:transform new-win (in frame-found :rect))
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
-     (log/error "window transformation failed: %n" err)))
+     (log/error "window transformation failed for %n: %n" hwnd err)))
   (:add-child frame-found new-win)
   new-win)
 
@@ -328,12 +346,24 @@
   self)
 
 
+(defn wm-retile [self]
+  (each f (get-in self [:frame-tree :toplevels])
+    (:retile f))
+  self)
+
+
+(defn wm-get-current-frame [self]
+  (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) nil))
+
+
 (def- wm-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
     :purge-windows wm-purge-windows
     :find-window wm-find-window
-    :add-window wm-add-window})
+    :add-window wm-add-window
+    :retile wm-retile
+    :get-current-frame wm-get-current-frame})
 
 
 (defn window-manager [uia-context]
