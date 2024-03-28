@@ -76,6 +76,12 @@
   (:retile (in context :wm)))
 
 
+(defn cmd-next-frame [context]
+  (def cur-frame (:get-current-frame (in context :wm)))
+  (when-let [sibling (:next-sibling cur-frame)]
+    (:activate (in context :wm) sibling)))
+
+
 (defn dispatch-command [cmd key-struct key-state context]
   (match cmd
     :quit
@@ -96,6 +102,10 @@
     :hsplit
     (when (= key-state :down)
       (cmd-hsplit context))
+
+    :next-frame
+    (when (= key-state :down)
+      (cmd-next-frame context))
 
     _
     (log/warning "Unknown command: %n" cmd)))

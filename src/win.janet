@@ -49,32 +49,13 @@
 
 ######### Window object #########
 
-(defn window-transform [self rect]
-  (log/debug "transforming window: %n, rect = %n" (in self :hwnd) rect)
-  (let [uia (get-in self [:wm :uia-context :uia])]
-    (with [uia-win
-           (:ElementFromHandle uia (in self :hwnd))
-           (in uia-win :Release)]
-      (with [pat
-             (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
-             (fn [pat] (when pat (:Release pat)))]
-        # TODO: restore maximized windows first
-        (when pat
-          (:Move pat (in rect :left) (in rect :top))
-          (:Resize pat
-                   (- (in rect :right) (in rect :left))
-                   (- (in rect :bottom) (in rect :top)))))))
-  self)
-
-
 (defn window-alive? [self]
   (not= FALSE (IsWindow (in self :hwnd))))
 
 
 (def- window-proto
   (table/setproto
-   @{:transform window-transform
-     :alive? window-alive?}
+   @{:alive? window-alive?}
    tree-node-proto))
 
 
@@ -266,23 +247,6 @@
       dead)))
 
 
-(defn frame-retile [self]
-  (cond
-    (empty? (in self :children))
-    nil
-
-    (= :window (get-in self [:children 0 :type]))
-    (each w (in self :children)
-      (try
-        (:transform w (in self :rect))
-        ((err fib)
-         (log/error "window transformation failed for %n: %n" (in w :hwnd) err))))
-
-    (= :frame (get-in self [:children 0 :type]))
-    (each f (in self :children)
-      (:retile f))))
-
-
 (defn frame-get-current-window [self]
   (var parent self)
   (var cur-child (in parent :current-child))
@@ -300,7 +264,6 @@
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows
-     :retile frame-retile
      :get-current-window frame-get-current-window}
    tree-node-proto))
 
@@ -333,16 +296,33 @@
   win)
 
 
+(defn wm-transform-window [self win fr]
+  (let [uia (get-in self [:uia-context :uia])
+        hwnd (in win :hwnd)
+        rect (in fr :rect)]
+    (log/debug "transforming window: %n, rect = %n" hwnd rect)
+    (try
+      (with [uia-win (:ElementFromHandle uia hwnd) (in uia-win :Release)]
+        (with [pat
+               (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
+               (fn [pat] (when pat (:Release pat)))]
+          # TODO: restore maximized windows first
+          (when pat
+            (:Move pat (in rect :left) (in rect :top))
+            (:Resize pat
+                     (- (in rect :right) (in rect :left))
+                     (- (in rect :bottom) (in rect :top))))))
+      ((err fib)
+       # XXX: Don't manage a window which cannot be transformed?
+       (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
+
+
 (defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
   (def new-win (window hwnd self))
   (def frame-found
     (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) new-win))
-  (try
-    (:transform new-win (in frame-found :rect))
-    ((err fib)
-     # XXX: Don't manage a window which cannot be transformed?
-     (log/error "window transformation failed for %n: %n" hwnd err)))
+  (wm-transform-window self new-win frame-found)
   (:add-child frame-found new-win)
   new-win)
 
@@ -388,12 +368,30 @@
       (SetForegroundWindow (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))))))
 
 
-(defn wm-retile [self]
-  (def cur-win (:get-current-window (wm-get-current-frame self)))
-  (each f (get-in self [:frame-tree :toplevels])
-    (:retile f))
-  (when cur-win
-    (wm-activate self cur-win))
+(defn wm-retile [self &opt fr]
+  (cond
+    (nil? fr)
+    # Retile the whole tree
+    (do
+      (def cur-win (:get-current-window (wm-get-current-frame self)))
+      (each f (get-in self [:frame-tree :toplevels])
+        (wm-retile self f))
+      (when cur-win
+        (wm-activate self cur-win)))
+
+    true
+    (cond
+      (empty? (in fr :children))
+      nil
+
+      (= :window (get-in fr [:children 0 :type]))
+      (each w (in fr :children)
+        (wm-transform-window self w fr))
+
+      (= :frame (get-in fr [:children 0 :type]))
+      (each f (in fr :children)
+        (wm-retile self f))))
+
   self)
 
 
