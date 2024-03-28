@@ -59,11 +59,10 @@
    tree-node-proto))
 
 
-(defn window [hwnd wm &opt parent]
+(defn window [hwnd &opt parent]
   (let [node (tree-node parent nil
                         :type :window
-                        :hwnd hwnd
-                        :wm wm)]
+                        :hwnd hwnd)]
     (table/setproto node window-proto)))
 
 
@@ -319,7 +318,7 @@
 
 (defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
-  (def new-win (window hwnd self))
+  (def new-win (window hwnd))
   (def frame-found
     (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) new-win))
   (wm-transform-window self new-win frame-found)

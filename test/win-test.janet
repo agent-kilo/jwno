@@ -33,8 +33,8 @@
   (assert (= (length (in dummy-frame :children)) 1))
   (assert (= (get-in dummy-frame [:children 0]) dummy-sub-frame1))
 
-  (def dummy-window1 (window :dummy-hwnd nil))
-  (def dummy-window2 (window :dummy-hwnd nil))
+  (def dummy-window1 (window :dummy-hwnd))
+  (def dummy-window2 (window :dummy-hwnd))
 
   (try
     (:add-child dummy-frame dummy-window1)
@@ -146,8 +146,8 @@
   (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (def dummy-window1 (window :dummy-hwnd1 nil))
-  (def dummy-window2 (window :dummy-hwnd2 nil))
+  (def dummy-window1 (window :dummy-hwnd1))
+  (def dummy-window2 (window :dummy-hwnd2))
   (:add-child dummy-frame dummy-window1)
   (:add-child dummy-frame dummy-window2)
   (:activate dummy-window1)
@@ -187,8 +187,8 @@
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
   (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd nil))
-  (var dummy-window2 (window :dummy-hwnd nil))
+  (var dummy-window1 (window :dummy-hwnd))
+  (var dummy-window2 (window :dummy-hwnd))
 
   (:add-child dummy-frame dummy-sub-frame1)
   (:add-child dummy-frame dummy-sub-frame2)
@@ -215,8 +215,8 @@
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
   (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd1 nil))
-  (var dummy-window2 (window :dummy-hwnd2 nil))
+  (var dummy-window1 (window :dummy-hwnd1))
+  (var dummy-window2 (window :dummy-hwnd2))
 
   (:add-child dummy-frame dummy-sub-frame1)
   (:add-child dummy-frame dummy-sub-frame2)
@@ -241,9 +241,9 @@
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
   (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd1 nil))
-  (var dummy-window2 (window :dummy-hwnd2 nil))
-  (var dummy-window3 (window :dummy-hwnd3 nil))
+  (var dummy-window1 (window :dummy-hwnd1))
+  (var dummy-window2 (window :dummy-hwnd2))
+  (var dummy-window3 (window :dummy-hwnd3))
 
   (assert (= dummy-frame (:find-frame-for-window dummy-frame dummy-window3)))
 
