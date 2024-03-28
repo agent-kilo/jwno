@@ -18,8 +18,23 @@
   self)
 
 
+(defn tree-node-next-sibling [self]
+  (cond
+    (nil? (in self :parent))
+    nil
+
+    true
+    (let [all-siblings (get-in self [:parent :children])
+          sibling-count (length all-siblings)]
+      (if-let [idx (find-index |(= $ self) all-siblings)]
+        (let [next-idx (% (+ idx 1) (length all-siblings))]
+          (in all-siblings next-idx))
+        (error "inconsistent states for frame tree")))))
+
+
 (def- tree-node-proto
-  @{:activate tree-node-activate})
+  @{:activate tree-node-activate
+    :next-sibling tree-node-next-sibling})
 
 
 (defn tree-node [parent children &keys extra-fields]
