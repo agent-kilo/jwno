@@ -4,6 +4,8 @@
 
 (def- repl-env (make-env))
 (merge-module repl-env (require "jw32/winuser"))
+(merge-module repl-env (require "jw32/combaseapi"))
+(merge-module repl-env (require "jw32/uiautomation"))
 (merge-module repl-env (require "./log") "log/")
 
 
