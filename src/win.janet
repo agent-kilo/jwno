@@ -32,9 +32,24 @@
         (error "inconsistent states for frame tree")))))
 
 
+(defn tree-node-prev-sibling [self]
+  (cond
+    (nil? (in self :parent))
+    nil
+
+    true
+    (let [all-siblings (get-in self [:parent :children])
+          sibling-count (length all-siblings)]
+      (if-let [idx (find-index |(= $ self) all-siblings)]
+        (let [prev-idx (% (+ sibling-count (- idx 1)) (length all-siblings))]
+          (in all-siblings prev-idx))
+        (error "inconsistent states for frame tree")))))
+
+
 (def- tree-node-proto
   @{:activate tree-node-activate
-    :next-sibling tree-node-next-sibling})
+    :next-sibling tree-node-next-sibling
+    :prev-sibling tree-node-prev-sibling})
 
 
 (defn tree-node [parent children &keys extra-fields]
@@ -363,12 +378,16 @@
   (:activate node)
   (cond
     (= :window (in node :type))
-    (SetForegroundWindow (in node :hwnd))
+    (when (= FALSE (SetForegroundWindow (in node :hwnd)))
+      (log/debug "SetForegroundWindow faild"))
+    
 
     (= :frame (in node :type))
     (if-let [cur-win (:get-current-window node)]
-      (SetForegroundWindow (in cur-win :hwnd))
-      (SetForegroundWindow (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))))))
+      (when (= FALSE (SetForegroundWindow (in cur-win :hwnd)))
+        (log/debug "SetForegroundWindow failed"))
+      (when (= FALSE (SetForegroundWindow (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))))
+        (log/debug "SetForegroundWindow to desktop failed")))))
 
 
 (defn wm-retile [self &opt fr]

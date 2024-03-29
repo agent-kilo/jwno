@@ -88,6 +88,12 @@
       (:activate (in context :wm) sibling))))
 
 
+(defn cmd-prev-window-in-frame [context]
+  (when-let [cur-win (:get-current-window (in context :wm))]
+    (when-let [sibling (:prev-sibling cur-win)]
+      (:activate (in context :wm) sibling))))
+
+
 (defn dispatch-command [cmd key-struct key-state context]
   (match cmd
     :quit
@@ -116,6 +122,10 @@
     :next-window-in-frame
     (when (= key-state :down)
       (cmd-next-window-in-frame context))
+
+    :prev-window-in-frame
+    (when (= key-state :down)
+      (cmd-prev-window-in-frame context))
 
     _
     (log/warning "Unknown command: %n" cmd)))
