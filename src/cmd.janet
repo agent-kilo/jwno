@@ -76,9 +76,22 @@
   (:retile (in context :wm)))
 
 
+(defn cmd-vsplit [context]
+  (def cur-frame (:get-current-frame (in context :wm)))
+  (:split cur-frame :vertical 2 [0.5])
+  (:activate (get-in cur-frame [:children 0]))
+  (:retile (in context :wm)))
+
+
 (defn cmd-next-frame [context]
   (def cur-frame (:get-current-frame (in context :wm)))
   (when-let [sibling (:next-sibling cur-frame)]
+    (:activate (in context :wm) sibling)))
+
+
+(defn cmd-prev-frame [context]
+  (def cur-frame (:get-current-frame (in context :wm)))
+  (when-let [sibling (:prev-sibling cur-frame)]
     (:activate (in context :wm) sibling)))
 
 
@@ -119,9 +132,17 @@
     (when (= key-state :down)
       (cmd-hsplit context))
 
+    :vsplit
+    (when (= key-state :down)
+      (cmd-vsplit context))
+
     :next-frame
     (when (= key-state :down)
       (cmd-next-frame context))
+
+    :prev-frame
+    (when (= key-state :down)
+      (cmd-prev-frame context))
 
     :next-window-in-frame
     (when (= key-state :down)

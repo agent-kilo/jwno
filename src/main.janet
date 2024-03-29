@@ -108,8 +108,16 @@
     :hsplit)
 
   (define-key keymap
+    (key VK_OEM_PERIOD @[:lwin])
+    :vsplit)
+
+  (define-key keymap
     (key (ascii "N") @[:lwin])
     :next-frame)
+
+  (define-key keymap
+    (key (ascii "E") @[:lwin])
+    :prev-frame)
 
   (define-key keymap
     (key (ascii "I") @[:lwin])
