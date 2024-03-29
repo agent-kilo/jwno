@@ -83,13 +83,17 @@
 
 
 (defn cmd-next-window-in-frame [context]
-  (when-let [cur-win (:get-current-window (in context :wm))]
+  (def cur-frame (:get-current-frame (in context :wm)))
+  (:purge-windows cur-frame)
+  (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:next-sibling cur-win)]
       (:activate (in context :wm) sibling))))
 
 
 (defn cmd-prev-window-in-frame [context]
-  (when-let [cur-win (:get-current-window (in context :wm))]
+  (def cur-frame (:get-current-frame (in context :wm)))
+  (:purge-windows cur-frame)
+  (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:prev-sibling cur-win)]
       (:activate (in context :wm) sibling))))
 
