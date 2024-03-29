@@ -355,6 +355,10 @@
   (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) nil))
 
 
+(defn wm-get-current-window [self]
+  (:get-current-window (get-in self [:frame-tree :current-toplevel])))
+
+
 (defn wm-activate [self node]
   (:activate node)
   (cond
@@ -402,6 +406,7 @@
     :add-window wm-add-window
     :retile wm-retile
     :get-current-frame wm-get-current-frame
+    :get-current-window wm-get-current-window
     :activate wm-activate})
 
 
@@ -427,6 +432,12 @@
   (log/debug "main-frame = %n" main-frame)
   (when (empty? toplevel-frames)
     (error "no monitor found"))
+
+  # Need this for SetForegroundWindow() to actually bring
+  # the windows to the foreground.
+  (when (= FALSE (SystemParametersInfo SPI_SETFOREGROUNDLOCKTIMEOUT 0 0 0))
+    (error "SPI_SETFOREGROUNDLOCKTIMEOUT failed"))
+
   (table/setproto
    @{:frame-tree @{:toplevels toplevel-frames
                    :current-toplevel main-frame}
