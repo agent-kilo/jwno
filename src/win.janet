@@ -374,26 +374,22 @@
   (def hwnd
     (let [uia-context (in self :uia-context)]
       (with [uia-win
-             (try
-               # This may fail due to e.g. insufficient privileges
-               (uia/get-focused-window uia-context)
-               ((err fib)
-                (log/debug "get-focused-window failed: %n" err)
-                nil))
+             (uia/get-focused-window uia-context)
              (fn [uia-win] (when uia-win (:Release uia-win)))]
         (when uia-win
           (:get_CachedNativeWindowHandle uia-win)))))
 
-  (when (not hwnd)
+  (when (nil? hwnd)
     (log/debug "No focused window")
     (break self))
 
   (when-let [win (wm-find-window self hwnd)]
+    # Already managed
     (:activate win)
     (break self))
 
   # TODO: window open/close events
-  (if-let [new-win (wm-add-window self hwnd)]
+  (when-let [new-win (wm-add-window self hwnd)]
     (:activate new-win))
   self)
 
@@ -404,7 +400,7 @@
     (break self))
 
   # TODO: window open events
-  (if-let [new-win (wm-add-window self hwnd)]
+  (when-let [new-win (wm-add-window self hwnd)]
     (:activate new-win))
   self)
 

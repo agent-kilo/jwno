@@ -108,34 +108,57 @@
         :control-view-walker walker}
     uia-context)
   (def root-hwnd (:get_CachedNativeWindowHandle root))
-  (let [focused (:GetFocusedElementBuildCache uia focus-cr)]
-    (if-not focused
-      (break nil))
-    (var ret nil)
-    (var cur focused)
-    (var parent (:GetParentElementBuildCache walker cur focus-cr))
-    (while (and parent
-                (not= root-hwnd (:get_CachedNativeWindowHandle parent))
-                (or (= 0 (:GetCachedPropertyValue cur UIA_IsTransformPatternAvailablePropertyId))
-                    (= 0 (:GetCachedPropertyValue cur UIA_IsWindowPatternAvailablePropertyId))))
-      (:Release cur)
-      (set cur parent)
-      (set parent (:GetParentElementBuildCache walker cur focus-cr))
-      (if parent
-        (log/debug "Next parent: %n" (:get_CachedNativeWindowHandle parent))
-        (log/debug "Next parent: %n" parent)))
-    (if-not parent
-      (break nil))
-    (let [trans-pat-available (:GetCachedPropertyValue cur UIA_IsTransformPatternAvailablePropertyId)
-          win-pat-available (:GetCachedPropertyValue cur UIA_IsWindowPatternAvailablePropertyId)]
-      (log/debug "IsTransformPatternAvailable = %n" trans-pat-available)
-      (log/debug "IsWindowPatternAvailable = %n" win-pat-available)
-      (if (and (not= trans-pat-available 0)
-               (not= win-pat-available 0))
-        # It's a window that can be resized
-        cur
-        # Something else we don't care about
-        # XXX: Maybe we should care about these, e.g. Save As dialogs?
-        (do
-          (:Release cur)
-          nil)))))
+
+  (def focused
+    (try
+      (:GetFocusedElementBuildCache uia focus-cr)
+      ((err fib)
+       # This may fail due to e.g. insufficient privileges
+       (log/debug "GetFocusedElementBuildCache failed: %n" err)
+       nil)))
+  (if-not focused
+    (break nil))
+
+  (var ret nil)
+  (var cur focused)
+  (var parent
+       (try
+         (:GetParentElementBuildCache walker cur focus-cr)
+         ((err fib)
+          # The window or its parent may have vanished
+          (log/debug "GetParentElementBuildCache failed: %n" err)
+          nil)))
+
+  (while true
+    (cond
+      (and
+        # Has a handle
+        (not (null? (:get_CachedNativeWindowHandle cur)))
+        # Can be transformed
+        (not= 0 (:GetCachedPropertyValue cur UIA_IsTransformPatternAvailablePropertyId))
+        # Is a window
+        (not= 0 (:GetCachedPropertyValue cur UIA_IsWindowPatternAvailablePropertyId)))
+      (do
+        (set ret cur)
+        (break))
+
+      (nil? parent)
+      (do
+        (:Release cur)
+        (break))
+
+      (= root-hwnd (:get_CachedNativeWindowHandle parent))
+      (do
+        (:Release cur)
+        (break)))
+
+    (:Release cur)
+    (set cur parent)
+    (set parent
+         (try
+           (:GetParentElementBuildCache walker cur focus-cr)
+           ((err fib)
+            (log/debug "GetParentElementBuildCache failed: %n" err)
+            nil))))
+
+  ret)
