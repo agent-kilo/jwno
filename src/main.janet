@@ -33,24 +33,10 @@
        (break)
 
        [:uia/window-opened hwnd]
-       (let [uia-context (in context :uia-context)]
-         (with [uia-win
-                (:ElementFromHandleBuildCache (in uia-context :uia)
-                                              hwnd
-                                              (in uia-context :focus-cr))
-                (fn [uia-win] (when uia-win (:Release uia-win)))]
-           (if (and (not= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
-                    (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId)))
-             (:window-opened (in context :wm) hwnd))))
+       (:window-opened (in context :wm) hwnd)
 
        :uia/focus-changed
-       (let [uia-context (in context :uia-context)]
-         (with [uia-win
-                (uia/get-focused-window uia-context)
-                (fn [uia-win] (when uia-win (:Release uia-win)))]
-           (when uia-win
-             (log/debug "uia-win hwnd = %n" (:get_CachedNativeWindowHandle uia-win))
-             (:focus-changed (in context :wm) (:get_CachedNativeWindowHandle uia-win)))))
+       (:focus-changed (in context :wm))
 
        [:key/key-event key key-state cmd]
        (process-key-event key key-state cmd context)

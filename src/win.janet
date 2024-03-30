@@ -3,6 +3,7 @@
 (use jw32/uiautomation)
 (use jw32/util)
 
+(import ./uia)
 (import ./log)
 
 
@@ -331,8 +332,31 @@
        (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
 
 
+(defn wm-should-manage? [self hwnd]
+  (let [uia-context (in self :uia-context)
+        uia (in uia-context :uia)
+        cr (in uia-context :focus-cr)]
+    (with [uia-win
+           (try
+             (:ElementFromHandleBuildCache uia hwnd cr)
+             ((err fib)
+              # The window may have vanished
+              (log/debug "ElementFromHandleBuildCache failed: %n" err)
+              nil))
+           (fn [uia-win] (when uia-win (:Release uia-win)))]
+      (if uia-win
+        # TODO: do not manage windows with higher integrity level
+        (and (not= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
+             (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId)))
+        false))))
+
+
 (defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
+  (when (not (wm-should-manage? self hwnd))
+    (log/debug "Ignoring window: %n" hwnd)
+    (break nil))
+
   (def new-win (window hwnd))
   (def frame-found
     (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) new-win))
@@ -341,18 +365,36 @@
   new-win)
 
 
-(defn wm-focus-changed [self hwnd]
+(defn wm-focus-changed [self]
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
   (wm-purge-windows self)
+
+  (def hwnd
+    (let [uia-context (in self :uia-context)]
+      (with [uia-win
+             (try
+               # This may fail due to e.g. insufficient privileges
+               (uia/get-focused-window uia-context)
+               ((err fib)
+                (log/debug "get-focused-window failed: %n" err)
+                nil))
+             (fn [uia-win] (when uia-win (:Release uia-win)))]
+        (when uia-win
+          (:get_CachedNativeWindowHandle uia-win)))))
+
+  (when (not hwnd)
+    (log/debug "No focused window")
+    (break self))
 
   (when-let [win (wm-find-window self hwnd)]
     (:activate win)
     (break self))
 
   # TODO: window open/close events
-  (:activate (wm-add-window self hwnd))
+  (if-let [new-win (wm-add-window self hwnd)]
+    (:activate new-win))
   self)
 
 
@@ -362,7 +404,8 @@
     (break self))
 
   # TODO: window open events
-  (:activate (wm-add-window self hwnd))
+  (if-let [new-win (wm-add-window self hwnd)]
+    (:activate new-win))
   self)
 
 
@@ -422,6 +465,7 @@
     :window-opened wm-window-opened
     :purge-windows wm-purge-windows
     :find-window wm-find-window
+    :should-manage? wm-should-manage?
     :add-window wm-add-window
     :retile wm-retile
     :get-current-frame wm-get-current-frame

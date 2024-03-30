@@ -108,12 +108,7 @@
         :control-view-walker walker}
     uia-context)
   (def root-hwnd (:get_CachedNativeWindowHandle root))
-  (let [focused (try
-                  # This may fail due to e.g. insufficient privileges
-                  (:GetFocusedElementBuildCache uia focus-cr)
-                  ((err fib)
-                   (log/debug (string/format "GetFocusedElementBuildCache failed: %n" err))
-                   nil))]
+  (let [focused (:GetFocusedElementBuildCache uia focus-cr)]
     (if-not focused
       (break nil))
     (var ret nil)
