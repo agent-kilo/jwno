@@ -1,5 +1,9 @@
 (use jw32/winuser)
+(use jw32/processthreadsapi)
+(use jw32/securitybaseapi)
 (use jw32/combaseapi)
+(use jw32/winnt)
+(use jw32/handleapi)
 (use jw32/uiautomation)
 (use jw32/util)
 
@@ -332,6 +336,33 @@
        (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
 
 
+(defn wm-is-window-process-elevated? [self hwnd]
+  (def [_tid pid] (GetWindowThreadProcessId hwnd))
+  (when (= (int/u64 0) pid)
+    (break false))
+
+  (with [proc
+         (OpenProcess PROCESS_QUERY_LIMITED_INFORMATION false pid)
+         CloseHandle]
+    (with [[ret token]
+           (OpenProcessToken proc TOKEN_QUERY)
+           (fn [[_ token]] (CloseHandle token))]
+      (when (= 0 ret)
+        (break false))
+      (def [_gti-ret elevated] (GetTokenInformation token TokenElevation))
+      elevated)))
+
+
+(defn wm-is-jwno-process-elevated? [self]
+  (with [[ret token]
+         (OpenProcessToken (GetCurrentProcess) TOKEN_QUERY)
+         (fn [[_ token]] (CloseHandle token))]
+    (when (= 0 ret)
+      (break false))
+    (def [_gti-ret elevated] (GetTokenInformation token TokenElevation))
+    elevated))
+
+
 (defn wm-should-manage? [self hwnd]
   (let [uia-context (in self :uia-context)
         uia (in uia-context :uia)
@@ -345,9 +376,10 @@
               nil))
            (fn [uia-win] (when uia-win (:Release uia-win)))]
       (if uia-win
-        # TODO: do not manage windows with higher integrity level
         (and (not= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
-             (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId)))
+             (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId))
+             (or (wm-is-jwno-process-elevated? self)
+                 (not (wm-is-window-process-elevated? self hwnd))))
         false))))
 
 
@@ -466,7 +498,9 @@
     :retile wm-retile
     :get-current-frame wm-get-current-frame
     :get-current-window wm-get-current-window
-    :activate wm-activate})
+    :activate wm-activate
+    :is-window-process-elevated? wm-is-window-process-elevated?
+    :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
 
 
 (defn window-manager [uia-context]
