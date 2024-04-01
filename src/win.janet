@@ -32,7 +32,7 @@
     (let [all-siblings (get-in self [:parent :children])
           sibling-count (length all-siblings)]
       (if-let [idx (find-index |(= $ self) all-siblings)]
-        (let [next-idx (% (+ idx 1) (length all-siblings))]
+        (let [next-idx (% (+ idx 1) sibling-count)]
           (in all-siblings next-idx))
         (error "inconsistent states for frame tree")))))
 
@@ -46,7 +46,7 @@
     (let [all-siblings (get-in self [:parent :children])
           sibling-count (length all-siblings)]
       (if-let [idx (find-index |(= $ self) all-siblings)]
-        (let [prev-idx (% (+ sibling-count (- idx 1)) (length all-siblings))]
+        (let [prev-idx (% (+ sibling-count (- idx 1)) sibling-count)]
           (in all-siblings prev-idx))
         (error "inconsistent states for frame tree")))))
 
@@ -488,6 +488,103 @@
   self)
 
 
+(defn wm-get-next-frame [self fr]
+  (cond
+    (nil? (in fr :parent))
+    # We are at the toplevel
+    (let [toplevels (get-in self [:frame-tree :toplevels])
+          toplevel-idx (if-let [idx (find-index |(= $ fr) toplevels)]
+                         idx
+                         (error "inconsistent states for frame tree"))
+          next-idx (% (+ toplevel-idx 1) (length toplevels))]
+      (var cur-fr (in toplevels next-idx))
+      (while true
+        (cond
+          (empty? (in cur-fr :children))
+          (break)
+
+          (= :window (get-in cur-fr [:children 0 :type]))
+          (break))
+        (set cur-fr (get-in cur-fr [:children 0])))
+      cur-fr)
+
+    true
+    (let [all-siblings (get-in fr [:parent :children])
+          sibling-count (length all-siblings)
+          fr-idx (if-let [idx (find-index |(= $ fr) all-siblings)]
+                   idx
+                   (error "inconsistent states for frame tree"))
+          next-idx (+ fr-idx 1)]
+      (cond
+        (>= next-idx sibling-count)
+        # We reached the end of the sub-frame list, go up
+        (wm-get-next-frame self (in fr :parent))
+
+        true
+        # there's the next sibling, go down
+        (do
+          (var cur-fr (in all-siblings next-idx))
+          (while true
+            (cond
+              (empty? (in cur-fr :children))
+              (break)
+
+              (= :window (get-in cur-fr [:children 0 :type]))
+              (break))
+            (set cur-fr (get-in cur-fr [:children 0])))
+          cur-fr)))))
+
+
+(defn wm-get-prev-frame [self fr]
+  (cond
+    (nil? (in fr :parent))
+    # We are at the toplevel
+    (let [toplevels (get-in self [:frame-tree :toplevels])
+          toplevel-count (length toplevels)
+          toplevel-idx (if-let [idx (find-index |(= $ fr) toplevels)]
+                         idx
+                         (error "inconsistent states for frame tree"))
+          prev-idx (% (+ toplevel-count (- toplevel-idx 1)) toplevel-count)]
+      (var cur-fr (in toplevels prev-idx))
+      (while true
+        (cond
+          (empty? (in cur-fr :children))
+          (break)
+
+          (= :window (get-in cur-fr [:children 0 :type]))
+          (break))
+        (def child-count (length (in cur-fr :children)))
+        (set cur-fr (get-in cur-fr [:children (- child-count 1)])))
+      cur-fr)
+
+    true
+    (let [all-siblings (get-in fr [:parent :children])
+          sibling-count (length all-siblings)
+          fr-idx (if-let [idx (find-index |(= $ fr) all-siblings)]
+                   idx
+                   (error "inconsistent states for frame tree"))
+          prev-idx (- fr-idx 1)]
+      (cond
+        (< prev-idx 0)
+        # We reached the beginning of the sub-frame list, go up
+        (wm-get-prev-frame self (in fr :parent))
+
+        true
+        # there's the previous sibling, go down
+        (do
+          (var cur-fr (in all-siblings prev-idx))
+          (while true
+            (cond
+              (empty? (in cur-fr :children))
+              (break)
+
+              (= :window (get-in cur-fr [:children 0 :type]))
+              (break))
+            (def child-count (length (in cur-fr :children)))
+            (set cur-fr (get-in cur-fr [:children (- child-count 1)])))
+          cur-fr)))))
+
+
 (def- wm-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
@@ -500,7 +597,9 @@
     :get-current-window wm-get-current-window
     :activate wm-activate
     :is-window-process-elevated? wm-is-window-process-elevated?
-    :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
+    :is-jwno-process-elevated? wm-is-jwno-process-elevated?
+    :get-next-frame wm-get-next-frame
+    :get-prev-frame wm-get-prev-frame})
 
 
 (defn window-manager [uia-context]

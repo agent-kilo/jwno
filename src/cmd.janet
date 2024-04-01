@@ -85,14 +85,14 @@
 
 (defn cmd-next-frame [context]
   (def cur-frame (:get-current-frame (in context :wm)))
-  (when-let [sibling (:next-sibling cur-frame)]
-    (:activate (in context :wm) sibling)))
+  (when-let [next-fr (:get-next-frame (in context :wm) cur-frame)]
+    (:activate (in context :wm) next-fr)))
 
 
 (defn cmd-prev-frame [context]
   (def cur-frame (:get-current-frame (in context :wm)))
-  (when-let [sibling (:prev-sibling cur-frame)]
-    (:activate (in context :wm) sibling)))
+  (when-let [prev-fr (:get-prev-frame (in context :wm) cur-frame)]
+    (:activate (in context :wm) prev-fr)))
 
 
 (defn cmd-next-window-in-frame [context]
