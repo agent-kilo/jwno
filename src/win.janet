@@ -23,7 +23,7 @@
   self)
 
 
-(defn tree-node-next-sibling [self]
+(defn tree-node-get-next-sibling [self]
   (cond
     (nil? (in self :parent))
     nil
@@ -37,7 +37,7 @@
         (error "inconsistent states for frame tree")))))
 
 
-(defn tree-node-prev-sibling [self]
+(defn tree-node-get-prev-sibling [self]
   (cond
     (nil? (in self :parent))
     nil
@@ -53,8 +53,8 @@
 
 (def- tree-node-proto
   @{:activate tree-node-activate
-    :next-sibling tree-node-next-sibling
-    :prev-sibling tree-node-prev-sibling})
+    :get-next-sibling tree-node-get-next-sibling
+    :get-prev-sibling tree-node-get-prev-sibling})
 
 
 (defn tree-node [parent children &keys extra-fields]
@@ -229,6 +229,10 @@
     (error "inconsistent states for frame tree")))
 
 
+(defn frame-get-current-frame [self]
+  (frame-find-frame-for-window self nil))
+
+
 (defn frame-purge-windows [self]
   (cond
     (empty? (in self :children))
@@ -276,7 +280,7 @@
   cur-child)
 
 
-(defn frame-first-frame [self]
+(defn frame-get-first-frame [self]
   (var cur-fr self)
   (while true
     (cond
@@ -289,7 +293,7 @@
   cur-fr)
 
 
-(defn frame-last-frame [self]
+(defn frame-get-last-frame [self]
   (var cur-fr self)
   (while true
     (cond
@@ -311,8 +315,9 @@
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows
      :get-current-window frame-get-current-window
-     :first-frame frame-first-frame
-     :last-frame frame-last-frame}
+     :get-current-frame frame-get-current-frame
+     :get-first-frame frame-get-first-frame
+     :get-last-frame frame-get-last-frame}
    tree-node-proto))
 
 
@@ -326,7 +331,7 @@
     (table/setproto node frame-proto)))
 
 
-(defn layout-next-frame [self node]
+(defn layout-get-next-frame [self node]
   (let [all-siblings (get-in node [:parent :children])
         sibling-count (length all-siblings)
         fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
@@ -338,14 +343,14 @@
     (cond
       (>= next-idx sibling-count)
       # We reached the end of the sub-frame list, go up
-      (layout-next-frame self (in node :parent))
+      (layout-get-next-frame self (in node :parent))
 
       true
       # there's the next sibling, go down
-      (:first-frame (in all-siblings next-idx)))))
+      (:get-first-frame (in all-siblings next-idx)))))
 
 
-(defn layout-prev-frame [self node]
+(defn layout-get-prev-frame [self node]
   (let [all-siblings (get-in node [:parent :children])
         sibling-count (length all-siblings)
         fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
@@ -357,18 +362,18 @@
     (cond
       (< prev-idx 0)
       # We reached the beginning of the sub-frame list, go up
-      (layout-prev-frame self (in node :parent))
+      (layout-get-prev-frame self (in node :parent))
 
       true
       # there's the previous sibling, go down
-      (:last-frame (in all-siblings prev-idx)))))
+      (:get-last-frame (in all-siblings prev-idx)))))
 
 
 (def layout-proto
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
-     :next-frame layout-next-frame
-     :prev-frame layout-prev-frame}
+     :get-next-frame layout-get-next-frame
+     :get-prev-frame layout-get-prev-frame}
    frame-proto))
 
 
@@ -403,16 +408,6 @@
 
 
 ######### Window manager object #########
-
-(defn wm-purge-windows [self]
-  (def dead (:purge-windows (in self :layout)))
-  (log/debug "purged %n dead windows" (length dead))
-  dead)
-
-
-(defn wm-find-window [self hwnd]
-  (:find-window (in self :layout) hwnd))
-
 
 (defn wm-transform-window [self win fr]
   (let [uia (get-in self [:uia-context :uia])
@@ -499,7 +494,8 @@
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (wm-purge-windows self)
+  (def dead (:purge-windows (in self :layout)))
+  (log/debug "purged %n dead windows" (length dead))
 
   (def hwnd
     (let [uia-context (in self :uia-context)]
@@ -513,7 +509,7 @@
     (log/debug "No focused window")
     (break self))
 
-  (when-let [win (wm-find-window self hwnd)]
+  (when-let [win (:find-window (in self :layout) hwnd)]
     # Already managed
     (:activate win)
     (break self))
@@ -525,7 +521,7 @@
 
 
 (defn wm-window-opened [self hwnd]
-  (when-let [win (wm-find-window self hwnd)]
+  (when-let [win (:find-window (in self :layout) hwnd)]
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break self))
 
@@ -533,14 +529,6 @@
   (when-let [new-win (wm-add-window self hwnd)]
     (:activate new-win))
   self)
-
-
-(defn wm-get-current-frame [self]
-  (:find-frame-for-window (in self :layout) nil))
-
-
-(defn wm-get-current-window [self]
-  (:get-current-window (in self :layout)))
 
 
 (defn wm-activate [self node]
@@ -586,29 +574,16 @@
   self)
 
 
-(defn wm-get-next-frame [self fr]
-  (:next-frame (in self :layout) fr))
-
-
-(defn wm-get-prev-frame [self fr]
-  (:prev-frame (in self :layout) fr))
-
-
 (def- wm-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
-    :purge-windows wm-purge-windows
-    :find-window wm-find-window
+
     :should-manage? wm-should-manage?
     :add-window wm-add-window
     :retile wm-retile
-    :get-current-frame wm-get-current-frame
-    :get-current-window wm-get-current-window
     :activate wm-activate
     :is-window-process-elevated? wm-is-window-process-elevated?
-    :is-jwno-process-elevated? wm-is-jwno-process-elevated?
-    :get-next-frame wm-get-next-frame
-    :get-prev-frame wm-get-prev-frame})
+    :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
 
 
 (defn window-manager [uia-context]

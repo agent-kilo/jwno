@@ -70,44 +70,44 @@
 
 
 (defn cmd-hsplit [context]
-  (def cur-frame (:get-current-frame (in context :wm)))
+  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
   (:split cur-frame :horizontal 2 [0.5])
   (:activate (get-in cur-frame [:children 0]))
-  (:retile (in context :wm)))
+  (:retile (in context :wm) cur-frame))
 
 
 (defn cmd-vsplit [context]
-  (def cur-frame (:get-current-frame (in context :wm)))
+  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
   (:split cur-frame :vertical 2 [0.5])
   (:activate (get-in cur-frame [:children 0]))
-  (:retile (in context :wm)))
+  (:retile (in context :wm) cur-frame))
 
 
 (defn cmd-next-frame [context]
-  (def cur-frame (:get-current-frame (in context :wm)))
-  (when-let [next-fr (:get-next-frame (in context :wm) cur-frame)]
+  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
+  (when-let [next-fr (:get-next-frame (get-in context [:wm :layout]) cur-frame)]
     (:activate (in context :wm) next-fr)))
 
 
 (defn cmd-prev-frame [context]
-  (def cur-frame (:get-current-frame (in context :wm)))
-  (when-let [prev-fr (:get-prev-frame (in context :wm) cur-frame)]
+  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
+  (when-let [prev-fr (:get-prev-frame (get-in context [:wm :layout]) cur-frame)]
     (:activate (in context :wm) prev-fr)))
 
 
 (defn cmd-next-window-in-frame [context]
-  (def cur-frame (:get-current-frame (in context :wm)))
+  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
-    (when-let [sibling (:next-sibling cur-win)]
+    (when-let [sibling (:get-next-sibling cur-win)]
       (:activate (in context :wm) sibling))))
 
 
 (defn cmd-prev-window-in-frame [context]
-  (def cur-frame (:get-current-frame (in context :wm)))
+  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
-    (when-let [sibling (:prev-sibling cur-win)]
+    (when-let [sibling (:get-prev-sibling cur-win)]
       (:activate (in context :wm) sibling))))
 
 
