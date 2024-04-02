@@ -69,17 +69,10 @@
   (:retile (in context :wm)))
 
 
-(defn cmd-hsplit [context]
+(defn cmd-split [context dir nfr ratios to-activate]
   (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
-  (:split cur-frame :horizontal 2 [0.5])
-  (:activate (get-in cur-frame [:children 0]))
-  (:retile (in context :wm) cur-frame))
-
-
-(defn cmd-vsplit [context]
-  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
-  (:split cur-frame :vertical 2 [0.5])
-  (:activate (get-in cur-frame [:children 0]))
+  (:split cur-frame dir nfr ratios)
+  (:activate (get-in cur-frame [:children to-activate]))
   (:retile (in context :wm) cur-frame))
 
 
@@ -128,13 +121,9 @@
     (when (= key-state :down)
       (cmd-retile context))
 
-    :hsplit
+    [:split dir nfr ratios to-activate]
     (when (= key-state :down)
-      (cmd-hsplit context))
-
-    :vsplit
-    (when (= key-state :down)
-      (cmd-vsplit context))
+      (cmd-split context dir nfr ratios to-activate))
 
     :next-frame
     (when (= key-state :down)

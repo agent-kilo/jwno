@@ -90,12 +90,19 @@
     :retile)
 
   (define-key keymap
-    (key VK_OEM_COMMA @[:lwin])
-    :hsplit)
+    [(key VK_OEM_COMMA @[:lwin])
+     (key VK_OEM_COMMA @[:lwin])]
+    [:split :horizontal 2 [0.5] 1])
 
   (define-key keymap
-    (key VK_OEM_PERIOD @[:lwin])
-    :vsplit)
+    [(key VK_OEM_COMMA @[:lwin])
+     (key (ascii "3"))]
+    [:split :horizontal 3 [0.2 0.6 0.2] 1])
+
+  (define-key keymap
+    [(key VK_OEM_PERIOD @[:lwin])
+     (key VK_OEM_PERIOD @[:lwin])]
+    [:split :vertical 2 [0.5] 1])
 
   (define-key keymap
     (key (ascii "N") @[:lwin])
