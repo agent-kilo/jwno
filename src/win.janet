@@ -276,6 +276,33 @@
   cur-child)
 
 
+(defn frame-first-frame [self]
+  (var cur-fr self)
+  (while true
+    (cond
+      (empty? (in cur-fr :children))
+      (break)
+
+      (= :window (get-in cur-fr [:children 0 :type]))
+      (break))
+    (set cur-fr (get-in cur-fr [:children 0])))
+  cur-fr)
+
+
+(defn frame-last-frame [self]
+  (var cur-fr self)
+  (while true
+    (cond
+      (empty? (in cur-fr :children))
+      (break)
+
+      (= :window (get-in cur-fr [:children 0 :type]))
+      (break))
+    (def child-count (length (in cur-fr :children)))
+    (set cur-fr (get-in cur-fr [:children (- child-count 1)])))
+  cur-fr)
+
+
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
@@ -283,7 +310,9 @@
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows
-     :get-current-window frame-get-current-window}
+     :get-current-window frame-get-current-window
+     :first-frame frame-first-frame
+     :last-frame frame-last-frame}
    tree-node-proto))
 
 
@@ -297,22 +326,92 @@
     (table/setproto node frame-proto)))
 
 
+(defn layout-next-frame [self node]
+  (let [all-siblings (get-in node [:parent :children])
+        sibling-count (length all-siblings)
+        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
+                 idx
+                 (error "inconsistent states for frame tree"))
+        next-idx (if (= self (in node :parent)) # Toplevel frames wrap around
+                   (% (+ fr-idx 1) sibling-count)
+                   (+ fr-idx 1))]
+    (cond
+      (>= next-idx sibling-count)
+      # We reached the end of the sub-frame list, go up
+      (layout-next-frame self (in node :parent))
+
+      true
+      # there's the next sibling, go down
+      (:first-frame (in all-siblings next-idx)))))
+
+
+(defn layout-prev-frame [self node]
+  (let [all-siblings (get-in node [:parent :children])
+        sibling-count (length all-siblings)
+        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
+                 idx
+                 (error "inconsistent states for frame tree"))
+        prev-idx (if (= self (in node :parent)) # Toplevel frames wrap around
+                   (% (+ fr-idx sibling-count -1) sibling-count)
+                   (- fr-idx 1))]
+    (cond
+      (< prev-idx 0)
+      # We reached the beginning of the sub-frame list, go up
+      (layout-prev-frame self (in node :parent))
+
+      true
+      # there's the previous sibling, go down
+      (:last-frame (in all-siblings prev-idx)))))
+
+
+(def layout-proto
+  (table/setproto
+   @{:split (fn [&] (error "unsupported operation"))
+     :next-frame layout-next-frame
+     :prev-frame layout-prev-frame}
+   frame-proto))
+
+
+(defn layout []
+  (def layout-obj (frame nil))
+  (put layout-obj :type :layout)
+  (table/setproto layout-obj layout-proto)
+
+  (def monitor-info (MONITORINFOEX))
+  (var main-frame nil)
+  (def enum-ret
+    (EnumDisplayMonitors
+     nil nil
+     (fn [hmon hmdc rect]
+       (def ret (GetMonitorInfo hmon monitor-info))
+       (if (= FALSE ret)
+         (error (string/format "GetMonitorInfo failed for monitor %n" hmon)))
+       (def new-frame (frame (in monitor-info :rcWork)))
+       (:add-child layout-obj new-frame)
+       (if (> (band (in monitor-info :dwFlags) MONITORINFOF_PRIMARY) (int/u64 0))
+         (set main-frame new-frame))
+       TRUE)))
+  (if (= FALSE enum-ret)
+    (error "EnumDisplayMonitors failed"))
+  (log/debug "toplevel-frames = %n" (in layout-obj :children))
+  (log/debug "main-frame = %n" main-frame)
+  (when (empty? (in layout-obj :children))
+    (error "no monitor found"))
+
+  (put layout-obj :current-child (or main-frame (get-in layout-obj [:children 0])))
+  layout-obj)
+
+
 ######### Window manager object #########
 
 (defn wm-purge-windows [self]
-  (def dead @[])
-  (each f (get-in self [:frame-tree :toplevels])
-    (array/push dead ;(:purge-windows f)))
+  (def dead (:purge-windows (in self :layout)))
   (log/debug "purged %n dead windows" (length dead))
   dead)
 
 
 (defn wm-find-window [self hwnd]
-  (var win nil)
-  (each f (get-in self [:frame-tree :toplevels])
-    (set win (:find-window f hwnd))
-    (if win (break)))
-  win)
+  (:find-window (in self :layout) hwnd))
 
 
 (defn wm-transform-window [self win fr]
@@ -390,8 +489,7 @@
     (break nil))
 
   (def new-win (window hwnd))
-  (def frame-found
-    (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) new-win))
+  (def frame-found (:find-frame-for-window (in self :layout) new-win))
   (wm-transform-window self new-win frame-found)
   (:add-child frame-found new-win)
   new-win)
@@ -438,11 +536,11 @@
 
 
 (defn wm-get-current-frame [self]
-  (:find-frame-for-window (get-in self [:frame-tree :current-toplevel]) nil))
+  (:find-frame-for-window (in self :layout) nil))
 
 
 (defn wm-get-current-window [self]
-  (:get-current-window (get-in self [:frame-tree :current-toplevel])))
+  (:get-current-window (in self :layout)))
 
 
 (defn wm-activate [self node]
@@ -454,10 +552,11 @@
     
 
     (= :frame (in node :type))
-    (if-let [cur-win (:get-current-window node)]
-      (when (= FALSE (SetForegroundWindow (in cur-win :hwnd)))
-        (log/debug "SetForegroundWindow failed"))
-      (when (= FALSE (SetForegroundWindow (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))))
+    (let [sfw-ret 
+          (if-let [cur-win (:get-current-window node)]
+            (SetForegroundWindow (in cur-win :hwnd))
+            (SetForegroundWindow (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))))]
+      (when (= FALSE sfw-ret)
         (log/debug "SetForegroundWindow to desktop failed")))))
 
 
@@ -466,9 +565,8 @@
     (nil? fr)
     # Retile the whole tree
     (do
-      (def cur-win (:get-current-window (wm-get-current-frame self)))
-      (each f (get-in self [:frame-tree :toplevels])
-        (wm-retile self f))
+      (def cur-win (:get-current-window (in self :layout)))
+      (wm-retile self (in self :layout))
       (when cur-win
         (wm-activate self cur-win)))
 
@@ -489,100 +587,11 @@
 
 
 (defn wm-get-next-frame [self fr]
-  (cond
-    (nil? (in fr :parent))
-    # We are at the toplevel
-    (let [toplevels (get-in self [:frame-tree :toplevels])
-          toplevel-idx (if-let [idx (find-index |(= $ fr) toplevels)]
-                         idx
-                         (error "inconsistent states for frame tree"))
-          next-idx (% (+ toplevel-idx 1) (length toplevels))]
-      (var cur-fr (in toplevels next-idx))
-      (while true
-        (cond
-          (empty? (in cur-fr :children))
-          (break)
-
-          (= :window (get-in cur-fr [:children 0 :type]))
-          (break))
-        (set cur-fr (get-in cur-fr [:children 0])))
-      cur-fr)
-
-    true
-    (let [all-siblings (get-in fr [:parent :children])
-          sibling-count (length all-siblings)
-          fr-idx (if-let [idx (find-index |(= $ fr) all-siblings)]
-                   idx
-                   (error "inconsistent states for frame tree"))
-          next-idx (+ fr-idx 1)]
-      (cond
-        (>= next-idx sibling-count)
-        # We reached the end of the sub-frame list, go up
-        (wm-get-next-frame self (in fr :parent))
-
-        true
-        # there's the next sibling, go down
-        (do
-          (var cur-fr (in all-siblings next-idx))
-          (while true
-            (cond
-              (empty? (in cur-fr :children))
-              (break)
-
-              (= :window (get-in cur-fr [:children 0 :type]))
-              (break))
-            (set cur-fr (get-in cur-fr [:children 0])))
-          cur-fr)))))
+  (:next-frame (in self :layout) fr))
 
 
 (defn wm-get-prev-frame [self fr]
-  (cond
-    (nil? (in fr :parent))
-    # We are at the toplevel
-    (let [toplevels (get-in self [:frame-tree :toplevels])
-          toplevel-count (length toplevels)
-          toplevel-idx (if-let [idx (find-index |(= $ fr) toplevels)]
-                         idx
-                         (error "inconsistent states for frame tree"))
-          prev-idx (% (+ toplevel-count (- toplevel-idx 1)) toplevel-count)]
-      (var cur-fr (in toplevels prev-idx))
-      (while true
-        (cond
-          (empty? (in cur-fr :children))
-          (break)
-
-          (= :window (get-in cur-fr [:children 0 :type]))
-          (break))
-        (def child-count (length (in cur-fr :children)))
-        (set cur-fr (get-in cur-fr [:children (- child-count 1)])))
-      cur-fr)
-
-    true
-    (let [all-siblings (get-in fr [:parent :children])
-          sibling-count (length all-siblings)
-          fr-idx (if-let [idx (find-index |(= $ fr) all-siblings)]
-                   idx
-                   (error "inconsistent states for frame tree"))
-          prev-idx (- fr-idx 1)]
-      (cond
-        (< prev-idx 0)
-        # We reached the beginning of the sub-frame list, go up
-        (wm-get-prev-frame self (in fr :parent))
-
-        true
-        # there's the previous sibling, go down
-        (do
-          (var cur-fr (in all-siblings prev-idx))
-          (while true
-            (cond
-              (empty? (in cur-fr :children))
-              (break)
-
-              (= :window (get-in cur-fr [:children 0 :type]))
-              (break))
-            (def child-count (length (in cur-fr :children)))
-            (set cur-fr (get-in cur-fr [:children (- child-count 1)])))
-          cur-fr)))))
+  (:prev-frame (in self :layout) fr))
 
 
 (def- wm-proto
@@ -603,35 +612,12 @@
 
 
 (defn window-manager [uia-context]
-  (def toplevel-frames @[])
-  (def monitor-info (MONITORINFOEX))
-  (var main-frame nil)
-  (def enum-ret
-    (EnumDisplayMonitors
-     nil nil
-     (fn [hmon hmdc rect]
-       (def ret (GetMonitorInfo hmon monitor-info))
-       (if (= FALSE ret)
-         (error (string/format "GetMonitorInfo failed for monitor %n" hmon)))
-       (def new-frame (frame (in monitor-info :rcWork)))
-       (array/push toplevel-frames new-frame)
-       (if (> (band (in monitor-info :dwFlags) MONITORINFOF_PRIMARY) (int/u64 0))
-         (set main-frame new-frame))
-       TRUE)))
-  (if (= FALSE enum-ret)
-    (error "EnumDisplayMonitors failed"))
-  (log/debug "toplevel-frames = %n" toplevel-frames)
-  (log/debug "main-frame = %n" main-frame)
-  (when (empty? toplevel-frames)
-    (error "no monitor found"))
-
   # Need this for SetForegroundWindow() to actually bring
   # the windows to the foreground.
   (when (= FALSE (SystemParametersInfo SPI_SETFOREGROUNDLOCKTIMEOUT 0 0 0))
     (error "SPI_SETFOREGROUNDLOCKTIMEOUT failed"))
 
   (table/setproto
-   @{:frame-tree @{:toplevels toplevel-frames
-                   :current-toplevel main-frame}
+   @{:layout (layout)
      :uia-context uia-context}
    wm-proto))
