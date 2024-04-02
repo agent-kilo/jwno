@@ -62,6 +62,9 @@
               @{:parent parent
                 :children children}
               tree-node-proto)]
+    (when children
+      (each c children
+        (put c :parent node)))
     (eachp [k v] extra-fields
       (put node k v))
     node))
@@ -377,34 +380,10 @@
    frame-proto))
 
 
-(defn layout []
-  (def layout-obj (frame nil))
+(defn layout [&opt children]
+  (def layout-obj (frame nil nil children))
   (put layout-obj :type :layout)
-  (table/setproto layout-obj layout-proto)
-
-  (def monitor-info (MONITORINFOEX))
-  (var main-frame nil)
-  (def enum-ret
-    (EnumDisplayMonitors
-     nil nil
-     (fn [hmon hmdc rect]
-       (def ret (GetMonitorInfo hmon monitor-info))
-       (if (= FALSE ret)
-         (error (string/format "GetMonitorInfo failed for monitor %n" hmon)))
-       (def new-frame (frame (in monitor-info :rcWork)))
-       (:add-child layout-obj new-frame)
-       (if (> (band (in monitor-info :dwFlags) MONITORINFOF_PRIMARY) (int/u64 0))
-         (set main-frame new-frame))
-       TRUE)))
-  (if (= FALSE enum-ret)
-    (error "EnumDisplayMonitors failed"))
-  (log/debug "toplevel-frames = %n" (in layout-obj :children))
-  (log/debug "main-frame = %n" main-frame)
-  (when (empty? (in layout-obj :children))
-    (error "no monitor found"))
-
-  (put layout-obj :current-child (or main-frame (get-in layout-obj [:children 0])))
-  layout-obj)
+  (table/setproto layout-obj layout-proto))
 
 
 ######### Window manager object #########
@@ -574,10 +553,37 @@
   self)
 
 
+(defn wm-enumerate-monitors [self]
+  (def work-areas @[])
+  (def monitor-info (MONITORINFOEX))
+  (var main-idx nil)
+  (var idx 0)
+  (def enum-ret
+    (EnumDisplayMonitors
+     nil nil
+     (fn [hmon hmdc rect]
+       (def ret (GetMonitorInfo hmon monitor-info))
+       (if (= FALSE ret)
+         (error (string/format "GetMonitorInfo failed for monitor %n" hmon)))
+       (array/push work-areas (in monitor-info :rcWork))
+       (if (> (band (in monitor-info :dwFlags) MONITORINFOF_PRIMARY) (int/u64 0))
+         (set main-idx idx))
+       (+= idx 1)
+       TRUE)))
+  (if (= FALSE enum-ret)
+    (error "EnumDisplayMonitors failed"))
+  (log/debug "work-areas = %n" work-areas)
+  (log/debug "main-idx = %n" main-idx)
+  (when (empty? work-areas)
+    (error "no monitor found"))
+  [work-areas main-idx])
+
+
 (def- wm-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
 
+    :enumerate-monitors wm-enumerate-monitors
     :should-manage? wm-should-manage?
     :add-window wm-add-window
     :retile wm-retile
@@ -592,7 +598,16 @@
   (when (= FALSE (SystemParametersInfo SPI_SETFOREGROUNDLOCKTIMEOUT 0 0 0))
     (error "SPI_SETFOREGROUNDLOCKTIMEOUT failed"))
 
-  (table/setproto
-   @{:layout (layout)
-     :uia-context uia-context}
-   wm-proto))
+  (def wm-obj
+    (table/setproto
+     @{:uia-context uia-context}
+     wm-proto))
+
+  (def [work-areas main-idx] (:enumerate-monitors wm-obj))
+  (put wm-obj :layout
+     (layout (map |(frame $) work-areas)))
+  (if main-idx
+    (:activate (get-in wm-obj [:layout :children main-idx]))
+    (:activate (get-in wm-obj [:layout :children 0])))
+
+  wm-obj)
