@@ -409,12 +409,48 @@
       (:get-last-frame (in all-siblings prev-idx)))))
 
 
+(defn layout-get-adjacent-frame [self node dir]
+  (let [all-siblings (get-in node [:parent :children])
+        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
+                 idx
+                 (error "inconsistent states for frame tree"))]
+    (var adj-fr nil)
+    (case dir
+      :left
+      (loop [i :down-to [(- fr-idx 1) 0]]
+        (def sibling (in all-siblings i))
+        (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (set adj-fr sibling)))
+      :right
+      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+        (def sibling (in all-siblings i))
+        (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (set adj-fr sibling)))
+      :up
+      (loop [i :down-to [(- fr-idx 1) 0]]
+        (def sibling (in all-siblings i))
+        (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (set adj-fr sibling)))
+      :down
+      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+        (def sibling (in all-siblings i))
+        (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (set adj-fr sibling))))
+
+    (if adj-fr
+      (:get-current-frame adj-fr)
+      (if (= self (in node :parent))
+        nil
+        (layout-get-adjacent-frame self (in node :parent) dir)))))
+
+
 (def layout-proto
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
      :flatten (fn [&] (error "unsupported operation"))
      :get-next-frame layout-get-next-frame
-     :get-prev-frame layout-get-prev-frame}
+     :get-prev-frame layout-get-prev-frame
+     :get-adjacent-frame layout-get-adjacent-frame}
    frame-proto))
 
 

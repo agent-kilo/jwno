@@ -124,6 +124,19 @@
     (key (ascii "M") @[:lwin])
     :prev-window-in-frame)
 
+  (define-key keymap
+    (key (ascii "N") @[:lwin :lctrl])
+    [:adjacent-frame :down])
+  (define-key keymap
+    (key (ascii "E") @[:lwin :lctrl])
+    [:adjacent-frame :up])
+  (define-key keymap
+    (key (ascii "M") @[:lwin :lctrl])
+    [:adjacent-frame :left])
+  (define-key keymap
+    (key (ascii "I") @[:lwin :lctrl])
+    [:adjacent-frame :right])
+
   # XXX: The argument of :map-to command can only be VK_*WIN or other
   # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
   # that modifier would be stuck in the :down state.

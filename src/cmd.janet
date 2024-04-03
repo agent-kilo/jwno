@@ -123,6 +123,13 @@
     (:activate wm prev-fr)))
 
 
+(defn cmd-adjacent-frame [context dir]
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
+  (when-let [adj-fr (:get-adjacent-frame (in wm :layout) cur-frame dir)]
+    (:activate wm adj-fr)))
+
+
 (defn cmd-next-window-in-frame [context]
   (def wm (in context :wm))
   (def cur-frame (:get-current-frame (in wm :layout)))
@@ -173,6 +180,10 @@
     :prev-frame
     (when (= key-state :down)
       (cmd-prev-frame context))
+
+    [:adjacent-frame dir]
+    (when (= key-state :down)
+      (cmd-adjacent-frame context dir))
 
     :next-window-in-frame
     (when (= key-state :down)
