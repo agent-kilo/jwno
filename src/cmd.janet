@@ -73,10 +73,11 @@
 
 
 (defn cmd-split [context dir nfr ratios to-activate]
-  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
   (:split cur-frame dir nfr ratios)
-  (:retile (in context :wm) cur-frame)
-  (:activate (in context :wm) (get-in cur-frame [:children to-activate])))
+  (:retile wm cur-frame)
+  (:activate wm (get-in cur-frame [:children to-activate])))
 
 
 (defn cmd-flatten [context]
@@ -91,41 +92,46 @@
 
     true
     (do
+      (def wm (in context :wm))
       (def cur-win (:get-current-window cur-frame))
       (:flatten parent)
-      (:retile (in context :wm) parent)
+      (:retile wm parent)
       (if cur-win
-        (:activate cur-win)
-        (when (not (empty? (in parent :children)))
-          (:activate (get-in parent [:children 0])))))))
+        (:activate wm cur-win)
+        (if (not (empty? (in parent :children)))
+          (:activate wm (get-in parent [:children 0])))))))
 
 
 (defn cmd-next-frame [context]
-  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
-  (when-let [next-fr (:get-next-frame (get-in context [:wm :layout]) cur-frame)]
-    (:activate (in context :wm) next-fr)))
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
+  (when-let [next-fr (:get-next-frame (in wm :layout) cur-frame)]
+    (:activate wm next-fr)))
 
 
 (defn cmd-prev-frame [context]
-  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
-  (when-let [prev-fr (:get-prev-frame (get-in context [:wm :layout]) cur-frame)]
-    (:activate (in context :wm) prev-fr)))
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
+  (when-let [prev-fr (:get-prev-frame (in wm :layout) cur-frame)]
+    (:activate wm prev-fr)))
 
 
 (defn cmd-next-window-in-frame [context]
-  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:get-next-sibling cur-win)]
-      (:activate (in context :wm) sibling))))
+      (:activate wm sibling))))
 
 
 (defn cmd-prev-window-in-frame [context]
-  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:get-prev-sibling cur-win)]
-      (:activate (in context :wm) sibling))))
+      (:activate wm sibling))))
 
 
 (defn dispatch-command [cmd key-struct key-state context]
