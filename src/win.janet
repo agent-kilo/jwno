@@ -200,6 +200,31 @@
   self)
 
 
+(defn frame-get-all-windows [self]
+  (cond
+    (empty? (in self :children))
+    []
+
+    (= :window (get-in self [:children 0 :type]))
+    (slice (in self :children))
+
+    (= :frame (get-in self [:children 0 :type]))
+    (let [offsprings @[]]
+      (each fr (in self :children)
+        (array/push offsprings ;(frame-get-all-windows fr)))
+      offsprings)))
+
+
+(defn frame-flatten [self]
+  (def all-windows (frame-get-all-windows self))
+  (each w all-windows
+    (put w :parent self))
+  (put self :children all-windows)
+  # The caller should decide which sub-frame to activate after the flattening
+  (put self :current-child nil)
+  self)
+
+
 (defn frame-find-window [self hwnd]
   (var found nil)
   (each child (in self :children)
@@ -314,10 +339,12 @@
   (table/setproto
    @{:add-child frame-add-child
      :split frame-split
+     :flatten frame-flatten
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows
      :get-current-window frame-get-current-window
+     :get-all-windows frame-get-all-windows
      :get-current-frame frame-get-current-frame
      :get-first-frame frame-get-first-frame
      :get-last-frame frame-get-last-frame}
@@ -375,6 +402,7 @@
 (def layout-proto
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
+     :flatten (fn [&] (error "unsupported operation"))
      :get-next-frame layout-get-next-frame
      :get-prev-frame layout-get-prev-frame}
    frame-proto))
@@ -511,31 +539,33 @@
 
 
 (defn wm-activate [self node]
-  (:activate node)
-  (cond
-    (= :window (in node :type))
-    (when (= FALSE (SetForegroundWindow (in node :hwnd)))
-      (log/debug "SetForegroundWindow faild"))
-    
+  (when node
+    (:activate node))
 
-    (= :frame (in node :type))
-    (let [sfw-ret 
-          (if-let [cur-win (:get-current-window node)]
-            (SetForegroundWindow (in cur-win :hwnd))
-            (SetForegroundWindow (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))))]
-      (when (= FALSE sfw-ret)
-        (log/debug "SetForegroundWindow to desktop failed")))))
+  (def hwnd
+    (cond
+      (nil? node)
+      (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))
+
+      (= :window (in node :type))
+      (in node :hwnd)
+
+      (= :frame (in node :type))
+      (if-let [cur-win (:get-current-window node)]
+        (in cur-win :hwnd)
+        (:get_CachedNativeWindowHandle (get-in self [:uia-context :root])))))
+
+  (log/debug "setting foreground window to %n" hwnd)
+  (def sfw-ret (SetForegroundWindow hwnd))
+  (when (= FALSE sfw-ret)
+    (log/debug "SetForegroundWindow failed")))
 
 
 (defn wm-retile [self &opt fr]
   (cond
     (nil? fr)
     # Retile the whole tree
-    (do
-      (def cur-win (:get-current-window (in self :layout)))
-      (wm-retile self (in self :layout))
-      (when cur-win
-        (wm-activate self cur-win)))
+    (wm-retile self (in self :layout))
 
     true
     (cond

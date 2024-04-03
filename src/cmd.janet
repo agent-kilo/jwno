@@ -66,14 +66,38 @@
 
 
 (defn cmd-retile [context]
-  (:retile (in context :wm)))
+  (def wm (in context :wm))
+  (def cur-win (:get-current-window (in wm :layout)))
+  (:retile wm)
+  (:activate wm cur-win))
 
 
 (defn cmd-split [context dir nfr ratios to-activate]
   (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
   (:split cur-frame dir nfr ratios)
-  (:activate (get-in cur-frame [:children to-activate]))
-  (:retile (in context :wm) cur-frame))
+  (:retile (in context :wm) cur-frame)
+  (:activate (in context :wm) (get-in cur-frame [:children to-activate])))
+
+
+(defn cmd-flatten [context]
+  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
+  (def parent (in cur-frame :parent))
+  (cond
+    (nil? parent)
+    (break)
+
+    (not= :frame (in parent :type))
+    (break)
+
+    true
+    (do
+      (def cur-win (:get-current-window cur-frame))
+      (:flatten parent)
+      (:retile (in context :wm) parent)
+      (if cur-win
+        (:activate cur-win)
+        (when (not (empty? (in parent :children)))
+          (:activate (get-in parent [:children 0])))))))
 
 
 (defn cmd-next-frame [context]
@@ -124,6 +148,10 @@
     [:split dir nfr ratios to-activate]
     (when (= key-state :down)
       (cmd-split context dir nfr ratios to-activate))
+
+    :flatten
+    (when (= key-state :down)
+      (cmd-flatten context))
 
     :next-frame
     (when (= key-state :down)

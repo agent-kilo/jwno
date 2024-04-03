@@ -105,6 +105,10 @@
     [:split :vertical 2 [0.5] 1])
 
   (define-key keymap
+    (key VK_OEM_2 @[:lwin])
+    :flatten)
+
+  (define-key keymap
     (key (ascii "N") @[:lwin])
     :next-frame)
 
