@@ -371,42 +371,32 @@
     (table/setproto node frame-proto)))
 
 
-(defn layout-get-next-frame [self node]
+(defn layout-enumerate-frame [self node dir]
   (let [all-siblings (get-in node [:parent :children])
         sibling-count (length all-siblings)
         fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
                  idx
                  (error "inconsistent states for frame tree"))
-        next-idx (if (= self (in node :parent)) # Toplevel frames wrap around
-                   (% (+ fr-idx 1) sibling-count)
-                   (+ fr-idx 1))]
+        idx-to-check (case dir
+                       :next
+                       (if (= self (in node :parent)) # Toplevel frames wrap around
+                         (% (+ fr-idx 1) sibling-count)
+                         (+ fr-idx 1))
+                       :prev
+                       (if (= self (in node :parent))
+                         (% (+ fr-idx sibling-count -1) sibling-count)
+                         (- fr-idx 1)))]
     (cond
-      (>= next-idx sibling-count)
+      (or (< idx-to-check 0)
+          (>= idx-to-check sibling-count))
       # We reached the end of the sub-frame list, go up
-      (layout-get-next-frame self (in node :parent))
+      (layout-enumerate-frame self (in node :parent) dir)
 
-      true
-      # there's the next sibling, go down
-      (:get-first-frame (in all-siblings next-idx)))))
+      (= dir :next)
+      (:get-first-frame (in all-siblings idx-to-check))
 
-
-(defn layout-get-prev-frame [self node]
-  (let [all-siblings (get-in node [:parent :children])
-        sibling-count (length all-siblings)
-        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
-                 idx
-                 (error "inconsistent states for frame tree"))
-        prev-idx (if (= self (in node :parent)) # Toplevel frames wrap around
-                   (% (+ fr-idx sibling-count -1) sibling-count)
-                   (- fr-idx 1))]
-    (cond
-      (< prev-idx 0)
-      # We reached the beginning of the sub-frame list, go up
-      (layout-get-prev-frame self (in node :parent))
-
-      true
-      # there's the previous sibling, go down
-      (:get-last-frame (in all-siblings prev-idx)))))
+      (= dir :prev)
+      (:get-last-frame (in all-siblings idx-to-check)))))
 
 
 (defn layout-get-adjacent-frame [self node dir]
@@ -448,8 +438,7 @@
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
      :flatten (fn [&] (error "unsupported operation"))
-     :get-next-frame layout-get-next-frame
-     :get-prev-frame layout-get-prev-frame
+     :enumerate-frame layout-enumerate-frame
      :get-adjacent-frame layout-get-adjacent-frame}
    frame-proto))
 

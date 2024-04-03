@@ -106,15 +106,15 @@
 
   (define-key keymap
     (key VK_OEM_2 @[:lwin])
-    :flatten)
+    :flatten-parent)
 
   (define-key keymap
     (key (ascii "N") @[:lwin])
-    :next-frame)
+    [:enum-frame :next])
 
   (define-key keymap
     (key (ascii "E") @[:lwin])
-    :prev-frame)
+    [:enum-frame :prev])
 
   (define-key keymap
     (key (ascii "I") @[:lwin])

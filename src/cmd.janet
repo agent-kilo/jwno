@@ -87,7 +87,7 @@
   (:activate wm (get-in cur-frame [:children to-activate])))
 
 
-(defn cmd-flatten [context]
+(defn cmd-flatten-parent [context]
   (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
   (def parent (in cur-frame :parent))
   (cond
@@ -109,18 +109,11 @@
           (:activate wm (get-in parent [:children 0])))))))
 
 
-(defn cmd-next-frame [context]
+(defn cmd-enum-frame [context dir]
   (def wm (in context :wm))
   (def cur-frame (:get-current-frame (in wm :layout)))
-  (when-let [next-fr (:get-next-frame (in wm :layout) cur-frame)]
-    (:activate wm next-fr)))
-
-
-(defn cmd-prev-frame [context]
-  (def wm (in context :wm))
-  (def cur-frame (:get-current-frame (in wm :layout)))
-  (when-let [prev-fr (:get-prev-frame (in wm :layout) cur-frame)]
-    (:activate wm prev-fr)))
+  (when-let [fr (:enumerate-frame (in wm :layout) cur-frame dir)]
+    (:activate wm fr)))
 
 
 (defn cmd-adjacent-frame [context dir]
@@ -169,17 +162,13 @@
     (when (= key-state :down)
       (cmd-split context dir nfr ratios to-activate move-win-to))
 
-    :flatten
+    :flatten-parent
     (when (= key-state :down)
-      (cmd-flatten context))
+      (cmd-flatten-parent context))
 
-    :next-frame
+    [:enum-frame dir]
     (when (= key-state :down)
-      (cmd-next-frame context))
-
-    :prev-frame
-    (when (= key-state :down)
-      (cmd-prev-frame context))
+      (cmd-enum-frame context dir))
 
     [:adjacent-frame dir]
     (when (= key-state :down)
