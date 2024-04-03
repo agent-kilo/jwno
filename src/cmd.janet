@@ -72,11 +72,18 @@
   (:activate wm cur-win))
 
 
-(defn cmd-split [context dir nfr ratios to-activate]
+(defn cmd-split [context dir nfr ratios to-activate move-win-to]
   (def wm (in context :wm))
   (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-win (:get-current-window cur-frame))
   (:split cur-frame dir nfr ratios)
+  (when (and (> move-win-to 0) (< move-win-to nfr))
+    (def move-to-fr (get-in cur-frame [:children move-win-to]))
+    (each w (slice (in (:get-first-frame cur-frame) :children))
+      (:add-child move-to-fr w)))
   (:retile wm cur-frame)
+  # Do not actually focus this window, just mark it as activated
+  (:activate cur-win)
   (:activate wm (get-in cur-frame [:children to-activate])))
 
 
@@ -151,9 +158,9 @@
     (when (= key-state :down)
       (cmd-retile context))
 
-    [:split dir nfr ratios to-activate]
+    [:split dir nfr ratios to-activate move-win-to]
     (when (= key-state :down)
-      (cmd-split context dir nfr ratios to-activate))
+      (cmd-split context dir nfr ratios to-activate move-win-to))
 
     :flatten
     (when (= key-state :down)

@@ -92,17 +92,17 @@
   (define-key keymap
     [(key VK_OEM_COMMA @[:lwin])
      (key VK_OEM_COMMA @[:lwin])]
-    [:split :horizontal 2 [0.5] 1])
+    [:split :horizontal 2 [0.5] 1 0])
 
   (define-key keymap
     [(key VK_OEM_COMMA @[:lwin])
      (key (ascii "3"))]
-    [:split :horizontal 3 [0.2 0.6 0.2] 1])
+    [:split :horizontal 3 [0.2 0.6 0.2] 0 1])
 
   (define-key keymap
     [(key VK_OEM_PERIOD @[:lwin])
      (key VK_OEM_PERIOD @[:lwin])]
-    [:split :vertical 2 [0.5] 1])
+    [:split :vertical 2 [0.5] 1 0])
 
   (define-key keymap
     (key VK_OEM_2 @[:lwin])

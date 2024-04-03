@@ -95,6 +95,16 @@
 (var frame nil)
 
 
+(defn frame-remove-child [self child]
+  (put self :children
+     (filter |(not= $ child) (in self :children)))
+  (if (= child (in self :current-child))
+    (if (empty? (in self :children))
+      (put self :current-child nil)
+      (put self :current-child (get-in self [:children 0]))))
+  self)
+
+
 (defn frame-add-child [self child]
   (let [children (in self :children)
         old-parent (in child :parent)]
@@ -121,8 +131,7 @@
     # Do the removal after a successful insertion, so
     # that we won't end up in an inconsistent state
     (when old-parent
-      (put old-parent :children
-         (filter |(not= $ child) (in old-parent :children)))))
+      (frame-remove-child old-parent child)))
   self)
 
 
@@ -338,6 +347,7 @@
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
+     :remove-child frame-remove-child
      :split frame-split
      :flatten frame-flatten
      :find-window frame-find-window
