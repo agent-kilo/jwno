@@ -141,6 +141,19 @@
       (:activate wm sibling))))
 
 
+(defn cmd-move-current-window [context dir]
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-win (:get-current-window cur-frame))
+
+  (when (nil? cur-win) (break))
+
+  (when-let [adj-fr (:get-adjacent-frame (in wm :layout) cur-frame dir)]
+    (:add-child adj-fr cur-win)
+    (:retile wm adj-fr)
+    (:activate wm cur-win)))
+
+
 (defn dispatch-command [cmd key-struct key-state context]
   (match cmd
     :quit
@@ -181,6 +194,10 @@
     :prev-window-in-frame
     (when (= key-state :down)
       (cmd-prev-window-in-frame context))
+
+    [:move-current-window dir]
+    (when (= key-state :down)
+      (cmd-move-current-window context dir))
 
     _
     (log/warning "Unknown command: %n" cmd)))
