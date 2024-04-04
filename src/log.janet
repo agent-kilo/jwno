@@ -1,4 +1,4 @@
-(use jw32/consoleapi)
+(use jw32/_consoleapi)
 
 
 (defn log-thread [chan output-fn]

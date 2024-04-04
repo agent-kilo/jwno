@@ -1,4 +1,4 @@
-(use jw32/winuser)
+(use jw32/_winuser)
 
 
 (defn show-error-and-exit [msg exit-code]

@@ -1,7 +1,7 @@
-(use jw32/combaseapi)
-(use jw32/uiautomation)
-(use jw32/errhandlingapi)
-(use jw32/util)
+(use jw32/_combaseapi)
+(use jw32/_uiautomation)
+(use jw32/_errhandlingapi)
+(use jw32/_util)
 
 (import ./log)
 

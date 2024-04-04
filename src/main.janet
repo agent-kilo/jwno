@@ -1,7 +1,7 @@
-(use jw32/winuser)
-(use jw32/libloaderapi)
-(use jw32/combaseapi)
-(use jw32/uiautomation)
+(use jw32/_winuser)
+(use jw32/_libloaderapi)
+(use jw32/_combaseapi)
+(use jw32/_uiautomation)
 
 (use ./key)
 (use ./cmd)
