@@ -83,7 +83,8 @@
       (:add-child move-to-fr w)))
   (:retile wm cur-frame)
   # Do not actually focus this window, just mark it as activated
-  (:activate cur-win)
+  (when cur-win
+    (:activate cur-win))
   (:activate wm (get-in cur-frame [:children to-activate])))
 
 
