@@ -5,6 +5,7 @@
 (use jw32/winnt)
 (use jw32/handleapi)
 (use jw32/uiautomation)
+(use jw32/dwmapi)
 (use jw32/util)
 
 (import ./uia)
@@ -500,23 +501,38 @@
 
 
 (defn wm-should-manage? [self hwnd]
-  (let [uia-context (in self :uia-context)
-        uia (in uia-context :uia)
-        cr (in uia-context :focus-cr)]
-    (with [uia-win
-           (try
-             (:ElementFromHandleBuildCache uia hwnd cr)
-             ((err fib)
-              # The window may have vanished
-              (log/debug "ElementFromHandleBuildCache failed: %n" err)
-              nil))
-           (fn [uia-win] (when uia-win (:Release uia-win)))]
-      (if uia-win
-        (and (not= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
-             (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId))
-             (or (wm-is-jwno-process-elevated? self)
-                 (not (wm-is-window-process-elevated? self hwnd))))
-        false))))
+  (cond
+    (> (try
+         (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
+         ((err fib)
+          (log/debug "DwmGetWindowAttribute failed: %n" err)
+          0))
+       0)
+    # This may be an invisible window created by ApplicationFrameWindow,
+    # or a window which lives on another virtual desktop
+    (break false)
+
+    (and (not (wm-is-jwno-process-elevated? self))
+         (wm-is-window-process-elevated? self hwnd))
+    # We do not have permission to handle this window
+    (break false)
+
+    true
+    (let [uia-context (in self :uia-context)
+          uia (in uia-context :uia)
+          cr (in uia-context :focus-cr)]
+      (with [uia-win
+             (try
+               (:ElementFromHandleBuildCache uia hwnd cr)
+               ((err fib)
+                # The window may have vanished
+                (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                nil))
+             (fn [uia-win] (when uia-win (:Release uia-win)))]
+        (if uia-win
+          (and (not= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
+               (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId)))
+          false)))))
 
 
 (defn wm-add-window [self hwnd]
