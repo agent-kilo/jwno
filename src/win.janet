@@ -24,18 +24,31 @@
   self)
 
 
+(defn tree-node-get-next-child [self child]
+  (let [all-children (in self :children)
+        child-count (length all-children)]
+    (if-let [idx (find-index |(= $ child) all-children)]
+      (let [next-idx (% (+ idx 1) child-count)]
+        (in all-children next-idx))
+      (error "inconsistent states for frame tree"))))
+
+
+(defn tree-node-get-prev-child [self child]
+  (let [all-children (in self :children)
+        child-count (length all-children)]
+    (if-let [idx (find-index |(= $ child) all-children)]
+      (let [prev-idx (% (+ child-count idx -1) child-count)]
+        (in all-children prev-idx))
+      (error "inconsistent states for frame tree"))))
+
+
 (defn tree-node-get-next-sibling [self]
   (cond
     (nil? (in self :parent))
     nil
 
     true
-    (let [all-siblings (get-in self [:parent :children])
-          sibling-count (length all-siblings)]
-      (if-let [idx (find-index |(= $ self) all-siblings)]
-        (let [next-idx (% (+ idx 1) sibling-count)]
-          (in all-siblings next-idx))
-        (error "inconsistent states for frame tree")))))
+    (tree-node-get-next-child (in self :parent) self)))
 
 
 (defn tree-node-get-prev-sibling [self]
@@ -44,16 +57,13 @@
     nil
 
     true
-    (let [all-siblings (get-in self [:parent :children])
-          sibling-count (length all-siblings)]
-      (if-let [idx (find-index |(= $ self) all-siblings)]
-        (let [prev-idx (% (+ sibling-count (- idx 1)) sibling-count)]
-          (in all-siblings prev-idx))
-        (error "inconsistent states for frame tree")))))
+    (tree-node-get-prev-child (in self :parent) self)))
 
 
 (def- tree-node-proto
   @{:activate tree-node-activate
+    :get-next-child tree-node-get-next-child
+    :get-prev-child tree-node-get-prev-child
     :get-next-sibling tree-node-get-next-sibling
     :get-prev-sibling tree-node-get-prev-sibling})
 
@@ -97,12 +107,16 @@
 
 
 (defn frame-remove-child [self child]
+  (def current-child (in self :current-child))
+  (def next-child
+    (when (= child current-child)
+      (:get-next-child self child)))
   (put self :children
      (filter |(not= $ child) (in self :children)))
-  (if (= child (in self :current-child))
-    (if (empty? (in self :children))
-      (put self :current-child nil)
-      (put self :current-child (get-in self [:children 0]))))
+  (when (= child current-child)
+    (if (= child next-child)
+      (put self :current-child nil) # There's no other child
+      (put self :current-child next-child)))
   self)
 
 
