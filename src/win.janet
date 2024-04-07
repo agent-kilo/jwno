@@ -239,6 +239,16 @@
       offsprings)))
 
 
+(defn frame-get-current-window [self]
+  (var parent self)
+  (var cur-child (in parent :current-child))
+  (while (and cur-child
+              (not= :window (in cur-child :type)))
+    (set parent cur-child)
+    (set cur-child (in parent :current-child)))
+  cur-child)
+
+
 (defn frame-flatten [self]
   (def cur-window (frame-get-current-window self))
   (def all-windows (frame-get-all-windows self))
@@ -332,16 +342,6 @@
         true # There are children, but none of them is active
         (error "inconsistent states for frame tree"))
       dead)))
-
-
-(defn frame-get-current-window [self]
-  (var parent self)
-  (var cur-child (in parent :current-child))
-  (while (and cur-child
-              (not= :window (in cur-child :type)))
-    (set parent cur-child)
-    (set cur-child (in parent :current-child)))
-  cur-child)
 
 
 (defn frame-get-first-frame [self]
