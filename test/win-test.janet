@@ -299,6 +299,24 @@
   (assert (= 100 (get-in dummy-sub-frame2 [:rect :right]))))
 
 
+(defn test-layout-get-adjacent-frame []
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-layout (layout [dummy-frame]))
+  (:split dummy-frame :horizontal 3 [0.3 0.4 0.3])
+
+  (assert (= 3 (length (in dummy-frame :children))))
+
+  (assert (= (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 0]) :right)
+             (get-in dummy-frame [:children 1])))
+  (assert (= (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 1]) :right)
+             (get-in dummy-frame [:children 2])))
+  (assert (= (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 2]) :left)
+             (get-in dummy-frame [:children 1])))
+  (assert (nil? (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 2]) :right)))
+  (assert (nil? (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 0]) :up)))
+  (assert (nil? (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 0]) :down))))
+
+
 (defn main [&]
   (test-tree-node-activate)
   (test-frame-constructor)
@@ -306,4 +324,5 @@
   (test-frame-split)
   (test-frame-find-window)
   (test-frame-find-frame-for-window)
-  (test-frame-resize))
+  (test-frame-resize)
+  (test-layout-get-adjacent-frame))

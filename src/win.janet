@@ -485,22 +485,26 @@
       (loop [i :down-to [(- fr-idx 1) 0]]
         (def sibling (in all-siblings i))
         (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)))
+          (set adj-fr sibling)
+          (break)))
       :right
       (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
         (def sibling (in all-siblings i))
         (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)))
+          (set adj-fr sibling)
+          (break)))
       :up
       (loop [i :down-to [(- fr-idx 1) 0]]
         (def sibling (in all-siblings i))
         (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling)))
+          (set adj-fr sibling)
+          (break)))
       :down
       (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
         (def sibling (in all-siblings i))
         (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling))))
+          (set adj-fr sibling)
+          (break))))
 
     (if adj-fr
       (:get-current-frame adj-fr)
@@ -513,6 +517,7 @@
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
      :flatten (fn [&] (error "unsupported operation"))
+     :transform (fn [&] (error "unsupported operation"))
      :enumerate-frame layout-enumerate-frame
      :get-adjacent-frame layout-get-adjacent-frame}
    frame-proto))
