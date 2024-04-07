@@ -101,13 +101,9 @@
     true
     (do
       (def wm (in context :wm))
-      (def cur-win (:get-current-window cur-frame))
       (:flatten parent)
       (:retile wm parent)
-      (if cur-win
-        (:activate wm cur-win)
-        (if (not (empty? (in parent :children)))
-          (:activate wm (get-in parent [:children 0])))))))
+      (:activate wm (:get-current-window parent)))))
 
 
 (defn cmd-enum-frame [context dir]
