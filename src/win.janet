@@ -315,7 +315,8 @@
         (each dw dead
           (when (= dw (in self :current-child))
             # The previous active child is dead, fill in a new one
-            (put self :current-child (in alive 0))))
+            (put self :current-child (in alive 0))
+            (break)))
 
         true # There are children, but none of them is active
         (error "inconsistent states for frame tree"))
