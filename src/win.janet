@@ -359,12 +359,72 @@
   cur-fr)
 
 
+(defn frame-resize [self new-rect]
+  (def old-rect (in self :rect))
+  (put self :rect new-rect)
+
+  (def all-children (in self :children))
+  (cond
+    (empty? all-children)
+    (break self)
+
+    (= :window (get-in all-children [0 :type]))
+    # Do not actually resize the windows until next retile
+    (break self)
+
+    (= :frame (get-in all-children [0 :type]))
+    (let [n (length all-children)
+          dx (- (in new-rect :left) (in old-rect :left))
+          dy (- (in new-rect :top) (in old-rect :top))
+          dw (+ (- dx)
+                (- (in new-rect :right)
+                   (in old-rect :right)))
+          dh (+ (- dy)
+                (- (in new-rect :bottom)
+                   (in old-rect :bottom)))
+          old-width (- (in old-rect :right) (in old-rect :left))
+          old-height (- (in old-rect :bottom) (in old-rect :top))]
+      (var cur-x (in new-rect :left))
+      (var cur-y (in new-rect :top))
+      (for i 0 n
+        (let [is-last (>= i (- n 1))
+              sub-fr (in all-children i)
+              sub-rect (if (struct? (in sub-fr :rect))
+                         (struct/to-table (in sub-fr :rect))
+                         (table/clone (in sub-fr :rect)))
+              w (- (in sub-rect :right) (in sub-rect :left))
+              h (- (in sub-rect :bottom) (in sub-rect :top))
+              wr (/ w old-width)
+              hr (/ h old-height)
+              sub-dw (math/floor (* wr dw))
+              sub-dh (math/floor (* hr dh))]
+          (put sub-rect :left cur-x)
+          (if (and is-last (= hr 1))
+            (put sub-rect :right (in new-rect :right)) # avoid rounding error
+            (put sub-rect :right (+ cur-x w sub-dw)))
+          (put sub-rect :top cur-y)
+          (if (and is-last (= wr 1))
+            (put sub-rect :bottom (in new-rect :bottom))
+            (put sub-rect :bottom (+ cur-y h sub-dh)))
+          (log/debug "sub-rect = %n" sub-rect)
+          (cond
+            (= wr 1) # vertical frame
+            (set cur-y (in sub-rect :bottom))
+
+            (= hr 1) # horizontal frame
+            (set cur-x (in sub-rect :right)))
+
+          (frame-resize sub-fr sub-rect)))
+      self)))
+
+
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
      :remove-child frame-remove-child
      :split frame-split
      :flatten frame-flatten
+     :resize frame-resize
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows

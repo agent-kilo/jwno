@@ -265,10 +265,45 @@
   (assert (= dummy-sub-frame2 (:find-frame-for-window dummy-frame dummy-window3))))
 
 
+(defn test-frame-resize []
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
+  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
+  (var dummy-window1 (window :dummy-hwnd1))
+  (var dummy-window2 (window :dummy-hwnd2))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+  (:add-child dummy-sub-frame1 dummy-window1)
+  (:add-child dummy-sub-frame2 dummy-window2)
+
+  (:resize dummy-frame {:top 10 :left 20 :bottom 110 :right 100})
+
+  (assert (= 10 (get-in dummy-frame [:rect :top])))
+  (assert (= 20 (get-in dummy-frame [:rect :left])))
+  (assert (= 110 (get-in dummy-frame [:rect :bottom])))
+  (assert (= 100 (get-in dummy-frame [:rect :right])))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 20 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:rect :bottom])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:rect :right])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
+  (assert (= 100 (get-in dummy-sub-frame2 [:rect :right]))))
+
+
 (defn main [&]
   (test-tree-node-activate)
   (test-frame-constructor)
   (test-frame-add-child)
   (test-frame-split)
   (test-frame-find-window)
-  (test-frame-find-frame-for-window))
+  (test-frame-find-frame-for-window)
+  (test-frame-resize))
