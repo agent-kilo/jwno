@@ -265,7 +265,7 @@
   (assert (= dummy-sub-frame2 (:find-frame-for-window dummy-frame dummy-window3))))
 
 
-(defn test-frame-resize []
+(defn test-frame-transform []
   #
   # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
   #              |
@@ -324,5 +324,5 @@
   (test-frame-split)
   (test-frame-find-window)
   (test-frame-find-frame-for-window)
-  (test-frame-resize)
+  (test-frame-transform)
   (test-layout-get-adjacent-frame))
