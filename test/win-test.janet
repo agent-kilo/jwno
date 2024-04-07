@@ -281,7 +281,7 @@
   (:add-child dummy-sub-frame1 dummy-window1)
   (:add-child dummy-sub-frame2 dummy-window2)
 
-  (:resize dummy-frame {:top 10 :left 20 :bottom 110 :right 100})
+  (:transform dummy-frame {:top 10 :left 20 :bottom 110 :right 100})
 
   (assert (= 10 (get-in dummy-frame [:rect :top])))
   (assert (= 20 (get-in dummy-frame [:rect :left])))

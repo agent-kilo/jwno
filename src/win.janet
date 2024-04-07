@@ -359,7 +359,7 @@
   cur-fr)
 
 
-(defn frame-resize [self new-rect]
+(defn frame-transform [self new-rect]
   (def old-rect (in self :rect))
   (put self :rect new-rect)
 
@@ -414,7 +414,7 @@
             (= hr 1) # horizontal frame
             (set cur-x (in sub-rect :right)))
 
-          (frame-resize sub-fr sub-rect)))
+          (frame-transform sub-fr sub-rect)))
       self)))
 
 
@@ -424,7 +424,7 @@
      :remove-child frame-remove-child
      :split frame-split
      :flatten frame-flatten
-     :resize frame-resize
+     :transform frame-transform
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows
