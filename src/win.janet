@@ -213,10 +213,10 @@
     (def old-children (in self :children))
     (def old-active-child (in self :current-child))
     (put self :children new-frames)
-    # The caller should decide which sub-frame to activate after the split
-    (put self :current-child nil)
     (def first-sub-frame (in new-frames 0))
-    # XXX: Move all window children to the first sub-frame
+    # XXX: Always activate the first sub-frame by default
+    (put self :current-child first-sub-frame)
+    # XXX: Move all window children to the first sub-frame by default
     (each win old-children
       (:add-child first-sub-frame win))
     (put first-sub-frame :current-child old-active-child))
@@ -240,12 +240,23 @@
 
 
 (defn frame-flatten [self]
+  (def cur-window (frame-get-current-window self))
   (def all-windows (frame-get-all-windows self))
   (each w all-windows
     (put w :parent self))
   (put self :children all-windows)
-  # The caller should decide which sub-frame to activate after the flattening
-  (put self :current-child nil)
+  # XXX: Default to the active window before flattening,
+  # or simply the first child
+  (put self :current-child
+     (cond
+       (not (nil? cur-window))
+       cur-window
+
+       (empty? all-windows)
+       nil
+
+       true
+       (in all-windows 0)))
   self)
 
 
