@@ -84,7 +84,8 @@
 ######### Window object #########
 
 (defn window-alive? [self]
-  (not= FALSE (IsWindow (in self :hwnd))))
+  (and (not= FALSE (IsWindow (in self :hwnd)))
+       (not= FALSE (IsWindowVisible (in self :hwnd)))))
 
 
 (def- window-proto
