@@ -164,7 +164,7 @@
   (:activate wm cur-win))
 
 
-(defn cmd-focus-mode [context]
+(defn cmd-focus-mode [context ratio]
   (def wm (in context :wm))
   (def cur-monitor (get-in wm [:layout :current-child]))
   (def mon-width (- (get-in cur-monitor [:rect :right]) (get-in cur-monitor [:rect :left])))
@@ -172,8 +172,8 @@
   (def cur-frame (:get-current-frame cur-monitor))
   (:resize cur-frame {:left 0
                       :top 0
-                      :right (math/floor (* 0.618 mon-width))
-                      :bottom (math/floor (* 0.618 mon-height))})
+                      :right (math/floor (* ratio mon-width))
+                      :bottom (math/floor (* ratio mon-height))})
   (def cur-win (:get-current-window cur-frame))
   (:retile wm)
   (:activate wm cur-win))
@@ -228,9 +228,9 @@
     (when (= key-state :down)
       (cmd-resize-current-frame context dw dh))
 
-    :focus-mode
+    [:focus-mode ratio]
     (when (= key-state :down)
-      (cmd-focus-mode context))
+      (cmd-focus-mode context ratio))
 
     _
     (log/warning "Unknown command: %n" cmd)))

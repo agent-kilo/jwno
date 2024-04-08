@@ -165,7 +165,7 @@
 
   (define-key keymap
     (key (ascii "F") @[:lwin])
-    :focus-mode)
+    [:focus-mode 0.7])
 
   # XXX: The argument of :map-to command can only be VK_*WIN or other
   # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
