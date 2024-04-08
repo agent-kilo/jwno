@@ -605,7 +605,6 @@
 
 (defn layout-balance-frames [self &opt fr recursive]
   (default recursive false)
-  (log/debug "balancing frame: %n" (if fr (in fr :rect)))
   (cond
     (nil? fr)
     (each toplevel-fr (in self :children)

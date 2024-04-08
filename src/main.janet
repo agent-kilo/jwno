@@ -167,6 +167,10 @@
     (key (ascii "F") @[:lwin])
     [:focus-mode 0.7])
 
+  (define-key keymap
+    (key VK_OEM_PLUS @[:lwin])
+    :balance-frames)
+
   # XXX: The argument of :map-to command can only be VK_*WIN or other
   # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
   # that modifier would be stuck in the :down state.
