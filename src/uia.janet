@@ -65,7 +65,9 @@
 (defn uia-init [chan]
   (CoInitializeEx nil COINIT_MULTITHREADED)
   (def uia
-    (CoCreateInstance CLSID_CUIAutomation nil CLSCTX_INPROC_SERVER IUIAutomation))
+    (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
+  (:put_AutoSetFocus uia false) # To reduce flicker
+
   (def root
     (with [cr (:CreateCacheRequest uia) (cr :Release)]
       (:AddProperty cr UIA_NativeWindowHandlePropertyId)
