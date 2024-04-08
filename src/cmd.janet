@@ -151,6 +151,34 @@
     (:activate wm cur-win)))
 
 
+(defn cmd-resize-current-frame [context dw dh]
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def rect (in cur-frame :rect))
+  (:resize cur-frame {:left (in rect :left)
+                      :top (in rect :top)
+                      :right (+ dw (in rect :right))
+                      :bottom (+ dh (in rect :bottom))})
+  (def cur-win (:get-current-window cur-frame))
+  (:retile wm)
+  (:activate wm cur-win))
+
+
+(defn cmd-focus-mode [context]
+  (def wm (in context :wm))
+  (def cur-monitor (get-in wm [:layout :current-child]))
+  (def mon-width (- (get-in cur-monitor [:rect :right]) (get-in cur-monitor [:rect :left])))
+  (def mon-height (- (get-in cur-monitor [:rect :bottom]) (get-in cur-monitor [:rect :top])))
+  (def cur-frame (:get-current-frame cur-monitor))
+  (:resize cur-frame {:left 0
+                      :top 0
+                      :right (math/floor (* 0.618 mon-width))
+                      :bottom (math/floor (* 0.618 mon-height))})
+  (def cur-win (:get-current-window cur-frame))
+  (:retile wm)
+  (:activate wm cur-win))
+
+
 (defn dispatch-command [cmd key-struct key-state context]
   (match cmd
     :quit
@@ -195,6 +223,14 @@
     [:move-current-window dir]
     (when (= key-state :down)
       (cmd-move-current-window context dir))
+
+    [:resize-current-frame dw dh]
+    (when (= key-state :down)
+      (cmd-resize-current-frame context dw dh))
+
+    :focus-mode
+    (when (= key-state :down)
+      (cmd-focus-mode context))
 
     _
     (log/warning "Unknown command: %n" cmd)))

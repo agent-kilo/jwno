@@ -150,6 +150,23 @@
     (key (ascii "I") @[:lwin :lshift])
     [:move-current-window :right])
 
+  (define-key keymap
+    [(key (ascii "S") @[:lwin]) (key (ascii "N") @[:lwin])]
+    [:resize-current-frame 0 100])
+  (define-key keymap
+    [(key (ascii "S") @[:lwin]) (key (ascii "E") @[:lwin])]
+    [:resize-current-frame 0 -100])
+  (define-key keymap
+    [(key (ascii "S") @[:lwin]) (key (ascii "M") @[:lwin])]
+    [:resize-current-frame -100 0])
+  (define-key keymap
+    [(key (ascii "S") @[:lwin]) (key (ascii "I") @[:lwin])]
+    [:resize-current-frame 100 0])
+
+  (define-key keymap
+    (key (ascii "F") @[:lwin])
+    :focus-mode)
+
   # XXX: The argument of :map-to command can only be VK_*WIN or other
   # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
   # that modifier would be stuck in the :down state.
