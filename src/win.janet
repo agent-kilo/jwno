@@ -603,13 +603,71 @@
         (layout-get-adjacent-frame self (in node :parent) dir)))))
 
 
+(defn layout-balance-frames [self &opt fr recursive]
+  (default recursive false)
+  (log/debug "balancing frame: %n" (if fr (in fr :rect)))
+  (cond
+    (nil? fr)
+    (each toplevel-fr (in self :children)
+      (layout-balance-frames self toplevel-fr recursive))
+
+    (empty? (in fr :children))
+    nil
+
+    (not= :frame (get-in fr [:children 0 :type]))
+    nil
+
+    true
+    (let [all-children (in fr :children)
+          child-count (length all-children)
+          fr-rect (in fr :rect)
+          fr-width (- (in fr-rect :right) (in fr-rect :left))
+          fr-height (- (in fr-rect :bottom) (in fr-rect :top))
+          dir (cond
+                (= (get-in all-children [0 :rect :left]) (get-in all-children [1 :rect :left]))
+                :vertical
+
+                (= (get-in all-children [0 :rect :top]) (get-in all-children [1 :rect :top]))
+                :horizontal)
+          balanced-len (math/floor (/ (case dir
+                                        :vertical fr-height
+                                        :horizontal fr-width)
+                                      child-count))]
+      (var cur-x (in fr-rect :left))
+      (var cur-y (in fr-rect :top))
+      (for i 0 child-count
+        (def is-last (>= i (- child-count 1)))
+        (def new-rect {:left cur-x
+                       :top cur-y
+                       :right (case dir
+                                :vertical (in fr-rect :right)
+                                :horizontal (if is-last
+                                              (in fr-rect :right) # To avoid rounding error
+                                              (+ cur-x balanced-len)))
+                       :bottom (case dir
+                                 :vertical (if is-last
+                                               (in fr-rect :bottom)
+                                               (+ cur-y balanced-len))
+                                 :horizontal (in fr-rect :bottom))})
+        (case dir
+          :vertical (+= cur-y balanced-len)
+          :horizontal (+= cur-x balanced-len))
+
+        (if recursive
+          (do
+            (put (in all-children i) :rect new-rect)
+            (layout-balance-frames self (in all-children i) recursive))
+          (:transform (in all-children i) new-rect))))))
+
+
 (def layout-proto
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
      :flatten (fn [&] (error "unsupported operation"))
      :transform (fn [&] (error "unsupported operation"))
      :enumerate-frame layout-enumerate-frame
-     :get-adjacent-frame layout-get-adjacent-frame}
+     :get-adjacent-frame layout-get-adjacent-frame
+     :balance-frames layout-balance-frames}
    frame-proto))
 
 
