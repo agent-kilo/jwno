@@ -431,6 +431,82 @@
       self)))
 
 
+(defn frame-resize [self new-rect]
+  (when (not= :frame (get-in self [:parent :type]))
+    # This is a toplevel frame, which tracks the monitor
+    # geometries and cannot be resized
+    (break self))
+
+  (let [parent (in self :parent)
+        all-siblings (in parent :children)
+        sibling-count (length all-siblings)
+        parent-rect (in parent :rect)
+        old-rect (in self :rect)
+        old-width (- (in old-rect :right) (in old-rect :left))
+        old-height (- (in old-rect :bottom) (in old-rect :top))
+        new-width (- (in new-rect :right) (in new-rect :left))
+        new-height (- (in new-rect :bottom) (in new-rect :top))
+        parent-width (- (in parent-rect :right) (in parent-rect :left))
+        parent-height (- (in parent-rect :bottom) (in parent-rect :top))
+        dir (cond
+              (= old-width parent-width) :vertical
+              (= old-height parent-height) :horizontal)
+        dw (- new-width old-width)
+        dh (- new-height old-height)]
+    (var cur-x (in parent-rect :left))
+    (var cur-y (in parent-rect :top))
+    (case dir
+      :vertical
+      (let [avail-h (- parent-height old-height)]
+        (for i 0 sibling-count
+          (def fr (in all-siblings i))
+          (def fr-rect (in fr :rect))
+          (def fr-height (- (in fr-rect :bottom) (in fr-rect :top)))
+          (def fr-dh
+            (if (= fr self)
+              dh
+              (math/floor (* (- dh) (/ fr-height avail-h)))))
+          (def fr-new-height (+ fr-height fr-dh))
+          (def is-last (>= i (- sibling-count 1)))
+          (frame-transform fr @{:left cur-x
+                                :top cur-y
+                                :right (in fr-rect :right)
+                                :bottom (if is-last
+                                          (in parent-rect :bottom) # avoid rounding error
+                                          (+ cur-y fr-new-height))})
+          (+= cur-y fr-new-height))
+        (when (not= dw 0)
+          (frame-resize parent @{:left (in parent-rect :left)
+                                 :top (in parent-rect :top)
+                                 :right (+ dw (in parent-rect :right))
+                                 :bottom (in parent-rect :bottom)})))
+
+      :horizontal
+      (let [avail-w (- parent-width old-width)]
+        (for i 0 sibling-count
+          (def fr (in all-siblings i))
+          (def fr-rect (in fr :rect))
+          (def fr-width (- (in fr-rect :right) (in fr-rect :left)))
+          (def fr-dw
+            (if (= fr self)
+              dw
+              (math/floor (* (- dw) (/ fr-width avail-w)))))
+          (def fr-new-width (+ fr-width fr-dw))
+          (def is-last (>= i (- sibling-count 1)))
+          (frame-transform fr @{:left cur-x
+                                :top cur-y
+                                :right (if is-last
+                                          (in parent-rect :right) # avoid rounding error
+                                          (+ cur-x fr-new-width))
+                                :bottom (in fr-rect :bottom)})
+          (+= cur-x fr-new-width))
+        (when (not= dh 0)
+          (frame-resize parent @{:left (in parent-rect :left)
+                                 :top (in parent-rect :top)
+                                 :right (in parent-rect :right)
+                                 :bottom (+ dh (in parent-rect :bottom))}))))))
+
+
 (def- frame-proto
   (table/setproto
    @{:add-child frame-add-child
@@ -438,6 +514,7 @@
      :split frame-split
      :flatten frame-flatten
      :transform frame-transform
+     :resize frame-resize
      :find-window frame-find-window
      :find-frame-for-window frame-find-frame-for-window
      :purge-windows frame-purge-windows
