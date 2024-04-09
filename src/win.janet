@@ -373,8 +373,7 @@
     (break self)
 
     (= :frame (get-in all-children [0 :type]))
-    (let [n (length all-children)
-          dx (- (in new-rect :left) (in old-rect :left))
+    (let [dx (- (in new-rect :left) (in old-rect :left))
           dy (- (in new-rect :top) (in old-rect :top))
           dw (+ (- dx)
                 (- (in new-rect :right)
