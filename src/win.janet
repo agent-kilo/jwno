@@ -600,41 +600,21 @@
           fr-rect (in fr :rect)
           fr-width (- (in fr-rect :right) (in fr-rect :left))
           fr-height (- (in fr-rect :bottom) (in fr-rect :top))
-          dir (cond
-                (= (get-in all-children [0 :rect :left]) (get-in all-children [1 :rect :left]))
-                :vertical
-
-                (= (get-in all-children [0 :rect :top]) (get-in all-children [1 :rect :top]))
-                :horizontal)
-          balanced-len (math/floor (/ (case dir
-                                        :vertical fr-height
-                                        :horizontal fr-width)
+          balanced-len (math/floor (/ (cond
+                                        (= vertical-frame-proto (table/getproto fr)) fr-height
+                                        (= horizontal-frame-proto (table/getproto fr)) fr-width)
                                       child-count))]
-      (var cur-x (in fr-rect :left))
-      (var cur-y (in fr-rect :top))
-      (for i 0 child-count
-        (def is-last (>= i (- child-count 1)))
-        (def new-rect {:left cur-x
-                       :top cur-y
-                       :right (case dir
-                                :vertical (in fr-rect :right)
-                                :horizontal (if is-last
-                                              (in fr-rect :right) # To avoid rounding error
-                                              (+ cur-x balanced-len)))
-                       :bottom (case dir
-                                 :vertical (if is-last
-                                               (in fr-rect :bottom)
-                                               (+ cur-y balanced-len))
-                                 :horizontal (in fr-rect :bottom))})
-        (case dir
-          :vertical (+= cur-y balanced-len)
-          :horizontal (+= cur-x balanced-len))
-
-        (if recursive
-          (do
-            (put (in all-children i) :rect new-rect)
-            (layout-balance-frames self (in all-children i) recursive))
-          (:transform (in all-children i) new-rect))))))
+      (def new-rects (:calculate-sub-rects fr (fn [_sub-fr _i] balanced-len)))
+      (if recursive
+        (map (fn [sub-fr rect]
+               (put sub-fr :rect rect)
+               (layout-balance-frames self sub-fr recursive))
+             all-children
+             new-rects)
+        (map (fn [sub-fr rect]
+               (:transform sub-fr rect))
+             all-children
+             new-rects)))))
 
 
 (defn layout-resize-frame [self fr new-rect]
