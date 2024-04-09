@@ -625,7 +625,6 @@
 
   (let [parent (in fr :parent)
         all-siblings (in parent :children)
-        sibling-count (length all-siblings)
         parent-rect (in parent :rect)
         old-rect (in fr :rect)
         old-width (- (in old-rect :right) (in old-rect :left))
@@ -634,33 +633,26 @@
         new-height (- (in new-rect :bottom) (in new-rect :top))
         parent-width (- (in parent-rect :right) (in parent-rect :left))
         parent-height (- (in parent-rect :bottom) (in parent-rect :top))
-        dir (cond
-              (= old-width parent-width) :vertical
-              (= old-height parent-height) :horizontal)
         dw (- new-width old-width)
-        dh (- new-height old-height)]
-    (var cur-x (in parent-rect :left))
-    (var cur-y (in parent-rect :top))
-    (case dir
-      :vertical
-      (let [avail-h (- parent-height old-height)]
-        (for i 0 sibling-count
-          (def sib-fr (in all-siblings i))
-          (def sib-rect (in sib-fr :rect))
-          (def sib-height (- (in sib-rect :bottom) (in sib-rect :top)))
-          (def sib-dh
-            (if (= sib-fr fr)
-              dh
-              (math/floor (* (- dh) (/ sib-height avail-h)))))
-          (def sib-new-height (+ sib-height sib-dh))
-          (def is-last (>= i (- sibling-count 1)))
-          (:transform sib-fr @{:left cur-x
-                               :top cur-y
-                               :right (in sib-rect :right)
-                               :bottom (if is-last
-                                         (in parent-rect :bottom) # avoid rounding error
-                                         (+ cur-y sib-new-height))})
-          (+= cur-y sib-new-height))
+        dh (- new-height old-height)
+        avail-h (- parent-height old-height)
+        avail-w (- parent-width old-width)]
+    (cond
+      (= vertical-frame-proto (table/getproto parent))
+      (let [new-rects (:calculate-sub-rects
+                         parent
+                         (fn [sib-fr _i]
+                           (def sib-rect (in sib-fr :rect))
+                           (def sib-height (- (in sib-rect :bottom) (in sib-rect :top)))
+                           (def sib-dh
+                             (if (= sib-fr fr)
+                               dh
+                               (math/floor (* (- dh) (/ sib-height avail-h)))))
+                           (+ sib-height sib-dh)))]
+        (map (fn [sib-fr rect]
+               (:transform sib-fr rect))
+             all-siblings
+             new-rects)
         (when (not= dw 0)
           (layout-resize-frame self
                                parent
@@ -668,26 +660,23 @@
                                  :top (in parent-rect :top)
                                  :right (+ dw (in parent-rect :right))
                                  :bottom (in parent-rect :bottom)})))
+      
 
-      :horizontal
-      (let [avail-w (- parent-width old-width)]
-        (for i 0 sibling-count
-          (def sib-fr (in all-siblings i))
-          (def sib-rect (in sib-fr :rect))
-          (def sib-width (- (in sib-rect :right) (in sib-rect :left)))
-          (def sib-dw
-            (if (= sib-fr fr)
-              dw
-              (math/floor (* (- dw) (/ sib-width avail-w)))))
-          (def sib-new-width (+ sib-width sib-dw))
-          (def is-last (>= i (- sibling-count 1)))
-          (:transform sib-fr @{:left cur-x
-                               :top cur-y
-                               :right (if is-last
-                                        (in parent-rect :right) # avoid rounding error
-                                        (+ cur-x sib-new-width))
-                               :bottom (in sib-rect :bottom)})
-          (+= cur-x sib-new-width))
+      (= horizontal-frame-proto (table/getproto parent))
+      (let [new-rects (:calculate-sub-rects
+                         parent
+                         (fn [sib-fr _i]
+                           (def sib-rect (in sib-fr :rect))
+                           (def sib-width (- (in sib-rect :right) (in sib-rect :left)))
+                           (def sib-dw
+                             (if (= sib-fr fr)
+                               dw
+                               (math/floor (* (- dw) (/ sib-width avail-w)))))
+                           (+ sib-width sib-dw)))]
+        (map (fn [sib-fr rect]
+               (:transform sib-fr rect))
+             all-siblings
+             new-rects)
         (when (not= dh 0)
           (layout-resize-frame self
                                parent
