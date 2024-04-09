@@ -75,7 +75,7 @@
   (:put_AutoSetFocus uia false) # To reduce flicker
 
   (def root
-    (with [cr (:CreateCacheRequest uia) (cr :Release)]
+    (with-uia [cr (:CreateCacheRequest uia)]
       (:AddProperty cr UIA_NativeWindowHandlePropertyId)
       (:GetRootElementBuildCache uia cr)))
   (def deinit-fns

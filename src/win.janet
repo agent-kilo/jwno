@@ -712,10 +712,8 @@
         rect (in fr :rect)]
     (log/debug "transforming window: %n, rect = %n" hwnd rect)
     (try
-      (with [uia-win (:ElementFromHandle uia hwnd) (in uia-win :Release)]
-        (with [pat
-               (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)
-               (fn [pat] (when pat (:Release pat)))]
+      (with-uia [uia-win (:ElementFromHandle uia hwnd)]
+        (with-uia [pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)]
           # TODO: restore maximized windows first
           (when pat
             (:Move pat (in rect :left) (in rect :top))
@@ -775,14 +773,13 @@
     (let [uia-context (in self :uia-context)
           uia (in uia-context :uia)
           cr (in uia-context :focus-cr)]
-      (with [uia-win
-             (try
-               (:ElementFromHandleBuildCache uia hwnd cr)
-               ((err fib)
-                # The window may have vanished
-                (log/debug "ElementFromHandleBuildCache failed: %n" err)
-                nil))
-             (fn [uia-win] (when uia-win (:Release uia-win)))]
+      (with-uia [uia-win
+                 (try
+                   (:ElementFromHandleBuildCache uia hwnd cr)
+                   ((err fib)
+                    # The window may have vanished
+                    (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                    nil))]
         (if uia-win
           (and (not= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
                (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId)))
@@ -811,9 +808,7 @@
 
   (def hwnd
     (let [uia-context (in self :uia-context)]
-      (with [uia-win
-             (uia/get-focused-window uia-context)
-             (fn [uia-win] (when uia-win (:Release uia-win)))]
+      (with-uia [uia-win (uia/get-focused-window uia-context)]
         (when uia-win
           (:get_CachedNativeWindowHandle uia-win)))))
 
