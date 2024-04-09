@@ -156,10 +156,12 @@
   (def wm (in context :wm))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def rect (in cur-frame :rect))
-  (:resize cur-frame {:left (in rect :left)
-                      :top (in rect :top)
-                      :right (+ dw (in rect :right))
-                      :bottom (+ dh (in rect :bottom))})
+  (:resize-frame (in wm :layout)
+                 cur-frame
+                 {:left (in rect :left)
+                  :top (in rect :top)
+                  :right (+ dw (in rect :right))
+                  :bottom (+ dh (in rect :bottom))})
   (def cur-win (:get-current-window cur-frame))
   (:retile wm)
   (:activate wm cur-win))
@@ -176,10 +178,12 @@
   (def mon-width (- (get-in cur-monitor [:rect :right]) (get-in cur-monitor [:rect :left])))
   (def mon-height (- (get-in cur-monitor [:rect :bottom]) (get-in cur-monitor [:rect :top])))
   (:balance-frames (in wm :layout) (in cur-frame :parent))
-  (:resize cur-frame {:left 0
-                      :top 0
-                      :right (math/floor (* ratio mon-width))
-                      :bottom (math/floor (* ratio mon-height))})
+  (:resize-frame (in wm :layout)
+                 cur-frame
+                 {:left 0
+                  :top 0
+                  :right (math/floor (* ratio mon-width))
+                  :bottom (math/floor (* ratio mon-height))})
   (def cur-win (:get-current-window cur-frame))
   (:retile wm)
   (:activate wm cur-win))
@@ -206,7 +210,7 @@
   (when (nil? win-rect)
     (break))
 
-  (:resize cur-frame win-rect)
+  (:resize-frame (in wm :layout) cur-frame win-rect)
   (:retile wm)
   (:activate wm cur-win))
 
