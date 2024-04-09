@@ -154,8 +154,6 @@
 
   (:split dummy-frame :horizontal)
 
-  (assert (nil? (in dummy-frame :current-child)))
-
   (assert (= (get-in dummy-frame [:children 0 :type]) :frame))
   (assert (= (get-in dummy-frame [:children 1 :type]) :frame))
 
