@@ -384,37 +384,28 @@
                    (in old-rect :bottom)))
           old-width (- (in old-rect :right) (in old-rect :left))
           old-height (- (in old-rect :bottom) (in old-rect :top))]
-      (var cur-x (in new-rect :left))
-      (var cur-y (in new-rect :top))
-      (for i 0 n
-        (let [is-last (>= i (- n 1))
-              sub-fr (in all-children i)
-              sub-rect (if (struct? (in sub-fr :rect))
-                         (struct/to-table (in sub-fr :rect))
-                         (table/clone (in sub-fr :rect)))
-              w (- (in sub-rect :right) (in sub-rect :left))
-              h (- (in sub-rect :bottom) (in sub-rect :top))
-              wr (/ w old-width)
-              hr (/ h old-height)
-              sub-dw (math/floor (* wr dw))
-              sub-dh (math/floor (* hr dh))]
-          (put sub-rect :left cur-x)
-          (if (and is-last (= hr 1))
-            (put sub-rect :right (in new-rect :right)) # avoid rounding error
-            (put sub-rect :right (+ cur-x w sub-dw)))
-          (put sub-rect :top cur-y)
-          (if (and is-last (= wr 1))
-            (put sub-rect :bottom (in new-rect :bottom))
-            (put sub-rect :bottom (+ cur-y h sub-dh)))
-          (log/debug "sub-rect = %n" sub-rect)
-          (cond
-            (= wr 1) # vertical frame
-            (set cur-y (in sub-rect :bottom))
+      (def calc-fn
+        (cond
+          (= horizontal-frame-proto (table/getproto self))
+          (fn [sub-fr _i]
+            (let [sub-rect (in sub-fr :rect)
+                  w (- (in sub-rect :right) (in sub-rect :left))
+                  wr (/ w old-width)
+                  sub-dw (math/floor (* wr dw))]
+              (+ w sub-dw)))
 
-            (= hr 1) # horizontal frame
-            (set cur-x (in sub-rect :right)))
-
-          (frame-transform sub-fr sub-rect)))
+          (= vertical-frame-proto (table/getproto self))
+          (fn [sub-fr _i]
+            (let [sub-rect (in sub-fr :rect)
+                  h (- (in sub-rect :bottom) (in sub-rect :top))
+                  hr (/ h old-height)
+                  sub-dh (math/floor (* hr dh))]
+              (+ h sub-dh)))))
+      (def new-rects (:calculate-sub-rects self calc-fn))
+      (map (fn [sub-fr rect]
+             (frame-transform sub-fr rect))
+           all-children
+           new-rects)
       self)))
 
 
