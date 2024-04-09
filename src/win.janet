@@ -8,7 +8,8 @@
 (use jw32/_dwmapi)
 (use jw32/_util)
 
-(import ./uia)
+(use ./uia)
+
 (import ./log)
 
 
@@ -808,7 +809,7 @@
 
   (def hwnd
     (let [uia-context (in self :uia-context)]
-      (with-uia [uia-win (uia/get-focused-window uia-context)]
+      (with-uia [uia-win (get-focused-window uia-context)]
         (when uia-win
           (:get_CachedNativeWindowHandle uia-win)))))
 
