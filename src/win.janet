@@ -708,7 +708,8 @@
 ######### Window manager object #########
 
 (defn wm-transform-window [self win fr]
-  (let [uia (get-in self [:uia-context :uia])
+  (let [uia-context (in self :uia-context)
+        uia (in uia-context :uia)
         hwnd (in win :hwnd)
         rect (in fr :rect)]
     (log/debug "transforming window: %n, rect = %n" hwnd rect)
@@ -716,11 +717,34 @@
       (with-uia [uia-win (:ElementFromHandle uia hwnd)]
         (with-uia [pat (:GetCurrentPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)]
           # TODO: restore maximized windows first
-          (when pat
-            (:Move pat (in rect :left) (in rect :top))
-            (:Resize pat
-                     (- (in rect :right) (in rect :left))
-                     (- (in rect :bottom) (in rect :top))))))
+          (when (and pat
+                     (not= 0 (:get_CurrentCanMove pat)))
+            (if (not= 0 (:get_CurrentCanResize pat))
+              (do
+                (:Move pat (in rect :left) (in rect :top))
+                (:Resize pat
+                         (- (in rect :right) (in rect :left))
+                         (- (in rect :bottom) (in rect :top))))
+              (when-let [win-rect
+                         (try
+                           (:get_CurrentBoundingRectangle uia-win)
+                           ((err fib)
+                            (log/debug "get_CurrentBoundingRectangle failed: %n" err)
+                            nil))]
+                (def fr-width (- (in rect :right) (in rect :left)))
+                (def fr-height (- (in rect :bottom) (in rect :top)))
+                (def win-width (- (in win-rect :right) (in win-rect :left)))
+                (def win-height (- (in win-rect :bottom) (in win-rect :top)))
+                # Move the window to the frame's center
+                (:Move pat
+                       (math/floor
+                        (+ (in rect :left)
+                           (/ fr-width 2)
+                           (/ win-width -2)))
+                       (math/floor
+                        (+ (in rect :top)
+                           (/ fr-height 2)
+                           (/ win-height -2)))))))))
       ((err fib)
        # XXX: Don't manage a window which cannot be transformed?
        (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
