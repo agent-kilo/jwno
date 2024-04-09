@@ -148,8 +148,10 @@
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (def dummy-window1 (window :dummy-hwnd1))
   (def dummy-window2 (window :dummy-hwnd2))
+  (def dummy-window3 (window :dummy-hwnd3))
   (:add-child dummy-frame dummy-window1)
   (:add-child dummy-frame dummy-window2)
+  (:add-child dummy-frame dummy-window3)
   (:activate dummy-window1)
 
   (:split dummy-frame :horizontal)
@@ -157,9 +159,10 @@
   (assert (= (get-in dummy-frame [:children 0 :type]) :frame))
   (assert (= (get-in dummy-frame [:children 1 :type]) :frame))
 
-  (assert (= (length (get-in dummy-frame [:children 0 :children])) 2))
+  (assert (= (length (get-in dummy-frame [:children 0 :children])) 3))
   (assert (= (get-in dummy-frame [:children 0 :children 0 :type]) :window))
   (assert (= (get-in dummy-frame [:children 0 :children 1 :type]) :window))
+  (assert (= (get-in dummy-frame [:children 0 :children 2 :type]) :window))
 
   (assert (= (length (get-in dummy-frame [:children 1 :children])) 0))
 

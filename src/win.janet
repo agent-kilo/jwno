@@ -103,8 +103,11 @@
 
 ######### Frame object #########
 
-# Forward declaration of the frame constructor
+# Forward declarations
 (var frame nil)
+(var- frame-proto nil)
+(var- vertical-frame-proto nil)
+(var- horizontal-frame-proto nil)
 
 
 (defn frame-remove-child [self child]
@@ -172,44 +175,27 @@
         left (in rect :left)
         right (in rect :right)
         height (- bottom top)
-        width (- right left)
-        new-frames @[]]
+        width (- right left)]
 
-    (var current-top top)
-    (var current-left left)
+    (def new-rects
+      (case direction
+        :horizontal
+        (do
+          (table/setproto self horizontal-frame-proto)
+          (:calculate-sub-rects self
+                                (fn [_ i]
+                                  (math/floor (* width (in full-ratios i))))
+                                n))
 
-    (case direction
-      :horizontal
-      (for i 0 n
-        (def current-width
-          (if (>= i (length full-ratios)) # Is this the last sub-frame?
-            (- (+ width left) current-left)
-            (math/floor (* width (in full-ratios i)))))
-        (if (<= current-width 0)
-          (error "cannot create zero-width frames"))
-        (array/push new-frames
-                    (frame {:top current-top
-                            :left current-left
-                            :right (+ current-left current-width)
-                            :bottom bottom}
-                           self))
-        (+= current-left current-width))
+        :vertical
+        (do
+          (table/setproto self vertical-frame-proto)
+          (:calculate-sub-rects self
+                                (fn [_ i]
+                                  (math/floor (* height (in full-ratios i))))
+                                n))))
 
-      :vertical
-      (for i 0 n
-        (def current-height
-          (if (>= i (length full-ratios)) # Is this the last sub-frame?
-            (- (+ height top) current-top)
-            (math/floor (* height (in full-ratios i)))))
-        (if (<= current-height 0)
-          (error "cannot create zero-height frames"))
-        (array/push new-frames
-                    (frame {:top current-top
-                            :left current-left
-                            :right right
-                            :bottom (+ current-top current-height)}
-                           self))
-        (+= current-top current-height)))
+    (def new-frames (map |(frame $ self) new-rects))
 
     (def old-children (in self :children))
     (def old-active-child (in self :current-child))
@@ -268,6 +254,7 @@
 
        true
        (in all-windows 0)))
+  (table/setproto self frame-proto) # Clear vertical/horizontal settings
   self)
 
 
@@ -431,22 +418,22 @@
       self)))
 
 
-(def- frame-proto
-  (table/setproto
-   @{:add-child frame-add-child
-     :remove-child frame-remove-child
-     :split frame-split
-     :flatten frame-flatten
-     :transform frame-transform
-     :find-window frame-find-window
-     :find-frame-for-window frame-find-frame-for-window
-     :purge-windows frame-purge-windows
-     :get-current-window frame-get-current-window
-     :get-all-windows frame-get-all-windows
-     :get-current-frame frame-get-current-frame
-     :get-first-frame frame-get-first-frame
-     :get-last-frame frame-get-last-frame}
-   tree-node-proto))
+(set frame-proto
+     (table/setproto
+      @{:add-child frame-add-child
+        :remove-child frame-remove-child
+        :split frame-split
+        :flatten frame-flatten
+        :transform frame-transform
+        :find-window frame-find-window
+        :find-frame-for-window frame-find-frame-for-window
+        :purge-windows frame-purge-windows
+        :get-current-window frame-get-current-window
+        :get-all-windows frame-get-all-windows
+        :get-current-frame frame-get-current-frame
+        :get-first-frame frame-get-first-frame
+        :get-last-frame frame-get-last-frame}
+      tree-node-proto))
 
 
 (varfn frame [rect &opt parent children]
@@ -457,6 +444,84 @@
                         :current-child (if-not (empty? children)
                                          (in children 0)))]
     (table/setproto node frame-proto)))
+
+
+(defn vertical-frame-calculate-sub-rects [self h-fn &opt count]
+  (def rect (in self :rect))
+  (var cur-y (in rect :top))
+  (var bottom (in rect :bottom))
+  (def left (in rect :left))
+  (def right (in rect :right))
+  (def children-type (get-in self [:children 0 :type]))
+  (def all-children
+    (cond
+      # This can be used to do calculation for a frame that contains windows.
+      # We only consider sub-frames when calculating.
+      (= :window children-type) []
+      (= :frame children-type) (in self :children)))
+  (def child-count (if (nil? count)
+                     (length all-children)
+                     # The caller can override child-count to calculate rects for new children
+                     count))
+  (def new-rects @[])
+  (for i 0 child-count
+    (def is-last (>= i (- child-count 1)))
+    (def new-h (if is-last
+                 (- bottom cur-y) # To avoid rounding error
+                 (h-fn (get all-children i) i)))
+    (when (<= new-h 0)
+      (error "cannot create zero-height frames"))
+    (array/push new-rects {:left left
+                           :right right
+                           :top cur-y
+                           :bottom (+ cur-y new-h)})
+    (+= cur-y new-h))
+  new-rects)
+
+
+(set vertical-frame-proto
+  (table/setproto
+   @{:calculate-sub-rects vertical-frame-calculate-sub-rects}
+   frame-proto))
+
+
+(defn horizontal-frame-calculate-sub-rects [self w-fn &opt count]
+  (def rect (in self :rect))
+  (var cur-x (in rect :left))
+  (var right (in rect :right))
+  (def top (in rect :top))
+  (def bottom (in rect :bottom))
+  (def children-type (get-in self [:children 0 :type]))
+  (def all-children
+    (cond
+      # This can be used to do calculation for a frame that contains windows.
+      # We only consider sub-frames when calculating.
+      (= :window children-type) []
+      (= :frame children-type) (in self :children)))
+  (def child-count (if (nil? count)
+                     (length all-children)
+                     # The caller can override child-count to calculate rects for new children
+                     count))
+  (def new-rects @[])
+  (for i 0 child-count
+    (def is-last (>= i (- child-count 1)))
+    (def new-w (if is-last
+                 (- right cur-x) # To avoid rounding error
+                 (w-fn (get all-children i) i)))
+    (when (<= new-w 0)
+      (error "cannot create zero-width frames"))
+    (array/push new-rects {:left cur-x
+                           :right (+ cur-x new-w)
+                           :top top
+                           :bottom bottom})
+    (+= cur-x new-w))
+  new-rects)
+
+
+(set horizontal-frame-proto
+  (table/setproto
+   @{:calculate-sub-rects horizontal-frame-calculate-sub-rects}
+   frame-proto))
 
 
 (defn layout-enumerate-frame [self node dir]
@@ -662,7 +727,7 @@
                                  :bottom (+ dh (in parent-rect :bottom))}))))))
 
 
-(def layout-proto
+(def- layout-proto
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
      :flatten (fn [&] (error "unsupported operation"))
