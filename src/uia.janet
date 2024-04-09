@@ -6,6 +6,12 @@
 (import ./log)
 
 
+(defmacro with-uia [[binding ctor dtor] & body]
+  ~(do
+     (def ,binding ,ctor)
+     ,(apply defer [(or dtor ~(fn [x] (when (not (nil? x)) (:Release x)))) binding] body)))
+
+
 (defn- handle-window-opened-event [sender event-id chan]
   (log/debug "#################### handle-window-opened-event ####################")
   (log/debug "++++ sender: %p" (:get_CachedName sender))
@@ -164,3 +170,16 @@
             nil))))
 
   ret)
+
+
+(defn get-window-bounding-rect [uia-context hwnd]
+  (def {:uia uia} uia-context)
+  (with-uia [cr (:CreateCacheRequest uia)]
+    (:AddProperty cr UIA_BoundingRectanglePropertyId)
+    (with-uia [uia-win (try
+                         (:ElementFromHandleBuildCache uia hwnd cr)
+                         ((err fib)
+                          (log/debug "ElementFromHandle failed: %n" err)
+                          nil))]
+      (when uia-win
+        (:get_CachedBoundingRectangle uia-win)))))

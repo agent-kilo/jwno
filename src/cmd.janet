@@ -1,5 +1,6 @@
 (use jw32/_winuser)
 
+(use ./uia)
 (use ./resource)
 
 (import ./log)
@@ -192,6 +193,24 @@
   (:activate wm cur-win))
 
 
+(defn cmd-frame-to-current-window-size [context]
+  (def wm (in context :wm))
+  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-win (:get-current-window cur-frame))
+  (when (nil? cur-win)
+    (break))
+
+  (def win-rect
+    (get-window-bounding-rect (in context :uia-context)
+                              (in cur-win :hwnd)))
+  (when (nil? win-rect)
+    (break))
+
+  (:resize cur-frame win-rect)
+  (:retile wm)
+  (:activate wm cur-win))
+
+
 (defn dispatch-command [cmd key-struct key-state context]
   (match cmd
     :quit
@@ -248,6 +267,10 @@
     :balance-frames
     (when (= key-state :down)
       (cmd-balance-frames context))
+
+    :frame-to-current-window-size
+    (when (= key-state :down)
+      (cmd-frame-to-current-window-size context))
 
     _
     (log/warning "Unknown command: %n" cmd)))

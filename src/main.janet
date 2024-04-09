@@ -171,6 +171,10 @@
     (key VK_OEM_PLUS @[:lwin])
     :balance-frames)
 
+  (define-key keymap
+    (key (ascii "S") @[:lwin :lctrl])
+    :frame-to-current-window-size)
+
   # XXX: The argument of :map-to command can only be VK_*WIN or other
   # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
   # that modifier would be stuck in the :down state.
