@@ -657,10 +657,10 @@
         (when (not= dw 0)
           (layout-resize-frame self
                                parent
-                               @{:left (in parent-rect :left)
-                                 :top (in parent-rect :top)
-                                 :right (+ dw (in parent-rect :right))
-                                 :bottom (in parent-rect :bottom)})))
+                               {:left (in parent-rect :left)
+                                :top (in parent-rect :top)
+                                :right (+ dw (in parent-rect :right))
+                                :bottom (in parent-rect :bottom)})))
       
 
       (= horizontal-frame-proto (table/getproto parent))
@@ -681,10 +681,10 @@
         (when (not= dh 0)
           (layout-resize-frame self
                                parent
-                               @{:left (in parent-rect :left)
-                                 :top (in parent-rect :top)
-                                 :right (in parent-rect :right)
-                                 :bottom (+ dh (in parent-rect :bottom))}))))))
+                               {:left (in parent-rect :left)
+                                :top (in parent-rect :top)
+                                :right (in parent-rect :right)
+                                :bottom (+ dh (in parent-rect :bottom))}))))))
 
 
 (def- layout-proto
