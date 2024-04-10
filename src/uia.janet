@@ -116,13 +116,62 @@
         (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsWindowPatternAvailablePropertyId))))
 
 
-(defn get-focused-window [uia-context]
+(defn get-parent-window [uia-context uia-elem]
   (def {:uia uia
         :root root
         :focus-cr focus-cr
         :control-view-walker walker}
     uia-context)
+
+  (var ret nil)
+  (var cur-elem uia-elem)
+  (var parent
+       (try
+         (:GetParentElementBuildCache walker cur-elem focus-cr)
+         ((err fib)
+          # The window or its parent may have vanished
+          (log/debug "GetParentElementBuildCache failed: %n" err)
+          nil)))
   (def root-hwnd (:get_CachedNativeWindowHandle root))
+
+  (while true
+    (def hwnd (:get_CachedNativeWindowHandle cur-elem))
+    (cond
+      (and
+        # Has a handle
+        (not (nil? hwnd))
+        (not (null? hwnd))
+        # Is a valid window?
+        (is-valid-uia-window? cur-elem))
+      (do
+        (set ret cur-elem)
+        (break))
+
+      (nil? parent)
+      (do
+        (:Release cur-elem)
+        (break))
+
+      (= root-hwnd (:get_CachedNativeWindowHandle parent))
+      (do
+        (:Release cur-elem)
+        (break)))
+
+    (:Release cur-elem)
+    (set cur-elem parent)
+    (set parent
+         (try
+           (:GetParentElementBuildCache walker cur-elem focus-cr)
+           ((err fib)
+            (log/debug "GetParentElementBuildCache failed: %n" err)
+            nil))))
+  ret)
+
+
+(defn get-focused-window [uia-context]
+  (def {:uia uia
+        :focus-cr focus-cr}
+    uia-context)
 
   (def focused
     (try
@@ -134,49 +183,7 @@
   (if-not focused
     (break nil))
 
-  (var ret nil)
-  (var cur focused)
-  (var parent
-       (try
-         (:GetParentElementBuildCache walker cur focus-cr)
-         ((err fib)
-          # The window or its parent may have vanished
-          (log/debug "GetParentElementBuildCache failed: %n" err)
-          nil)))
-
-  (while true
-    (def hwnd (:get_CachedNativeWindowHandle cur))
-    (cond
-      (and
-        # Has a handle
-        (not (nil? hwnd))
-        (not (null? hwnd))
-        # Is a valid window?
-        (is-valid-uia-window? cur))
-      (do
-        (set ret cur)
-        (break))
-
-      (nil? parent)
-      (do
-        (:Release cur)
-        (break))
-
-      (= root-hwnd (:get_CachedNativeWindowHandle parent))
-      (do
-        (:Release cur)
-        (break)))
-
-    (:Release cur)
-    (set cur parent)
-    (set parent
-         (try
-           (:GetParentElementBuildCache walker cur focus-cr)
-           ((err fib)
-            (log/debug "GetParentElementBuildCache failed: %n" err)
-            nil))))
-
-  ret)
+  (get-parent-window uia-context focused))
 
 
 (defn get-window-bounding-rect [uia-context hwnd]
