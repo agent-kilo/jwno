@@ -84,6 +84,7 @@
     (:CreateCacheRequest uia))
   (:AddProperty focus-cr UIA_NativeWindowHandlePropertyId)
   (:AddProperty focus-cr UIA_IsTransformPatternAvailablePropertyId)
+  (:AddProperty focus-cr UIA_TransformCanMovePropertyId)
   (:AddProperty focus-cr UIA_IsWindowPatternAvailablePropertyId)
   (def control-view-walker (:get_ControlViewWalker uia))
   @{:uia uia
@@ -107,6 +108,12 @@
   (:Release root)
   (:Release uia)
   (CoUninitialize))
+
+
+(defmacro is-valid-uia-window? [uia-win]
+  ~(and (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsTransformPatternAvailablePropertyId))
+        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_TransformCanMovePropertyId))
+        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsWindowPatternAvailablePropertyId))))
 
 
 (defn get-focused-window [uia-context]
@@ -138,14 +145,14 @@
           nil)))
 
   (while true
+    (def hwnd (:get_CachedNativeWindowHandle cur))
     (cond
       (and
         # Has a handle
-        (not (null? (:get_CachedNativeWindowHandle cur)))
-        # Can be transformed
-        (not= 0 (:GetCachedPropertyValue cur UIA_IsTransformPatternAvailablePropertyId))
-        # Is a window
-        (not= 0 (:GetCachedPropertyValue cur UIA_IsWindowPatternAvailablePropertyId)))
+        (not (nil? hwnd))
+        (not (null? hwnd))
+        # Is a valid window?
+        (is-valid-uia-window? cur))
       (do
         (set ret cur)
         (break))

@@ -779,7 +779,12 @@
     elevated))
 
 
-(defn wm-should-manage? [self hwnd]
+(defn wm-should-manage? [self hwnd? &opt uia-win]
+  (def hwnd
+    (if (or (nil? hwnd?) (null? hwnd?))
+      (:get_CachedNativeWindowHandle uia-win)
+      hwnd?))
+
   (cond
     (> (try
          (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
@@ -796,6 +801,9 @@
     # We do not have permission to handle this window
     (break false)
 
+    (not (nil? uia-win))
+    (is-valid-uia-window? uia-win)
+
     true
     (let [uia-context (in self :uia-context)
           uia (in uia-context :uia)
@@ -808,17 +816,12 @@
                     (log/debug "ElementFromHandleBuildCache failed: %n" err)
                     nil))]
         (if uia-win
-          (and (not= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
-               (not= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId)))
+          (is-valid-uia-window? uia-win)
           false)))))
 
 
 (defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
-  (when (not (wm-should-manage? self hwnd))
-    (log/debug "Ignoring window: %n" hwnd)
-    (break nil))
-
   (def new-win (window hwnd))
   (def frame-found (:find-frame-for-window (in self :layout) new-win))
   (wm-transform-window self new-win frame-found)
@@ -833,24 +836,30 @@
   (def dead (:purge-windows (in self :layout)))
   (log/debug "purged %n dead windows" (length dead))
 
-  (def hwnd
-    (let [uia-context (in self :uia-context)]
-      (with-uia [uia-win (get-focused-window uia-context)]
-        (when uia-win
-          (:get_CachedNativeWindowHandle uia-win)))))
+  (def uia-context (in self :uia-context))
+  (def hwnd-to-manage
+    (with-uia [uia-win (get-focused-window uia-context)]
+      (when (nil? uia-win)
+        (log/debug "No focused window")
+        (break nil))
+      
+      (def hwnd (:get_CachedNativeWindowHandle uia-win))
 
-  (when (nil? hwnd)
-    (log/debug "No focused window")
-    (break self))
+      (when-let [win (:find-window (in self :layout) hwnd)]
+        #Already managed
+        (:activate win)
+        (break nil))
 
-  (when-let [win (:find-window (in self :layout) hwnd)]
-    # Already managed
-    (:activate win)
-    (break self))
+      (when (not (wm-should-manage? self hwnd uia-win))
+        (log/debug "Ignoring window: %n" hwnd)
+        (break nil))
 
-  # TODO: window open/close events
-  (when-let [new-win (wm-add-window self hwnd)]
-    (:activate new-win))
+      hwnd))
+
+  (when hwnd-to-manage
+    # TODO: window open/close events
+    (let [new-win (wm-add-window self hwnd-to-manage)]
+      (:activate new-win)))
   self)
 
 
@@ -859,8 +868,12 @@
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break self))
 
+  (when (not (wm-should-manage? self hwnd))
+    (log/debug "Ignoring window: %n" hwnd)
+    (break self))
+
   # TODO: window open events
-  (when-let [new-win (wm-add-window self hwnd)]
+  (let [new-win (wm-add-window self hwnd)]
     (:activate new-win))
   self)
 
