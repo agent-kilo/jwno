@@ -8,8 +8,7 @@
 (use jw32/_dwmapi)
 (use jw32/_util)
 
-(use ./uia)
-
+(import ./uia)
 (import ./log)
 
 
@@ -708,21 +707,21 @@
 ######### Window manager object #########
 
 (defn wm-transform-window [self win fr]
-  (let [uia-context (in self :uia-context)
-        uia (in uia-context :uia)
+  (let [uia (in self :uia)
+        uia-com (in uia :com)
         hwnd (in win :hwnd)
         rect (in fr :rect)]
     (log/debug "transforming window: %n, rect = %n" hwnd rect)
     (try
-      (with-uia [cr (:CreateCacheRequest uia)]
+      (uia/with-uia [cr (:CreateCacheRequest uia-com)]
         (:AddPattern cr UIA_TransformPatternId)
         (:AddPattern cr UIA_WindowPatternId)
         (:AddProperty cr UIA_TransformCanMovePropertyId)
         (:AddProperty cr UIA_TransformCanResizePropertyId)
         (:AddProperty cr UIA_BoundingRectanglePropertyId)
 
-        (with-uia [uia-win (:ElementFromHandleBuildCache uia hwnd cr)]
-          (with-uia [pat (:GetCachedPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)]
+        (uia/with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
+          (uia/with-uia [pat (:GetCachedPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)]
             # TODO: restore maximized windows first
             (when (and pat
                        (not= 0 (:get_CachedCanMove pat)))
@@ -802,21 +801,21 @@
     (break false)
 
     (not (nil? uia-win))
-    (is-valid-uia-window? uia-win)
+    (uia/is-valid-uia-window? uia-win)
 
     true
-    (let [uia-context (in self :uia-context)
-          uia (in uia-context :uia)
-          cr (in uia-context :focus-cr)]
-      (with-uia [uia-win
+    (let [uia (in self :uia)
+          uia-com (in uia :com)
+          cr (in uia :focus-cr)]
+      (uia/with-uia [uia-win
                  (try
-                   (:ElementFromHandleBuildCache uia hwnd cr)
+                   (:ElementFromHandleBuildCache uia-com hwnd cr)
                    ((err fib)
                     # The window may have vanished
                     (log/debug "ElementFromHandleBuildCache failed: %n" err)
                     nil))]
         (if uia-win
-          (is-valid-uia-window? uia-win)
+          (uia/is-valid-uia-window? uia-win)
           false)))))
 
 
@@ -836,9 +835,9 @@
   (def dead (:purge-windows (in self :layout)))
   (log/debug "purged %n dead windows" (length dead))
 
-  (def uia-context (in self :uia-context))
+  (def uia (in self :uia))
   (def hwnd-to-manage
-    (with-uia [uia-win (get-focused-window uia-context)]
+    (uia/with-uia [uia-win (:get-focused-window uia)]
       (when (nil? uia-win)
         (log/debug "No focused window")
         (break nil))
@@ -885,7 +884,7 @@
   (def hwnd
     (cond
       (nil? node)
-      (:get_CachedNativeWindowHandle (get-in self [:uia-context :root]))
+      (:get_CachedNativeWindowHandle (get-in self [:uia :root]))
 
       (= :window (in node :type))
       (in node :hwnd)
@@ -893,7 +892,7 @@
       (= :frame (in node :type))
       (if-let [cur-win (:get-current-window node)]
         (in cur-win :hwnd)
-        (:get_CachedNativeWindowHandle (get-in self [:uia-context :root])))))
+        (:get_CachedNativeWindowHandle (get-in self [:uia :root])))))
 
   (log/debug "setting foreground window to %n" hwnd)
   (def sfw-ret (SetForegroundWindow hwnd))
@@ -962,7 +961,7 @@
     :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
 
 
-(defn window-manager [uia-context]
+(defn window-manager [uia]
   # Need this for SetForegroundWindow() to actually bring
   # the windows to the foreground.
   (when (= FALSE (SystemParametersInfo SPI_SETFOREGROUNDLOCKTIMEOUT 0 0 0))
@@ -970,7 +969,7 @@
 
   (def wm-obj
     (table/setproto
-     @{:uia-context uia-context}
+     @{:uia uia}
      wm-proto))
 
   (def [work-areas main-idx] (:enumerate-monitors wm-obj))

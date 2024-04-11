@@ -3,6 +3,7 @@
 (use jw32/_errhandlingapi)
 (use jw32/_util)
 
+(import ./const)
 (import ./log)
 
 
@@ -10,6 +11,12 @@
   ~(do
      (def ,binding ,ctor)
      ,(apply defer [(or dtor ~(fn [x] (when (not (nil? x)) (:Release x)))) binding] body)))
+
+
+(defmacro is-valid-uia-window? [uia-win]
+  ~(and (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsTransformPatternAvailablePropertyId))
+        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_TransformCanMovePropertyId))
+        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsWindowPatternAvailablePropertyId))))
 
 
 (defn- handle-window-opened-event [sender event-id chan]
@@ -30,98 +37,11 @@
   S_OK)
 
 
-(defn uia-init-event-handlers [uia element chan]
-  (def window-opened-handler
-    # Can't use `with` here, or there will be a "can't marshal alive fiber" error
-    (let [cr (:CreateCacheRequest uia)]
-      (:AddProperty cr UIA_NamePropertyId)
-      (:AddProperty cr UIA_ClassNamePropertyId)
-      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
-      (def handler
-        (:AddAutomationEventHandler
-           uia
-           UIA_Window_WindowOpenedEventId
-           element
-           TreeScope_Subtree
-           cr
-           (fn [sender event-id]
-             (handle-window-opened-event sender event-id chan))))
-      (:Release cr)
-      handler))
-
-  (def focus-changed-handler
-    (:AddFocusChangedEventHandler
-       uia
-       nil
-       (fn [sender]
-         (handle-focus-changed-event sender chan))))
-
-  [(fn []
-     (:RemoveAutomationEventHandler
-        uia
-        UIA_Window_WindowOpenedEventId
-        element
-        window-opened-handler))
-   (fn []
-     (:RemoveFocusChangedEventHandler
-        uia
-        focus-changed-handler))])
-
-
-(defn uia-init [chan]
-  (CoInitializeEx nil COINIT_MULTITHREADED)
-  (def uia
-    (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
-  (:put_AutoSetFocus uia false) # To reduce flicker
-
-  (def root
-    (with-uia [cr (:CreateCacheRequest uia)]
-      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
-      (:GetRootElementBuildCache uia cr)))
-  (def deinit-fns
-    (uia-init-event-handlers uia root chan))
-  (def focus-cr
-    (:CreateCacheRequest uia))
-  (:AddProperty focus-cr UIA_NativeWindowHandlePropertyId)
-  (:AddProperty focus-cr UIA_IsTransformPatternAvailablePropertyId)
-  (:AddProperty focus-cr UIA_TransformCanMovePropertyId)
-  (:AddProperty focus-cr UIA_IsWindowPatternAvailablePropertyId)
-  (def control-view-walker (:get_ControlViewWalker uia))
-  @{:uia uia
-    :root root
-    :deinit-fns deinit-fns
-    :focus-cr focus-cr
-    :control-view-walker control-view-walker})
-
-
-(defn uia-deinit [uia-context]
-  (def {:uia uia
-        :root root
-        :deinit-fns deinit-fns
-        :focus-cr focus-cr
-        :control-view-walker control-view-walker}
-    uia-context)
-  (each df deinit-fns
-    (df))
-  (:Release control-view-walker)
-  (:Release focus-cr)
-  (:Release root)
-  (:Release uia)
-  (CoUninitialize))
-
-
-(defmacro is-valid-uia-window? [uia-win]
-  ~(and (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsTransformPatternAvailablePropertyId))
-        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_TransformCanMovePropertyId))
-        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsWindowPatternAvailablePropertyId))))
-
-
-(defn get-parent-window [uia-context uia-elem]
-  (def {:uia uia
-        :root root
+(defn uia-get-parent-window [self uia-elem]
+  (def {:root root
         :focus-cr focus-cr
         :control-view-walker walker}
-    uia-context)
+    self)
 
   (var ret nil)
   (var cur-elem uia-elem)
@@ -168,14 +88,14 @@
   ret)
 
 
-(defn get-focused-window [uia-context]
-  (def {:uia uia
+(defn uia-get-focused-window [self]
+  (def {:com uia-com
         :focus-cr focus-cr}
-    uia-context)
+    self)
 
   (def focused
     (try
-      (:GetFocusedElementBuildCache uia focus-cr)
+      (:GetFocusedElementBuildCache uia-com focus-cr)
       ((err fib)
        # This may fail due to e.g. insufficient privileges
        (log/debug "GetFocusedElementBuildCache failed: %n" err)
@@ -183,17 +103,112 @@
   (if-not focused
     (break nil))
 
-  (get-parent-window uia-context focused))
+  (uia-get-parent-window self focused))
 
 
-(defn get-window-bounding-rect [uia-context hwnd]
-  (def {:uia uia} uia-context)
-  (with-uia [cr (:CreateCacheRequest uia)]
+(defn uia-get-window-bounding-rect [self hwnd]
+  (def {:com uia-com} self)
+  (with-uia [cr (:CreateCacheRequest uia-com)]
     (:AddProperty cr UIA_BoundingRectanglePropertyId)
     (with-uia [uia-win (try
-                         (:ElementFromHandleBuildCache uia hwnd cr)
+                         (:ElementFromHandleBuildCache uia-com hwnd cr)
                          ((err fib)
                           (log/debug "ElementFromHandle failed: %n" err)
                           nil))]
       (when uia-win
         (:get_CachedBoundingRectangle uia-win)))))
+
+
+(defn uia-destroy [self]
+  (def {:com uia-com
+        :root root
+        :deinit-fns deinit-fns
+        :focus-cr focus-cr
+        :control-view-walker control-view-walker}
+    self)
+  (each df deinit-fns
+    (df))
+  (:Release control-view-walker)
+  (:Release focus-cr)
+  (:Release root)
+  (:Release uia-com)
+  (CoUninitialize))
+
+
+(def- uia-proto
+  @{:get-parent-window uia-get-parent-window
+    :get-focused-window uia-get-focused-window
+    :get-window-bounding-rect uia-get-window-bounding-rect
+    :destroy uia-destroy})
+
+
+(defn uia-init-event-handlers [uia-com element chan]
+  (def window-opened-handler
+    # Can't use `with` here, or there will be a "can't marshal alive fiber" error
+    (let [cr (:CreateCacheRequest uia-com)]
+      (:AddProperty cr UIA_NamePropertyId)
+      (:AddProperty cr UIA_ClassNamePropertyId)
+      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
+      (def handler
+        (:AddAutomationEventHandler
+           uia-com
+           UIA_Window_WindowOpenedEventId
+           element
+           TreeScope_Subtree
+           cr
+           (fn [sender event-id]
+             (handle-window-opened-event sender event-id chan))))
+      (:Release cr)
+      handler))
+
+  (def focus-changed-handler
+    (:AddFocusChangedEventHandler
+       uia-com
+       nil
+       (fn [sender]
+         (handle-focus-changed-event sender chan))))
+
+  [(fn []
+     (:RemoveAutomationEventHandler
+        uia-com
+        UIA_Window_WindowOpenedEventId
+        element
+        window-opened-handler))
+   (fn []
+     (:RemoveFocusChangedEventHandler
+        uia-com
+        focus-changed-handler))])
+
+
+(defn init []
+  (def chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
+
+  (CoInitializeEx nil COINIT_MULTITHREADED)
+  (def uia-com
+    (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
+  (:put_AutoSetFocus uia-com false) # To reduce flicker
+
+  (def root
+    (with-uia [cr (:CreateCacheRequest uia-com)]
+      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
+      (:GetRootElementBuildCache uia-com cr)))
+
+  (def deinit-fns
+    (uia-init-event-handlers uia-com root chan))
+
+  (def focus-cr (:CreateCacheRequest uia-com))
+  (:AddProperty focus-cr UIA_NativeWindowHandlePropertyId)
+  (:AddProperty focus-cr UIA_IsTransformPatternAvailablePropertyId)
+  (:AddProperty focus-cr UIA_TransformCanMovePropertyId)
+  (:AddProperty focus-cr UIA_IsWindowPatternAvailablePropertyId)
+
+  (def control-view-walker (:get_ControlViewWalker uia-com))
+
+  (table/setproto
+   @{:com uia-com
+     :root root
+     :deinit-fns deinit-fns
+     :focus-cr focus-cr
+     :control-view-walker control-view-walker
+     :chan chan}
+   uia-proto))

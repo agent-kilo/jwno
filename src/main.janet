@@ -11,10 +11,8 @@
 (import ./ui)
 (import ./uia)
 (import ./repl)
+(import ./const)
 (import ./log)
-
-
-(def DEFAULT-CHAN-LIMIT 65536)
 
 
 (defn main-loop [context]
@@ -64,20 +62,19 @@
 
   (def hInstance (GetModuleHandle nil))
 
-  (def uia-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
-  (def uia-context
+  (def uia
     (try
-      (uia/uia-init uia-chan)
+      (uia/init)
       ((err fib)
        (show-error-and-exit err 1))))
 
   (def wm
     (try
-      (window-manager uia-context)
+      (window-manager uia)
       ((err fib)
        (show-error-and-exit err 1))))
 
-  (def ui-chan (ev/thread-chan DEFAULT-CHAN-LIMIT))
+  (def ui-chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
 
   (def keymap (define-keymap))
 
@@ -189,8 +186,8 @@
 
   (def context
     @{:hInstance hInstance
-      :uia-context uia-context
-      :event-sources [ui-chan uia-chan]
+      :uia uia
+      :event-sources [ui-chan (in uia :chan)]
 
       :current-keymap keymap
       :inhibit-win-key (inhibit-win-key? keymap)
@@ -206,5 +203,5 @@
   (main-loop context)
 
   (repl/stop-server repl-server)
-  (uia/uia-deinit uia-context)
+  (:destroy uia)
   (log/deinit))
