@@ -882,10 +882,14 @@
   (when node
     (:activate node))
 
+  (def uia (in self :uia))
+  (def root (in uia :root))
+  (def root-hwnd (:get_CachedNativeWindowHandle root))
+
   (def hwnd
     (cond
       (nil? node)
-      (:get_CachedNativeWindowHandle (get-in self [:uia :root]))
+      root-hwnd
 
       (= :window (in node :type))
       (in node :hwnd)
@@ -893,12 +897,14 @@
       (= :frame (in node :type))
       (if-let [cur-win (:get-current-window node)]
         (in cur-win :hwnd)
-        (:get_CachedNativeWindowHandle (get-in self [:uia :root])))))
+        root-hwnd)))
 
-  (log/debug "setting foreground window to %n" hwnd)
-  (def sfw-ret (SetForegroundWindow hwnd))
-  (when (= FALSE sfw-ret)
-    (log/debug "SetForegroundWindow failed")))
+  (log/debug "setting focus to window: %n" hwnd)
+  (if (= hwnd root-hwnd)
+    (SetForegroundWindow hwnd) # The UIA SetFocus method doesn't work for the desktop window
+    (:set-focus-to-window uia hwnd))
+
+  self)
 
 
 (defn wm-retile [self &opt fr]
@@ -963,11 +969,6 @@
 
 
 (defn window-manager [uia]
-  # Need this for SetForegroundWindow() to actually bring
-  # the windows to the foreground.
-  (when (= FALSE (SystemParametersInfo SPI_SETFOREGROUNDLOCKTIMEOUT 0 0 0))
-    (error "SPI_SETFOREGROUNDLOCKTIMEOUT failed"))
-
   (def wm-obj
     (table/setproto
      @{:uia uia}

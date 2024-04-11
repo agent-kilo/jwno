@@ -113,10 +113,21 @@
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache uia-com hwnd cr)
                          ((err fib)
-                          (log/debug "ElementFromHandle failed: %n" err)
+                          (log/debug "ElementFromHandleBuildCache failed: %n" err)
                           nil))]
       (when uia-win
         (:get_CachedBoundingRectangle uia-win)))))
+
+
+(defn uia-set-focus-to-window [self hwnd]
+  (def {:com uia-com} self)
+  (with-uia [uia-win (try
+                       (:ElementFromHandle uia-com hwnd)
+                       ((err fib)
+                        (log/debug "ElementFromHandle failed: %n" err)
+                        nil))]
+    (when uia-win
+      (:SetFocus uia-win))))
 
 
 (defn uia-destroy [self]
@@ -139,6 +150,7 @@
   @{:get-parent-window uia-get-parent-window
     :get-focused-window uia-get-focused-window
     :get-window-bounding-rect uia-get-window-bounding-rect
+    :set-focus-to-window uia-set-focus-to-window
     :destroy uia-destroy})
 
 
