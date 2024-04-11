@@ -1,6 +1,5 @@
 (use jw32/_winuser)
 
-(use ./uia)
 (use ./resource)
 
 (import ./log)
@@ -205,8 +204,8 @@
     (break))
 
   (def win-rect
-    (get-window-bounding-rect (in context :uia-context)
-                              (in cur-win :hwnd)))
+    (:get-window-bounding-rect (in context :uia)
+                               (in cur-win :hwnd)))
   (when (nil? win-rect)
     (break))
 
