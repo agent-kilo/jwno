@@ -131,7 +131,9 @@
       (empty? children)
       (do
         (put child :parent self)
-        (array/push children child))
+        (array/push children child)
+        # This is the only child, activate it to avoid inconsistent states
+        (put self :current-child child))
 
       (= (in child :type) :window)
       (if (= (get-in children [0 :type]) :window)
@@ -872,8 +874,7 @@
     (break self))
 
   # TODO: window open events
-  (let [new-win (wm-add-window self hwnd)]
-    (:activate new-win))
+  (wm-add-window self hwnd)
   self)
 
 
