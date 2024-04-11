@@ -9,6 +9,7 @@
 (use ./resource)
 (use ./util)
 
+(import ./const)
 (import ./log)
 
 (def GC-TIMER-INTERVAL 5000)    # in milliseconds
@@ -275,3 +276,36 @@
   (deinit-timer gc-timer-id)
   (UnhookWindowsHookEx hook-id)
   (ev/give chan :ui/exit))
+
+
+(defn ui-initialized [self thread-id msg-hwnd]
+  (put self :thread-id thread-id)
+  (put self :msg-hwnd msg-hwnd))
+
+
+(defn ui-post-message [self msg wparam lparam]
+  (if-let [msg-hwnd (in self :msg-hwnd)]
+    (PostMessage msg-hwnd msg wparam lparam)
+    (error "ui thread is not initialized")))
+
+
+(defn ui-destroy [self]
+  (ui-post-message self WM_COMMAND ID_MENU_EXIT 0))
+
+
+(def ui-proto
+  @{:initialized ui-initialized
+    :post-message ui-post-message
+    :destroy ui-destroy})
+
+
+(defn init [h-inst argv0 keymap]
+  (def chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
+  (ev/spawn-thread
+   (ui-thread h-inst argv0 keymap chan))
+  (table/setproto
+   @{:chan chan
+     # Members below are set with the :ui/initialized message
+     :thread-id nil
+     :msg-hwnd nil}
+   ui-proto))

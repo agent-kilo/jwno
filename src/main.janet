@@ -23,9 +23,7 @@
      [:take chan msg]
      (match msg
        [:ui/initialized thread-id msg-hwnd]
-       (do
-         (put context :ui-thread thread-id)
-         (put context :msg-hwnd msg-hwnd))
+       (:initialized (in context :ui) thread-id msg-hwnd)
 
        :ui/exit
        (break)
@@ -73,8 +71,6 @@
       (window-manager uia)
       ((err fib)
        (show-error-and-exit err 1))))
-
-  (def ui-chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
 
   (def keymap (define-keymap))
 
@@ -181,24 +177,22 @@
 
   (log/debug "keymap = %n" keymap)
 
-  (ev/spawn-thread
-   (ui/ui-thread hInstance (args 0) keymap ui-chan))
+  (def ui (ui/init hInstance (in args 0) keymap))
 
   (def context
     @{:hInstance hInstance
+      :wm wm
+      :ui ui
       :uia uia
-      :event-sources [ui-chan (in uia :chan)]
+      :event-sources [(in uia :chan)
+                      (in ui :chan)]
 
       :current-keymap keymap
       :inhibit-win-key (inhibit-win-key? keymap)
-      :key-states @{}
-
-      :wm wm
-
-      :ui-thread nil
-      :msg-hwnd nil})
+      :key-states @{}})
 
   (def repl-server (repl/start-server context))
+  (put context :repl repl-server)
 
   (main-loop context)
 

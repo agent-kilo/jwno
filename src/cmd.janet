@@ -6,9 +6,11 @@
 
 
 (defn cmd-quit [context]
-  (if (in context :msg-hwnd)
-    (PostMessage (in context :msg-hwnd) WM_COMMAND ID_MENU_EXIT 0)
-    (os/exit 0)))
+  (try
+    (:destroy (in context :ui))
+    ((err fib)
+     (log/warning "Failed to destroy UI thread: %n" err)
+     (os/exit 0))))
 
 
 (defn cmd-map-to [key-code key-state]
