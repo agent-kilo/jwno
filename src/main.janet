@@ -54,24 +54,7 @@
      (log/warning "Unhandled ev/select event: %n" event))))
 
 
-(defn main [& args]
-  (def log-chan (log/init :debug))
-  (log/debug "in main")
-
-  (def hInstance (GetModuleHandle nil))
-
-  (def uia
-    (try
-      (uia/init)
-      ((err fib)
-       (show-error-and-exit err 1))))
-
-  (def wm
-    (try
-      (window-manager uia)
-      ((err fib)
-       (show-error-and-exit err 1))))
-
+(defn build-keymap []
   (def keymap (define-keymap))
 
   (define-key keymap
@@ -176,11 +159,31 @@
     [:map-to VK_RWIN])
 
   (log/debug "keymap = %n" keymap)
+  keymap)
 
-  (def ui (ui/init hInstance (in args 0) keymap))
+
+(defn main [& args]
+  (def log-chan (log/init :debug))
+  (log/debug "in main")
+
+  (def uia
+    (try
+      (uia/init)
+      ((err fib)
+       (show-error-and-exit err 1))))
+
+  (def wm
+    (try
+      (window-manager uia)
+      ((err fib)
+       (show-error-and-exit err 1))))
+
+  (def h-inst (GetModuleHandle nil))
+  (def keymap (build-keymap))
+  (def ui (ui/init h-inst (in args 0) keymap))
 
   (def context
-    @{:hInstance hInstance
+    @{:h-instance h-inst
       :wm wm
       :ui ui
       :uia uia
