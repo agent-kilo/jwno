@@ -1,6 +1,7 @@
 (use jw32/_winuser)
 
 (use ./cmd)
+(use ./input)
 
 (import ./log)
 
@@ -235,3 +236,29 @@
           [nil keymap]))))
 
   [key-struct ret-cmd ret-keymap])
+
+
+(defn keyboard-hook-handler-translate-key [self hook-struct]
+  (def extra-info (in hook-struct :dwExtraInfo))
+  (when (test-kei-flag KEI-FLAG-REMAPPED extra-info)
+    # Already remapped
+    (break nil))
+
+  (if-let [binding (get-key-binding (in self :current-keymap)
+                                    (key (hook-struct :vkCode)))]
+    (match binding
+      [:map-to new-key]
+      new-key
+
+      _
+      nil)))
+
+
+(def- keyboard-hook-handler-proto
+  @{:translate-key keyboard-hook-handler-translate-key})
+
+
+(defn keyboard-hook-handler [keymap]
+  (table/setproto
+   @{:current-keymap keymap}
+   keyboard-hook-handler-proto))

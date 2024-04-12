@@ -1,5 +1,6 @@
 (use jw32/_winuser)
 
+(use ./input)
 (use ./resource)
 
 (import ./log)
@@ -14,13 +15,7 @@
 
 
 (defn cmd-map-to [key-code key-state]
-  (def input
-    (INPUT :type INPUT_KEYBOARD
-           :ki.wVk key-code
-           :ki.dwFlags (case key-state
-                         :up KEYEVENTF_KEYUP
-                         :down 0)))
-  (SendInput [input]))
+  (send-input (keyboard-input key-code key-state KEI-FLAG-REMAPPED)))
 
 
 (defn cmd-send-keys [keys context]
@@ -36,25 +31,12 @@
           (array/push input-seqs cur-inputs))
 
         [key-code key-state]
-        (array/push cur-inputs
-                    (INPUT :type INPUT_KEYBOARD
-                           :ki.wVk key-code
-                           :ki.dwFlags (if (= key-state :up)
-                                         KEYEVENTF_KEYUP
-                                         0)))
+        (array/push cur-inputs (keyboard-input key-code key-state))
 
         key-code
         (do
-          # Down event
-          (array/push cur-inputs
-                      (INPUT :type INPUT_KEYBOARD
-                             :ki.wVk key-code
-                             :ki.dwFlags 0))
-          # Up event
-          (array/push cur-inputs
-                      (INPUT :type INPUT_KEYBOARD
-                             :ki.wVk key-code
-                             :ki.dwFlags KEYEVENTF_KEYUP)))
+          (array/push cur-inputs (keyboard-input key-code :down))
+          (array/push cur-inputs (keyboard-input key-code :up)))
 
         _
         (log/warning "Unknown key spec: %n" k)))
@@ -64,7 +46,7 @@
     (each seq input-seqs
       (if (number? seq)
         (ev/sleep seq)
-        (SendInput seq)))))
+        (send-input ;seq)))))
 
 
 (defn cmd-retile [context]

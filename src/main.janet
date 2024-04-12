@@ -54,6 +54,17 @@
      (log/warning "Unhandled ev/select event: %n" event))))
 
 
+(defn build-testing-keymap []
+  (def keymap (define-keymap))
+
+  (define-key keymap
+    (key (ascii "A"))
+    [:map-to (ascii "B")])
+  (define-key keymap
+    (key (ascii "B"))
+    [:map-to (ascii "A")]))
+
+
 (defn build-keymap []
   (def keymap (define-keymap))
 
@@ -168,7 +179,10 @@
 
   (def uia
     (try
-      (uia/init)
+      #(uia/init)
+      # XXX: placeholder when testing keymaps
+      @{:chan (ev/thread-chan)
+        :destroy (fn [&])}
       ((err fib)
        (show-error-and-exit err 1))))
 
@@ -179,7 +193,7 @@
        (show-error-and-exit err 1))))
 
   (def h-inst (GetModuleHandle nil))
-  (def keymap (build-keymap))
+  (def keymap (build-testing-keymap))
   (def ui (ui/init h-inst (in args 0) keymap))
 
   (def context

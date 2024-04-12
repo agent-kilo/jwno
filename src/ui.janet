@@ -6,6 +6,7 @@
 (use jw32/_util)
 
 (use ./key)
+(use ./input)
 (use ./resource)
 (use ./util)
 
@@ -221,6 +222,42 @@
     (CallNextHookEx nil code wparam (hook-struct :address))))
 
 
+(defn- log-key-event [code wparam hook-struct]
+  (log/debug "################## log-key-event ##################")
+  (log/debug "code = %n" code)
+  (log/debug "wparam = %n" wparam)
+  (log/debug "vkCode = %n" (hook-struct :vkCode))
+  (log/debug "scanCode = %n" (hook-struct :scanCode))
+  (log/debug "flags.extended = %n" (hook-struct :flags.extended))
+  (log/debug "flags.lower_il_injected = %n" (hook-struct :flags.lower_il_injected))
+  (log/debug "flags.injected = %n" (hook-struct :flags.injected))
+  (log/debug "flags.altdown = %n" (hook-struct :flags.altdown))
+  (log/debug "flags.up = %n" (hook-struct :flags.up))
+  (log/debug "time = %n" (hook-struct :time))
+  (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
+
+
+(defn- reworked-keyboard-hook-proc [code wparam hook-struct chan handler]
+  (log-key-event code wparam hook-struct)
+
+  (when (< code 0)
+    (break (CallNextHookEx nil code wparam (hook-struct :address))))
+
+  (def extra-info (hook-struct :dwExtraInfo))
+
+  (when (test-kei-flag KEI-FLAG-SUPPRESS extra-info)
+    (break (CallNextHookEx nil code wparam (hook-struct :address))))
+
+  (when-let [new-key (:translate-key handler hook-struct)]
+    (def key-state (if (hook-struct :flags.up) :up :down))
+    (send-input (keyboard-input new-key
+                                key-state
+                                (bor KEI-FLAG-REMAPPED extra-info)))
+    (break 1))
+
+  (CallNextHookEx nil code wparam (hook-struct :address)))
+
+
 (defn- init-timer []
   (def timer-id (SetTimer nil 0 GC-TIMER-INTERVAL nil))
   (log/debug "timer-id = %n" timer-id)
@@ -254,14 +291,15 @@
 
   (log/debug "inhibit-win-key = %n" (in keyboard-hook-state :inhibit-win-key))
 
+  (def hook-handler (keyboard-hook-handler keymap))
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
                       (fn [code wparam hook-struct]
-                        (keyboard-hook-proc code
-                                            wparam
-                                            hook-struct
-                                            chan
-                                            keyboard-hook-state))
+                        (reworked-keyboard-hook-proc code
+                                                     wparam
+                                                     hook-struct
+                                                     chan
+                                                     hook-handler))
                       nil
                       0))
   (when (null? hook-id)
