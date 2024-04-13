@@ -262,6 +262,11 @@
   (def mod-states (:get-modifier-states handler hook-struct))
   (if-let [binding (:find-binding handler hook-struct mod-states)]
     (do
+      (when (or (in mod-states :lwin)
+                (in mod-states :rwin))
+        (send-input (keyboard-input 0xFF
+                                    (if key-up :up :down)
+                                    (bor KEI-FLAG-PASSTHROUGH extra-info))))
       (when-let [msg (:handle-binding handler hook-struct binding)]
         (ev/give chan msg))
       (break 1))
