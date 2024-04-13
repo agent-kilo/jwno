@@ -37,20 +37,6 @@
        [:key/command cmd]
        (dispatch-command cmd nil :down context)
 
-       [:key/key-event key key-state cmd]
-       (process-key-event key key-state cmd context)
-
-       [:key/raw-key-event key-code key-state]
-       (let [keymap (in context :current-keymap)
-             key-states (in context :key-states)
-             inhibit-win-key (in context :inhibit-win-key)]
-         (def [key-struct cmd new-keymap]
-           (process-raw-key-event key-code key-state keymap key-states inhibit-win-key))
-         (log/debug "new-keymap after process-raw-key-event: %n" new-keymap)
-         (if-not (nil? cmd)
-           (dispatch-command cmd key-struct key-state context))
-         (put context :current-keymap new-keymap))
-
        _
        (log/warning "Unknown message: %n" msg))
      _
@@ -188,11 +174,7 @@
       :ui ui
       :uia uia
       :event-sources [(in uia :chan)
-                      (in ui :chan)]
-
-      :current-keymap keymap
-      :inhibit-win-key (inhibit-win-key? keymap)
-      :key-states @{}})
+                      (in ui :chan)]})
 
   (def repl-server (repl/start-server context))
   (put context :repl repl-server)
