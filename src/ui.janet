@@ -19,7 +19,7 @@
 (def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
 
 
-(defn- msg-loop [chan gc-timer-id keyboard-hook-state]
+(defn- msg-loop [chan gc-timer-id hook-handler]
   (def msg (MSG))
 
   (forever
@@ -176,52 +176,6 @@
   hwnd)
 
 
-(defn- keyboard-hook-proc [code wparam hook-struct chan state]
-  (log/debug "################## keyboard-hook-proc ##################")
-  (log/debug "code = %n" code)
-  (log/debug "wparam = %n" wparam)
-  (log/debug "vkCode = %n" (hook-struct :vkCode))
-  (log/debug "scanCode = %n" (hook-struct :scanCode))
-  (log/debug "flags.extended = %n" (hook-struct :flags.extended))
-  (log/debug "flags.lower_il_injected = %n" (hook-struct :flags.lower_il_injected))
-  (log/debug "flags.injected = %n" (hook-struct :flags.injected))
-  (log/debug "flags.altdown = %n" (hook-struct :flags.altdown))
-  (log/debug "flags.up = %n" (hook-struct :flags.up))
-  (log/debug "time = %n" (hook-struct :time))
-  (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo))
-
-  (when (< code 0)
-    (break (CallNextHookEx nil code wparam (hook-struct :address))))
-
-  # Don't handle events injected by us
-  (when (hook-struct :flags.injected)
-    (log/debug "Injected event, skipping...")
-    (break (CallNextHookEx nil code wparam (hook-struct :address))))
-
-  (when (in state :raw-event-mode)
-    (dispatch-raw-key-event hook-struct chan)
-    # Treat all events as handled. The raw event handling code
-    # will take over from the main thread, and forward key events
-    # with SendInput()
-    (break 1))
-
-  (def current-keymap (in state :current-keymap))
-  (def key-states (in state :key-states))
-  (def inhibit-win-key (in state :inhibit-win-key))
-
-  # key-states are modified in-place
-  (def [handled new-keymap]
-    (dispatch-key-event current-keymap hook-struct chan inhibit-win-key key-states))
-  (log/debug "handled = %n" handled)
-  (log/debug "new-keymap = %n" new-keymap)
-
-  (put state :current-keymap new-keymap)
-
-  (if handled
-    1 # Tell the OS we processed this event
-    (CallNextHookEx nil code wparam (hook-struct :address))))
-
-
 (defn- log-key-event [code wparam hook-struct]
   (log/debug "################## log-key-event ##################")
   (log/debug "code = %n" code)
@@ -237,7 +191,7 @@
   (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
 
 
-(defn- reworked-keyboard-hook-proc [code wparam hook-struct chan handler]
+(defn- keyboard-hook-proc [code wparam hook-struct chan handler]
   (log-key-event code wparam hook-struct)
 
   (when (< code 0)
@@ -309,24 +263,15 @@
     ((err fib)
      (show-error-and-exit err 1)))
 
-  (def keyboard-hook-state
-    @{:current-keymap keymap
-      :key-states @{}
-      :inhibit-win-key (inhibit-win-key? keymap)
-      # TODO
-      :raw-event-mode true})
-
-  (log/debug "inhibit-win-key = %n" (in keyboard-hook-state :inhibit-win-key))
-
   (def hook-handler (keyboard-hook-handler keymap))
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
                       (fn [code wparam hook-struct]
-                        (reworked-keyboard-hook-proc code
-                                                     wparam
-                                                     hook-struct
-                                                     chan
-                                                     hook-handler))
+                        (keyboard-hook-proc code
+                                            wparam
+                                            hook-struct
+                                            chan
+                                            hook-handler))
                       nil
                       0))
   (when (null? hook-id)
@@ -336,7 +281,7 @@
 
   (ev/give chan [:ui/initialized (GetCurrentThreadId) msg-hwnd])
 
-  (msg-loop chan gc-timer-id keyboard-hook-state)
+  (msg-loop chan gc-timer-id hook-handler)
 
   (deinit-timer gc-timer-id)
   (UnhookWindowsHookEx hook-id)
