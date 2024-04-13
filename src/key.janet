@@ -254,10 +254,12 @@
       nil)))
 
 
-(defn keyboard-hook-handler-get-modifier-states [self]
+(defn keyboard-hook-handler-get-modifier-states [self hook-struct]
+  (def current-kc (in hook-struct :vkCode))
   (def states @{})
   (each kc (keys MODIFIER-KEYS)
-    (when (async-key-state-down? kc)
+    (when (and (not= kc current-kc) # Special case when only modifiers are pressed
+               (async-key-state-down? kc))
       (put states (in MODIFIER-KEYS kc) true)))
   states)
 

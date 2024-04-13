@@ -259,7 +259,8 @@
                                 (bor KEI-FLAG-REMAPPED extra-info)))
     (break 1))
 
-  (if-let [binding (:find-binding handler hook-struct (:get-modifier-states handler))]
+  (def mod-states (:get-modifier-states handler hook-struct))
+  (if-let [binding (:find-binding handler hook-struct mod-states)]
     (do
       (when-let [msg (:handle-binding handler hook-struct binding)]
         (ev/give chan msg))
