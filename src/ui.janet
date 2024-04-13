@@ -243,17 +243,33 @@
   (when (< code 0)
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
+  (def key-up (hook-struct :flags.up))
   (def extra-info (hook-struct :dwExtraInfo))
 
   (when (test-kei-flag KEI-FLAG-SUPPRESS extra-info)
+    # The event is sent to alter lower level key states (XXX: not implemented yet)
+    (break 1))
+
+  (when (test-kei-flag KEI-FLAG-PASSTHROUGH extra-info)
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
   (when-let [new-key (:translate-key handler hook-struct)]
-    (def key-state (if (hook-struct :flags.up) :up :down))
     (send-input (keyboard-input new-key
-                                key-state
+                                (if key-up :up :down)
                                 (bor KEI-FLAG-REMAPPED extra-info)))
     (break 1))
+
+  (if-let [binding (:find-binding handler hook-struct (:get-modifier-states handler))]
+    (do
+      (when-let [msg (:handle-binding handler hook-struct binding)]
+        (ev/give chan msg))
+      (break 1))
+    # We don't recognize the key combination, pass it through,
+    # and reset the keymap on key-up
+    (when key-up
+      (log/debug "Resetting keymap")
+      (:reset-keymap handler)
+      (ev/give chan [:key/reset-keymap (in handler :current-keymap)])))
 
   (CallNextHookEx nil code wparam (hook-struct :address)))
 

@@ -254,8 +254,83 @@
       nil)))
 
 
+(defn keyboard-hook-handler-get-modifier-states [self]
+  (def states @{})
+  (each kc (keys MODIFIER-KEYS)
+    (when (async-key-state-down? kc)
+      (put states (in MODIFIER-KEYS kc) true)))
+  states)
+
+
+(defn keyboard-hook-handler-find-binding [self hook-struct mod-keys]
+  (def mod-combinations-to-check @[mod-keys])
+  (each [mod lmod rmod] [[:shift :lshift :rshift]
+                         [:ctrl :lctrl :rctrl]
+                         [:alt :lalt :ralt]
+                         [:win :lwin :rwin]]
+    (each state (slice mod-combinations-to-check)
+      (when (or (in state lmod)
+                (in state rmod))
+        (def comb (table/clone state))
+        (put comb lmod nil)
+        (put comb rmod nil)
+        (put comb mod true)
+        (array/push mod-combinations-to-check comb))))
+
+  (log/debug "mod-combinations-to-check = %n" mod-combinations-to-check)
+
+  (var binding nil)
+  (each comb mod-combinations-to-check
+    (def key-struct (key (hook-struct :vkCode) (sort (keys comb))))
+    (log/debug "Finding binding for key: %n" key-struct)
+    (if-let [found (get-key-binding (in self :current-keymap) key-struct)]
+      (match found
+        [:map-to _]
+        # handled in translate-key
+        nil
+
+        _
+        (do
+          (set binding found)
+          (break)))))
+  binding)
+
+
+(defn keyboard-hook-handler-reset-keymap [self]
+  (var cur-keymap (in self :current-keymap))
+  (var parent-keymap (in cur-keymap :parent))
+  (while parent-keymap
+    (set cur-keymap parent-keymap)
+    (set parent-keymap (in cur-keymap :parent)))
+  (put self :current-keymap cur-keymap))
+
+
+(defn keyboard-hook-handler-handle-binding [self hook-struct binding]
+  (def key-up (hook-struct :flags.up))
+
+  (when (table? binding)
+    # It's a sub-keymap, activate it only on key-up
+    (if key-up
+      (do
+        (put self :current-keymap binding)
+        (break [:key/switch-keymap binding]))
+      (break nil)))
+
+  # It's a normal command, only fire on key-down, and
+  # try to reset to root keymap when key-up
+  (if key-up
+    (do
+      (keyboard-hook-handler-reset-keymap self)
+      [:key/reset-keymap (in self :current-keymap)])
+    [:key/command binding]))
+
+
 (def- keyboard-hook-handler-proto
-  @{:translate-key keyboard-hook-handler-translate-key})
+  @{:translate-key keyboard-hook-handler-translate-key
+    :find-binding keyboard-hook-handler-find-binding
+    :get-modifier-states keyboard-hook-handler-get-modifier-states
+    :reset-keymap keyboard-hook-handler-reset-keymap
+    :handle-binding keyboard-hook-handler-handle-binding})
 
 
 (defn keyboard-hook-handler [keymap]

@@ -34,6 +34,9 @@
        :uia/focus-changed
        (:focus-changed (in context :wm))
 
+       [:key/command cmd]
+       (dispatch-command cmd nil :down context)
+
        [:key/key-event key key-state cmd]
        (process-key-event key key-state cmd context)
 
@@ -56,13 +59,38 @@
 
 (defn build-testing-keymap []
   (def keymap (define-keymap))
+  (def sub-keymap (define-keymap))
+
+  (define-key sub-keymap
+    (key (ascii "Q") [:win])
+    :quit)
+
+  (define-key sub-keymap
+    (key (ascii "D") [:win])
+    :dummy-command)
+
+  (define-key sub-keymap
+    (key (ascii "A"))
+    [:map-to (ascii "B")])
+  (define-key sub-keymap
+    (key (ascii "B"))
+    [:map-to (ascii "A")])
+
+  (define-key keymap
+    (key (ascii "M") [:win])
+    sub-keymap)
 
   (define-key keymap
     (key (ascii "A"))
     [:map-to (ascii "B")])
   (define-key keymap
     (key (ascii "B"))
-    [:map-to (ascii "A")]))
+    [:map-to (ascii "A")])
+
+  #(define-key keymap
+  #  (key VK_LCONTROL)
+  #  [:map-to VK_CAPITAL])
+  )
 
 
 (defn build-keymap []
