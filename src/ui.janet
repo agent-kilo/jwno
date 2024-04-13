@@ -248,9 +248,11 @@
 
   (when (test-kei-flag KEI-FLAG-SUPPRESS extra-info)
     # The event is sent to alter lower level key states (XXX: not implemented yet)
+    (log/debug "Suppressing key")
     (break 1))
 
   (when (test-kei-flag KEI-FLAG-PASSTHROUGH extra-info)
+    (log/debug "Passing through key")
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
   (when-let [new-key (:translate-key handler hook-struct)]
@@ -260,24 +262,27 @@
     (break 1))
 
   (def mod-states (:get-modifier-states handler hook-struct))
+
   (if-let [binding (:find-binding handler hook-struct mod-states)]
     (do
       (when (or (in mod-states :lwin)
                 (in mod-states :rwin))
-        (send-input (keyboard-input 0xFF
+        # Send a dummy key event to stop the Start Menu from popping up
+        (send-input (keyboard-input VK_DUMMY
                                     (if key-up :up :down)
                                     (bor KEI-FLAG-PASSTHROUGH extra-info))))
       (when-let [msg (:handle-binding handler hook-struct binding)]
         (ev/give chan msg))
-      (break 1))
-    # We don't recognize the key combination, pass it through,
-    # and reset the keymap on key-up
-    (when key-up
-      (log/debug "Resetting keymap")
-      (:reset-keymap handler)
-      (ev/give chan [:key/reset-keymap (in handler :current-keymap)])))
+      1) # !!! IMPORTANT
 
-  (CallNextHookEx nil code wparam (hook-struct :address)))
+    (do
+      # We don't recognize the key combination, pass it through,
+      # and reset the keymap on key-up
+      (when key-up
+        (log/debug "Resetting keymap")
+        (:reset-keymap handler)
+        (ev/give chan [:key/reset-keymap (in handler :current-keymap)]))
+      (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
 (defn- init-timer []

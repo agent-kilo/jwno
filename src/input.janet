@@ -11,6 +11,10 @@
 (def KEI-FLAG-SUPPRESS (blshift (int/u64 4) KEI-SHIFT-BITS))
 (def KEI-FLAG-PASSTHROUGH (blshift (int/u64 8) KEI-SHIFT-BITS))
 
+# Dummy key to suppress the start menu
+# XXX: It's a reserved value in Windows headers
+(def VK_DUMMY 0xff)
+
 
 (defmacro test-kei-flag [flag extra-info]
   ~(> (band ,flag ,extra-info) (int/u64 0)))
