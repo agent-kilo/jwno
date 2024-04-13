@@ -35,7 +35,7 @@
        (:focus-changed (in context :wm))
 
        [:key/command cmd]
-       (dispatch-command cmd nil :down context)
+       (dispatch-command cmd context)
 
        _
        (log/warning "Unknown message: %n" msg))
