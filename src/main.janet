@@ -57,42 +57,6 @@
      (log/warning "Unhandled ev/select event: %n" event))))
 
 
-(defn build-testing-keymap []
-  (def keymap (define-keymap))
-  (def sub-keymap (define-keymap))
-
-  (define-key sub-keymap
-    (key (ascii "Q") [:win])
-    :quit)
-
-  (define-key sub-keymap
-    (key (ascii "D") [:win])
-    :dummy-command)
-
-  (define-key sub-keymap
-    (key (ascii "A"))
-    [:map-to (ascii "B")])
-  (define-key sub-keymap
-    (key (ascii "B"))
-    [:map-to (ascii "A")])
-
-  (define-key keymap
-    (key (ascii "M") [:win])
-    sub-keymap)
-
-  (define-key keymap
-    (key (ascii "A"))
-    [:map-to (ascii "B")])
-  (define-key keymap
-    (key (ascii "B"))
-    [:map-to (ascii "A")])
-
-  #(define-key keymap
-  #  (key VK_LCONTROL)
-  #  [:map-to VK_CAPITAL])
-  )
-
-
 (defn build-keymap []
   (def keymap (define-keymap))
 
@@ -190,9 +154,6 @@
     (key (ascii "S") @[:lwin :lctrl])
     :frame-to-current-window-size)
 
-  # XXX: The argument of :map-to command can only be VK_*WIN or other
-  # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
-  # that modifier would be stuck in the :down state.
   (define-key keymap
     (key VK_RMENU)
     [:map-to VK_RWIN])
@@ -207,10 +168,7 @@
 
   (def uia
     (try
-      #(uia/init)
-      # XXX: placeholder when testing keymaps
-      @{:chan (ev/thread-chan)
-        :destroy (fn [&])}
+      (uia/init)
       ((err fib)
        (show-error-and-exit err 1))))
 
@@ -221,7 +179,7 @@
        (show-error-and-exit err 1))))
 
   (def h-inst (GetModuleHandle nil))
-  (def keymap (build-testing-keymap))
+  (def keymap (build-keymap))
   (def ui (ui/init h-inst (in args 0) keymap))
 
   (def context
