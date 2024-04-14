@@ -105,9 +105,9 @@
 
 # Forward declarations
 (var frame nil)
-(var- frame-proto nil)
-(var- vertical-frame-proto nil)
-(var- horizontal-frame-proto nil)
+(var frame-proto nil)
+(var vertical-frame-proto nil)
+(var horizontal-frame-proto nil)
 
 
 (defn frame-remove-child [self child]

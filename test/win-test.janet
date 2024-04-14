@@ -203,7 +203,7 @@
 
   (:activate dummy-sub-frame2)
   (assert (= (in dummy-frame :current-child) dummy-sub-frame2))
-  (assert (nil? (in dummy-sub-frame2 :current-child)))
+  (assert (= (in dummy-sub-frame2 :current-child) dummy-window2))
   (assert (= (in dummy-sub-frame1 :current-child) dummy-window1)))
 
 
@@ -273,6 +273,8 @@
   #              +- dummy-sub-frame2 -- dummy-window2
   #
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  # XXX: wrap this up?
+  (table/setproto dummy-frame horizontal-frame-proto)
   (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
   (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
   (var dummy-window1 (window :dummy-hwnd1))
