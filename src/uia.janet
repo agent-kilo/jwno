@@ -20,14 +20,19 @@
 
 
 (defn- handle-window-opened-event [sender event-id chan]
+  (def name (:get_CachedName sender))
+  (def class-name (:get_CachedClassName sender))
+  (def hwnd (:get_CachedNativeWindowHandle sender))
+
   (log/debug "#################### handle-window-opened-event ####################")
-  (log/debug "++++ sender: %p" (:get_CachedName sender))
-  (log/debug "++++ class: %p" (:get_CachedClassName sender))
+  (log/debug "++++ sender: %n" name)
+  (log/debug "++++ class: %n" class-name)
+  (log/debug "++++ hwnd: %n" hwnd)
   (log/debug "++++ event-id: %d" event-id)
-  (def win-obj @{:name (:get_CachedName sender)
-                 :class-name (:get_CachedClassName sender)
-                 :native-window-handle (:get_CachedNativeWindowHandle sender)})
-  (ev/give chan [:uia/window-opened (:get_CachedNativeWindowHandle sender)])
+
+  (if (null? hwnd)
+    (log/warning "NULL hwnd received for window opened event")
+    (ev/give chan [:uia/window-opened hwnd]))
   S_OK)
 
 
