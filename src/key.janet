@@ -142,7 +142,9 @@
   (while parent-keymap
     (set cur-keymap parent-keymap)
     (set parent-keymap (in cur-keymap :parent)))
-  (put self :current-keymap cur-keymap))
+  (def old-keymap (in self :current-keymap))
+  (put self :current-keymap cur-keymap)
+  (not= old-keymap cur-keymap))
 
 
 (defn keyboard-hook-handler-handle-binding [self hook-struct binding]
@@ -159,8 +161,7 @@
   # It's a normal command, only fire on key-down, and
   # try to reset to root keymap when key-up
   (if key-up
-    (do
-      (keyboard-hook-handler-reset-keymap self)
+    (when (keyboard-hook-handler-reset-keymap self)
       [:key/reset-keymap (in self :current-keymap)])
     [:key/command binding]))
 

@@ -234,8 +234,9 @@
       # and reset the keymap on key-up
       (when key-up
         (log/debug "Resetting keymap")
-        (:reset-keymap handler)
-        (ev/give chan [:key/reset-keymap (in handler :current-keymap)]))
+        (when (:reset-keymap handler)
+          (ev/give chan
+                   [:key/reset-keymap (in handler :current-keymap)])))
       (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
