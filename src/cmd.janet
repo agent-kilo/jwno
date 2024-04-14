@@ -1,5 +1,6 @@
 (use jw32/_winuser)
 
+(use ./input)
 (use ./resource)
 
 (import ./log)
@@ -13,16 +14,7 @@
      (os/exit 0))))
 
 
-(defn cmd-map-to [key-code key-state]
-  (def input
-    (INPUT :type INPUT_KEYBOARD
-           :ki.wVk key-code
-           :ki.dwFlags (case key-state
-                         :up KEYEVENTF_KEYUP
-                         :down 0)))
-  (SendInput [input]))
-
-
+# TODO?
 (defn cmd-send-keys [keys context]
   (let [input-seqs @[]]
     (var cur-inputs @[])
@@ -36,25 +28,12 @@
           (array/push input-seqs cur-inputs))
 
         [key-code key-state]
-        (array/push cur-inputs
-                    (INPUT :type INPUT_KEYBOARD
-                           :ki.wVk key-code
-                           :ki.dwFlags (if (= key-state :up)
-                                         KEYEVENTF_KEYUP
-                                         0)))
+        (array/push cur-inputs (keyboard-input key-code key-state))
 
         key-code
         (do
-          # Down event
-          (array/push cur-inputs
-                      (INPUT :type INPUT_KEYBOARD
-                             :ki.wVk key-code
-                             :ki.dwFlags 0))
-          # Up event
-          (array/push cur-inputs
-                      (INPUT :type INPUT_KEYBOARD
-                             :ki.wVk key-code
-                             :ki.dwFlags KEYEVENTF_KEYUP)))
+          (array/push cur-inputs (keyboard-input key-code :down))
+          (array/push cur-inputs (keyboard-input key-code :up)))
 
         _
         (log/warning "Unknown key spec: %n" k)))
@@ -64,7 +43,7 @@
     (each seq input-seqs
       (if (number? seq)
         (ev/sleep seq)
-        (SendInput seq)))))
+        (send-input ;seq)))))
 
 
 (defn cmd-retile [context]
@@ -216,66 +195,46 @@
   (:activate wm cur-win))
 
 
-(defn dispatch-command [cmd key-struct key-state context]
+(defn dispatch-command [cmd context]
   (match cmd
     :quit
-    (when (= key-state :down)
-      (cmd-quit context))
-
-    [:map-to key-code]
-    (cmd-map-to key-code key-state)
-
-    [:send-keys & keys]
-    (when (= key-state :down)
-      (cmd-send-keys keys context))
+    (cmd-quit context)
 
     :retile
-    (when (= key-state :down)
-      (cmd-retile context))
+    (cmd-retile context)
 
     [:split dir nfr ratios to-activate move-win-to]
-    (when (= key-state :down)
-      (cmd-split context dir nfr ratios to-activate move-win-to))
+    (cmd-split context dir nfr ratios to-activate move-win-to)
 
     :flatten-parent
-    (when (= key-state :down)
-      (cmd-flatten-parent context))
+    (cmd-flatten-parent context)
 
     [:enum-frame dir]
-    (when (= key-state :down)
-      (cmd-enum-frame context dir))
+    (cmd-enum-frame context dir)
 
     [:adjacent-frame dir]
-    (when (= key-state :down)
-      (cmd-adjacent-frame context dir))
+    (cmd-adjacent-frame context dir)
 
     :next-window-in-frame
-    (when (= key-state :down)
-      (cmd-next-window-in-frame context))
+    (cmd-next-window-in-frame context)
 
     :prev-window-in-frame
-    (when (= key-state :down)
-      (cmd-prev-window-in-frame context))
+    (cmd-prev-window-in-frame context)
 
     [:move-current-window dir]
-    (when (= key-state :down)
-      (cmd-move-current-window context dir))
+    (cmd-move-current-window context dir)
 
     [:resize-current-frame dw dh]
-    (when (= key-state :down)
-      (cmd-resize-current-frame context dw dh))
+    (cmd-resize-current-frame context dw dh)
 
     [:focus-mode ratio]
-    (when (= key-state :down)
-      (cmd-focus-mode context ratio))
+    (cmd-focus-mode context ratio)
 
     :balance-frames
-    (when (= key-state :down)
-      (cmd-balance-frames context))
+    (cmd-balance-frames context)
 
     :frame-to-current-window-size
-    (when (= key-state :down)
-      (cmd-frame-to-current-window-size context))
+    (cmd-frame-to-current-window-size context)
 
     _
     (log/warning "Unknown command: %n" cmd)))

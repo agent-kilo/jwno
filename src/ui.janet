@@ -6,6 +6,7 @@
 (use jw32/_util)
 
 (use ./key)
+(use ./input)
 (use ./resource)
 (use ./util)
 
@@ -18,7 +19,7 @@
 (def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
 
 
-(defn- msg-loop [chan gc-timer-id keyboard-hook-state]
+(defn- msg-loop [chan gc-timer-id hook-handler]
   (def msg (MSG))
 
   (forever
@@ -175,8 +176,8 @@
   hwnd)
 
 
-(defn- keyboard-hook-proc [code wparam hook-struct chan state]
-  (log/debug "################## keyboard-hook-proc ##################")
+(defn- log-key-event [code wparam hook-struct]
+  (log/debug "################## log-key-event ##################")
   (log/debug "code = %n" code)
   (log/debug "wparam = %n" wparam)
   (log/debug "vkCode = %n" (hook-struct :vkCode))
@@ -187,38 +188,56 @@
   (log/debug "flags.altdown = %n" (hook-struct :flags.altdown))
   (log/debug "flags.up = %n" (hook-struct :flags.up))
   (log/debug "time = %n" (hook-struct :time))
-  (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo))
+  (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
+
+
+(defn- keyboard-hook-proc [code wparam hook-struct chan handler]
+  (log-key-event code wparam hook-struct)
 
   (when (< code 0)
     (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
-  # Don't handle events injected by us
-  (when (hook-struct :flags.injected)
-    (log/debug "Injected event, skipping...")
-    (break (CallNextHookEx nil code wparam (hook-struct :address))))
+  (def key-up (hook-struct :flags.up))
+  (def extra-info (hook-struct :dwExtraInfo))
 
-  (when (in state :raw-event-mode)
-    (dispatch-raw-key-event hook-struct chan)
-    # Treat all events as handled. The raw event handling code
-    # will take over from the main thread, and forward key events
-    # with SendInput()
+  (when (test-kei-flag KEI-FLAG-SUPPRESS extra-info)
+    # The event is sent to alter lower level key states (XXX: not implemented yet)
+    (log/debug "Suppressing key")
     (break 1))
 
-  (def current-keymap (in state :current-keymap))
-  (def key-states (in state :key-states))
-  (def inhibit-win-key (in state :inhibit-win-key))
+  (when (test-kei-flag KEI-FLAG-PASSTHROUGH extra-info)
+    (log/debug "Passing through key")
+    (break (CallNextHookEx nil code wparam (hook-struct :address))))
 
-  # key-states are modified in-place
-  (def [handled new-keymap]
-    (dispatch-key-event current-keymap hook-struct chan inhibit-win-key key-states))
-  (log/debug "handled = %n" handled)
-  (log/debug "new-keymap = %n" new-keymap)
+  (when-let [new-key (:translate-key handler hook-struct)]
+    (send-input (keyboard-input new-key
+                                (if key-up :up :down)
+                                (bor KEI-FLAG-REMAPPED extra-info)))
+    (break 1))
 
-  (put state :current-keymap new-keymap)
+  (def mod-states (:get-modifier-states handler hook-struct))
 
-  (if handled
-    1 # Tell the OS we processed this event
-    (CallNextHookEx nil code wparam (hook-struct :address))))
+  (if-let [binding (:find-binding handler hook-struct mod-states)]
+    (do
+      (when (or (in mod-states :lwin)
+                (in mod-states :rwin))
+        # Send a dummy key event to stop the Start Menu from popping up
+        (send-input (keyboard-input VK_DUMMY
+                                    (if key-up :up :down)
+                                    (bor KEI-FLAG-PASSTHROUGH extra-info))))
+      (when-let [msg (:handle-binding handler hook-struct binding)]
+        (ev/give chan msg))
+      1) # !!! IMPORTANT
+
+    (do
+      # We don't recognize the key combination, pass it through,
+      # and reset the keymap on key-up
+      (when key-up
+        (log/debug "Resetting keymap")
+        (when (:reset-keymap handler)
+          (ev/give chan
+                   [:key/reset-keymap (in handler :current-keymap)])))
+      (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
 (defn- init-timer []
@@ -245,15 +264,7 @@
     ((err fib)
      (show-error-and-exit err 1)))
 
-  (def keyboard-hook-state
-    @{:current-keymap keymap
-      :key-states @{}
-      :inhibit-win-key (inhibit-win-key? keymap)
-      # TODO
-      :raw-event-mode true})
-
-  (log/debug "inhibit-win-key = %n" (in keyboard-hook-state :inhibit-win-key))
-
+  (def hook-handler (keyboard-hook-handler keymap))
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
                       (fn [code wparam hook-struct]
@@ -261,7 +272,7 @@
                                             wparam
                                             hook-struct
                                             chan
-                                            keyboard-hook-state))
+                                            hook-handler))
                       nil
                       0))
   (when (null? hook-id)
@@ -271,7 +282,7 @@
 
   (ev/give chan [:ui/initialized (GetCurrentThreadId) msg-hwnd])
 
-  (msg-loop chan gc-timer-id keyboard-hook-state)
+  (msg-loop chan gc-timer-id hook-handler)
 
   (deinit-timer gc-timer-id)
   (UnhookWindowsHookEx hook-id)

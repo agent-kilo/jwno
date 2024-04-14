@@ -34,19 +34,8 @@
        :uia/focus-changed
        (:focus-changed (in context :wm))
 
-       [:key/key-event key key-state cmd]
-       (process-key-event key key-state cmd context)
-
-       [:key/raw-key-event key-code key-state]
-       (let [keymap (in context :current-keymap)
-             key-states (in context :key-states)
-             inhibit-win-key (in context :inhibit-win-key)]
-         (def [key-struct cmd new-keymap]
-           (process-raw-key-event key-code key-state keymap key-states inhibit-win-key))
-         (log/debug "new-keymap after process-raw-key-event: %n" new-keymap)
-         (if-not (nil? cmd)
-           (dispatch-command cmd key-struct key-state context))
-         (put context :current-keymap new-keymap))
+       [:key/command cmd]
+       (dispatch-command cmd context)
 
        _
        (log/warning "Unknown message: %n" msg))
@@ -58,102 +47,99 @@
   (def keymap (define-keymap))
 
   (define-key keymap
-    (key (ascii "Q") @[:lwin])
+    (key (ascii "Q") @[:win])
     :quit)
 
   (define-key keymap
-    (key (ascii "R") @[:lwin])
+    (key (ascii "R") @[:win])
     :retile)
 
   (define-key keymap
-    [(key VK_OEM_COMMA @[:lwin])
-     (key VK_OEM_COMMA @[:lwin])]
+    [(key VK_OEM_COMMA @[:win])
+     (key VK_OEM_COMMA @[:win])]
     [:split :horizontal 2 [0.5] 1 0])
 
   (define-key keymap
-    [(key VK_OEM_COMMA @[:lwin])
+    [(key VK_OEM_COMMA @[:win])
      (key (ascii "3"))]
     [:split :horizontal 3 [0.2 0.6 0.2] 0 1])
 
   (define-key keymap
-    [(key VK_OEM_PERIOD @[:lwin])
-     (key VK_OEM_PERIOD @[:lwin])]
+    [(key VK_OEM_PERIOD @[:win])
+     (key VK_OEM_PERIOD @[:win])]
     [:split :vertical 2 [0.5] 1 0])
 
   (define-key keymap
-    (key VK_OEM_2 @[:lwin])
+    (key VK_OEM_2 @[:win])
     :flatten-parent)
 
   (define-key keymap
-    (key (ascii "N") @[:lwin])
+    (key (ascii "N") @[:win])
     [:enum-frame :next])
 
   (define-key keymap
-    (key (ascii "E") @[:lwin])
+    (key (ascii "E") @[:win])
     [:enum-frame :prev])
 
   (define-key keymap
-    (key (ascii "I") @[:lwin])
+    (key (ascii "I") @[:win])
     :next-window-in-frame)
 
   (define-key keymap
-    (key (ascii "M") @[:lwin])
+    (key (ascii "M") @[:win])
     :prev-window-in-frame)
 
   (define-key keymap
-    (key (ascii "N") @[:lwin :lctrl])
+    (key (ascii "N") @[:win :ctrl])
     [:adjacent-frame :down])
   (define-key keymap
-    (key (ascii "E") @[:lwin :lctrl])
+    (key (ascii "E") @[:win :ctrl])
     [:adjacent-frame :up])
   (define-key keymap
-    (key (ascii "M") @[:lwin :lctrl])
+    (key (ascii "M") @[:win :ctrl])
     [:adjacent-frame :left])
   (define-key keymap
-    (key (ascii "I") @[:lwin :lctrl])
+    (key (ascii "I") @[:win :ctrl])
     [:adjacent-frame :right])
 
   (define-key keymap
-    (key (ascii "N") @[:lwin :lshift])
+    (key (ascii "N") @[:win :shift])
     [:move-current-window :down])
   (define-key keymap
-    (key (ascii "E") @[:lwin :lshift])
+    (key (ascii "E") @[:win :shift])
     [:move-current-window :up])
   (define-key keymap
-    (key (ascii "M") @[:lwin :lshift])
+    (key (ascii "M") @[:win :shift])
     [:move-current-window :left])
   (define-key keymap
-    (key (ascii "I") @[:lwin :lshift])
+    (key (ascii "I") @[:win :shift])
     [:move-current-window :right])
 
   (define-key keymap
-    [(key (ascii "S") @[:lwin]) (key (ascii "N") @[:lwin])]
+    [(key (ascii "S") @[:win]) (key (ascii "N") @[:win])]
     [:resize-current-frame 0 100])
   (define-key keymap
-    [(key (ascii "S") @[:lwin]) (key (ascii "E") @[:lwin])]
+    [(key (ascii "S") @[:win]) (key (ascii "E") @[:win])]
     [:resize-current-frame 0 -100])
   (define-key keymap
-    [(key (ascii "S") @[:lwin]) (key (ascii "M") @[:lwin])]
+    [(key (ascii "S") @[:win]) (key (ascii "M") @[:win])]
     [:resize-current-frame -100 0])
   (define-key keymap
-    [(key (ascii "S") @[:lwin]) (key (ascii "I") @[:lwin])]
+    [(key (ascii "S") @[:win]) (key (ascii "I") @[:win])]
     [:resize-current-frame 100 0])
 
   (define-key keymap
-    (key (ascii "F") @[:lwin])
+    (key (ascii "F") @[:win])
     [:focus-mode 0.7])
 
   (define-key keymap
-    (key VK_OEM_PLUS @[:lwin])
+    (key VK_OEM_PLUS @[:win])
     :balance-frames)
 
   (define-key keymap
-    (key (ascii "S") @[:lwin :lctrl])
+    (key (ascii "S") @[:win :ctrl])
     :frame-to-current-window-size)
 
-  # XXX: The argument of :map-to command can only be VK_*WIN or other
-  # normal keys. If other modifiers (e.g. CTRL or ALT) are specified,
-  # that modifier would be stuck in the :down state.
   (define-key keymap
     (key VK_RMENU)
     [:map-to VK_RWIN])
@@ -188,11 +174,7 @@
       :ui ui
       :uia uia
       :event-sources [(in uia :chan)
-                      (in ui :chan)]
-
-      :current-keymap keymap
-      :inhibit-win-key (inhibit-win-key? keymap)
-      :key-states @{}})
+                      (in ui :chan)]})
 
   (def repl-server (repl/start-server context))
   (put context :repl repl-server)
