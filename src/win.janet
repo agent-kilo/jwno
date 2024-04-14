@@ -962,6 +962,7 @@
     :enumerate-monitors wm-enumerate-monitors
     :should-manage? wm-should-manage?
     :add-window wm-add-window
+    :transform-window wm-transform-window
     :retile wm-retile
     :activate wm-activate
     :is-window-process-elevated? wm-is-window-process-elevated?
