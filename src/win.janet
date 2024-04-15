@@ -728,7 +728,9 @@
             # TODO: restore maximized windows first
             (when (and pat
                        (not= 0 (:get_CachedCanMove pat)))
-              (if (not= 0 (:get_CachedCanResize pat))
+              (def no-resize (get-in win [:tags :no-resize]))
+              (if (and (not no-resize)
+                       (not= 0 (:get_CachedCanResize pat)))
                 (do
                   (:Move pat (in rect :left) (in rect :top))
                   (:Resize pat
@@ -971,6 +973,18 @@
     :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
 
 
+(defn init-window-tags [win wm]
+  (when-let [win-info (:get-window-info (in wm :uia)
+                                        (in win :hwnd))]
+    (def {:name name
+          :class-name class-name}
+      win-info)
+    (cond
+      # TODO: Generic window rules?
+      (= class-name "#32770")
+      (put (in win :tags) :no-resize true))))
+
+
 (defn window-manager [uia hook-man]
   (def wm-obj
     (table/setproto
@@ -984,5 +998,9 @@
   (if main-idx
     (:activate (get-in wm-obj [:layout :children main-idx]))
     (:activate (get-in wm-obj [:layout :children 0])))
+
+  (:add-hook hook-man :new-window
+     (fn [_hook-name win]
+       (init-window-tags win wm-obj)))
 
   wm-obj)
