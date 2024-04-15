@@ -176,6 +176,7 @@
       :wm wm
       :ui ui
       :uia uia
+      :hook-manager hook-man
       :event-sources [(in uia :chan)
                       (in ui :chan)]})
 
