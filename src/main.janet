@@ -6,6 +6,7 @@
 (use ./key)
 (use ./cmd)
 (use ./win)
+(use ./hook)
 (use ./util)
 
 (import ./ui)
@@ -158,9 +159,11 @@
       ((err fib)
        (show-error-and-exit err 1))))
 
+  (def hook-man (hook-manager))
+
   (def wm
     (try
-      (window-manager uia)
+      (window-manager uia hook-man)
       ((err fib)
        (show-error-and-exit err 1))))
 

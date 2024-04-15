@@ -97,7 +97,8 @@
 (defn window [hwnd &opt parent]
   (let [node (tree-node parent nil
                         :type :window
-                        :hwnd hwnd)]
+                        :hwnd hwnd
+                        :tags @{})]
     (table/setproto node window-proto)))
 
 
@@ -825,8 +826,9 @@
   (log/debug "new window: %n" hwnd)
   (def new-win (window hwnd))
   (def frame-found (:find-frame-for-window (in self :layout) new-win))
-  (wm-transform-window self new-win frame-found)
   (:add-child frame-found new-win)
+  (:call-hook (in self :hook-manager) :new-window new-win)
+  (wm-transform-window self new-win frame-found)
   new-win)
 
 
@@ -969,10 +971,11 @@
     :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
 
 
-(defn window-manager [uia]
+(defn window-manager [uia hook-man]
   (def wm-obj
     (table/setproto
-     @{:uia uia}
+     @{:uia uia
+       :hook-manager hook-man}
      wm-proto))
 
   (def [work-areas main-idx] (:enumerate-monitors wm-obj))
