@@ -795,6 +795,12 @@
        (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
 
 
+(defn wm-set-window-alpha [self hwnd alpha]
+  (def ex-style (GetWindowLong hwnd GWL_EXSTYLE))
+  (SetWindowLong hwnd GWL_EXSTYLE (unsigned-to-signed-32 (bor ex-style WS_EX_LAYERED)))
+  (SetLayeredWindowAttributes hwnd 0 alpha LWA_ALPHA))
+
+
 (defn wm-is-window-process-elevated? [self hwnd]
   (def [_tid pid] (GetWindowThreadProcessId hwnd))
   (when (= (int/u64 0) pid)
@@ -1067,6 +1073,7 @@
     :should-manage? wm-should-manage?
     :add-window wm-add-window
     :transform-window wm-transform-window
+    :set-window-alpha wm-set-window-alpha
     :retile wm-retile
     :activate wm-activate
     :is-window-process-elevated? wm-is-window-process-elevated?
@@ -1081,6 +1088,14 @@
     # TODO: Generic window rules?
     (= class-name "#32770") # Dialog window class
     (put (in win :tags) :no-expand true)))
+
+
+(defn init-window-alpha [win uia-win wm]
+  (def class-name (:get_CachedClassName uia-win))
+  (when (not= "Emacs" class-name)
+    (break))
+  # TODO: Generic window rules?
+  (:set-window-alpha wm (in win :hwnd) (math/floor (* 256 0.9))))
 
 
 (defn check-uncloaked-window [hwnd]
@@ -1123,6 +1138,10 @@
   (:add-hook hook-man :new-window
      (fn [_hook-name win uia-win _exe-path]
        (init-window-tags win uia-win wm-obj)))
+
+  (:add-hook hook-man :new-window
+     (fn [_hook-name win uia-win _exe-path]
+       (init-window-alpha win uia-win wm-obj)))
 
   (:add-hook hook-man :filter-window
      (fn [_hook-name hwnd _uia-win _exe-path]
