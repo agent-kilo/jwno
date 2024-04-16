@@ -97,7 +97,8 @@
 (defn window [hwnd &opt parent]
   (let [node (tree-node parent nil
                         :type :window
-                        :hwnd hwnd)]
+                        :hwnd hwnd
+                        :tags @{})]
     (table/setproto node window-proto)))
 
 
@@ -708,6 +709,33 @@
 
 ######### Window manager object #########
 
+(defn- calc-centered-coords [win-rect fr-rect fit]
+  (def fr-width (- (in fr-rect :right) (in fr-rect :left)))
+  (def fr-height (- (in fr-rect :bottom) (in fr-rect :top)))
+  (def win-width (- (in win-rect :right) (in win-rect :left)))
+  (def win-height (- (in win-rect :bottom) (in win-rect :top)))
+
+  (def x
+    (math/floor
+     (+ (in fr-rect :left)
+        (/ fr-width 2)
+        (/ win-width -2))))
+  (def y
+    (math/floor
+     (+ (in fr-rect :top)
+        (/ fr-height 2)
+        (/ win-height -2))))
+
+  (if fit
+    (let [[fitted-x fitted-width] (if (< x (in fr-rect :left))
+                                    [(in fr-rect :left) fr-width]
+                                    [x win-width])
+          [fitted-y fitted-height] (if (< y (in fr-rect :top))
+                                     [(in fr-rect :top) fr-height]
+                                     [y win-height])]
+      [fitted-x fitted-y fitted-width fitted-height])
+    [x y win-width win-height]))
+
 (defn wm-transform-window [self win fr]
   (let [uia (in self :uia)
         uia-com (in uia :com)
@@ -727,27 +755,40 @@
             # TODO: restore maximized windows first
             (when (and pat
                        (not= 0 (:get_CachedCanMove pat)))
-              (if (not= 0 (:get_CachedCanResize pat))
+              (def tags (in win :tags))
+
+              (def no-resize (in tags :no-resize))
+              (def no-expand (in tags :no-expand))
+
+              (cond
+                (= 0 (:get_CachedCanResize pat))
+                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+                  # Move the window to the frame's center
+                  (def [x y _w _h]
+                    (calc-centered-coords win-rect rect false))
+                  (:Move pat x y))
+
+                no-resize
+                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+                  # Move the window to the frame's center
+                  (def [x y _w _h]
+                    (calc-centered-coords win-rect rect false))
+                  (:Move pat x y))
+
+                no-expand
+                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+                  # Move the window to the frame's center
+                  (def [x y w h]
+                    (calc-centered-coords win-rect rect true))
+                  (:Move pat x y)
+                  (:Resize pat w h))
+
+                true
                 (do
                   (:Move pat (in rect :left) (in rect :top))
                   (:Resize pat
                            (- (in rect :right) (in rect :left))
-                           (- (in rect :bottom) (in rect :top))))
-                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-                  (def fr-width (- (in rect :right) (in rect :left)))
-                  (def fr-height (- (in rect :bottom) (in rect :top)))
-                  (def win-width (- (in win-rect :right) (in win-rect :left)))
-                  (def win-height (- (in win-rect :bottom) (in win-rect :top)))
-                  # Move the window to the frame's center
-                  (:Move pat
-                         (math/floor
-                          (+ (in rect :left)
-                             (/ fr-width 2)
-                             (/ win-width -2)))
-                         (math/floor
-                          (+ (in rect :top)
-                             (/ fr-height 2)
-                             (/ win-height -2))))))))))
+                           (- (in rect :bottom) (in rect :top)))))))))
       ((err fib)
        # XXX: Don't manage a window which cannot be transformed?
        (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
@@ -780,53 +821,54 @@
     elevated))
 
 
-(defn wm-should-manage? [self hwnd? &opt uia-win]
-  (def hwnd
-    (if (or (nil? hwnd?) (null? hwnd?))
-      (:get_CachedNativeWindowHandle uia-win)
-      hwnd?))
+(defn wm-should-manage? [self hwnd? &opt uia-win?]
+  (def uia (in self :uia))
+  (def [hwnd uia-win]
+    (cond
+      (nil? uia-win?)
+      (if (or (nil? hwnd?) (null? hwnd?))
+        (error "invalid hwnd and uia-win")
+        [hwnd? (try
+                 (:ElementFromHandleBuildCache (in uia :com) hwnd? (in uia :focus-cr))
+                 ((err fib)
+                  (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                  nil))])
+
+      (or (nil? hwnd?) (null? hwnd?))
+      [(try
+         (:get_CachedNativeWindowHandle uia-win?)
+         ((err fib)
+          (log/debug "get_CachedNativeWindowHandle failed: %n" err)
+          nil))
+       uia-win?]
+
+      true
+      [hwnd? uia-win?]))
 
   (cond
-    (> (try
-         (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
-         ((err fib)
-          (log/debug "DwmGetWindowAttribute failed: %n" err)
-          0))
-       0)
-    # This may be an invisible window created by ApplicationFrameWindow,
-    # or a window which lives on another virtual desktop
-    (break false)
+    (nil? uia-win)
+    false
 
-    (and (not (wm-is-jwno-process-elevated? self))
-         (wm-is-window-process-elevated? self hwnd))
-    # We do not have permission to handle this window
-    (break false)
-
-    (not (nil? uia-win))
-    (uia/is-valid-uia-window? uia-win)
+    (nil? hwnd)
+    (do
+      (when (nil? uia-win?)
+        (:Release uia-win))
+      false)
 
     true
-    (let [uia (in self :uia)
-          uia-com (in uia :com)
-          cr (in uia :focus-cr)]
-      (uia/with-uia [uia-win
-                 (try
-                   (:ElementFromHandleBuildCache uia-com hwnd cr)
-                   ((err fib)
-                    # The window may have vanished
-                    (log/debug "ElementFromHandleBuildCache failed: %n" err)
-                    nil))]
-        (if uia-win
-          (uia/is-valid-uia-window? uia-win)
-          false)))))
+    (let [result (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win)]
+      (when (nil? uia-win?)
+        (:Release uia-win))
+      result)))
 
 
 (defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
   (def new-win (window hwnd))
   (def frame-found (:find-frame-for-window (in self :layout) new-win))
-  (wm-transform-window self new-win frame-found)
   (:add-child frame-found new-win)
+  (:call-hook (in self :hook-manager) :new-window new-win)
+  (wm-transform-window self new-win frame-found)
   new-win)
 
 
@@ -858,7 +900,7 @@
       hwnd))
 
   (when hwnd-to-manage
-    # TODO: window open/close events
+    # TODO: window close events
     (let [new-win (wm-add-window self hwnd-to-manage)]
       (:activate new-win)))
   self)
@@ -873,7 +915,6 @@
     (log/debug "Ignoring window: %n" hwnd)
     (break self))
 
-  # TODO: window open events
   (wm-add-window self hwnd)
   self)
 
@@ -969,10 +1010,46 @@
     :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
 
 
-(defn window-manager [uia]
+(defn init-window-tags [win wm]
+  (when-let [win-info (:get-window-info (in wm :uia)
+                                        (in win :hwnd))]
+    (def {:name name
+          :class-name class-name}
+      win-info)
+    (cond
+      # TODO: Generic window rules?
+      (= class-name "#32770")
+      (put (in win :tags) :no-expand true))))
+
+
+(defn check-uncloaked-window [hwnd]
+  (def cloaked-value
+    (try
+      (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
+      ((err fib)
+       (log/debug "DwmGetWindowAttribute failed: %n" err)
+       0)))
+  (= 0 cloaked-value))
+
+
+(defn check-unelevated-window [hwnd wm]
+  (or (:is-jwno-process-elevated? wm)
+      (not (:is-window-process-elevated? wm hwnd))))
+
+
+(defn check-valid-uia-window [uia-win]
+  (uia/is-valid-uia-window? uia-win))
+
+
+(defn check-not-pseudo-console-window [uia-win]
+  (not= "PseudoConsoleWindow" (:get_CachedClassName uia-win)))
+
+
+(defn window-manager [uia hook-man]
   (def wm-obj
     (table/setproto
-     @{:uia uia}
+     @{:uia uia
+       :hook-manager hook-man}
      wm-proto))
 
   (def [work-areas main-idx] (:enumerate-monitors wm-obj))
@@ -981,5 +1058,23 @@
   (if main-idx
     (:activate (get-in wm-obj [:layout :children main-idx]))
     (:activate (get-in wm-obj [:layout :children 0])))
+
+  (:add-hook hook-man :new-window
+     (fn [_hook-name win]
+       (init-window-tags win wm-obj)))
+
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name hwnd _uia-win]
+       (check-uncloaked-window hwnd)))
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name hwnd _uia-win]
+       (check-unelevated-window hwnd wm-obj)))
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name _hwnd uia-win]
+       (check-valid-uia-window uia-win)))
+  # TODO: Generic window rules?
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name _hwnd uia-win]
+       (check-not-pseudo-console-window uia-win)))
 
   wm-obj)

@@ -111,6 +111,21 @@
   (uia-get-parent-window self focused))
 
 
+(defn uia-get-window-info [self hwnd]
+  (def {:com uia-com} self)
+  (with-uia [cr (:CreateCacheRequest uia-com)]
+    (:AddProperty cr UIA_NamePropertyId)
+    (:AddProperty cr UIA_ClassNamePropertyId)
+    (with-uia [uia-win (try
+                         (:ElementFromHandleBuildCache uia-com hwnd cr)
+                         ((err fib)
+                          (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                          nil))]
+      (when uia-win
+        {:name (:get_CachedName uia-win)
+         :class-name (:get_CachedClassName uia-win)}))))
+
+
 (defn uia-get-window-bounding-rect [self hwnd]
   (def {:com uia-com} self)
   (with-uia [cr (:CreateCacheRequest uia-com)]
@@ -154,6 +169,7 @@
 (def- uia-proto
   @{:get-parent-window uia-get-parent-window
     :get-focused-window uia-get-focused-window
+    :get-window-info uia-get-window-info
     :get-window-bounding-rect uia-get-window-bounding-rect
     :set-focus-to-window uia-set-focus-to-window
     :destroy uia-destroy})
@@ -215,6 +231,8 @@
 
   (def focus-cr (:CreateCacheRequest uia-com))
   (:AddProperty focus-cr UIA_NativeWindowHandlePropertyId)
+  (:AddProperty focus-cr UIA_NamePropertyId)
+  (:AddProperty focus-cr UIA_ClassNamePropertyId)
   (:AddProperty focus-cr UIA_IsTransformPatternAvailablePropertyId)
   (:AddProperty focus-cr UIA_TransformCanMovePropertyId)
   (:AddProperty focus-cr UIA_IsWindowPatternAvailablePropertyId)
