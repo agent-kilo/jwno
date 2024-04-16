@@ -901,9 +901,36 @@
 (defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
   (def new-win (window hwnd))
-  (def frame-found (:find-frame-for-window (in self :layout) new-win))
+  (def uia (in self :uia))
+  (def exe-path (wm-get-window-process-path self hwnd))
+  (def hwnd-still-valid
+    (uia/with-uia [uia-win (try
+                             (:ElementFromHandleBuildCache (in uia :com) hwnd (in uia :focus-cr))
+                             ((err fib)
+                              (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                              nil))]
+      (if (nil? uia-win)
+        # The window may have disappeared between (wm-should-manage? ...) and (wm-add-window ...)
+        false
+        (do
+          (:call-hook (in self :hook-manager) :new-window new-win uia-win exe-path)
+          true))))
+
+  (when (not hwnd-still-valid)
+    (break nil))
+
+  (def tags (in new-win :tags))
+
+  # TODO: floating windows?
+
+  (def frame-found
+    (if-let [override-frame (in tags :frame)]
+      (do 
+        (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
+        override-frame)
+      (:find-frame-for-window (in self :layout) new-win)))
+
   (:add-child frame-found new-win)
-  (:call-hook (in self :hook-manager) :new-window new-win)
   (wm-transform-window self new-win frame-found)
   new-win)
 
@@ -1048,16 +1075,12 @@
     :get-window-process-path wm-get-window-process-path})
 
 
-(defn init-window-tags [win wm]
-  (when-let [win-info (:get-window-info (in wm :uia)
-                                        (in win :hwnd))]
-    (def {:name name
-          :class-name class-name}
-      win-info)
-    (cond
-      # TODO: Generic window rules?
-      (= class-name "#32770")
-      (put (in win :tags) :no-expand true))))
+(defn init-window-tags [win uia-win _wm]
+  (def class-name (:get_CachedClassName uia-win))
+  (cond
+    # TODO: Generic window rules?
+    (= class-name "#32770") # Dialog window class
+    (put (in win :tags) :no-expand true)))
 
 
 (defn check-uncloaked-window [hwnd]
@@ -1098,8 +1121,8 @@
     (:activate (get-in wm-obj [:layout :children 0])))
 
   (:add-hook hook-man :new-window
-     (fn [_hook-name win]
-       (init-window-tags win wm-obj)))
+     (fn [_hook-name win uia-win _exe-path]
+       (init-window-tags win uia-win wm-obj)))
 
   (:add-hook hook-man :filter-window
      (fn [_hook-name hwnd _uia-win _exe-path]
