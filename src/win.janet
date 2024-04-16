@@ -838,7 +838,22 @@
   (when (= (int/u64 0) pid)
     (break nil))
 
-  (wm-get-process-path self pid))
+  (def path (wm-get-process-path self pid))
+
+  (var uwp-pid nil)
+  (when (string/has-suffix? "ApplicationFrameHost.exe" path)
+    # Executables for UWP apps live somewhere else
+    (EnumChildWindows hwnd
+                      (fn [child-hwnd]
+                        (def [_tid child-pid] (GetWindowThreadProcessId child-hwnd))
+                        (when (and (not= (int/u64 0) child-pid)
+                                   (not= pid child-pid))
+                          (set uwp-pid child-pid)
+                          (break FALSE))
+                        TRUE)))
+  (if uwp-pid
+    (wm-get-process-path self uwp-pid)
+    path))
 
 
 (defn wm-should-manage? [self hwnd? &opt uia-win?]
@@ -876,7 +891,8 @@
       false)
 
     true
-    (let [result (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win)]
+    (let [exe-path (wm-get-window-process-path self hwnd)
+          result (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path)]
       (when (nil? uia-win?)
         (:Release uia-win))
       result)))
@@ -1086,17 +1102,17 @@
        (init-window-tags win wm-obj)))
 
   (:add-hook hook-man :filter-window
-     (fn [_hook-name hwnd _uia-win]
+     (fn [_hook-name hwnd _uia-win _exe-path]
        (check-uncloaked-window hwnd)))
   (:add-hook hook-man :filter-window
-     (fn [_hook-name hwnd _uia-win]
+     (fn [_hook-name hwnd _uia-win _exe-path]
        (check-unelevated-window hwnd wm-obj)))
   (:add-hook hook-man :filter-window
-     (fn [_hook-name _hwnd uia-win]
+     (fn [_hook-name _hwnd uia-win _exe-path]
        (check-valid-uia-window uia-win)))
   # TODO: Generic window rules?
   (:add-hook hook-man :filter-window
-     (fn [_hook-name _hwnd uia-win]
+     (fn [_hook-name _hwnd uia-win exe-path]
        (check-not-pseudo-console-window uia-win)))
 
   wm-obj)
