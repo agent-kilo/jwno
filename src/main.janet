@@ -142,6 +142,10 @@
     :frame-to-current-window-size)
 
   (define-key keymap
+    (key (ascii "C") @[:win :shift])
+    :close-current-window)
+
+  (define-key keymap
     (key VK_RMENU)
     [:map-to VK_RWIN])
 

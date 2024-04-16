@@ -195,6 +195,15 @@
   (:activate wm cur-win))
 
 
+(defn cmd-close-current-window [context]
+  (def wm (in context :wm))
+  (def cur-win (:get-current-window (in wm :layout)))
+  (when (nil? cur-win)
+    (break))
+
+  (PostMessage (in cur-win :hwnd) WM_CLOSE 0 0))
+
+
 (defn dispatch-command [cmd context]
   (match cmd
     :quit
@@ -235,6 +244,9 @@
 
     :frame-to-current-window-size
     (cmd-frame-to-current-window-size context)
+
+    :close-current-window
+    (cmd-close-current-window context)
 
     _
     (log/warning "Unknown command: %n" cmd)))
