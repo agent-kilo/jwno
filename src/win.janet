@@ -821,45 +821,45 @@
     elevated))
 
 
-(defn wm-should-manage? [self hwnd? &opt uia-win]
-  (def hwnd
-    (if (or (nil? hwnd?) (null? hwnd?))
-      (:get_CachedNativeWindowHandle uia-win)
-      hwnd?))
+(defn wm-should-manage? [self hwnd? &opt uia-win?]
+  (def uia (in self :uia))
+  (def [hwnd uia-win]
+    (cond
+      (nil? uia-win?)
+      (if (or (nil? hwnd?) (null? hwnd?))
+        (error "invalid hwnd and uia-win")
+        [hwnd? (try
+                 (:ElementFromHandleBuildCache (in uia :com) hwnd? (in uia :focus-cr))
+                 ((err fib)
+                  (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                  nil))])
+
+      (or (nil? hwnd?) (null? hwnd?))
+      [(try
+         (:get_CachedNativeWindowHandle uia-win?)
+         ((err fib)
+          (log/debug "get_CachedNativeWindowHandle failed: %n" err)
+          nil))
+       uia-win?]
+
+      true
+      [hwnd? uia-win?]))
 
   (cond
-    (> (try
-         (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
-         ((err fib)
-          (log/debug "DwmGetWindowAttribute failed: %n" err)
-          0))
-       0)
-    # This may be an invisible window created by ApplicationFrameWindow,
-    # or a window which lives on another virtual desktop
-    (break false)
+    (nil? uia-win)
+    false
 
-    (and (not (wm-is-jwno-process-elevated? self))
-         (wm-is-window-process-elevated? self hwnd))
-    # We do not have permission to handle this window
-    (break false)
-
-    (not (nil? uia-win))
-    (uia/is-valid-uia-window? uia-win)
+    (nil? hwnd)
+    (do
+      (when (nil? uia-win?)
+        (:Release uia-win))
+      false)
 
     true
-    (let [uia (in self :uia)
-          uia-com (in uia :com)
-          cr (in uia :focus-cr)]
-      (uia/with-uia [uia-win
-                 (try
-                   (:ElementFromHandleBuildCache uia-com hwnd cr)
-                   ((err fib)
-                    # The window may have vanished
-                    (log/debug "ElementFromHandleBuildCache failed: %n" err)
-                    nil))]
-        (if uia-win
-          (uia/is-valid-uia-window? uia-win)
-          false)))))
+    (let [result (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win)]
+      (when (nil? uia-win?)
+        (:Release uia-win))
+      result)))
 
 
 (defn wm-add-window [self hwnd]
@@ -900,7 +900,7 @@
       hwnd))
 
   (when hwnd-to-manage
-    # TODO: window open/close events
+    # TODO: window close events
     (let [new-win (wm-add-window self hwnd-to-manage)]
       (:activate new-win)))
   self)
@@ -915,7 +915,6 @@
     (log/debug "Ignoring window: %n" hwnd)
     (break self))
 
-  # TODO: window open events
   (wm-add-window self hwnd)
   self)
 
@@ -1023,6 +1022,29 @@
       (put (in win :tags) :no-expand true))))
 
 
+(defn check-uncloaked-window [hwnd]
+  (def cloaked-value
+    (try
+      (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
+      ((err fib)
+       (log/debug "DwmGetWindowAttribute failed: %n" err)
+       0)))
+  (= 0 cloaked-value))
+
+
+(defn check-unelevated-window [hwnd wm]
+  (or (:is-jwno-process-elevated? wm)
+      (not (:is-window-process-elevated? wm hwnd))))
+
+
+(defn check-valid-uia-window [uia-win]
+  (uia/is-valid-uia-window? uia-win))
+
+
+(defn check-not-pseudo-console-window [uia-win]
+  (not= "PseudoConsoleWindow" (:get_CachedClassName uia-win)))
+
+
 (defn window-manager [uia hook-man]
   (def wm-obj
     (table/setproto
@@ -1040,5 +1062,19 @@
   (:add-hook hook-man :new-window
      (fn [_hook-name win]
        (init-window-tags win wm-obj)))
+
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name hwnd _uia-win]
+       (check-uncloaked-window hwnd)))
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name hwnd _uia-win]
+       (check-unelevated-window hwnd wm-obj)))
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name _hwnd uia-win]
+       (check-valid-uia-window uia-win)))
+  # TODO: Generic window rules?
+  (:add-hook hook-man :filter-window
+     (fn [_hook-name _hwnd uia-win]
+       (check-not-pseudo-console-window uia-win)))
 
   wm-obj)
