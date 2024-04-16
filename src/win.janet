@@ -1,3 +1,4 @@
+(use jw32/_winbase)
 (use jw32/_winuser)
 (use jw32/_processthreadsapi)
 (use jw32/_securitybaseapi)
@@ -821,6 +822,25 @@
     elevated))
 
 
+(defn wm-get-process-path [self pid]
+  (with [proc
+         (OpenProcess (bor PROCESS_QUERY_INFORMATION
+                           PROCESS_VM_READ)
+                      true
+                      pid)
+         CloseHandle]
+    (log/debug "proc = %n" proc)
+    (QueryFullProcessImageName proc 0)))
+
+
+(defn wm-get-window-process-path [self hwnd]
+  (def [_tid pid] (GetWindowThreadProcessId hwnd))
+  (when (= (int/u64 0) pid)
+    (break nil))
+
+  (wm-get-process-path self pid))
+
+
 (defn wm-should-manage? [self hwnd? &opt uia-win?]
   (def uia (in self :uia))
   (def [hwnd uia-win]
@@ -1007,7 +1027,9 @@
     :retile wm-retile
     :activate wm-activate
     :is-window-process-elevated? wm-is-window-process-elevated?
-    :is-jwno-process-elevated? wm-is-jwno-process-elevated?})
+    :is-jwno-process-elevated? wm-is-jwno-process-elevated?
+    :get-process-path wm-get-process-path
+    :get-window-process-path wm-get-window-process-path})
 
 
 (defn init-window-tags [win wm]
