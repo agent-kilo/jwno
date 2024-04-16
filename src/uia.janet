@@ -233,6 +233,7 @@
   (:AddProperty focus-cr UIA_NativeWindowHandlePropertyId)
   (:AddProperty focus-cr UIA_NamePropertyId)
   (:AddProperty focus-cr UIA_ClassNamePropertyId)
+  (:AddProperty focus-cr UIA_BoundingRectanglePropertyId)
   (:AddProperty focus-cr UIA_IsTransformPatternAvailablePropertyId)
   (:AddProperty focus-cr UIA_TransformCanMovePropertyId)
   (:AddProperty focus-cr UIA_IsWindowPatternAvailablePropertyId)
