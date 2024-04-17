@@ -847,7 +847,8 @@
   (def path (wm-get-process-path self pid))
 
   (var uwp-pid nil)
-  (when (string/has-suffix? "ApplicationFrameHost.exe" path)
+  (when (and (not (nil? path))
+             (string/has-suffix? "ApplicationFrameHost.exe" path))
     # Executables for UWP apps live somewhere else
     (EnumChildWindows hwnd
                       (fn [child-hwnd]
