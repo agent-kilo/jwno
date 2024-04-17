@@ -146,6 +146,15 @@
     :close-current-window)
 
   (define-key keymap
+    [(key (ascii "T") @[:win])
+     (key (ascii "N") @[:win])]
+    [:change-current-window-alpha -25])
+  (define-key keymap
+    [(key (ascii "T") @[:win])
+     (key (ascii "E") @[:win])]
+    [:change-current-window-alpha 25])
+
+  (define-key keymap
     (key VK_RMENU)
     [:map-to VK_RWIN])
 

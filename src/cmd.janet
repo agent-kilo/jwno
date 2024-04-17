@@ -1,4 +1,5 @@
 (use jw32/_winuser)
+(use jw32/_errhandlingapi)
 
 (use ./input)
 (use ./resource)
@@ -204,6 +205,28 @@
   (PostMessage (in cur-win :hwnd) WM_CLOSE 0 0))
 
 
+(defn cmd-change-current-window-alpha [context delta]
+  (def wm (in context :wm))
+  (def cur-win (:get-current-window (in wm :layout)))
+  (when (nil? cur-win)
+    (break))
+
+  (def old-alpha
+    (if-let [attrs (GetLayeredWindowAttributes (in cur-win :hwnd))]
+      (in attrs 1)
+      (do
+        (log/debug "GetLayeredWindowAttributes failed: %n" (GetLastError))
+        255)))
+  (def new-alpha
+    (let [val (math/floor (+ old-alpha delta))]
+      (cond
+        (< val 0) 0
+        (> val 255) 255
+        true val)))
+  (log/debug "Setting window alpha from %n to %n" old-alpha new-alpha)
+  (:set-window-alpha wm (in cur-win :hwnd) new-alpha))
+
+
 (defn dispatch-command [cmd context]
   (match cmd
     :quit
@@ -247,6 +270,9 @@
 
     :close-current-window
     (cmd-close-current-window context)
+
+    [:change-current-window-alpha delta]
+    (cmd-change-current-window-alpha context delta)
 
     _
     (log/warning "Unknown command: %n" cmd)))
