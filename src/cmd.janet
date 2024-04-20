@@ -227,52 +227,80 @@
   (:set-window-alpha wm (in cur-win :hwnd) new-alpha))
 
 
-(defn dispatch-command [cmd context]
-  (match cmd
-    :quit
-    (cmd-quit context)
+(defn add-default-commands [command-man context]
+  (:add-command command-man :quit
+     (fn [] (cmd-quit context)))
+  (:add-command command-man :retile
+     (fn [] (cmd-retile context)))
 
-    :retile
-    (cmd-retile context)
+  (:add-command command-man :split
+     (fn [dir nfr ratios to-activate move-win-to]
+       (cmd-split context dir nfr ratios to-activate move-win-to)))
+  (:add-command command-man :flatten-parent
+     (fn [] (cmd-flatten-parent context)))
 
-    [:split dir nfr ratios to-activate move-win-to]
-    (cmd-split context dir nfr ratios to-activate move-win-to)
+  (:add-command command-man :resize-current-frame
+     (fn [dw dh] (cmd-resize-current-frame context dw dh)))
+  (:add-command command-man :frame-to-current-window-size
+     (fn [] (cmd-frame-to-current-window-size context)))
+  (:add-command command-man :balance-frames
+     (fn [] (cmd-balance-frames context)))
+  (:add-command command-man :focus-mode
+     (fn [ratio] (cmd-focus-mode context ratio)))
 
-    :flatten-parent
-    (cmd-flatten-parent context)
+  (:add-command command-man :enum-frame
+     (fn [dir] (cmd-enum-frame context dir)))
+  (:add-command command-man :adjacent-frame
+     (fn [dir] (cmd-adjacent-frame context dir)))
 
-    [:enum-frame dir]
-    (cmd-enum-frame context dir)
+  (:add-command command-man :next-window-in-frame
+     (fn [] (cmd-next-window-in-frame context)))
+  (:add-command command-man :prev-window-in-frame
+     (fn [] (cmd-prev-window-in-frame context)))
 
-    [:adjacent-frame dir]
-    (cmd-adjacent-frame context dir)
+  (:add-command command-man :move-current-window
+     (fn [dir] (cmd-move-current-window context dir)))
+  (:add-command command-man :close-current-window
+     (fn [] (cmd-close-current-window context)))
+  (:add-command command-man :change-current-window-alpha
+     (fn [delta] (cmd-change-current-window-alpha context delta))))
 
-    :next-window-in-frame
-    (cmd-next-window-in-frame context)
 
-    :prev-window-in-frame
-    (cmd-prev-window-in-frame context)
+(defn command-manager-call-command [self cmd & args]
+  (def commands (in self :commands))
+  (def found (in commands cmd))
+  (if found
+    (try
+      (found ;args)
+      ((err fib)
+       (log/error "command %n failed: %n" cmd err)))
+    (log/warning "unknown command: %n, args: %n" cmd args)))
 
-    [:move-current-window dir]
-    (cmd-move-current-window context dir)
 
-    [:resize-current-frame dw dh]
-    (cmd-resize-current-frame context dw dh)
+(defn command-manager-dispatch-command [self cmd-and-args]
+  (def call-with
+    (if (indexed? cmd-and-args)
+      cmd-and-args
+      [cmd-and-args]))
+  (command-manager-call-command self ;call-with))
 
-    [:focus-mode ratio]
-    (cmd-focus-mode context ratio)
 
-    :balance-frames
-    (cmd-balance-frames context)
+(defn command-manager-add-command [self name cmd-fn]
+  (put (in self :commands) name cmd-fn))
 
-    :frame-to-current-window-size
-    (cmd-frame-to-current-window-size context)
 
-    :close-current-window
-    (cmd-close-current-window context)
+(defn command-manager-remove-command [self name]
+  (put (in self :commands) name nil))
 
-    [:change-current-window-alpha delta]
-    (cmd-change-current-window-alpha context delta)
 
-    _
-    (log/warning "Unknown command: %n" cmd)))
+(def- command-manager-proto
+  @{:call-command command-manager-call-command
+    :dispatch-command command-manager-dispatch-command
+    :add-command command-manager-add-command
+    :remove-command command-manager-remove-command})
+
+
+(defn command-manager []
+  (table/setproto
+   @{:commands @{}}
+   command-manager-proto))

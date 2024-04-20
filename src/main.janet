@@ -36,7 +36,7 @@
        (:focus-changed (in context :wm))
 
        [:key/command cmd]
-       (dispatch-command cmd context)
+       (:dispatch-command (in context :command-manager) cmd)
 
        _
        (log/warning "Unknown message: %n" msg))
@@ -184,14 +184,19 @@
   (def keymap (build-keymap))
   (def ui (ui/init h-inst (in args 0) keymap))
 
+  (def command-man (command-manager))
+
   (def context
     @{:h-instance h-inst
       :wm wm
       :ui ui
       :uia uia
       :hook-manager hook-man
+      :command-manager command-man
       :event-sources [(in uia :chan)
                       (in ui :chan)]})
+
+  (add-default-commands command-man context)
 
   (def repl-server (repl/start-server context))
   (put context :repl repl-server)
