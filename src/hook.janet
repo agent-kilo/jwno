@@ -6,7 +6,7 @@
   (def hook-fn-list (in hooks hook-name @[]))
   (each hook-fn hook-fn-list
     (try
-      (hook-fn hook-name ;args)
+      (hook-fn ;args)
       ((err fib)
        (log/error "Hook function failed: %n" err)))))
 
@@ -18,7 +18,7 @@
   (each hook-fn hook-fn-list
     (set result
       (try
-        (hook-fn hook-name ;args)
+        (hook-fn ;args)
         ((err fib)
          (log/error "Hook function failed: %n" err)
          # XXX: defaults to true

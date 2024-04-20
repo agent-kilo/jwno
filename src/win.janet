@@ -1137,25 +1137,25 @@
     (:activate (get-in wm-obj [:layout :children 0])))
 
   (:add-hook hook-man :new-window
-     (fn [_hook-name win uia-win _exe-path]
+     (fn [win uia-win _exe-path]
        (init-window-tags win uia-win wm-obj)))
 
   (:add-hook hook-man :new-window
-     (fn [_hook-name win uia-win _exe-path]
+     (fn [win uia-win _exe-path]
        (init-window-alpha win uia-win wm-obj)))
 
   (:add-hook hook-man :filter-window
-     (fn [_hook-name hwnd _uia-win _exe-path]
+     (fn [hwnd _uia-win _exe-path]
        (check-uncloaked-window hwnd)))
   (:add-hook hook-man :filter-window
-     (fn [_hook-name hwnd _uia-win _exe-path]
+     (fn [hwnd _uia-win _exe-path]
        (check-unelevated-window hwnd wm-obj)))
   (:add-hook hook-man :filter-window
-     (fn [_hook-name _hwnd uia-win _exe-path]
+     (fn [_hwnd uia-win _exe-path]
        (check-valid-uia-window uia-win)))
   # TODO: Generic window rules?
   (:add-hook hook-man :filter-window
-     (fn [_hook-name _hwnd uia-win exe-path]
+     (fn [_hwnd uia-win exe-path]
        (check-not-pseudo-console-window uia-win)))
 
   wm-obj)
