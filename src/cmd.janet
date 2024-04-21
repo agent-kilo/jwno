@@ -9,7 +9,7 @@
 
 (defn cmd-quit [context]
   (try
-    (:destroy (in context :ui))
+    (:destroy (in context :ui-manager))
     ((err fib)
      (log/warning "Failed to destroy UI thread: %n" err)
      (os/exit 0))))

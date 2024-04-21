@@ -7,10 +7,10 @@
 (use ./cmd)
 (use ./win)
 (use ./hook)
+(use ./ui)
 (use ./uia)
 (use ./util)
 
-(import ./ui)
 (import ./repl)
 (import ./const)
 (import ./log)
@@ -24,7 +24,7 @@
      [:take chan msg]
      (match msg
        [:ui/initialized thread-id msg-hwnd]
-       (:initialized (in context :ui) thread-id msg-hwnd)
+       (:initialized (in context :ui-manager) thread-id msg-hwnd)
 
        :ui/exit
        (break)
@@ -182,19 +182,19 @@
 
   (def h-inst (GetModuleHandle nil))
   (def keymap (build-keymap))
-  (def ui (ui/init h-inst (in args 0) keymap))
+  (def ui-man (ui-manager h-inst (in args 0) keymap))
 
   (def command-man (command-manager))
 
   (def context
     @{:h-instance h-inst
       :wm wm
-      :ui ui
+      :ui-manager ui-man
       :uia-manager uia-man
       :hook-manager hook-man
       :command-manager command-man
       :event-sources [(in uia-man :chan)
-                      (in ui :chan)]})
+                      (in ui-man :chan)]})
 
   (add-default-commands command-man context)
 
