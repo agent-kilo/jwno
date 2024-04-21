@@ -9,7 +9,8 @@
 (use jw32/_dwmapi)
 (use jw32/_util)
 
-(import ./uia)
+(use ./uia)
+
 (import ./log)
 
 
@@ -738,21 +739,21 @@
     [x y win-width win-height]))
 
 (defn wm-transform-window [self win fr]
-  (let [uia (in self :uia)
-        uia-com (in uia :com)
+  (let [uia-man (in self :uia-manager)
+        uia-com (in uia-man :com)
         hwnd (in win :hwnd)
         rect (in fr :rect)]
     (log/debug "transforming window: %n, rect = %n" hwnd rect)
     (try
-      (uia/with-uia [cr (:CreateCacheRequest uia-com)]
+      (with-uia [cr (:CreateCacheRequest uia-com)]
         (:AddPattern cr UIA_TransformPatternId)
         (:AddPattern cr UIA_WindowPatternId)
         (:AddProperty cr UIA_TransformCanMovePropertyId)
         (:AddProperty cr UIA_TransformCanResizePropertyId)
         (:AddProperty cr UIA_BoundingRectanglePropertyId)
 
-        (uia/with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
-          (uia/with-uia [pat (:GetCachedPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)]
+        (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
+          (with-uia [pat (:GetCachedPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)]
             # TODO: restore maximized windows first
             (when (and pat
                        (not= 0 (:get_CachedCanMove pat)))
@@ -864,14 +865,16 @@
 
 
 (defn wm-should-manage? [self hwnd? &opt uia-win?]
-  (def uia (in self :uia))
+  (def uia-man (in self :uia-manager))
   (def [hwnd uia-win]
     (cond
       (nil? uia-win?)
       (if (or (nil? hwnd?) (null? hwnd?))
         (error "invalid hwnd and uia-win")
         [hwnd? (try
-                 (:ElementFromHandleBuildCache (in uia :com) hwnd? (in uia :focus-cr))
+                 (:ElementFromHandleBuildCache (in uia-man :com)
+                                               hwnd?
+                                               (in uia-man :focus-cr))
                  ((err fib)
                   (log/debug "ElementFromHandleBuildCache failed: %n" err)
                   nil))])
@@ -908,14 +911,14 @@
 (defn wm-add-window [self hwnd]
   (log/debug "new window: %n" hwnd)
   (def new-win (window hwnd))
-  (def uia (in self :uia))
+  (def uia-man (in self :uia-manager))
   (def exe-path (wm-get-window-process-path self hwnd))
   (def hwnd-still-valid
-    (uia/with-uia [uia-win (try
-                             (:ElementFromHandleBuildCache (in uia :com) hwnd (in uia :focus-cr))
-                             ((err fib)
-                              (log/debug "ElementFromHandleBuildCache failed: %n" err)
-                              nil))]
+    (with-uia [uia-win (try
+                         (:ElementFromHandleBuildCache (in uia-man :com) hwnd (in uia-man :focus-cr))
+                         ((err fib)
+                          (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                          nil))]
       (if (nil? uia-win)
         # The window may have disappeared between (wm-should-manage? ...) and (wm-add-window ...)
         false
@@ -949,9 +952,9 @@
   (def dead (:purge-windows (in self :layout)))
   (log/debug "purged %n dead windows" (length dead))
 
-  (def uia (in self :uia))
+  (def uia-man (in self :uia-manager))
   (def hwnd-to-manage
-    (uia/with-uia [uia-win (:get-focused-window uia)]
+    (with-uia [uia-win (:get-focused-window uia-man)]
       (when (nil? uia-win)
         (log/debug "No focused window")
         (break nil))
@@ -993,8 +996,8 @@
   (when node
     (:activate node))
 
-  (def uia (in self :uia))
-  (def root (in uia :root))
+  (def uia-man (in self :uia-manager))
+  (def root (in uia-man :root))
   (def root-hwnd (:get_CachedNativeWindowHandle root))
 
   (def hwnd
@@ -1013,7 +1016,7 @@
   (log/debug "setting focus to window: %n" hwnd)
   (if (= hwnd root-hwnd)
     (SetForegroundWindow hwnd) # The UIA SetFocus method doesn't work for the desktop window
-    (:set-focus-to-window uia hwnd))
+    (:set-focus-to-window uia-man hwnd))
 
   self)
 
@@ -1115,17 +1118,17 @@
 
 
 (defn check-valid-uia-window [uia-win]
-  (uia/is-valid-uia-window? uia-win))
+  (is-valid-uia-window? uia-win))
 
 
 (defn check-not-pseudo-console-window [uia-win]
   (not= "PseudoConsoleWindow" (:get_CachedClassName uia-win)))
 
 
-(defn window-manager [uia hook-man]
+(defn window-manager [uia-man hook-man]
   (def wm-obj
     (table/setproto
-     @{:uia uia
+     @{:uia-manager uia-man
        :hook-manager hook-man}
      wm-proto))
 

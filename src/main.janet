@@ -7,10 +7,10 @@
 (use ./cmd)
 (use ./win)
 (use ./hook)
+(use ./uia)
 (use ./util)
 
 (import ./ui)
-(import ./uia)
 (import ./repl)
 (import ./const)
 (import ./log)
@@ -166,9 +166,9 @@
   (def log-chan (log/init :debug))
   (log/debug "in main")
 
-  (def uia
+  (def uia-man
     (try
-      (uia/init)
+      (uia-manager)
       ((err fib)
        (show-error-and-exit err 1))))
 
@@ -176,7 +176,7 @@
 
   (def wm
     (try
-      (window-manager uia hook-man)
+      (window-manager uia-man hook-man)
       ((err fib)
        (show-error-and-exit err 1))))
 
@@ -190,10 +190,10 @@
     @{:h-instance h-inst
       :wm wm
       :ui ui
-      :uia uia
+      :uia-manager uia-man
       :hook-manager hook-man
       :command-manager command-man
-      :event-sources [(in uia :chan)
+      :event-sources [(in uia-man :chan)
                       (in ui :chan)]})
 
   (add-default-commands command-man context)
@@ -204,5 +204,5 @@
   (main-loop context)
 
   (repl/stop-server repl-server)
-  (:destroy uia)
+  (:destroy uia-man)
   (log/deinit))

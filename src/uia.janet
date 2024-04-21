@@ -42,7 +42,7 @@
   S_OK)
 
 
-(defn uia-get-parent-window [self uia-elem]
+(defn uia-manager-get-parent-window [self uia-elem]
   (def {:root root
         :focus-cr focus-cr
         :control-view-walker walker}
@@ -93,7 +93,7 @@
   ret)
 
 
-(defn uia-get-focused-window [self]
+(defn uia-manager-get-focused-window [self]
   (def {:com uia-com
         :focus-cr focus-cr}
     self)
@@ -108,10 +108,10 @@
   (if-not focused
     (break nil))
 
-  (uia-get-parent-window self focused))
+  (uia-manager-get-parent-window self focused))
 
 
-(defn uia-get-window-info [self hwnd]
+(defn uia-manager-get-window-info [self hwnd]
   (def {:com uia-com} self)
   (with-uia [cr (:CreateCacheRequest uia-com)]
     (:AddProperty cr UIA_NamePropertyId)
@@ -126,7 +126,7 @@
          :class-name (:get_CachedClassName uia-win)}))))
 
 
-(defn uia-get-window-bounding-rect [self hwnd]
+(defn uia-manager-get-window-bounding-rect [self hwnd]
   (def {:com uia-com} self)
   (with-uia [cr (:CreateCacheRequest uia-com)]
     (:AddProperty cr UIA_BoundingRectanglePropertyId)
@@ -139,7 +139,7 @@
         (:get_CachedBoundingRectangle uia-win)))))
 
 
-(defn uia-set-focus-to-window [self hwnd]
+(defn uia-manager-set-focus-to-window [self hwnd]
   (def {:com uia-com} self)
   (with-uia [uia-win (try
                        (:ElementFromHandle uia-com hwnd)
@@ -150,7 +150,7 @@
       (:SetFocus uia-win))))
 
 
-(defn uia-destroy [self]
+(defn uia-manager-destroy [self]
   (def {:com uia-com
         :root root
         :deinit-fns deinit-fns
@@ -166,13 +166,13 @@
   (CoUninitialize))
 
 
-(def- uia-proto
-  @{:get-parent-window uia-get-parent-window
-    :get-focused-window uia-get-focused-window
-    :get-window-info uia-get-window-info
-    :get-window-bounding-rect uia-get-window-bounding-rect
-    :set-focus-to-window uia-set-focus-to-window
-    :destroy uia-destroy})
+(def- uia-manager-proto
+  @{:get-parent-window uia-manager-get-parent-window
+    :get-focused-window uia-manager-get-focused-window
+    :get-window-info uia-manager-get-window-info
+    :get-window-bounding-rect uia-manager-get-window-bounding-rect
+    :set-focus-to-window uia-manager-set-focus-to-window
+    :destroy uia-manager-destroy})
 
 
 (defn uia-init-event-handlers [uia-com element chan]
@@ -213,7 +213,7 @@
         focus-changed-handler))])
 
 
-(defn init []
+(defn uia-manager []
   (def chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
 
   (CoInitializeEx nil COINIT_MULTITHREADED)
@@ -247,4 +247,4 @@
      :focus-cr focus-cr
      :control-view-walker control-view-walker
      :chan chan}
-   uia-proto))
+   uia-manager-proto))

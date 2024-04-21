@@ -186,7 +186,7 @@
     (break))
 
   (def win-rect
-    (:get-window-bounding-rect (in context :uia)
+    (:get-window-bounding-rect (in context :uia-manager)
                                (in cur-win :hwnd)))
   (when (nil? win-rect)
     (break))
