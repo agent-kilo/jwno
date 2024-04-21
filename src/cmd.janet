@@ -7,9 +7,9 @@
 (import ./log)
 
 
-(defn cmd-quit [context]
+(defn cmd-quit [ui-man]
   (try
-    (:destroy (in context :ui-manager))
+    (:destroy ui-man)
     ((err fib)
      (log/warning "Failed to destroy UI thread: %n" err)
      (os/exit 0))))
@@ -47,15 +47,13 @@
         (send-input ;seq)))))
 
 
-(defn cmd-retile [context]
-  (def wm (in context :window-manager))
+(defn cmd-retile [wm]
   (def cur-win (:get-current-window (in wm :layout)))
   (:retile wm)
   (:activate wm cur-win))
 
 
-(defn cmd-split [context dir nfr ratios to-activate move-win-to]
-  (def wm (in context :window-manager))
+(defn cmd-split [wm dir nfr ratios to-activate move-win-to]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def cur-win (:get-current-window cur-frame))
   (:split cur-frame dir nfr ratios)
@@ -70,8 +68,7 @@
   (:activate wm (get-in cur-frame [:children to-activate])))
 
 
-(defn cmd-flatten-parent [context]
-  (def wm (in context :window-manager))
+(defn cmd-flatten-parent [wm]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def parent (in cur-frame :parent))
   (cond
@@ -88,22 +85,19 @@
       (:activate wm (:get-current-window parent)))))
 
 
-(defn cmd-enum-frame [context dir]
-  (def wm (in context :window-manager))
+(defn cmd-enum-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (when-let [fr (:enumerate-frame (in wm :layout) cur-frame dir)]
     (:activate wm fr)))
 
 
-(defn cmd-adjacent-frame [context dir]
-  (def wm (in context :window-manager))
+(defn cmd-adjacent-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (when-let [adj-fr (:get-adjacent-frame (in wm :layout) cur-frame dir)]
     (:activate wm adj-fr)))
 
 
-(defn cmd-next-window-in-frame [context]
-  (def wm (in context :window-manager))
+(defn cmd-next-window-in-frame [wm]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
@@ -111,8 +105,7 @@
       (:activate wm sibling))))
 
 
-(defn cmd-prev-window-in-frame [context]
-  (def wm (in context :window-manager))
+(defn cmd-prev-window-in-frame [wm]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
@@ -120,8 +113,7 @@
       (:activate wm sibling))))
 
 
-(defn cmd-move-current-window [context dir]
-  (def wm (in context :window-manager))
+(defn cmd-move-current-window [wm dir]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def cur-win (:get-current-window cur-frame))
 
@@ -133,8 +125,7 @@
     (:activate wm cur-win)))
 
 
-(defn cmd-resize-current-frame [context dw dh]
-  (def wm (in context :window-manager))
+(defn cmd-resize-current-frame [wm dw dh]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def rect (in cur-frame :rect))
   (:resize-frame (in wm :layout)
@@ -148,8 +139,7 @@
   (:activate wm cur-win))
 
 
-(defn cmd-focus-mode [context ratio]
-  (def wm (in context :window-manager))
+(defn cmd-focus-mode [wm ratio]
   (def cur-monitor (get-in wm [:layout :current-child]))
   (def cur-frame (:get-current-frame cur-monitor))
   (when (= (in cur-frame :parent) (in wm :layout))
@@ -170,24 +160,21 @@
   (:activate wm cur-win))
 
 
-(defn cmd-balance-frames [context]
-  (def wm (in context :window-manager))
+(defn cmd-balance-frames [wm]
   (:balance-frames (in wm :layout) nil true)
   (def cur-win (:get-current-window (in wm :layout)))
   (:retile wm)
   (:activate wm cur-win))
 
 
-(defn cmd-frame-to-current-window-size [context]
-  (def wm (in context :window-manager))
+(defn cmd-frame-to-current-window-size [wm uia-man]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def cur-win (:get-current-window cur-frame))
   (when (nil? cur-win)
     (break))
 
   (def win-rect
-    (:get-window-bounding-rect (in context :uia-manager)
-                               (in cur-win :hwnd)))
+    (:get-window-bounding-rect uia-man (in cur-win :hwnd)))
   (when (nil? win-rect)
     (break))
 
@@ -196,8 +183,7 @@
   (:activate wm cur-win))
 
 
-(defn cmd-close-current-window [context]
-  (def wm (in context :window-manager))
+(defn cmd-close-current-window [wm]
   (def cur-win (:get-current-window (in wm :layout)))
   (when (nil? cur-win)
     (break))
@@ -205,8 +191,7 @@
   (PostMessage (in cur-win :hwnd) WM_CLOSE 0 0))
 
 
-(defn cmd-change-current-window-alpha [context delta]
-  (def wm (in context :window-manager))
+(defn cmd-change-current-window-alpha [wm delta]
   (def cur-win (:get-current-window (in wm :layout)))
   (when (nil? cur-win)
     (break))
@@ -228,42 +213,47 @@
 
 
 (defn add-default-commands [command-man context]
+  (def {:ui-manager ui-man
+        :uia-manager uia-man
+        :window-manager wm}
+    context)
+
   (:add-command command-man :quit
-     (fn [] (cmd-quit context)))
+     (fn [] (cmd-quit ui-man)))
   (:add-command command-man :retile
-     (fn [] (cmd-retile context)))
+     (fn [] (cmd-retile wm)))
 
   (:add-command command-man :split
      (fn [dir nfr ratios to-activate move-win-to]
-       (cmd-split context dir nfr ratios to-activate move-win-to)))
+       (cmd-split wm dir nfr ratios to-activate move-win-to)))
   (:add-command command-man :flatten-parent
-     (fn [] (cmd-flatten-parent context)))
+     (fn [] (cmd-flatten-parent wm)))
 
   (:add-command command-man :resize-current-frame
-     (fn [dw dh] (cmd-resize-current-frame context dw dh)))
+     (fn [dw dh] (cmd-resize-current-frame wm dw dh)))
   (:add-command command-man :frame-to-current-window-size
-     (fn [] (cmd-frame-to-current-window-size context)))
+     (fn [] (cmd-frame-to-current-window-size wm uia-man)))
   (:add-command command-man :balance-frames
-     (fn [] (cmd-balance-frames context)))
+     (fn [] (cmd-balance-frames wm)))
   (:add-command command-man :focus-mode
-     (fn [ratio] (cmd-focus-mode context ratio)))
+     (fn [ratio] (cmd-focus-mode wm ratio)))
 
   (:add-command command-man :enum-frame
-     (fn [dir] (cmd-enum-frame context dir)))
+     (fn [dir] (cmd-enum-frame wm dir)))
   (:add-command command-man :adjacent-frame
-     (fn [dir] (cmd-adjacent-frame context dir)))
+     (fn [dir] (cmd-adjacent-frame wm dir)))
 
   (:add-command command-man :next-window-in-frame
-     (fn [] (cmd-next-window-in-frame context)))
+     (fn [] (cmd-next-window-in-frame wm)))
   (:add-command command-man :prev-window-in-frame
-     (fn [] (cmd-prev-window-in-frame context)))
+     (fn [] (cmd-prev-window-in-frame wm)))
 
   (:add-command command-man :move-current-window
-     (fn [dir] (cmd-move-current-window context dir)))
+     (fn [dir] (cmd-move-current-window wm dir)))
   (:add-command command-man :close-current-window
-     (fn [] (cmd-close-current-window context)))
+     (fn [] (cmd-close-current-window wm)))
   (:add-command command-man :change-current-window-alpha
-     (fn [delta] (cmd-change-current-window-alpha context delta))))
+     (fn [delta] (cmd-change-current-window-alpha wm delta))))
 
 
 (defn command-manager-call-command [self cmd & args]
