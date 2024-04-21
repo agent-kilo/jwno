@@ -30,10 +30,10 @@
        (break)
 
        [:uia/window-opened hwnd]
-       (:window-opened (in context :wm) hwnd)
+       (:window-opened (in context :window-manager) hwnd)
 
        :uia/focus-changed
-       (:focus-changed (in context :wm))
+       (:focus-changed (in context :window-manager))
 
        [:key/command cmd]
        (:dispatch-command (in context :command-manager) cmd)
@@ -174,7 +174,7 @@
 
   (def hook-man (hook-manager))
 
-  (def wm
+  (def window-man
     (try
       (window-manager uia-man hook-man)
       ((err fib)
@@ -188,7 +188,7 @@
 
   (def context
     @{:h-instance h-inst
-      :wm wm
+      :window-manager window-man
       :ui-manager ui-man
       :uia-manager uia-man
       :hook-manager hook-man

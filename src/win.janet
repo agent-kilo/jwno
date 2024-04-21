@@ -1069,7 +1069,7 @@
   [work-areas main-idx])
 
 
-(def- wm-proto
+(def- window-manager-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
 
@@ -1086,7 +1086,7 @@
     :get-window-process-path wm-get-window-process-path})
 
 
-(defn init-window-tags [win uia-win _wm]
+(defn init-window-tags [win uia-win]
   (def class-name (:get_CachedClassName uia-win))
   (cond
     # TODO: Generic window rules?
@@ -1130,7 +1130,7 @@
     (table/setproto
      @{:uia-manager uia-man
        :hook-manager hook-man}
-     wm-proto))
+     window-manager-proto))
 
   (def [work-areas main-idx] (:enumerate-monitors wm-obj))
   (put wm-obj :layout
@@ -1141,7 +1141,7 @@
 
   (:add-hook hook-man :new-window
      (fn [win uia-win _exe-path]
-       (init-window-tags win uia-win wm-obj)))
+       (init-window-tags win uia-win)))
 
   (:add-hook hook-man :new-window
      (fn [win uia-win _exe-path]

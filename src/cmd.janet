@@ -48,14 +48,14 @@
 
 
 (defn cmd-retile [context]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-win (:get-current-window (in wm :layout)))
   (:retile wm)
   (:activate wm cur-win))
 
 
 (defn cmd-split [context dir nfr ratios to-activate move-win-to]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def cur-win (:get-current-window cur-frame))
   (:split cur-frame dir nfr ratios)
@@ -71,7 +71,8 @@
 
 
 (defn cmd-flatten-parent [context]
-  (def cur-frame (:get-current-frame (get-in context [:wm :layout])))
+  (def wm (in context :window-manager))
+  (def cur-frame (:get-current-frame (in wm :layout)))
   (def parent (in cur-frame :parent))
   (cond
     (nil? parent)
@@ -82,28 +83,27 @@
 
     true
     (do
-      (def wm (in context :wm))
       (:flatten parent)
       (:retile wm parent)
       (:activate wm (:get-current-window parent)))))
 
 
 (defn cmd-enum-frame [context dir]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (when-let [fr (:enumerate-frame (in wm :layout) cur-frame dir)]
     (:activate wm fr)))
 
 
 (defn cmd-adjacent-frame [context dir]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (when-let [adj-fr (:get-adjacent-frame (in wm :layout) cur-frame dir)]
     (:activate wm adj-fr)))
 
 
 (defn cmd-next-window-in-frame [context]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
@@ -112,7 +112,7 @@
 
 
 (defn cmd-prev-window-in-frame [context]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (:purge-windows cur-frame)
   (when-let [cur-win (:get-current-window cur-frame)]
@@ -121,7 +121,7 @@
 
 
 (defn cmd-move-current-window [context dir]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def cur-win (:get-current-window cur-frame))
 
@@ -134,7 +134,7 @@
 
 
 (defn cmd-resize-current-frame [context dw dh]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def rect (in cur-frame :rect))
   (:resize-frame (in wm :layout)
@@ -149,7 +149,7 @@
 
 
 (defn cmd-focus-mode [context ratio]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-monitor (get-in wm [:layout :current-child]))
   (def cur-frame (:get-current-frame cur-monitor))
   (when (= (in cur-frame :parent) (in wm :layout))
@@ -171,7 +171,7 @@
 
 
 (defn cmd-balance-frames [context]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (:balance-frames (in wm :layout) nil true)
   (def cur-win (:get-current-window (in wm :layout)))
   (:retile wm)
@@ -179,7 +179,7 @@
 
 
 (defn cmd-frame-to-current-window-size [context]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def cur-win (:get-current-window cur-frame))
   (when (nil? cur-win)
@@ -197,7 +197,7 @@
 
 
 (defn cmd-close-current-window [context]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-win (:get-current-window (in wm :layout)))
   (when (nil? cur-win)
     (break))
@@ -206,7 +206,7 @@
 
 
 (defn cmd-change-current-window-alpha [context delta]
-  (def wm (in context :wm))
+  (def wm (in context :window-manager))
   (def cur-win (:get-current-window (in wm :layout)))
   (when (nil? cur-win)
     (break))
