@@ -1,11 +1,17 @@
 (use jw32/_consoleapi)
 
 
-(defn log-thread [chan output-fn]
+(defn log-thread [chan logger-factories]
+  (def loggers
+    (map |($)
+         logger-factories))
   (forever
    (def msg (ev/take chan))
    (if-not msg (break))
-   (output-fn msg)))
+   (each lgr loggers
+     (:output lgr msg)))
+  (each lgr loggers
+    (:close lgr)))
 
 
 (var log-chan nil)
@@ -18,19 +24,43 @@
    :debug 4})
 
 
-(defn init [level &opt output-fn]
-  (default output-fn print)
+(defn print-logger []
+  {:output (fn [_self msg] (prin msg))
+   :close (fn [_self] :nop)})
+
+
+(defn file-logger [log-path]
+  (def log-file (file/open log-path :a+n))
+  {:output (fn [_self msg]
+             (file/write log-file msg)
+             (file/flush log-file))
+   :close (fn [_self] (file/close log-file))})
+
+
+(defn init [level & factories]
   (set log-level level)
-  (when (<= (in log-levels level) (in log-levels :quiet))
-    # No log at all, detach from the console
-    (FreeConsole)
-    (break))
+  (def logger-factories
+    (if (empty? factories)
+      [print-logger]
+      factories))
+
+  (cond
+    (<= (in log-levels level) (in log-levels :quiet))
+    # No log at all
+    (do
+      (FreeConsole)
+      (break))
+
+    (nil? (find |(= $ print-logger) logger-factories))
+    # No console log
+    (FreeConsole))
+
   # XXX: If this channel is full, log functions called in win32 callbacks would
   # try to trap into the Janet event loop, and break the callback control flow.
   # Have to make it large enough so that it's not easily filled up.
   (set log-chan (ev/thread-chan 65536))
   (ev/spawn-thread
-   (log-thread log-chan output-fn)))
+   (log-thread log-chan logger-factories)))
 
 
 (defn deinit []
@@ -40,8 +70,8 @@
 
 (defn- format-log-msg [level fmt args]
   (def time-str (os/strftime "%Y-%m-%d %H:%M:%S" nil true))
-  (string/format (string "%s [%s] " fmt)
-                 (os/strftime "%Y-%m-%d %H:%M:%S" nil true)
+  (string/format (string "%s [%s] " fmt "\n")
+                 time-str
                  level
                  ;args))
 

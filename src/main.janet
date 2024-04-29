@@ -163,7 +163,11 @@
 
 
 (defn main [& args]
-  (def log-chan (log/init :debug))
+  (let [log-path (string (get-exe-dir) "jwno.log")]
+    (log/init :debug
+              log/print-logger
+              (fn [] (log/file-logger log-path))))
+
   (log/debug "in main")
 
   (def uia-man
