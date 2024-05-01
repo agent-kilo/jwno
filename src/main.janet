@@ -9,6 +9,7 @@
 (use ./hook)
 (use ./ui)
 (use ./uia)
+(use ./config)
 (use ./util)
 
 (import ./repl)
@@ -163,12 +164,21 @@
 
 
 (defn main [& args]
-  (let [log-path (string (get-exe-dir) "jwno.log")]
-    (log/init :debug
-              log/print-logger
-              (fn [] (log/file-logger log-path))))
+  (def cli-args (parse-command-line))
+  (when (nil? cli-args)
+    (os/exit 1))
+
+  (let [log-path (in cli-args "log-file")
+        loggers (if (nil? log-path)
+                  [log/print-logger]
+                  [log/print-logger (fn [] (log/file-logger log-path))])]
+    (try
+      (log/init (in cli-args "log-level") ;loggers)
+      ((err fib)
+       (show-error-and-exit err 1))))
 
   (log/debug "in main")
+  (log/debug "cli-args = %n" cli-args)
 
   (def uia-man
     (try
@@ -204,6 +214,9 @@
 
   (def repl-server (repl/start-server context))
   (put context :repl repl-server)
+
+  (def config-env (load-config-file [(in cli-args "config")] context))
+  (log/debug "config-env = %n" config-env)
 
   (main-loop context)
 

@@ -38,6 +38,9 @@
 
 
 (defn init [level & factories]
+  (when (nil? (in log-levels level))
+    (error (string/format "Unknown log level: %s" level)))
+
   (set log-level level)
   (def logger-factories
     (if (empty? factories)

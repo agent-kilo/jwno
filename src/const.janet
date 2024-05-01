@@ -1,1 +1,3 @@
 (def DEFAULT-CHAN-LIMIT 65536)
+
+(def DEFAULT-CONFIG-FILE-NAME "jwno-config.janet")
