@@ -11,9 +11,24 @@
 
 
 (defn key [key &opt modifiers]
-  (default modifiers @[])
-  {:key key
-   :modifiers [;(sort modifiers)]})
+  (default modifiers [])
+
+  (def normalized-key
+    (cond
+      (number? key)
+      key
+
+      (or (keyword? key) (symbol? key))
+      (eval (symbol "VK_" (string/ascii-upper (string/replace-all "-" "_" key))))
+
+      (string? key)
+      (ascii (string/ascii-upper key))
+
+      true
+      (error (string/format "unknown key spec: %n" key))))
+
+  {:key normalized-key
+   :modifiers [;(sort (array ;modifiers))]})
 
 
 (defmacro- async-key-state-down? [vkey-code]
@@ -31,11 +46,7 @@
    VK_RWIN :rwin})
 
 
-(defn define-keymap []
-  (table/new 0))
-
-
-(defn set-key-def [keymap key-struct command-or-keymap]
+(defn- set-key-def [keymap key-struct command-or-keymap]
   (if (table? command-or-keymap)
     (let [sub-keymap command-or-keymap]
       (put sub-keymap :parent keymap)
@@ -44,36 +55,68 @@
       (put keymap key-struct command))))
 
 
-(defn define-key [keymap key-seq command-or-keymap]
-  (if-not (indexed? key-seq)
-    (break (define-key keymap [key-seq] command-or-keymap)))
+(var define-keymap nil) # Forward declaration
 
-  (def cur-key (in key-seq 0))
+
+(defn keymap-parse-key [self key-def]
+  (cond
+    (struct? key-def)
+    key-def
+
+    (indexed? key-def)
+    (key ;key-def)
+
+    (or (keyword? key-def)
+        (symbol? key-def)
+        (string? key-def))
+    (key key-def)
+
+    true
+    (error (string/format "unknown key def: %n" key-def))))
+
+
+(defn keymap-define-key [self key-seq command-or-keymap]
+  (cond
+    (not (indexed? key-seq))
+    # A single key struct
+    (break (keymap-define-key self [key-seq] command-or-keymap))
+
+    (or (keyword? (in key-seq 0))
+        (symbol? (in key-seq 0))
+        (string? (in key-seq 0)))
+    # A single key struct in indexed form
+    (break (keymap-define-key self [key-seq] command-or-keymap)))
+
+  (def cur-key (keymap-parse-key self (in key-seq 0)))
   (def rest-keys (slice key-seq 1))
-  (def cur-def (get keymap cur-key))
+  (def cur-def (get self cur-key))
 
   (if (<= (length rest-keys) 0)
-    (set-key-def keymap cur-key command-or-keymap)
+    (set-key-def self cur-key command-or-keymap)
     (let [sub-keymap (if (table? cur-def)
                        cur-def
                        (define-keymap))]
-      (set-key-def keymap
+      (set-key-def self
                    cur-key
-                   (define-key
+                   (keymap-define-key
                      sub-keymap
                      rest-keys
                      command-or-keymap))
-      keymap)))
+      self)))
 
 
-(defn get-key-binding [keymap key-struct]
-  (in keymap key-struct))
+(defn keymap-get-key-binding [self key-struct]
+  (in self key-struct))
 
 
-(defn get-root-keymap [keymap]
-  (if-let [parent (in keymap :parent)]
-    (get-root-keymap parent)
-    keymap))
+(def- keymap-proto
+  @{:define-key keymap-define-key
+    :parse-key keymap-parse-key
+    :get-key-binding keymap-get-key-binding})
+
+
+(varfn define-keymap []
+  (table/setproto (table/new 0) keymap-proto))
 
 
 (defn keyboard-hook-handler-translate-key [self hook-struct]
@@ -82,8 +125,8 @@
     # Already remapped
     (break nil))
 
-  (if-let [binding (get-key-binding (in self :current-keymap)
-                                    (key (hook-struct :vkCode)))]
+  (if-let [binding (:get-key-binding (in self :current-keymap)
+                                     (key (hook-struct :vkCode)))]
     (match binding
       [:map-to new-key]
       new-key
@@ -123,7 +166,7 @@
   (each comb mod-combinations-to-check
     (def key-struct (key (hook-struct :vkCode) (sort (keys comb))))
     (log/debug "Finding binding for key: %n" key-struct)
-    (if-let [found (get-key-binding (in self :current-keymap) key-struct)]
+    (if-let [found (:get-key-binding (in self :current-keymap) key-struct)]
       (match found
         [:map-to _]
         # handled in translate-key
