@@ -7,6 +7,9 @@
 
 
 (def- config-env (make-env))
+# TODO: More concise API?
+(merge-module config-env (require "jw32/_winuser"))
+(merge-module config-env (require "./key"))
 (merge-module config-env (require "./log") "log/")
 
 
