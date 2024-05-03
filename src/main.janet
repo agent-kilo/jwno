@@ -17,7 +17,7 @@
 (import ./log)
 
 
-(defn main-loop [context]
+(defn main-loop [cli-args context]
   (forever
    (def event (ev/select ;(in context :event-sources)))
 
@@ -25,7 +25,10 @@
      [:take chan msg]
      (match msg
        [:ui/initialized thread-id msg-hwnd]
-       (:initialized (in context :ui-manager) thread-id msg-hwnd)
+       (do
+         (:initialized (in context :ui-manager) thread-id msg-hwnd)
+         (def config-env (load-config-file [(in cli-args "config")] context))
+         (log/debug "config-env = %n" config-env))
 
        :ui/exit
        (break)
@@ -215,10 +218,7 @@
   (def repl-server (repl/start-server context))
   (put context :repl repl-server)
 
-  (def config-env (load-config-file [(in cli-args "config")] context))
-  (log/debug "config-env = %n" config-env)
-
-  (main-loop context)
+  (main-loop cli-args context)
 
   (repl/stop-server repl-server)
   (:destroy uia-man)
