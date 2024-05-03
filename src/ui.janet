@@ -16,7 +16,9 @@
 (def GC-TIMER-INTERVAL 5000)    # in milliseconds
 
 (def NOTIFY-ICON-ID 1)
+
 (def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
+(def SET-KEYMAP-MSG (+ WM_APP 2))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -103,7 +105,7 @@
     (error "Failed to delete notify icon")))
 
 
-(defn- msg-wndproc [hwnd msg wparam lparam]
+(defn- msg-wndproc [hwnd msg wparam lparam hook-handler]
   (log/debug "################## msg-wndproc ##################")
   (log/debug "hwnd = %p" hwnd)
   (log/debug "msg = %p" msg)
@@ -111,6 +113,10 @@
   (log/debug "lparam = %p" lparam)
 
   (case msg
+    SET-KEYMAP-MSG
+    (let [keymap (unmarshal-and-free wparam)]
+      (put hook-handler :current-keymap keymap))
+
     NOTIFY-ICON-CALLBACK-MSG
     (do
       (def notif-event (LOWORD lparam))
@@ -148,11 +154,12 @@
   0)
 
 
-(defn- create-msg-window [hInstance]
+(defn- create-msg-window [hInstance hook-handler]
   (def class-name "JwnoMsgWinClass")
   (def wc
     (WNDCLASSEX
-     :lpfnWndProc msg-wndproc
+     :lpfnWndProc (fn [hwnd msg wparam lparam]
+                    (msg-wndproc hwnd msg wparam lparam hook-handler))
      :hInstance hInstance
      :lpszClassName class-name))
   (when (null? (RegisterClassEx wc))
@@ -254,9 +261,11 @@
 
 
 (defn ui-thread [hInstance argv0 keymap chan]
+  (def hook-handler (keyboard-hook-handler keymap))
+
   (def msg-hwnd
     (try
-      (create-msg-window hInstance)
+      (create-msg-window hInstance hook-handler)
       ((err fib)
        (show-error-and-exit err 1))))
   (try
@@ -264,7 +273,6 @@
     ((err fib)
      (show-error-and-exit err 1)))
 
-  (def hook-handler (keyboard-hook-handler keymap))
   (def hook-id
     (SetWindowsHookEx WH_KEYBOARD_LL
                       (fn [code wparam hook-struct]
@@ -300,6 +308,11 @@
     (error "ui thread is not initialized")))
 
 
+(defn ui-manager-set-keymap [self keymap]
+  (def buf-ptr (alloc-and-marshal keymap))
+  (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
+
+
 (defn ui-manager-destroy [self]
   (ui-manager-post-message self WM_COMMAND ID_MENU_EXIT 0))
 
@@ -307,6 +320,7 @@
 (def ui-manager-proto
   @{:initialized ui-manager-initialized
     :post-message ui-manager-post-message
+    :set-keymap ui-manager-set-keymap
     :destroy ui-manager-destroy})
 
 
