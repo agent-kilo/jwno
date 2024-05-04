@@ -25,7 +25,7 @@
       (ascii (string/ascii-upper key))
 
       true
-      (error (string/format "unknown key spec: %n" key))))
+      (error (string/format "unknown key: %n" key))))
 
   {:key normalized-key
    :modifiers [;(sort (array ;modifiers))]})
@@ -58,33 +58,145 @@
 (var define-keymap nil) # Forward declaration
 
 
-(defn keymap-parse-key [self key-def]
+(def key-name-to-code
+  {"lwin" VK_LWIN
+   "rwin" VK_RWIN
+   "lalt" VK_LMENU
+   "ralt" VK_RMENU
+   "lctrl" VK_LCONTROL
+   "rctrl" VK_RCONTROL
+   "lshift" VK_LSHIFT
+   "rshift" VK_RSHIFT
+
+   "a" (ascii "A")
+   "b" (ascii "B")
+   "c" (ascii "C")
+   "d" (ascii "D")
+   "e" (ascii "E")
+   "f" (ascii "F")
+   "g" (ascii "G")
+   "h" (ascii "H")
+   "i" (ascii "I")
+   "j" (ascii "J")
+   "k" (ascii "K")
+   "l" (ascii "L")
+   "m" (ascii "M")
+   "n" (ascii "N")
+   "o" (ascii "O")
+   "p" (ascii "P")
+   "q" (ascii "Q")
+   "r" (ascii "R")
+   "s" (ascii "S")
+   "t" (ascii "T")
+   "u" (ascii "U")
+   "v" (ascii "V")
+   "w" (ascii "W")
+   "x" (ascii "X")
+   "y" (ascii "Y")
+   "z" (ascii "Z")
+   "0" (ascii "0")
+   "1" (ascii "1")
+   "2" (ascii "2")
+   "3" (ascii "3")
+   "4" (ascii "4")
+   "5" (ascii "5")
+   "6" (ascii "6")
+   "7" (ascii "7")
+   "8" (ascii "8")
+   "9" (ascii "9")
+
+   "f1" VK_F1
+   "f2" VK_F2
+   "f3" VK_F3
+   "f4" VK_F4
+   "f5" VK_F5
+   "f6" VK_F6
+   "f7" VK_F7
+   "f8" VK_F8
+   "f9" VK_F9
+   "f10" VK_F10
+   "f11" VK_F11
+   "f12" VK_F12
+   "f13" VK_F13
+   "f14" VK_F14
+   "f15" VK_F15
+   "f16" VK_F16
+   "f17" VK_F17
+   "f18" VK_F18
+   "f19" VK_F19
+   "f20" VK_F20
+   "f21" VK_F21
+   "f22" VK_F22
+   "f23" VK_F23
+   "f24" VK_F24
+
+   "," VK_OEM_COMMA
+   "." VK_OEM_PERIOD
+   "=" VK_OEM_PLUS
+   ";" VK_OEM_1
+   "/" VK_OEM_2
+  })
+
+
+(def key-spec-peg
+  (peg/compile
+   ~{:win (sequence (choice "w" "W")
+                    (choice "i" "I")
+                    (choice "n" "N"))
+     :alt (sequence (choice "a" "A")
+                    (choice "l" "L")
+                    (choice "t" "T"))
+     :ctrl (sequence (choice "c" "C")
+                     (choice "t" "T")
+                     (choice "r" "R")
+                     (choice "l" "L"))
+     :shift (sequence (choice "s" "S")
+                      (choice "h" "H")
+                      (choice "i" "I")
+                      (choice "f" "F")
+                      (choice "t" "T"))
+     :mod (choice :win :alt :ctrl :shift)
+     :mod-with-sides (sequence (choice "l" "L" "r" "R") :mod)
+     :mod-capture (replace (capture (choice :mod :mod-with-sides))
+                           ,(fn [mod-str] (keyword (string/ascii-lower mod-str))))
+     :mod-prefix (sequence :mod-capture (choice "+" "-"))
+
+     :f-key (sequence (choice "f" "F")
+                      (choice (sequence "2" (range "04"))
+                              (sequence "1" (range "09"))
+                              (range "19")))
+     :ascii-key (range "az" "AZ" "09")
+     :trigger-key (choice :mod-with-sides :f-key :ascii-key "," "." "=" ";" "/") # TODO
+     :trigger-capture (replace (capture :trigger-key)
+                               ,(fn [trig-str]
+                                  (if-let [code (in key-name-to-code (string/ascii-lower trig-str))]
+                                    code
+                                    (error (string/format "unknown key name: %n" trig-str)))))
+
+     :main (sequence (group (any :mod-prefix)) :trigger-capture -1)}))
+
+
+(defn keymap-parse-key [self key-spec]
   (cond
-    (struct? key-def)
-    key-def
+    (struct? key-spec)
+    key-spec
 
-    (indexed? key-def)
-    (key ;key-def)
+    (indexed? key-spec)
+    (key ;key-spec)
 
-    (or (keyword? key-def)
-        (symbol? key-def)
-        (string? key-def))
-    (key key-def)
+    (string? key-spec)
+    (if-let [matched (peg/match key-spec-peg key-spec)]
+      (let [[mods key-code] matched]
+        (key key-code mods))
+      (error (string/format "failed to parse key spec: %n" key-spec)))
 
     true
-    (error (string/format "unknown key def: %n" key-def))))
+    (error (string/format "unknown key spec: %n" key-spec))))
 
 
 (defn keymap-define-key [self key-seq command-or-keymap]
-  (cond
-    (not (indexed? key-seq))
-    # A single key struct
-    (break (keymap-define-key self [key-seq] command-or-keymap))
-
-    (or (keyword? (in key-seq 0))
-        (symbol? (in key-seq 0))
-        (string? (in key-seq 0)))
-    # A single key struct in indexed form
+  (if-not (indexed? key-seq)
+    # A single key spec
     (break (keymap-define-key self [key-seq] command-or-keymap)))
 
   (def cur-key (keymap-parse-key self (in key-seq 0)))
