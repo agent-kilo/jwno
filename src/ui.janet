@@ -238,8 +238,11 @@
 
     (do
       # We don't recognize the key combination, pass it through,
-      # and reset the keymap on key-up
-      (when key-up
+      # and reset the keymap on key-up.
+      # And we don't want modifier keys to reset the keymap, since this
+      # will prevent the next key combo from having different modifiers.
+      (when (and key-up
+                 (not (in MODIFIER-KEYS (in hook-struct :vkCode))))
         (log/debug "Resetting keymap")
         (when (:reset-keymap handler)
           (ev/give chan
