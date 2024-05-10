@@ -5,8 +5,43 @@
 (import spork/httpf)
 
 
-(defn build-keymap []
-  (def keymap (define-keymap))
+(def key-man (in jwno-context :key-manager))
+(def command-man (in jwno-context :command-manager))
+
+
+(def resize-mode-keymap
+  (:new-keymap key-man))
+(:define-key resize-mode-keymap
+  "n"
+  [:resize-current-frame 0 100])
+(:define-key resize-mode-keymap
+  "e"
+  [:resize-current-frame 0 -100])
+(:define-key resize-mode-keymap
+  "m"
+  [:resize-current-frame -100 0])
+(:define-key resize-mode-keymap
+  "i"
+  [:resize-current-frame 100 0])
+(:define-key resize-mode-keymap
+  "enter"
+  :pop-keymap)
+
+
+(defn cmd-resize-mode [key-man]
+  (:push-keymap key-man resize-mode-keymap))
+(defn cmd-pop-keymap [key-man]
+  (:pop-keymap key-man))
+
+
+(:add-command command-man :resize-mode
+   (fn [] (cmd-resize-mode key-man)))
+(:add-command command-man :pop-keymap
+   (fn [] (cmd-pop-keymap key-man)))
+
+
+(defn build-keymap [key-man]
+  (def keymap (:new-keymap key-man))
   (def k
     (fn [key-seq cmd]
       (:define-key keymap key-seq cmd)))
@@ -87,6 +122,9 @@
   (:define-key keymap
     ["win+s" "win+i"]
     [:resize-current-frame 100 0])
+  (:define-key keymap
+    ["win+s" "win+s"]
+    :resize-mode)
 
   (:define-key keymap
     "win+f"
@@ -126,4 +164,4 @@
   keymap)
 
 
-(:set-keymap (in jwno-context :ui-manager) (build-keymap))
+(:push-keymap key-man (build-keymap key-man))

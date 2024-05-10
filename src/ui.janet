@@ -312,7 +312,7 @@
 
 
 (defn ui-manager-set-keymap [self keymap]
-  (def buf-ptr (alloc-and-marshal keymap))
+  (def buf-ptr (alloc-and-marshal (if (nil? keymap) @{} keymap)))
   (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
 
 

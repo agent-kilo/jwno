@@ -79,6 +79,8 @@
       ((err fib)
        (show-error-and-exit err 1))))
 
+  (def key-man (key-manager ui-man))
+
   (def window-man
     (try
       (window-manager uia-man hook-man)
@@ -94,6 +96,7 @@
   (put context :ui-manager ui-man)
   (put context :uia-manager uia-man)
   (put context :event-sources [(in uia-man :chan) (in ui-man :chan)])
+  (put context :key-manager key-man)
   (put context :window-manager window-man)
   (put context :repl repl-server)
 

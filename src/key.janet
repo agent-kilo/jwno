@@ -68,6 +68,9 @@
    "lshift" VK_LSHIFT
    "rshift" VK_RSHIFT
 
+   "enter" VK_RETURN
+   "esc"   VK_ESCAPE
+
    "a" (ascii "A")
    "b" (ascii "B")
    "c" (ascii "C")
@@ -165,8 +168,10 @@
                       (choice (sequence "2" (range "04"))
                               (sequence "1" (range "09"))
                               (range "19")))
+     :non-ascii-key (choice "enter" "esc" :f-key)
      :ascii-key (range "az" "AZ" "09")
-     :trigger-key (choice :mod-with-sides :f-key :ascii-key "," "." "=" ";" "/") # TODO
+     :punctuation-key (choice "," "." "=" ";" "/")
+     :trigger-key (choice :mod-with-sides :non-ascii-key :ascii-key :punctuation-key) # TODO
      :trigger-capture (replace (capture :trigger-key)
                                ,(fn [trig-str]
                                   (if-let [code (in key-name-to-code (string/ascii-lower trig-str))]
@@ -229,6 +234,35 @@
 
 (varfn define-keymap []
   (table/setproto (table/new 0) keymap-proto))
+
+
+(defn key-manager-new-keymap [self]
+  (define-keymap))
+
+
+(defn key-manager-push-keymap [self keymap]
+  (array/push (in self :keymap-stack) keymap)
+  (:set-keymap (in self :ui-manager) keymap))
+
+
+(defn key-manager-pop-keymap [self]
+  (def stack (in self :keymap-stack))
+  (def ret (array/pop stack))
+  (:set-keymap (in self :ui-manager) (last stack))
+  ret)
+
+
+(def- key-manager-proto
+  @{:new-keymap key-manager-new-keymap
+    :push-keymap key-manager-push-keymap
+    :pop-keymap key-manager-pop-keymap})
+
+
+(defn key-manager [ui-man]
+  (table/setproto
+   @{:keymap-stack @[]
+     :ui-manager ui-man}
+   key-manager-proto))
 
 
 (defn keyboard-hook-handler-translate-key [self hook-struct]
