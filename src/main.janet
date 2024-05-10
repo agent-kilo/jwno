@@ -65,13 +65,19 @@
   (log/debug "in main")
   (log/debug "cli-args = %n" cli-args)
 
+  (def context @{}) # Forward declaration
+
+  (def hook-man (hook-manager))
+
+  (def command-man (command-manager))
+
+  (def ui-man (ui-manager (GetModuleHandle nil) (in args 0) @{}))
+
   (def uia-man
     (try
       (uia-manager)
       ((err fib)
        (show-error-and-exit err 1))))
-
-  (def hook-man (hook-manager))
 
   (def window-man
     (try
@@ -79,25 +85,19 @@
       ((err fib)
        (show-error-and-exit err 1))))
 
-  (def h-inst (GetModuleHandle nil))
-  (def ui-man (ui-manager h-inst (in args 0) @{}))
+  # context will only get referenced after the main-loop is running
+  # and when the first REPL client connects.
+  (def repl-server (repl/start-server context))
 
-  (def command-man (command-manager))
-
-  (def context
-    @{:h-instance h-inst
-      :window-manager window-man
-      :ui-manager ui-man
-      :uia-manager uia-man
-      :hook-manager hook-man
-      :command-manager command-man
-      :event-sources [(in uia-man :chan)
-                      (in ui-man :chan)]})
+  (put context :hook-manager hook-man)
+  (put context :command-manager command-man)
+  (put context :ui-manager ui-man)
+  (put context :uia-manager uia-man)
+  (put context :event-sources [(in uia-man :chan) (in ui-man :chan)])
+  (put context :window-manager window-man)
+  (put context :repl repl-server)
 
   (add-default-commands command-man context)
-
-  (def repl-server (repl/start-server context))
-  (put context :repl repl-server)
 
   (main-loop cli-args context)
 
