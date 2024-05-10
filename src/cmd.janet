@@ -215,6 +215,7 @@
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
         :uia-manager uia-man
+        :key-manager key-man
         :window-manager wm}
     context)
 
@@ -253,7 +254,12 @@
   (:add-command command-man :close-current-window
      (fn [] (cmd-close-current-window wm)))
   (:add-command command-man :change-current-window-alpha
-     (fn [delta] (cmd-change-current-window-alpha wm delta))))
+     (fn [delta] (cmd-change-current-window-alpha wm delta)))
+
+  (:add-command command-man :push-keymap
+     (fn [keymap] (:push-keymap key-man keymap)))
+  (:add-command command-man :pop-keymap
+     (fn [] (:pop-keymap key-man))))
 
 
 (defn command-manager-call-command [self cmd & args]
