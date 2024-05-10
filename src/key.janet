@@ -169,9 +169,11 @@
                               (sequence "1" (range "09"))
                               (range "19")))
      :non-ascii-key (choice "enter" "esc" :f-key)
-     :ascii-key (range "az" "AZ" "09")
+
      :punctuation-key (choice "," "." "=" ";" "/")
-     :trigger-key (choice :mod-with-sides :non-ascii-key :ascii-key :punctuation-key) # TODO
+     :ascii-key (choice (range "az" "AZ" "09") :punctuation-key)
+
+     :trigger-key (choice :mod-with-sides :non-ascii-key :ascii-key) # TODO
      :trigger-capture (replace (capture :trigger-key)
                                ,(fn [trig-str]
                                   (if-let [code (in key-name-to-code (string/ascii-lower trig-str))]
