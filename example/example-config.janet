@@ -10,34 +10,49 @@
 
 
 (def resize-mode-keymap
-  (:new-keymap key-man))
-(:define-key resize-mode-keymap
-  "n"
-  [:resize-current-frame 0 100])
-(:define-key resize-mode-keymap
-  "e"
-  [:resize-current-frame 0 -100])
-(:define-key resize-mode-keymap
-  "m"
-  [:resize-current-frame -100 0])
-(:define-key resize-mode-keymap
-  "i"
-  [:resize-current-frame 100 0])
-(:define-key resize-mode-keymap
-  "enter"
-  :pop-keymap)
+  (let [keymap (:new-keymap key-man)]
+    (:define-key keymap
+      "n"
+      [:resize-current-frame 0 100])
+    (:define-key keymap
+      "e"
+      [:resize-current-frame 0 -100])
+    (:define-key keymap
+      "m"
+      [:resize-current-frame -100 0])
+    (:define-key keymap
+      "i"
+      [:resize-current-frame 100 0])
+    (:define-key keymap
+      "enter"
+      :pop-keymap)
+    keymap))
 
 
-(defn cmd-resize-mode [key-man]
-  (:push-keymap key-man resize-mode-keymap))
-(defn cmd-pop-keymap [key-man]
-  (:pop-keymap key-man))
+(def move-mode-keymap
+  (let [keymap (:new-keymap key-man)]
+    (:define-key keymap
+      "n"
+      [:move-current-window :down])
+    (:define-key keymap
+      "e"
+      [:move-current-window :up])
+    (:define-key keymap
+      "m"
+      [:move-current-window :left])
+    (:define-key keymap
+      "i"
+      [:move-current-window :right])
+    (:define-key keymap
+      "enter"
+      :pop-keymap)
+    keymap))
 
 
 (:add-command command-man :resize-mode
-   (fn [] (cmd-resize-mode key-man)))
-(:add-command command-man :pop-keymap
-   (fn [] (cmd-pop-keymap key-man)))
+   (fn [] (:push-keymap key-man resize-mode-keymap)))
+(:add-command command-man :move-mode
+   (fn [] (:push-keymap key-man move-mode-keymap)))
 
 
 (defn build-keymap [key-man]
@@ -109,6 +124,9 @@
   (:define-key keymap
     "win+shift+i"
     [:move-current-window :right])
+  (:define-key keymap
+    "win+w"
+    :move-mode)
 
   (:define-key keymap
     ["win+s" "win+n"]
