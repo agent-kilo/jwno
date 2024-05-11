@@ -153,7 +153,7 @@
      :mod-with-sides (sequence (set "lr") :mod)
      :mod-capture (replace (capture (choice :mod :mod-with-sides))
                            ,(fn [mod-str] (keyword mod-str)))
-     :mod-prefix (sequence :mod-capture (choice "+" "-"))
+     :mod-prefix (sequence :mod-capture :s* (choice "+" "-") :s*)
 
      :f-key (sequence "f"
                       (choice (sequence "2" (range "04"))
@@ -171,21 +171,18 @@
                                     code
                                     (error (string/format "unknown key name: %n" trig-str)))))
 
-     :main (sequence (group (any :mod-prefix)) :trigger-capture -1)}))
+     :combo-capture (group (sequence (group (any :mod-prefix)) :trigger-capture))
+     :main (sequence (any (sequence :combo-capture :s+)) :combo-capture :s* -1)
+    }))
 
 
 (defn keymap-parse-key [self key-spec]
   (cond
-    (struct? key-spec)
-    key-spec
-
-    (indexed? key-spec)
-    (key ;key-spec)
-
     (string? key-spec)
     (if-let [matched (peg/match key-spec-peg (string/ascii-lower key-spec))]
-      (let [[mods key-code] matched]
-        (key key-code mods))
+      (map |(let [[mods key-code] $]
+              (key key-code mods))
+           matched)
       (error (string/format "failed to parse key spec: %n" key-spec)))
 
     true
@@ -194,10 +191,12 @@
 
 (defn keymap-define-key [self key-seq command-or-keymap]
   (if-not (indexed? key-seq)
-    # A single key spec
-    (break (keymap-define-key self [key-seq] command-or-keymap)))
+    (if (string? key-seq)
+      (break (keymap-define-key self (keymap-parse-key self key-seq) command-or-keymap))
+      # A single key spec
+      (break (keymap-define-key self [key-seq] command-or-keymap))))
 
-  (def cur-key (keymap-parse-key self (in key-seq 0)))
+  (def cur-key (in key-seq 0))
   (def rest-keys (slice key-seq 1))
   (def cur-def (get self cur-key))
 
