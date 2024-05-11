@@ -198,6 +198,10 @@
   (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
 
 
+# msg-wndproc and this keyboard hook both have access to the
+# same keyboard-hook-handler, but since hook events and window
+# messages are serialized on the same UI thread, there won't be
+# any race conditions.
 (defn- keyboard-hook-proc [code wparam hook-struct chan handler]
   (log-key-event code wparam hook-struct)
 
