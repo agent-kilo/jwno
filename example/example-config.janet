@@ -68,15 +68,15 @@
     :retile)
 
   (:define-key keymap
-    ["win+," "win+,"]
+    "win+, win+,"
     [:split :horizontal 2 [0.5] 1 0])
 
   (:define-key keymap
-    ["win+," "3"]
+    "win+, 3"
     [:split :horizontal 3 [0.2 0.6 0.2] 0 1])
 
   (:define-key keymap
-    ["win+." "win+."]
+    "win+. win+."
     [:split :vertical 2 [0.5] 1 0])
 
   (:define-key keymap
@@ -129,19 +129,19 @@
     :move-mode)
 
   (:define-key keymap
-    ["win+s" "win+n"]
+    "win+s win+n"
     [:resize-current-frame 0 100])
   (:define-key keymap
-    ["win+s" "win+e"]
+    "win+s win+e"
     [:resize-current-frame 0 -100])
   (:define-key keymap
-    ["win+s" "win+m"]
+    "win+s win+m"
     [:resize-current-frame -100 0])
   (:define-key keymap
-    ["win+s" "win+i"]
+    "win+s win+i"
     [:resize-current-frame 100 0])
   (:define-key keymap
-    ["win+s" "win+s"]
+    "win+s win+s"
     :resize-mode)
 
   (:define-key keymap
@@ -161,14 +161,14 @@
     :close-current-window)
 
   (:define-key keymap
-    ["win+t" "win+n"]
+    "win+t win+n"
     [:change-current-window-alpha -25])
   (:define-key keymap
-    ["win+t" "win+e"]
+    "win+t win+e"
     [:change-current-window-alpha 25])
 
   (:define-key keymap
-    ["rwin" "f"]
+    "rwin f"
     [:focus-mode 0.7])
 
   # XXX: If a remapped key is used to trigger keymap switching, and
