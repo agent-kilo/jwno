@@ -141,42 +141,33 @@
   })
 
 
+# Only matches lower case key names. Do string/ascii-lower before
+# matching against this PEG.
 (def key-spec-peg
   (peg/compile
-   ~{:win (sequence (choice "w" "W")
-                    (choice "i" "I")
-                    (choice "n" "N"))
-     :alt (sequence (choice "a" "A")
-                    (choice "l" "L")
-                    (choice "t" "T"))
-     :ctrl (sequence (choice "c" "C")
-                     (choice "t" "T")
-                     (choice "r" "R")
-                     (choice "l" "L"))
-     :shift (sequence (choice "s" "S")
-                      (choice "h" "H")
-                      (choice "i" "I")
-                      (choice "f" "F")
-                      (choice "t" "T"))
+   ~{:win "win"
+     :alt "alt"
+     :ctrl "ctrl"
+     :shift "shift"
      :mod (choice :win :alt :ctrl :shift)
-     :mod-with-sides (sequence (choice "l" "L" "r" "R") :mod)
+     :mod-with-sides (sequence (set "lr") :mod)
      :mod-capture (replace (capture (choice :mod :mod-with-sides))
-                           ,(fn [mod-str] (keyword (string/ascii-lower mod-str))))
+                           ,(fn [mod-str] (keyword mod-str)))
      :mod-prefix (sequence :mod-capture (choice "+" "-"))
 
-     :f-key (sequence (choice "f" "F")
+     :f-key (sequence "f"
                       (choice (sequence "2" (range "04"))
                               (sequence "1" (range "09"))
                               (range "19")))
      :non-ascii-key (choice "enter" "esc" :f-key)
 
      :punctuation-key (choice "," "." "=" ";" "/")
-     :ascii-key (choice (range "az" "AZ" "09") :punctuation-key)
+     :ascii-key (choice (range "az" "09") :punctuation-key)
 
      :trigger-key (choice :mod-with-sides :non-ascii-key :ascii-key) # TODO
      :trigger-capture (replace (capture :trigger-key)
                                ,(fn [trig-str]
-                                  (if-let [code (in key-name-to-code (string/ascii-lower trig-str))]
+                                  (if-let [code (in key-name-to-code trig-str)]
                                     code
                                     (error (string/format "unknown key name: %n" trig-str)))))
 
@@ -192,7 +183,7 @@
     (key ;key-spec)
 
     (string? key-spec)
-    (if-let [matched (peg/match key-spec-peg key-spec)]
+    (if-let [matched (peg/match key-spec-peg (string/ascii-lower key-spec))]
       (let [[mods key-code] matched]
         (key key-code mods))
       (error (string/format "failed to parse key spec: %n" key-spec)))
