@@ -7,29 +7,29 @@
 
 (defn test-find-binding []
   (def keymap (define-keymap))
-  (define-key keymap
+  (:define-key keymap
     (key (ascii "A") @[:lctrl])
     :dummy-command-a)
-  (define-key keymap
+  (:define-key keymap
     (key (ascii "B") @[:ctrl])
     :dummy-command-b)
-  (define-key keymap
+  (:define-key keymap
     (key (ascii "C"))
     :dummy-command-c)
 
   (def sub-keymap (define-keymap))
-  (define-key sub-keymap
+  (:define-key sub-keymap
     (key (ascii "E"))
     :dummy-command-e)
 
-  (define-key keymap
+  (:define-key keymap
     (key (ascii "D"))
     sub-keymap)
 
-  (define-key keymap
+  (:define-key keymap
     (key (ascii "F") @[:lctrl :lalt])
     :dummy-command-f)
-  (define-key keymap
+  (:define-key keymap
     (key (ascii "G") @[:ctrl :alt])
     :dummy-command-g)
 

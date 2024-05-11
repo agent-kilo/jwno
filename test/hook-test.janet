@@ -12,10 +12,10 @@
   (:add-hook hook-man :dummy-hook hook-fn)
 
   (:call-hook hook-man :dummy-hook)
-  (assert (= [:dummy-hook] hook-called-with))
+  (assert (= [] hook-called-with))
 
   (:call-hook hook-man :dummy-hook 'arg1 'arg2)
-  (assert (= [:dummy-hook 'arg1 'arg2] hook-called-with))
+  (assert (= ['arg1 'arg2] hook-called-with))
 
   (:remove-hook hook-man :dummy-hook hook-fn)
 
@@ -46,17 +46,17 @@
 
   (:add-hook hook-man :dummy-hook hook-fn1)
   (assert (= true (:call-filter-hook hook-man :dummy-hook 'arg1)))
-  (assert (= [:dummy-hook 'arg1] hook-fn1-called-with))
+  (assert (= ['arg1] hook-fn1-called-with))
 
   (:add-hook hook-man :dummy-hook hook-fn2)
   (assert (= false (:call-filter-hook hook-man :dummy-hook 'other-arg1)))
-  (assert (= [:dummy-hook 'other-arg1] hook-fn1-called-with))
-  (assert (= [:dummy-hook 'other-arg1] hook-fn2-called-with))
+  (assert (= ['other-arg1] hook-fn1-called-with))
+  (assert (= ['other-arg1] hook-fn2-called-with))
 
   (:add-hook hook-man :dummy-hook hook-fn3)
   (assert (= false (:call-filter-hook hook-man :dummy-hook 'another-arg1)))
-  (assert (= [:dummy-hook 'another-arg1] hook-fn1-called-with))
-  (assert (= [:dummy-hook 'another-arg1] hook-fn2-called-with))
+  (assert (= ['another-arg1] hook-fn1-called-with))
+  (assert (= ['another-arg1] hook-fn2-called-with))
   (assert (nil? hook-fn3-called-with)))
 
 
