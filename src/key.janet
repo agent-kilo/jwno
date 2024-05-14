@@ -218,10 +218,17 @@
   (in self key-struct))
 
 
+(defn keymap-get-root [self]
+  (if-let [parent (in self :parent)]
+    (keymap-get-root parent)
+    self))
+
+
 (def- keymap-proto
   @{:define-key keymap-define-key
     :parse-key keymap-parse-key
-    :get-key-binding keymap-get-key-binding})
+    :get-key-binding keymap-get-key-binding
+    :get-root keymap-get-root})
 
 
 (varfn define-keymap []
