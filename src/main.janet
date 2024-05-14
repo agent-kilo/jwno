@@ -71,7 +71,7 @@
 
   (def command-man (command-manager))
 
-  (def ui-man (ui-manager (GetModuleHandle nil) (in args 0) @{}))
+  (def ui-man (ui-manager (GetModuleHandle nil) (in args 0) nil))
 
   (def uia-man
     (try

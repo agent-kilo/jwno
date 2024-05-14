@@ -182,4 +182,4 @@
   keymap)
 
 
-(:push-keymap key-man (build-keymap key-man) true)
+(:push-keymap key-man (build-keymap key-man))
