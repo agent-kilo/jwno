@@ -19,6 +19,7 @@
 
 (def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
 (def SET-KEYMAP-MSG (+ WM_APP 2))
+(def SET-PENDING-KEYMAP-MSG (+ WM_APP 3))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -115,7 +116,11 @@
   (case msg
     SET-KEYMAP-MSG
     (let [keymap (unmarshal-and-free wparam)]
-      (put hook-handler :current-keymap keymap))
+      (:set-keymap hook-handler keymap))
+
+    SET-PENDING-KEYMAP-MSG
+    (let [keymap (unmarshal-and-free wparam)]
+      (:set-pending-keymap hook-handler keymap))
 
     NOTIFY-ICON-CALLBACK-MSG
     (do
@@ -316,8 +321,13 @@
 
 
 (defn ui-manager-set-keymap [self keymap]
-  (def buf-ptr (alloc-and-marshal (if (nil? keymap) @{} keymap)))
+  (def buf-ptr (alloc-and-marshal keymap))
   (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
+
+
+(defn ui-manager-set-pending-keymap [self keymap]
+  (def buf-ptr (alloc-and-marshal keymap))
+  (ui-manager-post-message self SET-PENDING-KEYMAP-MSG buf-ptr 0))
 
 
 (defn ui-manager-destroy [self]
@@ -328,6 +338,7 @@
   @{:initialized ui-manager-initialized
     :post-message ui-manager-post-message
     :set-keymap ui-manager-set-keymap
+    :set-pending-keymap ui-manager-set-pending-keymap
     :destroy ui-manager-destroy})
 
 

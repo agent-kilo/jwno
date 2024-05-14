@@ -232,15 +232,24 @@
   (define-keymap))
 
 
-(defn key-manager-push-keymap [self keymap]
+(defn key-manager-push-keymap [self keymap &opt immediate]
+  (default immediate false)
   (array/push (in self :keymap-stack) keymap)
-  (:set-keymap (in self :ui-manager) keymap))
+  (def ui-man (in self :ui-manager))
+  (if immediate
+    (:set-keymap ui-man keymap)
+    (:set-pending-keymap ui-man keymap)))
 
 
-(defn key-manager-pop-keymap [self]
+(defn key-manager-pop-keymap [self &opt immediate]
+  (default immediate false)
   (def stack (in self :keymap-stack))
   (def ret (array/pop stack))
-  (:set-keymap (in self :ui-manager) (last stack))
+  (def ui-man (in self :ui-manager))
+  (def top-keymap (last stack))
+  (if immediate
+    (:set-keymap ui-man top-keymap)
+    (:set-pending-keymap ui-man top-keymap))
   ret)
 
 
@@ -347,12 +356,30 @@
     [:key/command binding]))
 
 
+(defn keyboard-hook-handler-set-keymap [self keymap]
+  (def to-set 
+    (if (nil? keymap)
+      (define-keymap)
+      keymap))
+  (put self :current-keymap to-set))
+
+
+(defn keyboard-hook-handler-set-pending-keymap [self keymap]
+  (def to-set 
+    (if (nil? keymap)
+      (define-keymap)
+      keymap))
+  (put self :pending-keymap to-set))
+
+
 (def- keyboard-hook-handler-proto
   @{:translate-key keyboard-hook-handler-translate-key
     :find-binding keyboard-hook-handler-find-binding
     :get-modifier-states keyboard-hook-handler-get-modifier-states
     :reset-keymap keyboard-hook-handler-reset-keymap
-    :handle-binding keyboard-hook-handler-handle-binding})
+    :handle-binding keyboard-hook-handler-handle-binding
+    :set-keymap keyboard-hook-handler-set-keymap
+    :set-pending-keymap keyboard-hook-handler-set-pending-keymap})
 
 
 (defn keyboard-hook-handler [keymap]
