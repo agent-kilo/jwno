@@ -239,28 +239,18 @@
   (define-keymap))
 
 
-(defn key-manager-push-keymap [self keymap]
-  (array/push (in self :keymap-stack) keymap)
+(defn key-manager-set-keymap [self keymap]
   (:set-keymap (in self :ui-manager) keymap))
-
-
-(defn key-manager-pop-keymap [self &opt immediate]
-  (def stack (in self :keymap-stack))
-  (def ret (array/pop stack))
-  (:set-keymap (in self :ui-manager) (last stack))
-  ret)
 
 
 (def- key-manager-proto
   @{:new-keymap key-manager-new-keymap
-    :push-keymap key-manager-push-keymap
-    :pop-keymap key-manager-pop-keymap})
+    :set-keymap key-manager-set-keymap})
 
 
 (defn key-manager [ui-man]
   (table/setproto
-   @{:keymap-stack @[]
-     :ui-manager ui-man}
+   @{:ui-manager ui-man}
    key-manager-proto))
 
 

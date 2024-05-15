@@ -176,4 +176,4 @@
   keymap)
 
 
-(:push-keymap key-man (build-keymap key-man))
+(:set-keymap key-man (build-keymap key-man))
