@@ -49,12 +49,6 @@
     keymap))
 
 
-(:add-command command-man :resize-mode
-   (fn [] (:push-keymap key-man resize-mode-keymap)))
-(:add-command command-man :move-mode
-   (fn [] (:push-keymap key-man move-mode-keymap)))
-
-
 (defn build-keymap [key-man]
   (def keymap (:new-keymap key-man))
   (def k
@@ -126,7 +120,7 @@
     [:move-current-window :right])
   (:define-key keymap
     "win+w"
-    :move-mode)
+    [:push-keymap move-mode-keymap])
 
   (:define-key keymap
     "win+s win+n"
@@ -142,7 +136,7 @@
     [:resize-current-frame 100 0])
   (:define-key keymap
     "win+s win+s"
-    :resize-mode)
+    [:push-keymap resize-mode-keymap])
 
   (:define-key keymap
     "win+f"
