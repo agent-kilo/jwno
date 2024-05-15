@@ -325,14 +325,10 @@
 
 
 (defn keyboard-hook-handler-reset-keymap [self]
-  (var cur-keymap (in self :current-keymap))
-  (var parent-keymap (in cur-keymap :parent))
-  (while parent-keymap
-    (set cur-keymap parent-keymap)
-    (set parent-keymap (in cur-keymap :parent)))
-  (def old-keymap (in self :current-keymap))
-  (put self :current-keymap cur-keymap)
-  (not= old-keymap cur-keymap))
+  (def cur-keymap (in self :current-keymap))
+  (def root-keymap (:get-root cur-keymap))
+  (put self :current-keymap root-keymap)
+  (not= root-keymap cur-keymap))
 
 
 (defn keyboard-hook-handler-handle-binding [self hook-struct binding]
