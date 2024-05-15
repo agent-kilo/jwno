@@ -264,6 +264,34 @@
    key-manager-proto))
 
 
+(defn keyboard-hook-handler-set-keymap [self keymap]
+  (def to-set 
+    (if (nil? keymap)
+      (define-keymap)
+      keymap))
+  (put self :current-keymap to-set)
+  (put self :keymap-stack @[]))
+
+
+(defn keyboard-hook-handler-push-keymap [self keymap]
+  (def new-keymap 
+    (if (nil? keymap)
+      (define-keymap)
+      keymap))
+  (array/push (in self :keymap-stack) (in self :current-keymap))
+  (put self :current-keymap new-keymap))
+
+
+(defn keyboard-hook-handler-pop-keymap [self]
+  (def old-keymap (in self :current-keymap))
+  (def new-keymap
+    (if-let [stack-top (array/pop (in self :keymap-stack))]
+      stack-top
+      (define-keymap)))
+  (put self :current-keymap new-keymap)
+  old-keymap)
+
+
 (defn keyboard-hook-handler-translate-key [self hook-struct]
   (def extra-info (in hook-struct :dwExtraInfo))
   (when (test-kei-flag KEI-FLAG-REMAPPED extra-info)
@@ -342,12 +370,24 @@
         (break [:key/switch-keymap binding]))
       (break nil)))
 
-  # It's a normal command, only fire on key-down, and
-  # try to reset to root keymap when key-up
-  (if key-up
-    (when (keyboard-hook-handler-reset-keymap self)
-      [:key/reset-keymap (in self :current-keymap)])
-    [:key/command binding]))
+  (match binding
+    [:push-keymap keymap]
+    (when key-up
+      (keyboard-hook-handler-push-keymap self keymap)
+      [:key/push-keymap (in self :current-keymap)])
+
+    :pop-keymap
+    (when key-up
+      (keyboard-hook-handler-pop-keymap self)
+      [:key/pop-keymap (in self :current-keymap)])
+
+    _
+    # It's a normal command, only fire on key-down, and
+    # try to reset to root keymap when key-up
+    (if key-up
+      (when (keyboard-hook-handler-reset-keymap self)
+        [:key/reset-keymap (in self :current-keymap)])
+      [:key/command binding])))
 
 
 (defn keyboard-hook-handler-handle-unbound [self hook-struct]
@@ -362,25 +402,20 @@
       [:key/reset-keymap (in self :current-keymap)])))
 
 
-(defn keyboard-hook-handler-set-keymap [self keymap]
-  (def to-set 
-    (if (nil? keymap)
-      (define-keymap)
-      keymap))
-  (put self :current-keymap to-set))
-
-
 (def- keyboard-hook-handler-proto
-  @{:translate-key keyboard-hook-handler-translate-key
+  @{:set-keymap keyboard-hook-handler-set-keymap
+    :push-keymap keyboard-hook-handler-push-keymap
+    :pop-keymap keyboard-hook-handler-pop-keymap
+    :translate-key keyboard-hook-handler-translate-key
     :find-binding keyboard-hook-handler-find-binding
     :get-modifier-states keyboard-hook-handler-get-modifier-states
     :reset-keymap keyboard-hook-handler-reset-keymap
     :handle-binding keyboard-hook-handler-handle-binding
-    :handle-unbound keyboard-hook-handler-handle-unbound
-    :set-keymap keyboard-hook-handler-set-keymap})
+    :handle-unbound keyboard-hook-handler-handle-unbound})
 
 
 (defn keyboard-hook-handler [keymap]
   (table/setproto
-   @{:current-keymap keymap}
+   @{:keymap-stack @[]
+     :current-keymap keymap}
    keyboard-hook-handler-proto))
