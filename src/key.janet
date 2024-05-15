@@ -268,7 +268,10 @@
     (if (nil? keymap)
       (define-keymap)
       keymap))
-  (array/push (in self :keymap-stack) (in self :current-keymap))
+  # XXX: Always reset the current keymap at the same time,
+  # Or a sub-keymap may still be active when we pop the stack.
+  (array/push (in self :keymap-stack)
+              (:get-root (in self :current-keymap)))
   (put self :current-keymap new-keymap))
 
 
