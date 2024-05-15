@@ -153,6 +153,9 @@
   (:define-key keymap
     "win+shift+c"
     :close-current-window)
+  (:define-key keymap
+    "win+shift+f"
+    :close-current-frame)
 
   (:define-key keymap
     "win+t win+n"

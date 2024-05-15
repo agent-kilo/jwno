@@ -167,6 +167,14 @@
   (:activate wm cur-win))
 
 
+(defn cmd-close-current-frame [wm]
+  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-win (:get-current-window cur-frame))
+  (:close-frame (in wm :layout) cur-frame)
+  (:retile wm)
+  (:activate wm cur-win))
+
+
 (defn cmd-frame-to-current-window-size [wm uia-man]
   (def cur-frame (:get-current-frame (in wm :layout)))
   (def cur-win (:get-current-window cur-frame))
@@ -232,6 +240,8 @@
 
   (:add-command command-man :resize-current-frame
      (fn [dw dh] (cmd-resize-current-frame wm dw dh)))
+  (:add-command command-man :close-current-frame
+     (fn [] (cmd-close-current-frame wm)))
   (:add-command command-man :frame-to-current-window-size
      (fn [] (cmd-frame-to-current-window-size wm uia-man)))
   (:add-command command-man :balance-frames
