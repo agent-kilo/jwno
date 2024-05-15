@@ -115,7 +115,7 @@
   (case msg
     SET-KEYMAP-MSG
     (let [keymap (unmarshal-and-free wparam)]
-      (put hook-handler :current-keymap keymap))
+      (:set-keymap hook-handler keymap))
 
     NOTIFY-ICON-CALLBACK-MSG
     (do
@@ -198,6 +198,10 @@
   (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
 
 
+# msg-wndproc and this keyboard hook both have access to the
+# same keyboard-hook-handler, but since hook events and window
+# messages are serialized on the same UI thread, there won't be
+# any race conditions.
 (defn- keyboard-hook-proc [code wparam hook-struct chan handler]
   (log-key-event code wparam hook-struct)
 
@@ -229,21 +233,16 @@
       (when (or (in mod-states :lwin)
                 (in mod-states :rwin))
         # Send a dummy key event to stop the Start Menu from popping up
-        (send-input (keyboard-input VK_DUMMY
-                                    (if key-up :up :down)
-                                    (bor KEI-FLAG-PASSTHROUGH extra-info))))
+        (send-input(keyboard-input VK_DUMMY
+                                   (if key-up :up :down)
+                                   (bor KEI-FLAG-PASSTHROUGH extra-info))))
       (when-let [msg (:handle-binding handler hook-struct binding)]
         (ev/give chan msg))
       1) # !!! IMPORTANT
 
     (do
-      # We don't recognize the key combination, pass it through,
-      # and reset the keymap on key-up
-      (when key-up
-        (log/debug "Resetting keymap")
-        (when (:reset-keymap handler)
-          (ev/give chan
-                   [:key/reset-keymap (in handler :current-keymap)])))
+      (when-let [msg (:handle-unbound handler hook-struct)]
+        (ev/give chan msg))
       (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
