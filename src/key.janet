@@ -350,6 +350,18 @@
     [:key/command binding]))
 
 
+(defn keyboard-hook-handler-handle-unbound [self hook-struct]
+  (def key-up (hook-struct :flags.up))
+  # Reset the keymap on key-up, even for key combos we don't recognize.
+  # We don't want modifier keys to reset the keymap, since this
+  # will prevent the next key combo from having different modifiers.
+  (when (and key-up
+             (not (in MODIFIER-KEYS (in hook-struct :vkCode))))
+    (log/debug "Resetting keymap")
+    (when (keyboard-hook-handler-reset-keymap self)
+      [:key/reset-keymap (in self :current-keymap)])))
+
+
 (defn keyboard-hook-handler-set-keymap [self keymap]
   (def to-set 
     (if (nil? keymap)
@@ -364,6 +376,7 @@
     :get-modifier-states keyboard-hook-handler-get-modifier-states
     :reset-keymap keyboard-hook-handler-reset-keymap
     :handle-binding keyboard-hook-handler-handle-binding
+    :handle-unbound keyboard-hook-handler-handle-unbound
     :set-keymap keyboard-hook-handler-set-keymap})
 
 

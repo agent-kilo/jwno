@@ -233,24 +233,16 @@
       (when (or (in mod-states :lwin)
                 (in mod-states :rwin))
         # Send a dummy key event to stop the Start Menu from popping up
-        (send-input (keyboard-input VK_DUMMY
-                                    (if key-up :up :down)
-                                    (bor KEI-FLAG-PASSTHROUGH extra-info))))
+        (send-input(keyboard-input VK_DUMMY
+                                   (if key-up :up :down)
+                                   (bor KEI-FLAG-PASSTHROUGH extra-info))))
       (when-let [msg (:handle-binding handler hook-struct binding)]
         (ev/give chan msg))
       1) # !!! IMPORTANT
 
     (do
-      # We don't recognize the key combination, pass it through,
-      # and reset the keymap on key-up.
-      # And we don't want modifier keys to reset the keymap, since this
-      # will prevent the next key combo from having different modifiers.
-      (when (and key-up
-                 (not (in MODIFIER-KEYS (in hook-struct :vkCode))))
-        (log/debug "Resetting keymap")
-        (when (:reset-keymap handler)
-          (ev/give chan
-                   [:key/reset-keymap (in handler :current-keymap)])))
+      (when-let [msg (:handle-unbound handler hook-struct)]
+        (ev/give chan msg))
       (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
