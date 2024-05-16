@@ -563,7 +563,6 @@
 
 (defn layout-get-adjacent-frame-impl-descent [self orig-node node dir]
   (def children (in node :children))
-  (def node-rect (in node :rect))
   (def {:top orig-top :left orig-left} (in orig-node :rect))
 
   (cond
@@ -573,61 +572,37 @@
     (= :window (get-in children [0 :type]))
     node
 
-    (= dir :left)
-    # Find the right-most sub-frame that has the closest y coordinate.
-    (case (table/getproto node)
-      horizontal-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
+    (= :frame (get-in children [0 :type]))
+    (layout-get-adjacent-frame-impl-descent self
+                                            orig-node
+                                            (case [dir (table/getproto node)]
+                                              [:left horizontal-frame-proto]
                                               (last children)
-                                              dir)
-      vertical-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
-                                              (find-closest-child children orig-top :top)
-                                              dir))
 
-    (= dir :right)
-    # Find the left-most sub-frame that has the closest y coordinate.
-    (case (table/getproto node)
-      horizontal-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
+                                              [:left vertical-frame-proto]
+                                              (find-closest-child children orig-top :top)
+
+                                              [:right horizontal-frame-proto]
                                               (first children)
-                                              dir)
-      vertical-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
-                                              (find-closest-child children orig-top :top)
-                                              dir))
 
-    (= dir :up)
-    # Find the lower-most sub-frame that has the closest x coordinate.
-    (case (table/getproto node)
-      horizontal-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
+                                              [:right vertical-frame-proto]
+                                              (find-closest-child children orig-top :top)
+
+                                              [:up horizontal-frame-proto]
                                               (find-closest-child children orig-left :left)
-                                              dir)
-      vertical-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
+
+                                              [:up vertical-frame-proto]
                                               (last children)
-                                              dir))
 
-    (= dir :down)
-    # Find the upper-most sub-frame that has the closest x coordinate.
-    (case (table/getproto node)
-      horizontal-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
+                                              [:down horizontal-frame-proto]
                                               (find-closest-child children orig-left :left)
-                                              dir)
-      vertical-frame-proto
-      (layout-get-adjacent-frame-impl-descent self
-                                              orig-node
-                                              (first children)
-                                              dir))))
+
+                                              [:down vertical-frame-proto]
+                                              (first children))
+                                            dir)
+
+    true
+    (error "inconsistent states for frame tree")))
 
 
 (defn layout-get-adjacent-frame-impl-ascent [self orig-node node dir]
