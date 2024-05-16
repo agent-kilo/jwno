@@ -942,13 +942,13 @@
        (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
 
 
-(defn wm-set-window-alpha [self hwnd alpha]
+(defn wm-set-hwnd-alpha [self hwnd alpha]
   (def ex-style (GetWindowLong hwnd GWL_EXSTYLE))
   (SetWindowLong hwnd GWL_EXSTYLE (unsigned-to-signed-32 (bor ex-style WS_EX_LAYERED)))
   (SetLayeredWindowAttributes hwnd 0 alpha LWA_ALPHA))
 
 
-(defn wm-is-window-process-elevated? [self hwnd]
+(defn wm-hwnd-process-elevated? [self hwnd]
   (def [_tid pid] (GetWindowThreadProcessId hwnd))
   (when (= (int/u64 0) pid)
     (break false))
@@ -965,7 +965,7 @@
       elevated)))
 
 
-(defn wm-is-jwno-process-elevated? [self]
+(defn wm-jwno-process-elevated? [self]
   (with [[ret token]
          (OpenProcessToken (GetCurrentProcess) TOKEN_QUERY)
          (fn [[_ token]] (CloseHandle token))]
@@ -975,7 +975,7 @@
     elevated))
 
 
-(defn wm-get-process-path [self pid]
+(defn wm-get-pid-path [self pid]
   (with [proc
          (OpenProcess (bor PROCESS_QUERY_INFORMATION
                            PROCESS_VM_READ)
@@ -986,12 +986,12 @@
     (QueryFullProcessImageName proc 0)))
 
 
-(defn wm-get-window-process-path [self hwnd]
+(defn wm-get-hwnd-path [self hwnd]
   (def [_tid pid] (GetWindowThreadProcessId hwnd))
   (when (= (int/u64 0) pid)
     (break nil))
 
-  (def path (wm-get-process-path self pid))
+  (def path (wm-get-pid-path self pid))
 
   (var uwp-pid nil)
   (when (and (not (nil? path))
@@ -1006,11 +1006,11 @@
                           (break FALSE))
                         TRUE)))
   (if uwp-pid
-    (wm-get-process-path self uwp-pid)
+    (wm-get-pid-path self uwp-pid)
     path))
 
 
-(defn wm-should-manage? [self hwnd? &opt uia-win?]
+(defn wm-should-manage-hwnd? [self hwnd? &opt uia-win?]
   (def uia-man (in self :uia-manager))
   (def [hwnd uia-win]
     (cond
@@ -1047,18 +1047,18 @@
       false)
 
     true
-    (let [exe-path (wm-get-window-process-path self hwnd)
+    (let [exe-path (wm-get-hwnd-path self hwnd)
           result (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path)]
       (when (nil? uia-win?)
         (:Release uia-win))
       result)))
 
 
-(defn wm-add-window [self hwnd]
+(defn wm-add-hwnd [self hwnd]
   (log/debug "new window: %n" hwnd)
   (def new-win (window hwnd))
   (def uia-man (in self :uia-manager))
-  (def exe-path (wm-get-window-process-path self hwnd))
+  (def exe-path (wm-get-hwnd-path self hwnd))
   (def hwnd-still-valid
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache (in uia-man :com) hwnd (in uia-man :focus-cr))
@@ -1066,7 +1066,7 @@
                           (log/debug "ElementFromHandleBuildCache failed: %n" err)
                           nil))]
       (if (nil? uia-win)
-        # The window may have disappeared between (wm-should-manage? ...) and (wm-add-window ...)
+        # The window may have disappeared between (wm-should-manage-hwnd? ...) and (wm-add-hwnd ...)
         false
         (do
           (:call-hook (in self :hook-manager) :new-window new-win uia-win exe-path)
@@ -1112,7 +1112,7 @@
         (:activate win)
         (break nil))
 
-      (when (not (wm-should-manage? self hwnd uia-win))
+      (when (not (wm-should-manage-hwnd? self hwnd uia-win))
         (log/debug "Ignoring window: %n" hwnd)
         (break nil))
 
@@ -1120,7 +1120,7 @@
 
   (when hwnd-to-manage
     # TODO: window close events
-    (let [new-win (wm-add-window self hwnd-to-manage)]
+    (let [new-win (wm-add-hwnd self hwnd-to-manage)]
       (:activate new-win)))
   self)
 
@@ -1130,11 +1130,11 @@
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break self))
 
-  (when (not (wm-should-manage? self hwnd))
+  (when (not (wm-should-manage-hwnd? self hwnd))
     (log/debug "Ignoring window: %n" hwnd)
     (break self))
 
-  (wm-add-window self hwnd)
+  (wm-add-hwnd self hwnd)
   self)
 
 
@@ -1228,20 +1228,21 @@
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
 
-    :enumerate-monitors wm-enumerate-monitors
-    :should-manage? wm-should-manage?
-    :add-window wm-add-window
     :transform-window wm-transform-window
-    :set-window-alpha wm-set-window-alpha
     :retile wm-retile
     :activate wm-activate
-    :is-window-process-elevated? wm-is-window-process-elevated?
-    :is-jwno-process-elevated? wm-is-jwno-process-elevated?
-    :get-process-path wm-get-process-path
-    :get-window-process-path wm-get-window-process-path
 
+    :add-hwnd wm-add-hwnd
+    :should-manage-hwnd? wm-should-manage-hwnd?
+    :get-hwnd-path wm-get-hwnd-path
+    :set-hwnd-alpha wm-set-hwnd-alpha
     :close-hwnd wm-close-hwnd
-    :hwnd-alive? wm-hwnd-alive?})
+    :hwnd-alive? wm-hwnd-alive?
+    :hwnd-process-elevated? wm-hwnd-process-elevated?
+
+    :get-pid-path wm-get-pid-path
+    :enumerate-monitors wm-enumerate-monitors
+    :jwno-process-elevated? wm-jwno-process-elevated?})
 
 
 (defn init-window-tags [win uia-win]
@@ -1271,8 +1272,8 @@
 
 
 (defn check-unelevated-window [hwnd wm]
-  (or (:is-jwno-process-elevated? wm)
-      (not (:is-window-process-elevated? wm hwnd))))
+  (or (:jwno-process-elevated? wm)
+      (not (:hwnd-process-elevated? wm hwnd))))
 
 
 (defn check-valid-uia-window [uia-win]

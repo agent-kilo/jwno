@@ -216,7 +216,7 @@
         (> val 255) 255
         true val)))
   (log/debug "Setting window alpha from %n to %n" old-alpha new-alpha)
-  (:set-window-alpha wm (in cur-win :hwnd) new-alpha))
+  (:set-hwnd-alpha wm (in cur-win :hwnd) new-alpha))
 
 
 (defn add-default-commands [command-man context]
