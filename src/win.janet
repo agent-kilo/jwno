@@ -103,9 +103,14 @@
        (not= FALSE (IsWindowVisible (in self :hwnd)))))
 
 
+(defn window-close [self]
+  (PostMessage (in self :hwnd) WM_CLOSE 0 0))
+
+
 (def- window-proto
   (table/setproto
-   @{:alive? window-alive?}
+   @{:alive? window-alive?
+     :close window-close}
    tree-node-proto))
 
 

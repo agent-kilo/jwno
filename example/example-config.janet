@@ -13,8 +13,10 @@
 (:add-command command-man :close-current-window-or-frame
    (fn []
      (if-let [cur-win (:get-current-window (in window-man :layout))]
-       (:call-command command-man :close-current-window)
-       (:call-command command-man :close-current-frame))))
+       (:close cur-win)
+       (let [layout (in window-man :layout)
+             cur-frame (:get-current-frame layout)]
+         (:close-frame layout cur-frame)))))
 
 
 (defmacro k [key-seq cmd]

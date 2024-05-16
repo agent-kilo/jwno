@@ -195,8 +195,7 @@
   (def cur-win (:get-current-window (in wm :layout)))
   (when (nil? cur-win)
     (break))
-
-  (PostMessage (in cur-win :hwnd) WM_CLOSE 0 0))
+  (:close cur-win))
 
 
 (defn cmd-change-current-window-alpha [wm delta]
