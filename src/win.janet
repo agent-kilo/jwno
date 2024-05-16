@@ -98,14 +98,9 @@
 
 ######### Window object #########
 
-(defn window-alive? [self]
-  (and (not= FALSE (IsWindow (in self :hwnd)))
-       (not= FALSE (IsWindowVisible (in self :hwnd)))))
-
-
 (def- window-proto
   (table/setproto
-   @{:alive? window-alive?}
+   @{}
    tree-node-proto))
 
 
@@ -305,7 +300,7 @@
   (frame-find-frame-for-window self nil))
 
 
-(defn frame-purge-windows [self]
+(defn frame-purge-windows [self wm]
   (cond
     (empty? (in self :children))
     @[]
@@ -313,14 +308,14 @@
     (= :frame (get-in self [:children 0 :type]))
     (let [dead @[]]
       (each f (in self :children)
-        (array/push dead ;(frame-purge-windows f)))
+        (array/push dead ;(frame-purge-windows f wm)))
       dead)
 
     (= :window (get-in self [:children 0 :type]))
     (let [[alive dead] 
           (reduce
             (fn [[a d] w]
-              (if (:alive? w)
+              (if (:hwnd-alive? wm (in w :hwnd))
                 (array/push a w)
                 (array/push d w))
               [a d])
@@ -1100,7 +1095,7 @@
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (def dead (:purge-windows (in self :layout)))
+  (def dead (:purge-windows (in self :layout) self))
   (log/debug "purged %n dead windows" (length dead))
 
   (def uia-man (in self :uia-manager))
@@ -1224,6 +1219,11 @@
   (PostMessage hwnd WM_CLOSE 0 0))
 
 
+(defn wm-hwnd-alive? [self hwnd]
+  (and (not= FALSE (IsWindow hwnd))
+       (not= FALSE (IsWindowVisible hwnd))))
+
+
 (def- window-manager-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
@@ -1240,7 +1240,8 @@
     :get-process-path wm-get-process-path
     :get-window-process-path wm-get-window-process-path
 
-    :close-hwnd wm-close-hwnd})
+    :close-hwnd wm-close-hwnd
+    :hwnd-alive? wm-hwnd-alive?})
 
 
 (defn init-window-tags [win uia-win]
