@@ -103,14 +103,9 @@
        (not= FALSE (IsWindowVisible (in self :hwnd)))))
 
 
-(defn window-close [self]
-  (PostMessage (in self :hwnd) WM_CLOSE 0 0))
-
-
 (def- window-proto
   (table/setproto
-   @{:alive? window-alive?
-     :close window-close}
+   @{:alive? window-alive?}
    tree-node-proto))
 
 
@@ -1225,6 +1220,10 @@
   [work-areas main-idx])
 
 
+(defn wm-close-hwnd [self hwnd]
+  (PostMessage hwnd WM_CLOSE 0 0))
+
+
 (def- window-manager-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
@@ -1239,7 +1238,9 @@
     :is-window-process-elevated? wm-is-window-process-elevated?
     :is-jwno-process-elevated? wm-is-jwno-process-elevated?
     :get-process-path wm-get-process-path
-    :get-window-process-path wm-get-window-process-path})
+    :get-window-process-path wm-get-window-process-path
+
+    :close-hwnd wm-close-hwnd})
 
 
 (defn init-window-tags [win uia-win]
