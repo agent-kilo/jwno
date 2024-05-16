@@ -16,7 +16,8 @@
        (:close cur-win)
        (let [layout (in window-man :layout)
              cur-frame (:get-current-frame layout)]
-         (:close-frame layout cur-frame)))))
+         (:close-frame layout cur-frame)
+         (:retile window-man)))))
 
 
 (defmacro k [key-seq cmd]
