@@ -7,173 +7,90 @@
 
 (def key-man (in jwno-context :key-manager))
 (def command-man (in jwno-context :command-manager))
+(def window-man (in jwno-context :window-manager))
+
+
+(:add-command command-man :close-current-window-or-frame
+   (fn []
+     (if-let [cur-win (:get-current-window (in window-man :layout))]
+       (:call-command command-man :close-current-window)
+       (:call-command command-man :close-current-frame))))
+
+
+(defmacro k [key-seq cmd]
+  ~(:define-key keymap ,key-seq ,cmd))
 
 
 (def resize-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (:define-key keymap
-      "n"
-      [:resize-current-frame 0 100])
-    (:define-key keymap
-      "e"
-      [:resize-current-frame 0 -100])
-    (:define-key keymap
-      "m"
-      [:resize-current-frame -100 0])
-    (:define-key keymap
-      "i"
-      [:resize-current-frame 100 0])
-    (:define-key keymap
-      "enter"
-      :pop-keymap)
+    (k "n" [:resize-current-frame 0 100])
+    (k "e" [:resize-current-frame 0 -100])
+    (k "m" [:resize-current-frame -100 0])
+    (k "i" [:resize-current-frame 100 0])
+    (k "=" :balance-frames)
+    (k "z" [:focus-mode 0.7])
+    (k "enter" :pop-keymap)
     keymap))
 
 
 (def move-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (:define-key keymap
-      "n"
-      [:move-current-window :down])
-    (:define-key keymap
-      "e"
-      [:move-current-window :up])
-    (:define-key keymap
-      "m"
-      [:move-current-window :left])
-    (:define-key keymap
-      "i"
-      [:move-current-window :right])
-    (:define-key keymap
-      "enter"
-      :pop-keymap)
+    (k "n" [:move-current-window :down])
+    (k "e" [:move-current-window :up])
+    (k "m" [:move-current-window :left])
+    (k "i" [:move-current-window :right])
+    (k "enter" :pop-keymap)
     keymap))
+
+
+(def alpha-mode-keymap
+  (let [keymap (:new-keymap key-man)]
+    (k "n" [:change-current-window-alpha -25])
+    (k "e" [:change-current-window-alpha 25])
+    (k "enter" :pop-keymap)))
 
 
 (defn build-keymap [key-man]
   (def keymap (:new-keymap key-man))
-  (def k
-    (fn [key-seq cmd]
-      (:define-key keymap key-seq cmd)))
 
-  (k "win+q" :quit)
+  (k "win + shift + q" :quit)
+  (k "win + t" :retile)
 
-  (:define-key keymap
-    "win+r"
-    :retile)
+  (k "win + shift + c" :close-current-window-or-frame)
+  (k "win + shift + f" :close-current-frame)
+  (k "win + ctrl + f" :flatten-parent)
 
-  (:define-key keymap
-    "win+, win+,"
-    [:split :horizontal 2 [0.5] 1 0])
+  (k "win + ," [:split :horizontal 2 [0.5] 1 0])
+  (k "win + ." [:split :vertical 2 [0.5] 1 0])
+  (k "win + =" :balance-frames)
+  (k "win + z" [:focus-mode 0.7])
 
-  (:define-key keymap
-    "win+, 3"
-    [:split :horizontal 3 [0.2 0.6 0.2] 0 1])
+  (k "win + n" [:enum-frame :next])
+  (k "win + e" [:enum-frame :prev])
+  (k "win + i" :next-window-in-frame)
+  (k "win + m" :prev-window-in-frame)
 
-  (:define-key keymap
-    "win+. win+."
-    [:split :vertical 2 [0.5] 1 0])
+  (k "win + ctrl + n" [:adjacent-frame :down])
+  (k "win + ctrl + e" [:adjacent-frame :up])
+  (k "win + ctrl + m" [:adjacent-frame :left])
+  (k "win + ctrl + i" [:adjacent-frame :right])
 
-  (:define-key keymap
-    "win+/"
-    :flatten-parent)
+  (k "win + shift + n" [:move-current-window :down])
+  (k "win + shift + e" [:move-current-window :up])
+  (k "win + shift + m" [:move-current-window :left])
+  (k "win + shift + i" [:move-current-window :right])
 
-  (:define-key keymap
-    "win+n"
-    [:enum-frame :next])
+  (k "win + s" [:push-keymap resize-mode-keymap])
+  (k "win + g" [:push-keymap move-mode-keymap])
 
-  (:define-key keymap
-    "win+e"
-    [:enum-frame :prev])
+  (k "win + shift + s" :frame-to-current-window-size)
 
-  (:define-key keymap
-    "win+i"
-    :next-window-in-frame)
-
-  (:define-key keymap
-    "win+m"
-    :prev-window-in-frame)
-
-  (:define-key keymap
-    "win+ctrl+n"
-    [:adjacent-frame :down])
-  (:define-key keymap
-    "win+ctrl+e"
-    [:adjacent-frame :up])
-  (:define-key keymap
-    "win+ctrl+m"
-    [:adjacent-frame :left])
-  (:define-key keymap
-    "win+ctrl+i"
-    [:adjacent-frame :right])
-
-  (:define-key keymap
-    "win+shift+n"
-    [:move-current-window :down])
-  (:define-key keymap
-    "win+shift+e"
-    [:move-current-window :up])
-  (:define-key keymap
-    "win+shift+m"
-    [:move-current-window :left])
-  (:define-key keymap
-    "win+shift+i"
-    [:move-current-window :right])
-  (:define-key keymap
-    "win+w"
-    [:push-keymap move-mode-keymap])
-
-  (:define-key keymap
-    "win+s win+n"
-    [:resize-current-frame 0 100])
-  (:define-key keymap
-    "win+s win+e"
-    [:resize-current-frame 0 -100])
-  (:define-key keymap
-    "win+s win+m"
-    [:resize-current-frame -100 0])
-  (:define-key keymap
-    "win+s win+i"
-    [:resize-current-frame 100 0])
-  (:define-key keymap
-    "win+s win+s"
-    [:push-keymap resize-mode-keymap])
-
-  (:define-key keymap
-    "win+f"
-    [:focus-mode 0.7])
-
-  (:define-key keymap
-    "win+="
-    :balance-frames)
-
-  (:define-key keymap
-    "win+ctrl+s"
-    :frame-to-current-window-size)
-
-  (:define-key keymap
-    "win+shift+c"
-    :close-current-window)
-  (:define-key keymap
-    "win+shift+f"
-    :close-current-frame)
-
-  (:define-key keymap
-    "win+t win+n"
-    [:change-current-window-alpha -25])
-  (:define-key keymap
-    "win+t win+e"
-    [:change-current-window-alpha 25])
-
-  (:define-key keymap
-    "rwin f"
-    [:focus-mode 0.7])
+  (k "win + a" [:push-keymap alpha-mode-keymap])
 
   # XXX: If a remapped key is used to trigger keymap switching, and
   # the switched keymap doesn't have the same remap, the translated key
   # will be stuck down.
-  (:define-key keymap
-    "ralt"
-    [:map-to VK_RWIN])
+  (k "ralt" [:map-to VK_RWIN])
 
   (log/debug "keymap = %n" keymap)
   keymap)
