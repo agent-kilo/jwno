@@ -14,6 +14,19 @@
 (import ./log)
 
 
+(defmacro rect-width [rect]
+  ~(- (in ,rect :right) (in ,rect :left)))
+
+
+(defmacro rect-height [rect]
+  ~(- (in ,rect :bottom) (in ,rect :top)))
+
+
+(defmacro rect-size [rect]
+  ~[(- (in ,rect :right) (in ,rect :left))
+    (- (in ,rect :bottom) (in ,rect :top))])
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -174,14 +187,7 @@
       (slice ratios 0 (- n 1))
       ratios))
 
-  (let [rect (in self :rect)
-        top (in rect :top)
-        bottom (in rect :bottom)
-        left (in rect :left)
-        right (in rect :right)
-        height (- bottom top)
-        width (- right left)]
-
+  (let [[width height] (rect-size (in self :rect))]
     (def new-rects
       (case direction
         :horizontal
@@ -386,22 +392,19 @@
           dh (+ (- dy)
                 (- (in new-rect :bottom)
                    (in old-rect :bottom)))
-          old-width (- (in old-rect :right) (in old-rect :left))
-          old-height (- (in old-rect :bottom) (in old-rect :top))]
+          [old-width old-height] (rect-size old-rect)]
       (def calc-fn
         (cond
           (= horizontal-frame-proto (table/getproto self))
           (fn [sub-fr _i]
-            (let [sub-rect (in sub-fr :rect)
-                  w (- (in sub-rect :right) (in sub-rect :left))
+            (let [w (rect-width (in sub-fr :rect))
                   wr (/ w old-width)
                   sub-dw (math/floor (* wr dw))]
               (+ w sub-dw)))
 
           (= vertical-frame-proto (table/getproto self))
           (fn [sub-fr _i]
-            (let [sub-rect (in sub-fr :rect)
-                  h (- (in sub-rect :bottom) (in sub-rect :top))
+            (let [h (rect-height (in sub-fr :rect))
                   hr (/ h old-height)
                   sub-dh (math/floor (* hr dh))]
               (+ h sub-dh)))))
@@ -602,9 +605,7 @@
     true
     (let [all-children (in fr :children)
           child-count (length all-children)
-          fr-rect (in fr :rect)
-          fr-width (- (in fr-rect :right) (in fr-rect :left))
-          fr-height (- (in fr-rect :bottom) (in fr-rect :top))
+          [fr-width fr-height] (rect-size (in fr :rect))
           balanced-len (math/floor (/ (cond
                                         (= vertical-frame-proto (table/getproto fr)) fr-height
                                         (= horizontal-frame-proto (table/getproto fr)) fr-width)
@@ -631,13 +632,9 @@
   (let [parent (in fr :parent)
         all-siblings (in parent :children)
         parent-rect (in parent :rect)
-        old-rect (in fr :rect)
-        old-width (- (in old-rect :right) (in old-rect :left))
-        old-height (- (in old-rect :bottom) (in old-rect :top))
-        new-width (- (in new-rect :right) (in new-rect :left))
-        new-height (- (in new-rect :bottom) (in new-rect :top))
-        parent-width (- (in parent-rect :right) (in parent-rect :left))
-        parent-height (- (in parent-rect :bottom) (in parent-rect :top))
+        [old-width old-height] (rect-size (in fr :rect))
+        [new-width new-height] (rect-size new-rect)
+        [parent-width parent-height] (rect-size parent-rect)
         dw (- new-width old-width)
         dh (- new-height old-height)
         avail-h (- parent-height old-height)
@@ -647,8 +644,7 @@
       (let [new-rects (:calculate-sub-rects
                          parent
                          (fn [sib-fr _i]
-                           (def sib-rect (in sib-fr :rect))
-                           (def sib-height (- (in sib-rect :bottom) (in sib-rect :top)))
+                           (def sib-height (rect-height (in sib-fr :rect)))
                            (def sib-dh
                              (if (= sib-fr fr)
                                dh
@@ -671,8 +667,7 @@
       (let [new-rects (:calculate-sub-rects
                          parent
                          (fn [sib-fr _i]
-                           (def sib-rect (in sib-fr :rect))
-                           (def sib-width (- (in sib-rect :right) (in sib-rect :left)))
+                           (def sib-width (rect-width (in sib-fr :rect)))
                            (def sib-dw
                              (if (= sib-fr fr)
                                dw
@@ -703,8 +698,8 @@
     (let [parent (in fr :parent)
           all-children (in fr :children)
           all-siblings (in parent :children)
-          parent-rect (in parent :rect)
-          fr-rect (in fr :rect)]
+          [fr-width fr-height] (rect-size (in fr :rect))
+          [parent-width parent-height] (rect-size (in parent :rect))]
       (if (> (length all-siblings) 2)
         (do
           (:remove-child parent fr)
@@ -712,26 +707,16 @@
           (def calc-fn
             (cond
               (= horizontal-frame-proto (table/getproto parent))
-              (let [fr-width (- (in fr-rect :right)
-                                (in fr-rect :left))
-                    parent-width (- (in parent-rect :right)
-                                    (in parent-rect :left))
-                    rest-width (- parent-width fr-width)]
+              (let [rest-width (- parent-width fr-width)]
                 (fn [sib-fr _]
-                  (let [sib-rect (in sib-fr :rect)
-                        sib-width (- (in sib-rect :right) (in sib-rect :left))
+                  (let [sib-width (rect-width (in sib-fr :rect))
                         ratio (/ sib-width rest-width)]
                     (math/floor (* ratio parent-width)))))
 
               (= vertical-frame-proto (table/getproto parent))
-              (let [fr-height (- (in fr-rect :bottom)
-                                 (in fr-rect :top))
-                    parent-height (- (in parent-rect :bottom)
-                                     (in parent-rect :top))
-                    rest-height (- parent-height fr-height)]
+              (let [rest-height (- parent-height fr-height)]
                 (fn [sib-fr _]
-                  (let [sib-rect (in sib-fr :rect)
-                        sib-height (- (in sib-rect :bottom) (in sib-rect :top))
+                  (let [sib-height (rect-height (in sib-fr :rect))
                         ratio (/ sib-height rest-height)]
                     (math/floor (* ratio parent-height)))))))
           (def new-rects (:calculate-sub-rects parent calc-fn))
@@ -751,6 +736,7 @@
           # so that the tree stays consistent.
           (def sibling (:get-next-sibling fr))
           (def sibling-rect (in sibling :rect))
+          (def [sibling-width sibling-height] (rect-size sibling-rect))
 
           (def cur-frame (:get-current-frame sibling))
           (each child all-children
@@ -777,26 +763,17 @@
               (def calc-fn
                 (cond
                   (= horizontal-frame-proto (table/getproto parent))
-                  (let [sibling-width (- (in sibling-rect :right)
-                                         (in sibling-rect :left))
-                        parent-width (- (in parent-rect :right)
-                                        (in parent-rect :left))]
-                    (fn [sub-fr _]
-                      (let [sub-rect (in sub-fr :rect)
-                            sub-width (- (in sub-rect :right) (in sub-rect :left))
-                            ratio (/ sub-width sibling-width)]
-                        (math/floor (* ratio parent-width)))))
+                  (fn [sub-fr _]
+                    (let [sub-width (rect-width (in sub-fr :rect))
+                          ratio (/ sub-width sibling-width)]
+                      (math/floor (* ratio parent-width))))
 
                   (= vertical-frame-proto (table/getproto parent))
-                  (let [sibling-height (- (in sibling-rect :bottom)
-                                          (in sibling-rect :top))
-                        parent-height (- (in parent-rect :bottom)
-                                         (in parent-rect :top))]
-                    (fn [sub-fr _]
-                      (let [sub-rect (in sub-fr :rect)
-                            sub-height (- (in sub-rect :bottom) (in sub-rect :top))
-                            ratio (/ sub-height sibling-height)]
-                        (math/floor (* ratio parent-height)))))))
+                  (fn [sub-fr _]
+                    (let [sub-height (rect-height (in sub-fr :rect))
+                          ratio (/ sub-height sibling-height)]
+                      (math/floor (* ratio parent-height))))))
+
               (def new-rects (:calculate-sub-rects parent calc-fn))
               (map (fn [sib-fr rect]
                      (:transform sib-fr rect))
@@ -831,10 +808,8 @@
 ######### Window manager object #########
 
 (defn- calc-centered-coords [win-rect fr-rect fit]
-  (def fr-width (- (in fr-rect :right) (in fr-rect :left)))
-  (def fr-height (- (in fr-rect :bottom) (in fr-rect :top)))
-  (def win-width (- (in win-rect :right) (in win-rect :left)))
-  (def win-height (- (in win-rect :bottom) (in win-rect :top)))
+  (def [fr-width fr-height] (rect-size fr-rect))
+  (def [win-width win-height] (rect-size win-rect))
 
   (def x
     (math/floor
@@ -907,9 +882,7 @@
                 true
                 (do
                   (:Move pat (in rect :left) (in rect :top))
-                  (:Resize pat
-                           (- (in rect :right) (in rect :left))
-                           (- (in rect :bottom) (in rect :top)))))))))
+                  (:Resize pat ;(rect-size rect))))))))
       ((err fib)
        # XXX: Don't manage a window which cannot be transformed?
        (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
