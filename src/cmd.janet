@@ -274,6 +274,7 @@
     (try
       (found ;args)
       ((err fib)
+       (debug/stacktrace fib err)
        (log/error "command %n failed: %n" cmd err)))
     (log/warning "unknown command: %n, args: %n" cmd args)))
 
