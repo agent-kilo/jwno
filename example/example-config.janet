@@ -13,79 +13,6 @@
 (def hook-man (in jwno-context :hook-manager))
 
 
-(:add-hook hook-man :filter-window
-   (fn [_hwnd uia-win exe-path]
-     (def class-name (:get_CachedClassName uia-win))
-     # Excluded windows
-     (cond
-       # The invisible pseudo window from the Terminal app.
-       (= "PseudoConsoleWindow" class-name)
-       false
-
-       # The hidden window created when the Bluetootk icon
-       # was right-clicked
-       (= "BluetoothNotificationAreaIconWindowClass" class-name)
-       false
-
-       # The hidden "Edit" window from Acrobat
-       (and (string/has-suffix? "Acrobat.exe" exe-path)
-            (= "Edit" class-name))
-       false
-
-       true)))
-
-
-(:add-hook hook-man :new-window
-   (fn [win uia-win _exe-path]
-     (def class-name (:get_CachedClassName uia-win))
-     (cond
-       (= "Emacs" class-name)
-       (:set-hwnd-alpha window-man (in win :hwnd) (math/floor (* 256 0.9)))
-
-       (= "#32770" class-name) # Dialog window class
-       (put (in win :tags) :no-expand true))))
-
-
-(:add-hook hook-man :dead-window
-   (fn [dead-win]
-     (def parent (in dead-win :parent))
-     (when (empty? (in parent :children))
-       (:close-frame (in window-man :layout) parent)
-       (:retile window-man))))
-
-
-(:add-command command-man :close-current-window-or-frame
-   (fn []
-     (def layout (in window-man :layout))
-     # cur-win will be nil if the current frame is empty.
-     (if-let [cur-win (:get-current-window layout)]
-       (:close-hwnd window-man (in cur-win :hwnd))
-       (let [cur-frame (:get-current-frame layout)]
-         (:close-frame layout cur-frame)
-         (:retile window-man)
-         (:activate window-man (:get-current-window layout))))))
-
-
-(:add-command command-man :split-and-move-current-window
-   (fn [dir]
-     (def layout (in window-man :layout))
-     (def cur-frame (:get-current-frame layout))
-     (def cur-win (:get-current-window cur-frame))
-     (def win-count (length (in cur-frame :children)))
-     # Existing windows are all moved to the first new frame
-     # after splitting.
-     (:split cur-frame dir 2 [0.5])
-     (def last-new-frame (last (in cur-frame :children)))
-     # Only move the current window away when there's at
-     # least another window in the old frame
-     (when (>= win-count 2)
-       # The child will be automatically removed from its
-       # former parent.
-       (:add-child last-new-frame cur-win))
-     (:retile window-man cur-frame)
-     (:activate window-man last-new-frame)))
-
-
 (defmacro k [key-seq cmd]
   ~(:define-key keymap ,key-seq ,cmd))
 
@@ -166,3 +93,73 @@
 
 
 (:set-keymap key-man (build-keymap key-man))
+
+
+(:add-hook hook-man :filter-window
+   (fn [_hwnd uia-win exe-path]
+     (def class-name (:get_CachedClassName uia-win))
+     # Excluded windows
+     (cond
+       # The invisible pseudo window from the Terminal app.
+       (= "PseudoConsoleWindow" class-name)
+       false
+
+       # The hidden window created when the Bluetootk icon
+       # was right-clicked
+       (= "BluetoothNotificationAreaIconWindowClass" class-name)
+       false
+
+       # The hidden "Edit" window from Acrobat
+       (and (string/has-suffix? "Acrobat.exe" exe-path)
+            (= "Edit" class-name))
+       false
+
+       true)))
+
+(:add-hook hook-man :new-window
+   (fn [win uia-win _exe-path]
+     (def class-name (:get_CachedClassName uia-win))
+     (cond
+       (= "Emacs" class-name)
+       (:set-hwnd-alpha window-man (in win :hwnd) (math/floor (* 256 0.9)))
+
+       (= "#32770" class-name) # Dialog window class
+       (put (in win :tags) :no-expand true))))
+
+(:add-hook hook-man :dead-window
+   (fn [dead-win]
+     (def parent (in dead-win :parent))
+     (when (empty? (in parent :children))
+       (:close-frame (in window-man :layout) parent)
+       (:retile window-man))))
+
+
+(:add-command command-man :close-current-window-or-frame
+   (fn []
+     (def layout (in window-man :layout))
+     # cur-win will be nil if the current frame is empty.
+     (if-let [cur-win (:get-current-window layout)]
+       (:close-hwnd window-man (in cur-win :hwnd))
+       (let [cur-frame (:get-current-frame layout)]
+         (:close-frame layout cur-frame)
+         (:retile window-man)
+         (:activate window-man (:get-current-window layout))))))
+
+(:add-command command-man :split-and-move-current-window
+   (fn [dir]
+     (def layout (in window-man :layout))
+     (def cur-frame (:get-current-frame layout))
+     (def cur-win (:get-current-window cur-frame))
+     (def win-count (length (in cur-frame :children)))
+     # Existing windows are all moved to the first new frame
+     # after splitting.
+     (:split cur-frame dir 2 [0.5])
+     (def last-new-frame (last (in cur-frame :children)))
+     # Only move the current window away when there's at
+     # least another window in the old frame
+     (when (>= win-count 2)
+       # The child will be automatically removed from its
+       # former parent.
+       (:add-child last-new-frame cur-win))
+     (:retile window-man cur-frame)
+     (:activate window-man last-new-frame)))
