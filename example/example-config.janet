@@ -12,10 +12,11 @@
 
 (:add-command command-man :close-current-window-or-frame
    (fn []
-     (if-let [cur-win (:get-current-window (in window-man :layout))]
+     (def layout (in window-man :layout))
+     # cur-win will be nil if the current frame is empty.
+     (if-let [cur-win (:get-current-window layout)]
        (:close-hwnd window-man (in cur-win :hwnd))
-       (let [layout (in window-man :layout)
-             cur-frame (:get-current-frame layout)]
+       (let [cur-frame (:get-current-frame layout)]
          (:close-frame layout cur-frame)
          (:retile window-man)
          (:activate window-man (:get-current-window layout))))))
@@ -27,11 +28,15 @@
      (def cur-frame (:get-current-frame layout))
      (def cur-win (:get-current-window cur-frame))
      (def win-count (length (in cur-frame :children)))
+     # Existing windows are all moved to the first new frame
+     # after splitting.
      (:split cur-frame dir 2 [0.5])
      (def last-new-frame (last (in cur-frame :children)))
+     # Only move the current window away when there's at
+     # least another window in the old frame
      (when (>= win-count 2)
-       # Only move the current window when there's at least
-       # another window in the old frame
+       # The child will be automatically removed from its
+       # former parent.
        (:add-child last-new-frame cur-win))
      (:retile window-man cur-frame)
      (:activate window-man last-new-frame)))
