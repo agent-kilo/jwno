@@ -99,7 +99,7 @@
 
 (defn cmd-next-window-in-frame [wm]
   (def cur-frame (:get-current-frame (in wm :layout)))
-  (:purge-windows cur-frame wm)
+  #(:purge-windows cur-frame wm)
   (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:get-next-sibling cur-win)]
       (:activate wm sibling))))
@@ -107,7 +107,7 @@
 
 (defn cmd-prev-window-in-frame [wm]
   (def cur-frame (:get-current-frame (in wm :layout)))
-  (:purge-windows cur-frame wm)
+  #(:purge-windows cur-frame wm)
   (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:get-prev-sibling cur-win)]
       (:activate wm sibling))))

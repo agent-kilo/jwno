@@ -8,6 +8,15 @@
 (def key-man (in jwno-context :key-manager))
 (def command-man (in jwno-context :command-manager))
 (def window-man (in jwno-context :window-manager))
+(def hook-man (in jwno-context :hook-manager))
+
+
+(:add-hook hook-man :dead-window
+   (fn [dead-win]
+     (def parent (in dead-win :parent))
+     (when (empty? (in parent :children))
+       (:close-frame (in window-man :layout) parent)
+       (:retile window-man))))
 
 
 (:add-command command-man :close-current-window-or-frame

@@ -1096,6 +1096,8 @@
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
   (def dead (:purge-windows (in self :layout) self))
+  (each dw dead
+    (:call-hook (in self :hook-manager) :dead-window dw))
   (log/debug "purged %n dead windows" (length dead))
 
   (def uia-man (in self :uia-manager))
