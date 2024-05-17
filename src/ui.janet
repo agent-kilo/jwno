@@ -19,6 +19,8 @@
 
 (def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
 (def SET-KEYMAP-MSG (+ WM_APP 2))
+(def SET-HOOKS-MSG (+ WM_APP 3))
+(def REMOVE-HOOKS-MSG (+ WM_APP 4))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -105,6 +107,69 @@
     (error "Failed to delete notify icon")))
 
 
+(defn- log-key-event [code wparam hook-struct]
+  (log/debug "################## log-key-event ##################")
+  (log/debug "code = %n" code)
+  (log/debug "wparam = %n" wparam)
+  (log/debug "vkCode = %n" (hook-struct :vkCode))
+  (log/debug "scanCode = %n" (hook-struct :scanCode))
+  (log/debug "flags.extended = %n" (hook-struct :flags.extended))
+  (log/debug "flags.lower_il_injected = %n" (hook-struct :flags.lower_il_injected))
+  (log/debug "flags.injected = %n" (hook-struct :flags.injected))
+  (log/debug "flags.altdown = %n" (hook-struct :flags.altdown))
+  (log/debug "flags.up = %n" (hook-struct :flags.up))
+  (log/debug "time = %n" (hook-struct :time))
+  (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
+
+
+# msg-wndproc and this keyboard hook both have access to the
+# same keyboard-hook-handler, but since hook events and window
+# messages are serialized on the same UI thread, there won't be
+# any race conditions.
+(defn- keyboard-hook-proc [code wparam hook-struct handler]
+  (log-key-event code wparam hook-struct)
+
+  (when (< code 0)
+    (break (CallNextHookEx nil code wparam (hook-struct :address))))
+
+  (def key-up (hook-struct :flags.up))
+  (def extra-info (hook-struct :dwExtraInfo))
+
+  (when (test-kei-flag KEI-FLAG-SUPPRESS extra-info)
+    # The event is sent to alter lower level key states (XXX: not implemented yet)
+    (log/debug "Suppressing key")
+    (break 1))
+
+  (when (test-kei-flag KEI-FLAG-PASSTHROUGH extra-info)
+    (log/debug "Passing through key")
+    (break (CallNextHookEx nil code wparam (hook-struct :address))))
+
+  (when-let [new-key (:translate-key handler hook-struct)]
+    (send-input (keyboard-input new-key
+                                (if key-up :up :down)
+                                (bor KEI-FLAG-REMAPPED extra-info)))
+    (break 1))
+
+  (def mod-states (:get-modifier-states handler hook-struct))
+
+  (if-let [binding (:find-binding handler hook-struct mod-states)]
+    (do
+      (when (or (in mod-states :lwin)
+                (in mod-states :rwin))
+        # Send a dummy key event to stop the Start Menu from popping up
+        (send-input(keyboard-input VK_DUMMY
+                                   (if key-up :up :down)
+                                   (bor KEI-FLAG-PASSTHROUGH extra-info))))
+      (when-let [msg (:handle-binding handler hook-struct binding)]
+        (ev/give (in handler :chan) msg))
+      1) # !!! IMPORTANT
+
+    (do
+      (when-let [msg (:handle-unbound handler hook-struct)]
+        (ev/give (in handler :chan) msg))
+      (CallNextHookEx nil code wparam (hook-struct :address)))))
+
+
 (defn- msg-wndproc [hwnd msg wparam lparam hook-handler]
   (log/debug "################## msg-wndproc ##################")
   (log/debug "hwnd = %p" hwnd)
@@ -116,6 +181,32 @@
     SET-KEYMAP-MSG
     (let [keymap (unmarshal-and-free wparam)]
       (:set-keymap hook-handler keymap))
+
+    SET-HOOKS-MSG
+    (let [old-hook (in hook-handler :hook-id)]
+      (when (and (not (nil? old-hook))
+                 (not (null? old-hook)))
+        (log/debug "Removing old hook: %n" old-hook)
+        (UnhookWindowsHookEx old-hook))
+      (def new-hook
+        (SetWindowsHookEx WH_KEYBOARD_LL
+                          (fn [code wparam hook-struct]
+                            (keyboard-hook-proc code
+                                                wparam
+                                                hook-struct
+                                                hook-handler))
+                          nil
+                          0))
+      (when (null? new-hook)
+        (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
+      (log/debug "Registered new hook: %n" new-hook)
+      (put hook-handler :hook-id new-hook))
+
+    REMOVE-HOOKS-MSG
+    (when-let [old-hook (in hook-handler :hook-id)]
+      (log/debug "Removing old hook: %n" old-hook)
+      (UnhookWindowsHookEx old-hook)
+      (put hook-handler :hook-id nil))
 
     NOTIFY-ICON-CALLBACK-MSG
     (do
@@ -183,69 +274,6 @@
   hwnd)
 
 
-(defn- log-key-event [code wparam hook-struct]
-  (log/debug "################## log-key-event ##################")
-  (log/debug "code = %n" code)
-  (log/debug "wparam = %n" wparam)
-  (log/debug "vkCode = %n" (hook-struct :vkCode))
-  (log/debug "scanCode = %n" (hook-struct :scanCode))
-  (log/debug "flags.extended = %n" (hook-struct :flags.extended))
-  (log/debug "flags.lower_il_injected = %n" (hook-struct :flags.lower_il_injected))
-  (log/debug "flags.injected = %n" (hook-struct :flags.injected))
-  (log/debug "flags.altdown = %n" (hook-struct :flags.altdown))
-  (log/debug "flags.up = %n" (hook-struct :flags.up))
-  (log/debug "time = %n" (hook-struct :time))
-  (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
-
-
-# msg-wndproc and this keyboard hook both have access to the
-# same keyboard-hook-handler, but since hook events and window
-# messages are serialized on the same UI thread, there won't be
-# any race conditions.
-(defn- keyboard-hook-proc [code wparam hook-struct chan handler]
-  (log-key-event code wparam hook-struct)
-
-  (when (< code 0)
-    (break (CallNextHookEx nil code wparam (hook-struct :address))))
-
-  (def key-up (hook-struct :flags.up))
-  (def extra-info (hook-struct :dwExtraInfo))
-
-  (when (test-kei-flag KEI-FLAG-SUPPRESS extra-info)
-    # The event is sent to alter lower level key states (XXX: not implemented yet)
-    (log/debug "Suppressing key")
-    (break 1))
-
-  (when (test-kei-flag KEI-FLAG-PASSTHROUGH extra-info)
-    (log/debug "Passing through key")
-    (break (CallNextHookEx nil code wparam (hook-struct :address))))
-
-  (when-let [new-key (:translate-key handler hook-struct)]
-    (send-input (keyboard-input new-key
-                                (if key-up :up :down)
-                                (bor KEI-FLAG-REMAPPED extra-info)))
-    (break 1))
-
-  (def mod-states (:get-modifier-states handler hook-struct))
-
-  (if-let [binding (:find-binding handler hook-struct mod-states)]
-    (do
-      (when (or (in mod-states :lwin)
-                (in mod-states :rwin))
-        # Send a dummy key event to stop the Start Menu from popping up
-        (send-input(keyboard-input VK_DUMMY
-                                   (if key-up :up :down)
-                                   (bor KEI-FLAG-PASSTHROUGH extra-info))))
-      (when-let [msg (:handle-binding handler hook-struct binding)]
-        (ev/give chan msg))
-      1) # !!! IMPORTANT
-
-    (do
-      (when-let [msg (:handle-unbound handler hook-struct)]
-        (ev/give chan msg))
-      (CallNextHookEx nil code wparam (hook-struct :address)))))
-
-
 (defn- init-timer []
   (def timer-id (SetTimer nil 0 GC-TIMER-INTERVAL nil))
   (log/debug "timer-id = %n" timer-id)
@@ -261,6 +289,20 @@
 
 (defn ui-thread [hInstance argv0 keymap chan]
   (def hook-handler (keyboard-hook-handler keymap))
+  (put hook-handler :chan chan)
+
+  (def hook-id
+    (SetWindowsHookEx WH_KEYBOARD_LL
+                      (fn [code wparam hook-struct]
+                        (keyboard-hook-proc code
+                                            wparam
+                                            hook-struct
+                                            hook-handler))
+                      nil
+                      0))
+  (when (null? hook-id)
+    (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
+  (put hook-handler :hook-id hook-id)
 
   (def msg-hwnd
     (try
@@ -271,19 +313,6 @@
     (create-notify-icon hInstance msg-hwnd argv0)
     ((err fib)
      (show-error-and-exit err 1)))
-
-  (def hook-id
-    (SetWindowsHookEx WH_KEYBOARD_LL
-                      (fn [code wparam hook-struct]
-                        (keyboard-hook-proc code
-                                            wparam
-                                            hook-struct
-                                            chan
-                                            hook-handler))
-                      nil
-                      0))
-  (when (null? hook-id)
-    (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
 
   (def gc-timer-id (init-timer))
 
@@ -312,6 +341,14 @@
   (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
 
 
+(defn ui-manager-set-hooks [self]
+  (ui-manager-post-message self SET-HOOKS-MSG 0 0))
+
+
+(defn ui-manager-remove-hooks [self]
+  (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
+
+
 (defn ui-manager-destroy [self]
   (ui-manager-post-message self WM_COMMAND ID_MENU_EXIT 0))
 
@@ -320,6 +357,8 @@
   @{:initialized ui-manager-initialized
     :post-message ui-manager-post-message
     :set-keymap ui-manager-set-keymap
+    :set-hooks ui-manager-set-hooks
+    :remove-hooks ui-manager-remove-hooks
     :destroy ui-manager-destroy})
 
 
