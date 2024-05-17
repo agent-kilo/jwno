@@ -14,16 +14,31 @@
 
 
 (:add-hook hook-man :filter-window
-   (fn [hwnd uia-win exe-path]
-     # Exclude the tiny un-resizable "Edit" window from Acrobat
-     (not (and (string/has-suffix? "Acrobat.exe" exe-path)
-               (= "Edit" (:get_CachedClassName uia-win))))))
+   (fn [_hwnd uia-win exe-path]
+     (def class-name (:get_CachedClassName uia-win))
+     # Excluded windows
+     (cond
+       # The invisible pseudo window from the Terminal app.
+       (= "PseudoConsoleWindow" class-name)
+       false
+
+       # The tiny un-resizable "Edit" window from Acrobat
+       (and (string/has-suffix? "Acrobat.exe" exe-path)
+            (= "Edit" class-name))
+       false
+
+       true)))
 
 
 (:add-hook hook-man :new-window
    (fn [win uia-win _exe-path]
-     (when (= "Emacs" (:get_CachedClassName uia-win))
-       (:set-hwnd-alpha window-man (in win :hwnd) (math/floor (* 256 0.9))))))
+     (def class-name (:get_CachedClassName uia-win))
+     (cond
+       (= "Emacs" class-name)
+       (:set-hwnd-alpha window-man (in win :hwnd) (math/floor (* 256 0.9)))
+
+       (= "#32770" class-name) # Dialog window class
+       (put (in win :tags) :no-expand true))))
 
 
 (:add-hook hook-man :dead-window

@@ -1247,35 +1247,29 @@
     :jwno-process-elevated? wm-jwno-process-elevated?})
 
 
-(defn init-window-tags [win uia-win]
-  (def class-name (:get_CachedClassName uia-win))
-  (cond
-    # TODO: Generic window rules?
-    (= class-name "#32770") # Dialog window class
-    (put (in win :tags) :no-expand true)))
-
-
-(defn check-uncloaked-window [hwnd]
-  (def cloaked-value
-    (try
-      (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
-      ((err fib)
-       (log/debug "DwmGetWindowAttribute failed: %n" err)
-       0)))
-  (= 0 cloaked-value))
-
-
-(defn check-unelevated-window [hwnd wm]
-  (or (:jwno-process-elevated? wm)
-      (not (:hwnd-process-elevated? wm hwnd))))
-
-
 (defn check-valid-uia-window [uia-win]
   (is-valid-uia-window? uia-win))
 
 
-(defn check-not-pseudo-console-window [uia-win]
-  (not= "PseudoConsoleWindow" (:get_CachedClassName uia-win)))
+(defn default-window-filter [hwnd uia-win exe-path wm]
+  (cond
+    (not (is-valid-uia-window? uia-win))
+    false
+
+    # Exclude cloaked windows
+    (not= 0 (try
+              (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
+              ((err fib)
+               (log/debug "DwmGetWindowAttribute failed: %n" err)
+               0)))
+    false
+
+    # Exclude windows we are not privileged enough to manage
+    (and (not (:jwno-process-elevated? wm))
+         (:hwnd-process-elevated? wm hwnd))
+    false
+
+    true))
 
 
 (defn window-manager [uia-man hook-man]
@@ -1292,22 +1286,8 @@
     (:activate (get-in wm-obj [:layout :children main-idx]))
     (:activate (get-in wm-obj [:layout :children 0])))
 
-  (:add-hook hook-man :new-window
-     (fn [win uia-win _exe-path]
-       (init-window-tags win uia-win)))
-
   (:add-hook hook-man :filter-window
-     (fn [hwnd _uia-win _exe-path]
-       (check-uncloaked-window hwnd)))
-  (:add-hook hook-man :filter-window
-     (fn [hwnd _uia-win _exe-path]
-       (check-unelevated-window hwnd wm-obj)))
-  (:add-hook hook-man :filter-window
-     (fn [_hwnd uia-win _exe-path]
-       (check-valid-uia-window uia-win)))
-  # TODO: Generic window rules?
-  (:add-hook hook-man :filter-window
-     (fn [_hwnd uia-win exe-path]
-       (check-not-pseudo-console-window uia-win)))
+     (fn [hwnd uia-win exe-path]
+       (default-window-filter hwnd uia-win exe-path wm-obj)))
 
   wm-obj)
