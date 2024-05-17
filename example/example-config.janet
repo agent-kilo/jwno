@@ -22,7 +22,12 @@
        (= "PseudoConsoleWindow" class-name)
        false
 
-       # The tiny un-resizable "Edit" window from Acrobat
+       # The hidden window created when the Bluetootk icon
+       # was right-clicked
+       (= "BluetoothNotificationAreaIconWindowClass" class-name)
+       false
+
+       # The hidden "Edit" window from Acrobat
        (and (string/has-suffix? "Acrobat.exe" exe-path)
             (= "Edit" class-name))
        false
