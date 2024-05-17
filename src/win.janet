@@ -1255,14 +1255,6 @@
     (put (in win :tags) :no-expand true)))
 
 
-(defn init-window-alpha [win uia-win wm]
-  (def class-name (:get_CachedClassName uia-win))
-  (when (not= "Emacs" class-name)
-    (break))
-  # TODO: Generic window rules?
-  (:set-window-alpha wm (in win :hwnd) (math/floor (* 256 0.9))))
-
-
 (defn check-uncloaked-window [hwnd]
   (def cloaked-value
     (try
@@ -1303,10 +1295,6 @@
   (:add-hook hook-man :new-window
      (fn [win uia-win _exe-path]
        (init-window-tags win uia-win)))
-
-  (:add-hook hook-man :new-window
-     (fn [win uia-win _exe-path]
-       (init-window-alpha win uia-win wm-obj)))
 
   (:add-hook hook-man :filter-window
      (fn [hwnd _uia-win _exe-path]

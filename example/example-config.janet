@@ -2,13 +2,28 @@
 (log/info "++++++++ Keys in jwno-context: %n ++++++++" (keys jwno-context))
 
 
-(import spork/httpf)
+# When running from a compiled binary, this needs the Janet
+# env be set up properly beforehand
+#(import spork/httpf)
 
 
 (def key-man (in jwno-context :key-manager))
 (def command-man (in jwno-context :command-manager))
 (def window-man (in jwno-context :window-manager))
 (def hook-man (in jwno-context :hook-manager))
+
+
+(:add-hook hook-man :filter-window
+   (fn [hwnd uia-win exe-path]
+     # Exclude the tiny un-resizable "Edit" window from Acrobat
+     (not (and (string/has-suffix? "Acrobat.exe" exe-path)
+               (= "Edit" (:get_CachedClassName uia-win))))))
+
+
+(:add-hook hook-man :new-window
+   (fn [win uia-win _exe-path]
+     (when (= "Emacs" (:get_CachedClassName uia-win))
+       (:set-hwnd-alpha window-man (in win :hwnd) (math/floor (* 256 0.9))))))
 
 
 (:add-hook hook-man :dead-window
