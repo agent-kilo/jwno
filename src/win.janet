@@ -792,17 +792,17 @@
           (def sibling-rect (in sibling :rect))
           (def [sibling-width sibling-height] (rect-size sibling-rect))
 
-          (def cur-frame (:get-current-frame sibling))
+          (def to-frame (:get-current-frame sibling))
           (each child all-children
             (put child :parent nil)
-            (:add-child cur-frame child))
+            (:add-child to-frame child))
 
           (put parent :children @[])
           (table/setproto parent (table/getproto sibling)) # reset horizontal/vertical split states
-
           (each child (in sibling :children)
             (put child :parent nil)
             (:add-child parent child))
+          (put parent :current-child (in sibling :current-child))
 
           (cond
             (empty? (in parent :children))

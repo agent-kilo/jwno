@@ -172,7 +172,9 @@
   (def cur-win (:get-current-window cur-frame))
   (:close-frame (in wm :layout) cur-frame)
   (:retile wm)
-  (:activate wm cur-win))
+  (if cur-win
+    (:activate wm cur-win)
+    (:activate wm (:get-current-window (in wm :layout)))))
 
 
 (defn cmd-frame-to-current-window-size [wm uia-man]
