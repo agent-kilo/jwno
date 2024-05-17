@@ -104,7 +104,7 @@
        (= "PseudoConsoleWindow" class-name)
        false
 
-       # The hidden window created when the Bluetootk icon
+       # The hidden window created when the Bluetooth icon
        # was right-clicked
        (= "BluetoothNotificationAreaIconWindowClass" class-name)
        false
