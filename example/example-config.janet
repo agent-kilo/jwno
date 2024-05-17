@@ -21,6 +21,22 @@
          (:activate window-man (:get-current-window layout))))))
 
 
+(:add-command command-man :split-and-move-current-window
+   (fn [dir]
+     (def layout (in window-man :layout))
+     (def cur-frame (:get-current-frame layout))
+     (def cur-win (:get-current-window cur-frame))
+     (def win-count (length (in cur-frame :children)))
+     (:split cur-frame dir 2 [0.5])
+     (def last-new-frame (last (in cur-frame :children)))
+     (when (>= win-count 2)
+       # Only move the current window when there's at least
+       # another window in the old frame
+       (:add-child last-new-frame cur-win))
+     (:retile window-man cur-frame)
+     (:activate window-man last-new-frame)))
+
+
 (defmacro k [key-seq cmd]
   ~(:define-key keymap ,key-seq ,cmd))
 
@@ -64,8 +80,8 @@
   (k "win + shift + f" :close-current-frame)
   (k "win + ctrl + f" :flatten-parent)
 
-  (k "win + ," [:split :horizontal 2 [0.5] 1 0])
-  (k "win + ." [:split :vertical 2 [0.5] 1 0])
+  (k "win + ," [:split-and-move-current-window :horizontal])
+  (k "win + ." [:split-and-move-current-window :vertical])
   (k "win + =" :balance-frames)
   (k "win + z" [:focus-mode 0.7])
 
