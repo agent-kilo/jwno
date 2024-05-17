@@ -109,6 +109,11 @@
        (= "BluetoothNotificationAreaIconWindowClass" class-name)
        false
 
+       # The hidden window created when the PowerToys icon
+       # was right-clicked
+       (= "PToyTrayIconWindow" class-name)
+       false
+
        # The hidden "Edit" window from Acrobat
        (and (string/has-suffix? "Acrobat.exe" exe-path)
             (= "Edit" class-name))
