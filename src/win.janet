@@ -7,6 +7,7 @@
 (use jw32/_handleapi)
 (use jw32/_uiautomation)
 (use jw32/_dwmapi)
+(use jw32/_errhandlingapi)
 (use jw32/_util)
 
 (use ./uia)
@@ -1121,8 +1122,7 @@
       hwnd))
 
   (when hwnd-to-manage
-    # TODO: window close events
-    (let [new-win (wm-add-hwnd self hwnd-to-manage)]
+    (if-let [new-win (wm-add-hwnd self hwnd-to-manage)]
       (:activate new-win)))
   self)
 
@@ -1261,7 +1261,12 @@
               (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
               ((err fib)
                (log/debug "DwmGetWindowAttribute failed: %n" err)
-               0)))
+               (if (= err E_HANDLE)
+                 # The hwnd got invalidated before we checked it,
+                 # assume the window is closed. Return an arbitrary
+                 # flag so that the filter returns early.
+                 0xffff
+                 0))))
     false
 
     # Exclude windows we are not privileged enough to manage
