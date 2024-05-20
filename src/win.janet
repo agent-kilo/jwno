@@ -11,6 +11,7 @@
 (use jw32/_util)
 
 (use ./uia)
+(use ./util)
 
 (import ./log)
 
@@ -940,7 +941,10 @@
                   (:Resize pat ;(rect-size rect))))))))
       ((err fib)
        # XXX: Don't manage a window which cannot be transformed?
-       (log/error "window transformation failed for %n: %n" (in win :hwnd) err)))))
+       (log/error "window transformation failed for %n: %n\n%s"
+                  (in win :hwnd)
+                  err
+                  (get-stack-trace fib))))))
 
 
 (defn wm-set-hwnd-alpha [self hwnd alpha]
@@ -1023,14 +1027,18 @@
                                                hwnd?
                                                (in uia-man :focus-cr))
                  ((err fib)
-                  (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                  (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                             err
+                             (get-stack-trace fib))
                   nil))])
 
       (or (nil? hwnd?) (null? hwnd?))
       [(try
          (:get_CachedNativeWindowHandle uia-win?)
          ((err fib)
-          (log/debug "get_CachedNativeWindowHandle failed: %n" err)
+          (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
+                     err
+                     (get-stack-trace fib))
           nil))
        uia-win?]
 
@@ -1064,7 +1072,9 @@
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache (in uia-man :com) hwnd (in uia-man :focus-cr))
                          ((err fib)
-                          (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                          (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                                     err
+                                     (get-stack-trace fib))
                           nil))]
       (if (nil? uia-win)
         # The window may have disappeared between (wm-should-manage-hwnd? ...) and (wm-add-hwnd ...)
@@ -1260,7 +1270,9 @@
     (not= 0 (try
               (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
               ((err fib)
-               (log/debug "DwmGetWindowAttribute failed: %n" err)
+               (log/debug "DwmGetWindowAttribute failed: %n\n%s"
+                          err
+                          (get-stack-trace fib))
                (if (= err E_HANDLE)
                  # The hwnd got invalidated before we checked it,
                  # assume the window is closed. Return an arbitrary
