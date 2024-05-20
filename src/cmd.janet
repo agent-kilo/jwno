@@ -11,7 +11,9 @@
   (try
     (:destroy ui-man)
     ((err fib)
-     (log/warning "Failed to destroy UI thread: %n" err)
+     (log/warning "Failed to destroy UI thread: %n\n%s"
+                  err
+                  (get-stack-trace fib))
      (os/exit 0))))
 
 
@@ -275,8 +277,10 @@
     (try
       (found ;args)
       ((err fib)
-       #(debug/stacktrace fib err)
-       (log/error "command %n failed: %n" cmd err)))
+       (log/error "command %n failed: %n\n%s"
+                  cmd
+                  err
+                  (get-stack-trace fib))))
     (log/warning "unknown command: %n, args: %n" cmd args)))
 
 
