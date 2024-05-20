@@ -52,6 +52,8 @@
 
 (defn- create-notify-icon-menu []
   (def hMenu (CreatePopupMenu))
+  (AppendMenu hMenu MF_STRING ID_MENU_RESET_KBD_HOOKS "&Reset Keyboard Hooks")
+  (AppendMenu hMenu MF_SEPARATOR 0 0)
   (AppendMenu hMenu MF_STRING ID_MENU_EXIT "E&xit")
   hMenu)
 
@@ -232,7 +234,10 @@
           (remove-notify-icon hwnd)
           ((err fib)
            (show-error-and-exit err 1)))
-        (DestroyWindow hwnd)))
+        (DestroyWindow hwnd))
+
+      ID_MENU_RESET_KBD_HOOKS
+      (PostMessage hwnd SET-HOOKS-MSG 0 0))
 
     WM_CLOSE
     (DestroyWindow hwnd)
