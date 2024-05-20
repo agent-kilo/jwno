@@ -1,3 +1,5 @@
+(use ./util)
+
 (import ./log)
 
 

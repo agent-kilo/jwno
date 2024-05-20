@@ -3,6 +3,7 @@
 
 (use ./input)
 (use ./resource)
+(use ./util)
 
 (import ./log)
 
