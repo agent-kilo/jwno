@@ -115,6 +115,9 @@
        (= "PToyTrayIconWindow" class-name)
        false
 
+       (= "Mozilla_firefox_default_RemoteWindow" class-name)
+       false
+
        # The hidden "Edit" window from Acrobat
        (and (string/has-suffix? "Acrobat.exe" exe-path)
             (= "Edit" class-name))
