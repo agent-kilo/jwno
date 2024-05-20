@@ -8,7 +8,9 @@
     (try
       (hook-fn ;args)
       ((err fib)
-       (log/error "Hook function failed: %n" err)))))
+       (log/error "Hook function failed: %n\n%s"
+                  err
+                  (get-stack-trace fib))))))
 
 
 (defn hook-manager-call-filter-hook [self hook-name & args]
@@ -20,7 +22,9 @@
       (try
         (hook-fn ;args)
         ((err fib)
-         (log/error "Hook function failed: %n" err)
+         (log/error "Hook function failed: %n\n%s"
+                    err
+                    (get-stack-trace fib))
          # XXX: defaults to true
          true)))
     (log/debug "result of %n: %n" hook-fn result)
