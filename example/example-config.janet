@@ -86,7 +86,7 @@
   # XXX: If a remapped key is used to trigger keymap switching, and
   # the switched keymap doesn't have the same remap, the translated key
   # will be stuck down.
-  (k "ralt" [:map-to VK_RWIN])
+  (k "ralt" [:map-to (:get-key-code key-man "rwin")])
 
   (log/debug "keymap = %n" keymap)
   keymap)

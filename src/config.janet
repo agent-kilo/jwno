@@ -7,8 +7,6 @@
 
 
 (def- config-env (make-env))
-# TODO: More concise API?
-(merge-module config-env (require "jw32/_winuser")) # For VK_* values
 (merge-module config-env (require "./log") "log/")
 
 

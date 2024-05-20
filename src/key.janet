@@ -243,9 +243,16 @@
   (:set-keymap (in self :ui-manager) keymap))
 
 
+(defn key-manager-get-key-code [self key-name]
+  (if-let [kc (in key-name-to-code key-name)]
+    kc
+    (error (string/format "unknown key: %n" key-name))))
+
+
 (def- key-manager-proto
   @{:new-keymap key-manager-new-keymap
-    :set-keymap key-manager-set-keymap})
+    :set-keymap key-manager-set-keymap
+    :get-key-code key-manager-get-key-code})
 
 
 (defn key-manager [ui-man]
