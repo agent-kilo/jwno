@@ -3,6 +3,8 @@
 (use jw32/_errhandlingapi)
 (use jw32/_util)
 
+(use ./util)
+
 (import ./const)
 (import ./log)
 
@@ -55,7 +57,9 @@
          (:GetParentElementBuildCache walker cur-elem focus-cr)
          ((err fib)
           # The window or its parent may have vanished
-          (log/debug "GetParentElementBuildCache failed: %n" err)
+          (log/debug "GetParentElementBuildCache failed: %n\n%s"
+                     err
+                     (get-stack-trace fib))
           nil)))
   (def root-hwnd (:get_CachedNativeWindowHandle root))
 
@@ -88,7 +92,9 @@
          (try
            (:GetParentElementBuildCache walker cur-elem focus-cr)
            ((err fib)
-            (log/debug "GetParentElementBuildCache failed: %n" err)
+            (log/debug "GetParentElementBuildCache failed: %n\n%s"
+                       err
+                       (get-stack-trace fib))
             nil))))
   ret)
 
@@ -103,7 +109,9 @@
       (:GetFocusedElementBuildCache uia-com focus-cr)
       ((err fib)
        # This may fail due to e.g. insufficient privileges
-       (log/debug "GetFocusedElementBuildCache failed: %n" err)
+       (log/debug "GetFocusedElementBuildCache failed: %n\n%s"
+                  err
+                  (get-stack-trace fib))
        nil)))
   (if-not focused
     (break nil))
@@ -119,7 +127,9 @@
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache uia-com hwnd cr)
                          ((err fib)
-                          (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                          (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                                     err
+                                     (get-stack-trace fib))
                           nil))]
       (when uia-win
         {:name (:get_CachedName uia-win)
@@ -133,7 +143,9 @@
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache uia-com hwnd cr)
                          ((err fib)
-                          (log/debug "ElementFromHandleBuildCache failed: %n" err)
+                          (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                                     err
+                                     (get-stack-trace fib))
                           nil))]
       (when uia-win
         (:get_CachedBoundingRectangle uia-win)))))
@@ -144,7 +156,9 @@
   (with-uia [uia-win (try
                        (:ElementFromHandle uia-com hwnd)
                        ((err fib)
-                        (log/debug "ElementFromHandle failed: %n" err)
+                        (log/debug "ElementFromHandle failed: %n\n%s"
+                                   err
+                                   (get-stack-trace fib))
                         nil))]
     (when uia-win
       (:SetFocus uia-win))))
