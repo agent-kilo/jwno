@@ -97,6 +97,7 @@
 
 (:add-hook hook-man :filter-window
    (fn [_hwnd uia-win exe-path]
+     (def name (:get_CachedName uia-win))
      (def class-name (:get_CachedClassName uia-win))
      # Excluded windows
      (cond
@@ -117,6 +118,11 @@
        # The hidden "Edit" window from Acrobat
        (and (string/has-suffix? "Acrobat.exe" exe-path)
             (= "Edit" class-name))
+       false
+
+       # Steam notify icon menu
+       (and (string/has-suffix? "steamwebhelper.exe" exe-path)
+            (= "Menu" name))
        false
 
        true)))
