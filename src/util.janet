@@ -33,3 +33,11 @@
     # XXX: No path separator found, assume it's started
     # from current working directory.
     (string (os/cwd) "\\")))
+
+
+(defn get-stack-trace [fib]
+  (def err-buf @"")
+  (with-dyns [:err err-buf
+              :err-color false]
+    (debug/stacktrace fib))
+  err-buf)
