@@ -76,7 +76,7 @@
   (def hIcon
     (try
       (LoadIconMetric hinst IDI_LOGO LIM_SMALL)
-      ((err fib)
+      ((_err _fib)
        # Are we running from the source tree?
        (if (or (string/has-suffix? "/main.janet" argv0)
                (string/has-suffix? "\\main.janet" argv0))
