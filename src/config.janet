@@ -41,7 +41,9 @@
     (try
       (with [_config-file (os/open path :r)]
         (set found path))
-      ((_err _fib) :nop)))
+      ((_err _fib) :nop))
+    (when found
+      (break)))
   found)
 
 
