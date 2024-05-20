@@ -1,9 +1,11 @@
 (use jw32/_winuser)
 
 
-(defn show-error-and-exit [msg exit-code]
+(defn show-error-and-exit [msg exit-code &opt stack-trace]
   (MessageBox nil
-              (string/format "Error: %s" msg)
+              (if stack-trace
+                (string/format "Error: %s\n%s" msg stack-trace)
+                (string/format "Error: %s" msg))
               "Error"
               (bor MB_ICONEXCLAMATION MB_OK))
   (os/exit exit-code))

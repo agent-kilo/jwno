@@ -60,7 +60,7 @@
     (try
       (log/init (in cli-args "log-level") ;loggers)
       ((err fib)
-       (show-error-and-exit err 1))))
+       (show-error-and-exit err 1 (get-stack-trace fib)))))
 
   (log/debug "in main")
   (log/debug "cli-args = %n" cli-args)
@@ -77,7 +77,7 @@
     (try
       (uia-manager)
       ((err fib)
-       (show-error-and-exit err 1))))
+       (show-error-and-exit err 1 (get-stack-trace fib)))))
 
   (def key-man (key-manager ui-man))
 
@@ -85,7 +85,7 @@
     (try
       (window-manager uia-man hook-man)
       ((err fib)
-       (show-error-and-exit err 1))))
+       (show-error-and-exit err 1 (get-stack-trace fib)))))
 
   # context will only get referenced after the main-loop is running
   # and when the first REPL client connects.

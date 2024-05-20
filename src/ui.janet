@@ -233,7 +233,7 @@
         (try
           (remove-notify-icon hwnd)
           ((err fib)
-           (show-error-and-exit err 1)))
+           (show-error-and-exit err 1 (get-stack-trace fib))))
         (DestroyWindow hwnd))
 
       ID_MENU_RESET_KBD_HOOKS
@@ -313,11 +313,11 @@
     (try
       (create-msg-window hInstance hook-handler)
       ((err fib)
-       (show-error-and-exit err 1))))
+       (show-error-and-exit err 1 (get-stack-trace fib)))))
   (try
     (create-notify-icon hInstance msg-hwnd argv0)
     ((err fib)
-     (show-error-and-exit err 1)))
+     (show-error-and-exit err 1 (get-stack-trace fib))))
 
   (def gc-timer-id (init-timer))
 
