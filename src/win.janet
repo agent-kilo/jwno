@@ -1045,22 +1045,33 @@
       true
       [hwnd? uia-win?]))
 
-  (cond
-    (nil? uia-win)
-    false
+  (def exe-path
+    (unless (nil? hwnd)
+      (wm-get-hwnd-path self hwnd)))
 
-    (nil? hwnd)
-    (do
-      (when (nil? uia-win?)
-        (:Release uia-win))
-      false)
+  (def result
+    (cond
+      (nil? uia-win)
+      # ElementFromHandleBuildCache failed
+      false
 
-    true
-    (let [exe-path (wm-get-hwnd-path self hwnd)
-          result (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path)]
-      (when (nil? uia-win?)
-        (:Release uia-win))
-      result)))
+      (nil? hwnd)
+      # get_CachedNativeWindowHandle failed
+      false
+
+      (nil? exe-path)
+      # wm-get-hwnd-path failed
+      false
+
+      true
+      (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path)))
+
+  (when (and (nil? uia-win?)
+             (not (nil? uia-win)))
+    # uia-win is constructed locally in this case, release it.
+    (:Release uia-win))
+
+  result)
 
 
 (defn wm-add-hwnd [self hwnd]
