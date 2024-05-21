@@ -176,8 +176,7 @@
   (:Release control-view-walker)
   (:Release focus-cr)
   (:Release root)
-  (:Release uia-com)
-  (CoUninitialize))
+  (:Release uia-com))
 
 
 (def- uia-manager-proto
@@ -230,7 +229,6 @@
 (defn uia-manager []
   (def chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
 
-  (CoInitializeEx nil COINIT_MULTITHREADED)
   (def uia-com
     (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
   (:put_AutoSetFocus uia-com false) # To reduce flicker
