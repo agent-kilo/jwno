@@ -1239,6 +1239,14 @@
   [work-areas main-idx])
 
 
+(defn wm-new-layout [self]
+  (def [work-areas main-idx] (wm-enumerate-monitors self))
+  (def new-layout (layout (map |(frame $) work-areas)))
+  (def to-activate (or main-idx 0))
+  (:activate (get-in new-layout [:children to-activate]))
+  new-layout)
+
+
 (defn wm-close-hwnd [self hwnd]
   (PostMessage hwnd WM_CLOSE 0 0))
 
@@ -1272,6 +1280,8 @@
     :get-pid-path wm-get-pid-path
     :enumerate-monitors wm-enumerate-monitors
     :jwno-process-elevated? wm-jwno-process-elevated?
+
+    :new-layout wm-new-layout
 
     :destroy wm-destroy})
 
@@ -1321,12 +1331,7 @@
        :hook-manager hook-man}
      window-manager-proto))
 
-  (def [work-areas main-idx] (:enumerate-monitors wm-obj))
-  (put wm-obj :layout
-     (layout (map |(frame $) work-areas)))
-  (if main-idx
-    (:activate (get-in wm-obj [:layout :children main-idx]))
-    (:activate (get-in wm-obj [:layout :children 0])))
+  (put wm-obj :layout (wm-new-layout wm-obj))
 
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path]
