@@ -1105,9 +1105,14 @@
 
 (defn wm-add-hwnd [self hwnd]
   (log/debug "new window: %n" hwnd)
+
+  (def exe-path (wm-get-hwnd-path self hwnd))
+  (unless exe-path
+    # The window disappeared just before wm-get-hwnd-path
+    (break nil))
+
   (def new-win (window hwnd))
   (def uia-man (in self :uia-manager))
-  (def exe-path (wm-get-hwnd-path self hwnd))
   (def hwnd-still-valid
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache (in uia-man :com) hwnd (in uia-man :focus-cr))
