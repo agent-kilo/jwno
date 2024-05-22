@@ -96,7 +96,7 @@
 
 
 (:add-hook hook-man :filter-window
-   (fn [_hwnd uia-win exe-path]
+   (fn [_hwnd uia-win exe-path _desktop-id]
      (def name (:get_CachedName uia-win))
      (def class-name (:get_CachedClassName uia-win))
      # Excluded windows

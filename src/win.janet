@@ -1016,6 +1016,16 @@
     path))
 
 
+(defn wm-get-hwnd-virtual-desktop [self hwnd]
+  (try
+    (:GetWindowDesktopId (in self :vdm-com) hwnd)
+    ((err fib)
+     (log/debug "GetWindowDesktopId failed: %n\n%s"
+                err
+                (get-stack-trace fib))
+     nil)))
+
+
 (defn wm-should-manage-hwnd? [self hwnd? &opt uia-win?]
   (def uia-man (in self :uia-manager))
   (def [hwnd uia-win]
@@ -1050,6 +1060,10 @@
     (unless (nil? hwnd)
       (wm-get-hwnd-path self hwnd)))
 
+  (def desktop-id
+    (unless (nil? hwnd)
+      (wm-get-hwnd-virtual-desktop self hwnd)))
+
   (def result
     (cond
       (nil? uia-win)
@@ -1064,8 +1078,12 @@
       # wm-get-hwnd-path failed
       false
 
+      (nil? desktop-id)
+      # wm-get-hwnd-virtual-desktop failed
+      false
+
       true
-      (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path)))
+      (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path desktop-id)))
 
   (when (and (nil? uia-win?)
              (not (nil? uia-win)))
@@ -1270,6 +1288,7 @@
     :activate wm-activate
 
     :add-hwnd wm-add-hwnd
+    :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
     :should-manage-hwnd? wm-should-manage-hwnd?
     :get-hwnd-path wm-get-hwnd-path
     :set-hwnd-alpha wm-set-hwnd-alpha
@@ -1334,7 +1353,7 @@
   (put wm-obj :layout (wm-new-layout wm-obj))
 
   (:add-hook hook-man :filter-window
-     (fn [hwnd uia-win exe-path]
+     (fn [hwnd uia-win exe-path _desktop-id]
        (default-window-filter hwnd uia-win exe-path wm-obj)))
 
   wm-obj)
