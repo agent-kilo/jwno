@@ -3,6 +3,7 @@
 (use jw32/_processthreadsapi)
 (use jw32/_securitybaseapi)
 (use jw32/_combaseapi)
+(use jw32/_shobjidl_core)
 (use jw32/_winnt)
 (use jw32/_handleapi)
 (use jw32/_uiautomation)
@@ -1247,6 +1248,11 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
+(defn wm-destroy [self]
+  (def {:vdm-com vdm-com} self)
+  (:Release vdm-com))
+
+
 (def- window-manager-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
@@ -1265,7 +1271,9 @@
 
     :get-pid-path wm-get-pid-path
     :enumerate-monitors wm-enumerate-monitors
-    :jwno-process-elevated? wm-jwno-process-elevated?})
+    :jwno-process-elevated? wm-jwno-process-elevated?
+
+    :destroy wm-destroy})
 
 
 (defn check-valid-uia-window [uia-win]
@@ -1301,9 +1309,15 @@
 
 
 (defn window-manager [uia-man hook-man]
+  (def vdm-com
+    (CoCreateInstance CLSID_VirtualDesktopManager
+                      nil
+                      CLSCTX_INPROC_SERVER
+                      IVirtualDesktopManager))
   (def wm-obj
     (table/setproto
-     @{:uia-manager uia-man
+     @{:vdm-com vdm-com
+       :uia-manager uia-man
        :hook-manager hook-man}
      window-manager-proto))
 

@@ -109,6 +109,7 @@
   (main-loop cli-args context)
 
   (repl/stop-server repl-server)
+  (:destroy window-man)
   (:destroy uia-man)
   (CoUninitialize)
   (log/deinit))
