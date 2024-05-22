@@ -222,7 +222,8 @@
     (= :window (get-in self [:children 0 :type]))
     (slice (in self :children))
 
-    (= :frame (get-in self [:children 0 :type]))
+    (or (= :frame (get-in self [:children 0 :type]))
+        (= :layout (get-in self [:children 0 :type])))
     (let [offsprings @[]]
       (each fr (in self :children)
         (array/push offsprings ;(frame-get-all-windows fr)))
@@ -271,7 +272,8 @@
         (set found child)
         (break))
 
-      (= :frame (in child :type))
+      (or (= :frame (in child :type))
+          (= :layout (in child :type)))
       (do
         (set found (frame-find-window child hwnd))
         (if found (break)))))
@@ -302,7 +304,8 @@
     (empty? (in self :children))
     @[]
 
-    (= :frame (get-in self [:children 0 :type]))
+    (or (= :frame (get-in self [:children 0 :type]))
+        (= :layout (get-in self [:children 0 :type])))
     (let [dead @[]]
       (each f (in self :children)
         (array/push dead ;(frame-purge-windows f wm)))
@@ -408,6 +411,12 @@
       self)))
 
 
+(defn frame-get-layout [self]
+  (if (or (nil? self) (= :layout (in self :type)))
+    self
+    (frame-get-layout (in self :parent))))
+
+
 (set frame-proto
      (table/setproto
       @{:add-child frame-add-child
@@ -422,7 +431,8 @@
         :get-all-windows frame-get-all-windows
         :get-current-frame frame-get-current-frame
         :get-first-frame frame-get-first-frame
-        :get-last-frame frame-get-last-frame}
+        :get-last-frame frame-get-last-frame
+        :get-layout frame-get-layout}
       tree-node-proto))
 
 
@@ -850,25 +860,49 @@
    frame-proto))
 
 
-(defn layout [&opt children]
+(defn layout [id &opt children]
   (def layout-obj (frame nil nil children))
   (put layout-obj :type :layout)
+  (put layout-obj :id id)
   (table/setproto layout-obj layout-proto))
 
 
 ######### Virtual desktop container object #########
 
+(defn vdc-find-frame-for-window [self win]
+  (def wm (in self :window-man))
+  (def vd (:get-hwnd-virtual-desktop wm (in win :hwnd)))
+  (unless vd
+    (break nil))
+
+  (var layout-found nil)
+  (each lo (in self :children)
+    (when (= (in lo :id) vd)
+      (set layout-found lo)
+      (break)))
+
+  (def lo
+    (if layout-found
+      layout-found
+      (let [new-layout (:new-layout wm vd)]
+        (:add-child self new-layout)
+        new-layout)))
+  (:find-frame-for-window lo win))
+
+
 (def- virtual-desktop-container-proto
   (table/setproto
    @{:split (fn [&] (error "unsupported operation"))
      :flatten (fn [&] (error "unsupported operation"))
-     :transform (fn [&] (error "unsupported operation"))}
+     :transform (fn [&] (error "unsupported operation"))
+     :find-frame-for-window vdc-find-frame-for-window}
    frame-proto))
 
 
-(defn virtual-desktop-container []
+(defn virtual-desktop-container [wm]
   (def vdc-obj (frame nil nil @[]))
   (put vdc-obj :type :virtual-desktop-container)
+  (put vdc-obj :window-man wm)
   (table/setproto vdc-obj virtual-desktop-container-proto))
 
 
@@ -1140,7 +1174,7 @@
       (do 
         (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
         override-frame)
-      (:find-frame-for-window (in self :layout) new-win)))
+      (:find-frame-for-window (in self :root) new-win)))
 
   (:add-child frame-found new-win)
   (wm-transform-window self new-win frame-found)
@@ -1151,7 +1185,7 @@
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (def dead (:purge-windows (in self :layout) self))
+  (def dead (:purge-windows (in self :root) self))
   (each dw dead
     (:call-hook (in self :hook-manager) :dead-window dw))
   (log/debug "purged %n dead windows" (length dead))
@@ -1165,7 +1199,7 @@
       
       (def hwnd (:get_CachedNativeWindowHandle uia-win))
 
-      (when-let [win (:find-window (in self :layout) hwnd)]
+      (when-let [win (:find-window (in self :root) hwnd)]
         #Already managed
         (:activate win)
         (break nil))
@@ -1183,7 +1217,7 @@
 
 
 (defn wm-window-opened [self hwnd]
-  (when-let [win (:find-window (in self :layout) hwnd)]
+  (when-let [win (:find-window (in self :root) hwnd)]
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break self))
 
@@ -1211,7 +1245,8 @@
       (= :window (in node :type))
       (in node :hwnd)
 
-      (= :frame (in node :type))
+      (or (= :frame (in node :type))
+          (= :layout (in node :type)))
       (if-let [cur-win (:get-current-window node)]
         (in cur-win :hwnd)
         root-hwnd)))
@@ -1228,7 +1263,7 @@
   (cond
     (nil? fr)
     # Retile the whole tree
-    (wm-retile self (in self :layout))
+    (wm-retile self (in self :root))
 
     true
     (cond
@@ -1239,7 +1274,8 @@
       (each w (in fr :children)
         (wm-transform-window self w fr))
 
-      (= :frame (get-in fr [:children 0 :type]))
+      (or (= :frame (get-in fr [:children 0 :type]))
+          (= :layout (get-in fr [:children 0 :type])))
       (each f (in fr :children)
         (wm-retile self f))))
 
@@ -1272,9 +1308,9 @@
   [work-areas main-idx])
 
 
-(defn wm-new-layout [self]
+(defn wm-new-layout [self id]
   (def [work-areas main-idx] (wm-enumerate-monitors self))
-  (def new-layout (layout (map |(frame $) work-areas)))
+  (def new-layout (layout id (map |(frame $) work-areas)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
   new-layout)
@@ -1358,16 +1394,13 @@
                       nil
                       CLSCTX_INPROC_SERVER
                       IVirtualDesktopManager))
-  (def vdc-obj (virtual-desktop-container))
   (def wm-obj
     (table/setproto
      @{:vdm-com vdm-com
-       :root vdc-obj
        :uia-manager uia-man
        :hook-manager hook-man}
      window-manager-proto))
-
-  (put wm-obj :layout (wm-new-layout wm-obj))
+  (put wm-obj :root (virtual-desktop-container wm-obj))
 
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path _desktop-id]
