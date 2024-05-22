@@ -51,13 +51,13 @@
 
 
 (defn cmd-retile [wm]
-  (def cur-win (:get-current-window (in wm :layout)))
+  (def cur-win (:get-current-window (in wm :root)))
   (:retile wm)
   (:activate wm cur-win))
 
 
 (defn cmd-split [wm dir nfr ratios to-activate move-win-to]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (:split cur-frame dir nfr ratios)
   (when (and (> move-win-to 0) (< move-win-to nfr))
@@ -72,7 +72,7 @@
 
 
 (defn cmd-flatten-parent [wm]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   (def parent (in cur-frame :parent))
   (cond
     (nil? parent)
@@ -89,19 +89,19 @@
 
 
 (defn cmd-enum-frame [wm dir]
-  (def cur-frame (:get-current-frame (in wm :layout)))
-  (when-let [fr (:enumerate-frame (in wm :layout) cur-frame dir)]
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (when-let [fr (:enumerate-frame (:get-layout cur-frame) cur-frame dir)]
     (:activate wm fr)))
 
 
 (defn cmd-adjacent-frame [wm dir]
-  (def cur-frame (:get-current-frame (in wm :layout)))
-  (when-let [adj-fr (:get-adjacent-frame (in wm :layout) cur-frame dir)]
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (when-let [adj-fr (:get-adjacent-frame (:get-layout cur-frame) cur-frame dir)]
     (:activate wm adj-fr)))
 
 
 (defn cmd-next-window-in-frame [wm]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   #(:purge-windows cur-frame wm)
   (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:get-next-sibling cur-win)]
@@ -109,7 +109,7 @@
 
 
 (defn cmd-prev-window-in-frame [wm]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   #(:purge-windows cur-frame wm)
   (when-let [cur-win (:get-current-window cur-frame)]
     (when-let [sibling (:get-prev-sibling cur-win)]
@@ -117,21 +117,21 @@
 
 
 (defn cmd-move-current-window [wm dir]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
 
   (when (nil? cur-win) (break))
 
-  (when-let [adj-fr (:get-adjacent-frame (in wm :layout) cur-frame dir)]
+  (when-let [adj-fr (:get-adjacent-frame (:get-layout cur-frame) cur-frame dir)]
     (:add-child adj-fr cur-win)
     (:retile wm adj-fr)
     (:activate wm cur-win)))
 
 
 (defn cmd-resize-current-frame [wm dw dh]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   (def rect (in cur-frame :rect))
-  (:resize-frame (in wm :layout)
+  (:resize-frame (:get-layout cur-frame)
                  cur-frame
                  {:left (in rect :left)
                   :top (in rect :top)
@@ -143,16 +143,17 @@
 
 
 (defn cmd-focus-mode [wm ratio]
-  (def cur-monitor (get-in wm [:layout :current-child]))
-  (def cur-frame (:get-current-frame cur-monitor))
-  (when (= (in cur-frame :parent) (in wm :layout))
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (def cur-layout (:get-layout cur-frame))
+  (def cur-monitor (in cur-layout :current-child))
+  (when (= (in cur-frame :parent) cur-layout)
     # It's a toplevel frame, which can't be resized
     (break))
 
   (def mon-width (- (get-in cur-monitor [:rect :right]) (get-in cur-monitor [:rect :left])))
   (def mon-height (- (get-in cur-monitor [:rect :bottom]) (get-in cur-monitor [:rect :top])))
-  (:balance-frames (in wm :layout) (in cur-frame :parent))
-  (:resize-frame (in wm :layout)
+  (:balance-frames cur-layout (in cur-frame :parent))
+  (:resize-frame cur-layout
                  cur-frame
                  {:left 0
                   :top 0
@@ -164,24 +165,25 @@
 
 
 (defn cmd-balance-frames [wm]
-  (:balance-frames (in wm :layout) nil true)
-  (def cur-win (:get-current-window (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (:balance-frames (:get-layout cur-frame) nil true)
+  (def cur-win (:get-current-window cur-frame))
   (:retile wm)
   (:activate wm cur-win))
 
 
 (defn cmd-close-current-frame [wm]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
-  (:close-frame (in wm :layout) cur-frame)
+  (:close-frame (:get-layout cur-frame) cur-frame)
   (:retile wm)
   (if cur-win
     (:activate wm cur-win)
-    (:activate wm (:get-current-window (in wm :layout)))))
+    (:activate wm (:get-current-window cur-frame))))
 
 
 (defn cmd-frame-to-current-window-size [wm uia-man]
-  (def cur-frame (:get-current-frame (in wm :layout)))
+  (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (when (nil? cur-win)
     (break))
@@ -191,20 +193,20 @@
   (when (nil? win-rect)
     (break))
 
-  (:resize-frame (in wm :layout) cur-frame win-rect)
+  (:resize-frame (:get-layout cur-frame) cur-frame win-rect)
   (:retile wm)
   (:activate wm cur-win))
 
 
 (defn cmd-close-current-window [wm]
-  (def cur-win (:get-current-window (in wm :layout)))
+  (def cur-win (:get-current-window (in wm :root)))
   (when (nil? cur-win)
     (break))
   (:close cur-win))
 
 
 (defn cmd-change-current-window-alpha [wm delta]
-  (def cur-win (:get-current-window (in wm :layout)))
+  (def cur-win (:get-current-window (in wm :root)))
   (when (nil? cur-win)
     (break))
 

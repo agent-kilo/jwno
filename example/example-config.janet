@@ -144,25 +144,26 @@
    (fn [dead-win]
      (def parent (in dead-win :parent))
      (when (empty? (in parent :children))
-       (:close-frame (in window-man :layout) parent)
+       (:close-frame (:get-layout parent) parent)
        (:retile window-man))))
 
 
 (:add-command command-man :close-current-window-or-frame
    (fn []
-     (def layout (in window-man :layout))
+     (def cur-frame (:get-current-frame (in window-man :root)))
+     (def layout (:get-layout cur-frame))
      # cur-win will be nil if the current frame is empty.
      (if-let [cur-win (:get-current-window layout)]
        (:close-hwnd window-man (in cur-win :hwnd))
-       (let [cur-frame (:get-current-frame layout)]
+       (do
          (:close-frame layout cur-frame)
          (:retile window-man)
          (:activate window-man (:get-current-window layout))))))
 
 (:add-command command-man :split-and-move-current-window
    (fn [dir]
-     (def layout (in window-man :layout))
-     (def cur-frame (:get-current-frame layout))
+     (def root (in window-man :root))
+     (def cur-frame (:get-current-frame root))
      (def cur-win (:get-current-window cur-frame))
      (def win-count (length (in cur-frame :children)))
      # Existing windows are all moved to the first new frame
