@@ -39,7 +39,7 @@
   (try
     (:add-child dummy-frame dummy-window1)
     ((err fib)
-     (assert (= err "cannot mix frames and windows"))))
+     (assert (= err "cannot mix different types of children"))))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
 
@@ -54,7 +54,7 @@
   (try
     (:add-child dummy-frame dummy-sub-frame1)
     ((err fib)
-     (assert (= err "cannot mix frames and windows")))))
+     (assert (= err "cannot mix different types of children")))))
 
 
 (defn test-frame-split []

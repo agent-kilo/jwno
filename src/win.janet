@@ -149,19 +149,13 @@
         # This is the only child, activate it to avoid inconsistent states
         (put self :current-child child))
 
-      (= (in child :type) :window)
-      (if (= (get-in children [0 :type]) :window)
-        (do
-          (put child :parent self)
-          (array/push children child))
-        (error "cannot mix frames and windows"))
+      (not= (in child :type) (get-in children [0 :type]))
+      (error "cannot mix different types of children")
 
-      (= (in child :type) :frame)
-      (if (= (get-in children [0 :type]) :frame)
-        (do
-          (put child :parent self)
-          (array/push children child))
-        (error "cannot mix frames and windows")))
+      true
+      (do
+        (put child :parent self)
+        (array/push children child)))
 
     # Do the removal after a successful insertion, so
     # that we won't end up in an inconsistent state
@@ -862,6 +856,22 @@
   (table/setproto layout-obj layout-proto))
 
 
+######### Virtual desktop container object #########
+
+(def- virtual-desktop-container-proto
+  (table/setproto
+   @{:split (fn [&] (error "unsupported operation"))
+     :flatten (fn [&] (error "unsupported operation"))
+     :transform (fn [&] (error "unsupported operation"))}
+   frame-proto))
+
+
+(defn virtual-desktop-container []
+  (def vdc-obj (frame nil nil @[]))
+  (put vdc-obj :type :virtual-desktop-container)
+  (table/setproto vdc-obj virtual-desktop-container-proto))
+
+
 ######### Window manager object #########
 
 (defn- calc-centered-coords [win-rect fr-rect fit]
@@ -1343,9 +1353,11 @@
                       nil
                       CLSCTX_INPROC_SERVER
                       IVirtualDesktopManager))
+  (def vdc-obj (virtual-desktop-container))
   (def wm-obj
     (table/setproto
      @{:vdm-com vdm-com
+       :root vdc-obj
        :uia-manager uia-man
        :hook-manager hook-man}
      window-manager-proto))
