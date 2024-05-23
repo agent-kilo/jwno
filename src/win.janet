@@ -639,7 +639,7 @@
               (+ h sub-dh)))))
       (def new-rects (:calculate-sub-rects self calc-fn))
       (map (fn [sub-fr rect]
-             (frame-transform sub-fr rect))
+             (:transform sub-fr rect))
            all-children
            new-rects)
       self)))
