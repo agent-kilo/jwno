@@ -705,13 +705,113 @@
                     :bottom (+ dh (in parent-rect :bottom))}))))))
 
 
+(defn frame-close [self]
+  (def parent (in self :parent))
+  (def children (in self :children))
+
+  (cond
+    (= :layout (in parent :type))
+    # This is a toplevel frame, which tracks the monitor
+    # geometries and cannot be closed
+    nil
+
+    (or (empty? children)
+        (= :window (in (first children) :type)))
+    (let [all-siblings (in parent :children)
+          [width height] (rect-size (in self :rect))
+          [parent-width parent-height] (rect-size (in parent :rect))]
+      (if (> (length all-siblings) 2)
+        (do
+          (:remove-child parent self)
+
+          (def calc-fn
+            (cond
+              (= horizontal-frame-proto (table/getproto parent))
+              (let [rest-width (- parent-width width)]
+                (fn [sib-fr _]
+                  (let [sib-width (rect-width (in sib-fr :rect))
+                        ratio (/ sib-width rest-width)]
+                    (math/floor (* ratio parent-width)))))
+
+              (= vertical-frame-proto (table/getproto parent))
+              (let [rest-height (- parent-height height)]
+                (fn [sib-fr _]
+                  (let [sib-height (rect-height (in sib-fr :rect))
+                        ratio (/ sib-height rest-height)]
+                    (math/floor (* ratio parent-height)))))))
+          (def new-rects (:calculate-sub-rects parent calc-fn))
+          (map (fn [sib-fr rect]
+                 (:transform sib-fr rect))
+               (in parent :children)
+               new-rects)
+
+          (def cur-frame (:get-current-frame parent))
+          (each child children
+            (put child :parent nil)
+            (:add-child cur-frame child)))
+
+        (do
+          # When the frame is closed, the parent will only have a single child.
+          # Remove that child too, and move all children to the parent,
+          # so that the tree stays consistent.
+          (def sibling (:get-next-sibling self))
+          (def sibling-rect (in sibling :rect))
+          (def [sibling-width sibling-height] (rect-size sibling-rect))
+
+          (def to-frame (:get-current-frame sibling))
+          (each child children
+            (put child :parent nil)
+            (:add-child to-frame child))
+
+          (put parent :children @[])
+          (table/setproto parent (table/getproto sibling)) # reset horizontal/vertical split states
+          (each child (in sibling :children)
+            (put child :parent nil)
+            (:add-child parent child))
+          (put parent :current-child (in sibling :current-child))
+
+          (cond
+            (empty? (in parent :children))
+            nil
+
+            (= :window (get-in parent [:children 0 :type]))
+            # Wait for retile to actually resize the windows
+            nil
+
+            (= :frame (get-in parent [:children 0 :type]))
+            (do
+              (def calc-fn
+                (cond
+                  (= horizontal-frame-proto (table/getproto parent))
+                  (fn [sub-fr _]
+                    (let [sub-width (rect-width (in sub-fr :rect))
+                          ratio (/ sub-width sibling-width)]
+                      (math/floor (* ratio parent-width))))
+
+                  (= vertical-frame-proto (table/getproto parent))
+                  (fn [sub-fr _]
+                    (let [sub-height (rect-height (in sub-fr :rect))
+                          ratio (/ sub-height sibling-height)]
+                      (math/floor (* ratio parent-height))))))
+
+              (def new-rects (:calculate-sub-rects parent calc-fn))
+              (map (fn [sib-fr rect]
+                     (:transform sib-fr rect))
+                   (in parent :children)
+                   new-rects))))))
+
+    (= :frame (in (first children) :type))
+    (error "cannot close frames containing sub-frames")))
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
         :balance frame-balance
         :flatten frame-flatten
         :transform frame-transform
-        :resize frame-resize}
+        :resize frame-resize
+        :close frame-close}
       tree-node-proto))
 
 
@@ -800,109 +900,9 @@
    frame-proto))
 
 
-(defn layout-close-frame [self fr]
-  (cond
-    (= self (in fr :parent))
-    # This is a toplevel frame, which tracks the monitor
-    # geometries and cannot be closed
-    nil
-
-    (or (empty? (in fr :children))
-        (= :window (get-in fr [:children 0 :type])))
-    (let [parent (in fr :parent)
-          all-children (in fr :children)
-          all-siblings (in parent :children)
-          [fr-width fr-height] (rect-size (in fr :rect))
-          [parent-width parent-height] (rect-size (in parent :rect))]
-      (if (> (length all-siblings) 2)
-        (do
-          (:remove-child parent fr)
-
-          (def calc-fn
-            (cond
-              (= horizontal-frame-proto (table/getproto parent))
-              (let [rest-width (- parent-width fr-width)]
-                (fn [sib-fr _]
-                  (let [sib-width (rect-width (in sib-fr :rect))
-                        ratio (/ sib-width rest-width)]
-                    (math/floor (* ratio parent-width)))))
-
-              (= vertical-frame-proto (table/getproto parent))
-              (let [rest-height (- parent-height fr-height)]
-                (fn [sib-fr _]
-                  (let [sib-height (rect-height (in sib-fr :rect))
-                        ratio (/ sib-height rest-height)]
-                    (math/floor (* ratio parent-height)))))))
-          (def new-rects (:calculate-sub-rects parent calc-fn))
-          (map (fn [sib-fr rect]
-                 (:transform sib-fr rect))
-               (in parent :children)
-               new-rects)
-
-          (def cur-frame (:get-current-frame parent))
-          (each child all-children
-            (put child :parent nil)
-            (:add-child cur-frame child)))
-
-        (do
-          # When fr is closed, the parent will only have a single child.
-          # Remove that child too, and move all children to the parent,
-          # so that the tree stays consistent.
-          (def sibling (:get-next-sibling fr))
-          (def sibling-rect (in sibling :rect))
-          (def [sibling-width sibling-height] (rect-size sibling-rect))
-
-          (def to-frame (:get-current-frame sibling))
-          (each child all-children
-            (put child :parent nil)
-            (:add-child to-frame child))
-
-          (put parent :children @[])
-          (table/setproto parent (table/getproto sibling)) # reset horizontal/vertical split states
-          (each child (in sibling :children)
-            (put child :parent nil)
-            (:add-child parent child))
-          (put parent :current-child (in sibling :current-child))
-
-          (cond
-            (empty? (in parent :children))
-            nil
-
-            (= :window (get-in parent [:children 0 :type]))
-            # Wait for retile to actually resize the windows
-            nil
-
-            (= :frame (get-in parent [:children 0 :type]))
-            (do
-              (def calc-fn
-                (cond
-                  (= horizontal-frame-proto (table/getproto parent))
-                  (fn [sub-fr _]
-                    (let [sub-width (rect-width (in sub-fr :rect))
-                          ratio (/ sub-width sibling-width)]
-                      (math/floor (* ratio parent-width))))
-
-                  (= vertical-frame-proto (table/getproto parent))
-                  (fn [sub-fr _]
-                    (let [sub-height (rect-height (in sub-fr :rect))
-                          ratio (/ sub-height sibling-height)]
-                      (math/floor (* ratio parent-height))))))
-
-              (def new-rects (:calculate-sub-rects parent calc-fn))
-              (map (fn [sib-fr rect]
-                     (:transform sib-fr rect))
-                   (in parent :children)
-                   new-rects))))))
-
-    (= :frame (get-in fr [:children 0 :type]))
-    (error "cannot close frames containing sub-frames"))
-
-  self)
-
-
 (def- layout-proto
   (table/setproto
-   @{:close-frame layout-close-frame}
+   @{}
    tree-node-proto))
 
 

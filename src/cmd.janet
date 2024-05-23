@@ -160,7 +160,7 @@
 (defn cmd-close-current-frame [wm]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
-  (:close-frame (:get-layout cur-frame) cur-frame)
+  (:close cur-frame)
   (:retile wm)
   (if cur-win
     (:activate wm cur-win)
