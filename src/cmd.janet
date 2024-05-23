@@ -90,7 +90,7 @@
 
 (defn cmd-enum-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (when-let [fr (:enumerate-frame (:get-layout cur-frame) cur-frame dir)]
+  (when-let [fr (:enumerate-node (:get-layout cur-frame) cur-frame dir)]
     (:activate wm fr)))
 
 
@@ -100,20 +100,11 @@
     (:activate wm adj-fr)))
 
 
-(defn cmd-next-window-in-frame [wm]
+(defn cmd-enum-window-in-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
-  #(:purge-windows cur-frame wm)
   (when-let [cur-win (:get-current-window cur-frame)]
-    (when-let [sibling (:get-next-sibling cur-win)]
-      (:activate wm sibling))))
-
-
-(defn cmd-prev-window-in-frame [wm]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  #(:purge-windows cur-frame wm)
-  (when-let [cur-win (:get-current-window cur-frame)]
-    (when-let [sibling (:get-prev-sibling cur-win)]
-      (:activate wm sibling))))
+    (def sibling (:enumerate-node cur-frame cur-win dir))
+    (:activate wm sibling)))
 
 
 (defn cmd-move-current-window [wm dir]
@@ -260,10 +251,8 @@
   (:add-command command-man :adjacent-frame
      (fn [dir] (cmd-adjacent-frame wm dir)))
 
-  (:add-command command-man :next-window-in-frame
-     (fn [] (cmd-next-window-in-frame wm)))
-  (:add-command command-man :prev-window-in-frame
-     (fn [] (cmd-prev-window-in-frame wm)))
+  (:add-command command-man :enum-window-in-frame
+     (fn [dir] (cmd-enum-window-in-frame wm dir)))
 
   (:add-command command-man :move-current-window
      (fn [dir] (cmd-move-current-window wm dir)))

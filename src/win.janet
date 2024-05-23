@@ -198,6 +198,61 @@
     (:get-last-frame (last children))))
 
 
+(defn tree-node-enumerate-node [self node dir &opt wrap-around node-type]
+  (default wrap-around true)
+  (default node-type (in node :type))
+
+  (when (= :window (in self :type))
+    (error "invalid operation"))
+
+  (let [parent (in node :parent)
+        all-siblings (in parent :children)
+        sibling-count (length all-siblings)
+        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
+                 idx
+                 (error "inconsistent states for frame tree"))
+        idx-to-check (case dir
+                       :next
+                       (if (and wrap-around (= self parent)) # Toplevel frames wrap around
+                         (% (+ fr-idx 1) sibling-count)
+                         (+ fr-idx 1))
+                       :prev
+                       (if (and wrap-around (= self parent))
+                         (% (+ fr-idx sibling-count -1) sibling-count)
+                         (- fr-idx 1)))]
+    (cond
+      (or (< idx-to-check 0)
+          (>= idx-to-check sibling-count))
+      # We reached the end of the sub-frame list
+      (if (= self parent)
+        nil # Stop at the top node
+        (:enumerate-node self parent dir wrap-around node-type))
+
+      (= dir :next)
+      (let [node-to-check (in all-siblings idx-to-check)]
+        (cond
+          (not= :window node-type)
+          (:get-first-frame node-to-check)
+
+          (= :window (in node-to-check :type))
+          node-to-check
+
+          true
+          (first (:get-all-windows node-to-check))))
+
+      (= dir :prev)
+      (let [node-to-check (in all-siblings idx-to-check)]
+        (cond
+          (not= :window node-type)
+          (:get-last-frame node-to-check)
+
+          (= :window (in node-to-check :type))
+          node-to-check
+
+          true
+          (last (:get-all-windows node-to-check)))))))
+
+
 (defn tree-node-find-hwnd [self hwnd]
   (cond
     (= :window (in self :type))
@@ -277,6 +332,7 @@
     :get-current-frame tree-node-get-current-frame
     :get-first-frame tree-node-get-first-frame
     :get-last-frame tree-node-get-last-frame
+    :enumerate-node tree-node-enumerate-node
     :find-hwnd tree-node-find-hwnd
     :purge-windows tree-node-purge-windows
     :get-layout tree-node-get-layout})
@@ -388,7 +444,7 @@
        nil
 
        true
-       (in all-windows 0)))
+       (first all-windows)))
   (table/setproto self frame-proto) # Clear vertical/horizontal settings
   self)
 
@@ -530,34 +586,6 @@
   (table/setproto
    @{:calculate-sub-rects horizontal-frame-calculate-sub-rects}
    frame-proto))
-
-
-(defn layout-enumerate-frame [self node dir]
-  (let [all-siblings (get-in node [:parent :children])
-        sibling-count (length all-siblings)
-        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
-                 idx
-                 (error "inconsistent states for frame tree"))
-        idx-to-check (case dir
-                       :next
-                       (if (= self (in node :parent)) # Toplevel frames wrap around
-                         (% (+ fr-idx 1) sibling-count)
-                         (+ fr-idx 1))
-                       :prev
-                       (if (= self (in node :parent))
-                         (% (+ fr-idx sibling-count -1) sibling-count)
-                         (- fr-idx 1)))]
-    (cond
-      (or (< idx-to-check 0)
-          (>= idx-to-check sibling-count))
-      # We reached the end of the sub-frame list, go up
-      (layout-enumerate-frame self (in node :parent) dir)
-
-      (= dir :next)
-      (:get-first-frame (in all-siblings idx-to-check))
-
-      (= dir :prev)
-      (:get-last-frame (in all-siblings idx-to-check)))))
 
 
 (defn- find-closest-child [children reference rect-key]
@@ -857,8 +885,7 @@
 
 (def- layout-proto
   (table/setproto
-   @{:enumerate-frame layout-enumerate-frame
-     :get-adjacent-frame layout-get-adjacent-frame
+   @{:get-adjacent-frame layout-get-adjacent-frame
      :resize-frame layout-resize-frame
      :balance-frames layout-balance-frames
      :close-frame layout-close-frame}

@@ -63,8 +63,8 @@
 
   (k "win + n" [:enum-frame :next])
   (k "win + e" [:enum-frame :prev])
-  (k "win + i" :next-window-in-frame)
-  (k "win + m" :prev-window-in-frame)
+  (k "win + i" [:enum-window-in-frame :next])
+  (k "win + m" [:enum-window-in-frame :prev])
 
   (k "win + ctrl + n" [:adjacent-frame :down])
   (k "win + ctrl + e" [:adjacent-frame :up])
