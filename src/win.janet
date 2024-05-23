@@ -529,6 +529,38 @@
   self)
 
 
+(defn frame-balance [self &opt recursive]
+  (default recursive false)
+
+  (def all-children (in self :children))
+
+  (cond
+    (empty? all-children)
+    nil
+
+    (not= :frame (get-in self [:children 0 :type]))
+    nil
+
+    true
+    (let [child-count (length all-children)
+          [width height] (rect-size (in self :rect))
+          balanced-len (math/floor (/ (cond
+                                        (= vertical-frame-proto (table/getproto self)) height
+                                        (= horizontal-frame-proto (table/getproto self)) width)
+                                      child-count))]
+      (def new-rects (:calculate-sub-rects self (fn [_sub-fr _i] balanced-len)))
+      (if recursive
+        (map (fn [sub-fr rect]
+               (put sub-fr :rect rect)
+               (:balance sub-fr recursive))
+             all-children
+             new-rects)
+        (map (fn [sub-fr rect]
+               (:transform sub-fr rect))
+             all-children
+             new-rects)))))
+
+
 (defn frame-flatten [self]
   (def cur-window (:get-current-window self))
   (def all-windows (:get-all-windows self))
@@ -600,6 +632,7 @@
 (set frame-proto
      (table/setproto
       @{:split frame-split
+        :balance frame-balance
         :flatten frame-flatten
         :transform frame-transform}
       tree-node-proto))
@@ -688,40 +721,6 @@
   (table/setproto
    @{:calculate-sub-rects horizontal-frame-calculate-sub-rects}
    frame-proto))
-
-
-(defn layout-balance-frames [self &opt fr recursive]
-  (default recursive false)
-  (cond
-    (nil? fr)
-    (each toplevel-fr (in self :children)
-      (layout-balance-frames self toplevel-fr recursive))
-
-    (empty? (in fr :children))
-    nil
-
-    (not= :frame (get-in fr [:children 0 :type]))
-    nil
-
-    true
-    (let [all-children (in fr :children)
-          child-count (length all-children)
-          [fr-width fr-height] (rect-size (in fr :rect))
-          balanced-len (math/floor (/ (cond
-                                        (= vertical-frame-proto (table/getproto fr)) fr-height
-                                        (= horizontal-frame-proto (table/getproto fr)) fr-width)
-                                      child-count))]
-      (def new-rects (:calculate-sub-rects fr (fn [_sub-fr _i] balanced-len)))
-      (if recursive
-        (map (fn [sub-fr rect]
-               (put sub-fr :rect rect)
-               (layout-balance-frames self sub-fr recursive))
-             all-children
-             new-rects)
-        (map (fn [sub-fr rect]
-               (:transform sub-fr rect))
-             all-children
-             new-rects)))))
 
 
 (defn layout-resize-frame [self fr new-rect]
@@ -890,7 +889,6 @@
 (def- layout-proto
   (table/setproto
    @{:resize-frame layout-resize-frame
-     :balance-frames layout-balance-frames
      :close-frame layout-close-frame}
    tree-node-proto))
 

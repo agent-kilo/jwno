@@ -143,7 +143,6 @@
 
   (def mon-width (- (get-in cur-monitor [:rect :right]) (get-in cur-monitor [:rect :left])))
   (def mon-height (- (get-in cur-monitor [:rect :bottom]) (get-in cur-monitor [:rect :top])))
-  (:balance-frames cur-layout (in cur-frame :parent))
   (:resize-frame cur-layout
                  cur-frame
                  {:left 0
@@ -157,7 +156,9 @@
 
 (defn cmd-balance-frames [wm]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (:balance-frames (:get-layout cur-frame) nil true)
+  (def cur-layout (:get-layout cur-frame))
+  (each fr (in cur-layout :children)
+    (:balance fr true))
   (def cur-win (:get-current-window cur-frame))
   (:retile wm)
   (:activate wm cur-win))
