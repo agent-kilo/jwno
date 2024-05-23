@@ -122,12 +122,11 @@
 (defn cmd-resize-current-frame [wm dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def rect (in cur-frame :rect))
-  (:resize-frame (:get-layout cur-frame)
-                 cur-frame
-                 {:left (in rect :left)
-                  :top (in rect :top)
-                  :right (+ dw (in rect :right))
-                  :bottom (+ dh (in rect :bottom))})
+  (:resize cur-frame
+           {:left (in rect :left)
+            :top (in rect :top)
+            :right (+ dw (in rect :right))
+            :bottom (+ dh (in rect :bottom))})
   (def cur-win (:get-current-window cur-frame))
   (:retile wm)
   (:activate wm cur-win))
@@ -136,15 +135,13 @@
 (defn cmd-focus-mode [wm ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-top (:get-top-frame cur-frame))
-  (def cur-layout (:get-layout cur-frame))
   (def mon-width (- (get-in cur-top [:rect :right]) (get-in cur-top [:rect :left])))
   (def mon-height (- (get-in cur-top [:rect :bottom]) (get-in cur-top [:rect :top])))
-  (:resize-frame cur-layout
-                 cur-frame
-                 {:left 0
-                  :top 0
-                  :right (math/floor (* ratio mon-width))
-                  :bottom (math/floor (* ratio mon-height))})
+  (:resize cur-frame
+           {:left 0
+            :top 0
+            :right (math/floor (* ratio mon-width))
+            :bottom (math/floor (* ratio mon-height))})
   (def cur-win (:get-current-window cur-frame))
   (:retile wm)
   (:activate wm cur-win))
@@ -181,7 +178,7 @@
   (when (nil? win-rect)
     (break))
 
-  (:resize-frame (:get-layout cur-frame) cur-frame win-rect)
+  (:resize cur-frame win-rect)
   (:retile wm)
   (:activate wm cur-win))
 

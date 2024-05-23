@@ -645,12 +645,73 @@
       self)))
 
 
+(defn frame-resize [self new-rect]
+  (def parent (in self :parent))
+  (when (= :layout (in parent :type))
+    # This is a toplevel frame, which tracks the monitor
+    # geometries and cannot be resized
+    (break))
+
+  (let [all-siblings (in parent :children)
+        parent-rect (in parent :rect)
+        [old-width old-height] (rect-size (in self :rect))
+        [new-width new-height] (rect-size new-rect)
+        [parent-width parent-height] (rect-size parent-rect)
+        dw (- new-width old-width)
+        dh (- new-height old-height)
+        avail-h (- parent-height old-height)
+        avail-w (- parent-width old-width)]
+    (cond
+      (= vertical-frame-proto (table/getproto parent))
+      (let [new-rects (:calculate-sub-rects
+                         parent
+                         (fn [sib-fr _i]
+                           (def sib-height (rect-height (in sib-fr :rect)))
+                           (def sib-dh
+                             (if (= sib-fr self)
+                               dh
+                               (math/floor (* (- dh) (/ sib-height avail-h)))))
+                           (+ sib-height sib-dh)))]
+        (map (fn [sib-fr rect]
+               (:transform sib-fr rect))
+             all-siblings
+             new-rects)
+        (when (not= dw 0)
+          (:resize parent
+                   {:left (in parent-rect :left)
+                    :top (in parent-rect :top)
+                    :right (+ dw (in parent-rect :right))
+                    :bottom (in parent-rect :bottom)})))
+
+      (= horizontal-frame-proto (table/getproto parent))
+      (let [new-rects (:calculate-sub-rects
+                         parent
+                         (fn [sib-fr _i]
+                           (def sib-width (rect-width (in sib-fr :rect)))
+                           (def sib-dw
+                             (if (= sib-fr self)
+                               dw
+                               (math/floor (* (- dw) (/ sib-width avail-w)))))
+                           (+ sib-width sib-dw)))]
+        (map (fn [sib-fr rect]
+               (:transform sib-fr rect))
+             all-siblings
+             new-rects)
+        (when (not= dh 0)
+          (:resize parent
+                   {:left (in parent-rect :left)
+                    :top (in parent-rect :top)
+                    :right (in parent-rect :right)
+                    :bottom (+ dh (in parent-rect :bottom))}))))))
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
         :balance frame-balance
         :flatten frame-flatten
-        :transform frame-transform}
+        :transform frame-transform
+        :resize frame-resize}
       tree-node-proto))
 
 
@@ -737,69 +798,6 @@
   (table/setproto
    @{:calculate-sub-rects horizontal-frame-calculate-sub-rects}
    frame-proto))
-
-
-(defn layout-resize-frame [self fr new-rect]
-  (when (= self (in fr :parent))
-    # This is a toplevel frame, which tracks the monitor
-    # geometries and cannot be resized
-    (break self))
-
-  (let [parent (in fr :parent)
-        all-siblings (in parent :children)
-        parent-rect (in parent :rect)
-        [old-width old-height] (rect-size (in fr :rect))
-        [new-width new-height] (rect-size new-rect)
-        [parent-width parent-height] (rect-size parent-rect)
-        dw (- new-width old-width)
-        dh (- new-height old-height)
-        avail-h (- parent-height old-height)
-        avail-w (- parent-width old-width)]
-    (cond
-      (= vertical-frame-proto (table/getproto parent))
-      (let [new-rects (:calculate-sub-rects
-                         parent
-                         (fn [sib-fr _i]
-                           (def sib-height (rect-height (in sib-fr :rect)))
-                           (def sib-dh
-                             (if (= sib-fr fr)
-                               dh
-                               (math/floor (* (- dh) (/ sib-height avail-h)))))
-                           (+ sib-height sib-dh)))]
-        (map (fn [sib-fr rect]
-               (:transform sib-fr rect))
-             all-siblings
-             new-rects)
-        (when (not= dw 0)
-          (layout-resize-frame self
-                               parent
-                               {:left (in parent-rect :left)
-                                :top (in parent-rect :top)
-                                :right (+ dw (in parent-rect :right))
-                                :bottom (in parent-rect :bottom)})))
-      
-
-      (= horizontal-frame-proto (table/getproto parent))
-      (let [new-rects (:calculate-sub-rects
-                         parent
-                         (fn [sib-fr _i]
-                           (def sib-width (rect-width (in sib-fr :rect)))
-                           (def sib-dw
-                             (if (= sib-fr fr)
-                               dw
-                               (math/floor (* (- dw) (/ sib-width avail-w)))))
-                           (+ sib-width sib-dw)))]
-        (map (fn [sib-fr rect]
-               (:transform sib-fr rect))
-             all-siblings
-             new-rects)
-        (when (not= dh 0)
-          (layout-resize-frame self
-                               parent
-                               {:left (in parent-rect :left)
-                                :top (in parent-rect :top)
-                                :right (in parent-rect :right)
-                                :bottom (+ dh (in parent-rect :bottom))}))))))
 
 
 (defn layout-close-frame [self fr]
@@ -904,8 +902,7 @@
 
 (def- layout-proto
   (table/setproto
-   @{:resize-frame layout-resize-frame
-     :close-frame layout-close-frame}
+   @{:close-frame layout-close-frame}
    tree-node-proto))
 
 
