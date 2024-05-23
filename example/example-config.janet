@@ -59,7 +59,7 @@
   (k "win + ," [:split-and-move-current-window :horizontal])
   (k "win + ." [:split-and-move-current-window :vertical])
   (k "win + =" :balance-frames)
-  (k "win + z" [:focus-mode 0.7])
+  (k "win + o" [:focus-mode 0.7])
 
   (k "win + n" [:enum-frame :next])
   (k "win + e" [:enum-frame :prev])
