@@ -968,7 +968,6 @@
         hwnd (in win :hwnd)
         rect (in fr :rect)]
     (log/debug "transforming window: %n, rect = %n" hwnd rect)
-    (log/debug "fr = %n" fr)
     (try
       (with-uia [cr (:CreateCacheRequest uia-com)]
         (:AddPattern cr UIA_TransformPatternId)
