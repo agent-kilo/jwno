@@ -78,21 +78,219 @@
     (tree-node-get-prev-child (in self :parent) self)))
 
 
+(defn tree-node-add-child [self child]
+  (let [children (in self :children)
+        old-parent (in child :parent)]
+    (cond
+      (empty? children)
+      (do
+        (put child :parent self)
+        (array/push children child)
+        # This is the only child, activate it to avoid inconsistent states
+        (put self :current-child child))
+
+      (not= (in child :type) (in (first children) :type))
+      (error "cannot mix different types of children")
+
+      true
+      (do
+        (put child :parent self)
+        (array/push children child)))
+
+    # Do the removal after a successful insertion, so
+    # that we won't end up in an inconsistent state
+    (when old-parent
+      (:remove-child old-parent child))))
+
+
+(defn tree-node-remove-child [self child]
+  (def current-child (in self :current-child))
+  (when (= child current-child)
+    (def next-child (:get-next-child self child))
+    (if (= child next-child)
+      (put self :current-child nil) # There's no other child
+      (put self :current-child next-child)))
+  (put self :children
+     (filter |(not= $ child) (in self :children))))
+
+
+(defn tree-node-get-all-windows [self]
+  (def children (in self :children))
+  (cond
+    (or (nil? children) (empty? children))
+    []
+
+    (= :window (in (first children) :type))
+    (slice (in self :children))
+
+    true # children are other container nodes
+    (let [offsprings @[]]
+      (each c children
+        (array/push offsprings ;(:get-all-windows c)))
+      offsprings)))
+
+
+(defn tree-node-get-current-window [self]
+  (cond
+    (= :window (in self :type))
+    self
+
+    (nil? (in self :current-child))
+    nil
+
+    true
+    (:get-current-window (in self :current-child))))
+
+
+(defn tree-node-get-current-frame [self]
+  (def children (in self :children))
+  (def current-child (in self :current-child))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    self
+
+    (= :window (in (first children) :type))
+    self
+
+    (not (nil? current-child))
+    (:get-current-frame current-child)
+
+    true
+    # There are children, but no current-child
+    (error "inconsistent states for frame tree")))
+
+
+(defn tree-node-get-first-frame [self]
+  (def children (in self :children))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    self
+
+    (= :window (in (first children) :type))
+    self
+
+    true
+    (:get-first-frame (first children))))
+
+
+(defn tree-node-get-last-frame [self]
+  (def children (in self :children))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    self
+
+    (= :window (in (first children) :type))
+    self
+
+    true
+    (:get-last-frame (last children))))
+
+
+(defn tree-node-find-hwnd [self hwnd]
+  (cond
+    (= :window (in self :type))
+    (if (= hwnd (in self :hwnd))
+      self
+      nil)
+
+    true
+    (do
+      (var found nil)
+      (each c (in self :children)
+        (when-let [win-found (:find-hwnd c hwnd)]
+          (set found win-found)
+          (break)))
+      found)))
+
+
+(defn tree-node-purge-windows [self pred]
+  (def children (in self :children))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    @[]
+
+    (= :window (in (first children) :type))
+    (let [[alive dead] (reduce
+                         (fn [[a d] w]
+                           (if (pred w)
+                             (array/push d w)
+                             (array/push a w))
+                           [a d])
+                         [@[] @[]]
+                         children)]
+      (put self :children alive)
+      (cond
+        (empty? alive)
+        (put self :current-child nil)
+
+        (in self :current-child)
+        (let [current-child (in self :current-child)]
+          (each dw dead
+            (when (= dw current-child)
+              # The previous active child is dead, fill in a new one
+              (put self :current-child (first alive))
+              (break))))
+
+        true # There are children, but none of them is active
+        (error "inconsistent states for frame tree"))
+      dead)
+
+    true # children are other container nodes
+    (let [dead @[]]
+      (each c children
+        (array/push dead ;(:purge-windows c pred)))
+      dead)))
+
+
+(defn tree-node-get-layout [self]
+  (if (or (nil? self) (= :layout (in self :type)))
+    self
+    (tree-node-get-layout (in self :parent))))
+
+
 (def- tree-node-proto
   @{:activate tree-node-activate
     :get-next-child tree-node-get-next-child
     :get-prev-child tree-node-get-prev-child
     :get-next-sibling tree-node-get-next-sibling
-    :get-prev-sibling tree-node-get-prev-sibling})
+    :get-prev-sibling tree-node-get-prev-sibling
+    :add-child tree-node-add-child
+    :remove-child tree-node-remove-child
+    :get-all-windows tree-node-get-all-windows
+    :get-current-window tree-node-get-current-window
+    :get-current-frame tree-node-get-current-frame
+    :get-first-frame tree-node-get-first-frame
+    :get-last-frame tree-node-get-last-frame
+    :find-hwnd tree-node-find-hwnd
+    :purge-windows tree-node-purge-windows
+    :get-layout tree-node-get-layout})
 
 
-(defn tree-node [parent children &keys extra-fields]
+(defn tree-node [node-type &opt parent children &keys extra-fields]
   (let [node (table/setproto
               @{:parent parent
-                :children children}
+                :children @[]
+                :type node-type}
               tree-node-proto)]
     (when children
       (each c children
+        (:add-child node c)
         (put c :parent node)))
     (eachp [k v] extra-fields
       (put node k v))
@@ -108,8 +306,7 @@
 
 
 (defn window [hwnd &opt parent]
-  (let [node (tree-node parent nil
-                        :type :window
+  (let [node (tree-node :window parent nil
                         :hwnd hwnd
                         :tags @{})]
     (table/setproto node window-proto)))
@@ -122,46 +319,6 @@
 (var frame-proto nil)
 (var vertical-frame-proto nil)
 (var horizontal-frame-proto nil)
-
-
-(defn frame-remove-child [self child]
-  (def current-child (in self :current-child))
-  (def next-child
-    (when (= child current-child)
-      (:get-next-child self child)))
-  (put self :children
-     (filter |(not= $ child) (in self :children)))
-  (when (= child current-child)
-    (if (= child next-child)
-      (put self :current-child nil) # There's no other child
-      (put self :current-child next-child)))
-  self)
-
-
-(defn frame-add-child [self child]
-  (let [children (in self :children)
-        old-parent (in child :parent)]
-    (cond
-      (empty? children)
-      (do
-        (put child :parent self)
-        (array/push children child)
-        # This is the only child, activate it to avoid inconsistent states
-        (put self :current-child child))
-
-      (not= (in child :type) (get-in children [0 :type]))
-      (error "cannot mix different types of children")
-
-      true
-      (do
-        (put child :parent self)
-        (array/push children child)))
-
-    # Do the removal after a successful insertion, so
-    # that we won't end up in an inconsistent state
-    (when old-parent
-      (frame-remove-child old-parent child)))
-  self)
 
 
 (defn frame-split [self direction &opt n ratios]
@@ -214,35 +371,9 @@
   self)
 
 
-(defn frame-get-all-windows [self]
-  (cond
-    (empty? (in self :children))
-    []
-
-    (= :window (get-in self [:children 0 :type]))
-    (slice (in self :children))
-
-    (or (= :frame (get-in self [:children 0 :type]))
-        (= :layout (get-in self [:children 0 :type])))
-    (let [offsprings @[]]
-      (each fr (in self :children)
-        (array/push offsprings ;(frame-get-all-windows fr)))
-      offsprings)))
-
-
-(defn frame-get-current-window [self]
-  (var parent self)
-  (var cur-child (in parent :current-child))
-  (while (and cur-child
-              (not= :window (in cur-child :type)))
-    (set parent cur-child)
-    (set cur-child (in parent :current-child)))
-  cur-child)
-
-
 (defn frame-flatten [self]
-  (def cur-window (frame-get-current-window self))
-  (def all-windows (frame-get-all-windows self))
+  (def cur-window (:get-current-window self))
+  (def all-windows (:get-all-windows self))
   (each w all-windows
     (put w :parent self))
   (put self :children all-windows)
@@ -260,109 +391,6 @@
        (in all-windows 0)))
   (table/setproto self frame-proto) # Clear vertical/horizontal settings
   self)
-
-
-(defn frame-find-window [self hwnd]
-  (var found nil)
-  (each child (in self :children)
-    (cond
-      (and (= :window (in child :type))
-           (= hwnd (in child :hwnd)))
-      (do
-        (set found child)
-        (break))
-
-      (or (= :frame (in child :type))
-          (= :layout (in child :type)))
-      (do
-        (set found (frame-find-window child hwnd))
-        (if found (break)))))
-  found)
-
-
-(defn frame-find-frame-for-window [self win]
-  (cond
-    (empty? (in self :children))
-    self
-
-    (= :window (get-in self [:children 0 :type]))
-    self
-
-    (in self :current-child)
-    (frame-find-frame-for-window (in self :current-child) win)
-
-    true
-    (error "inconsistent states for frame tree")))
-
-
-(defn frame-get-current-frame [self]
-  (frame-find-frame-for-window self nil))
-
-
-(defn frame-purge-windows [self wm]
-  (cond
-    (empty? (in self :children))
-    @[]
-
-    (or (= :frame (get-in self [:children 0 :type]))
-        (= :layout (get-in self [:children 0 :type])))
-    (let [dead @[]]
-      (each f (in self :children)
-        (array/push dead ;(frame-purge-windows f wm)))
-      dead)
-
-    (= :window (get-in self [:children 0 :type]))
-    (let [[alive dead] 
-          (reduce
-            (fn [[a d] w]
-              (if (:hwnd-alive? wm (in w :hwnd))
-                (array/push a w)
-                (array/push d w))
-              [a d])
-            [@[] @[]]
-            (in self :children))]
-      (put self :children alive)
-      (cond
-        (empty? alive)
-        (put self :current-child nil)
-
-        (in self :current-child)
-        (each dw dead
-          (when (= dw (in self :current-child))
-            # The previous active child is dead, fill in a new one
-            (put self :current-child (in alive 0))
-            (break)))
-
-        true # There are children, but none of them is active
-        (error "inconsistent states for frame tree"))
-      dead)))
-
-
-(defn frame-get-first-frame [self]
-  (var cur-fr self)
-  (while true
-    (cond
-      (empty? (in cur-fr :children))
-      (break)
-
-      (= :window (get-in cur-fr [:children 0 :type]))
-      (break))
-    (set cur-fr (get-in cur-fr [:children 0])))
-  cur-fr)
-
-
-(defn frame-get-last-frame [self]
-  (var cur-fr self)
-  (while true
-    (cond
-      (empty? (in cur-fr :children))
-      (break)
-
-      (= :window (get-in cur-fr [:children 0 :type]))
-      (break))
-    (def child-count (length (in cur-fr :children)))
-    (set cur-fr (get-in cur-fr [:children (- child-count 1)])))
-  cur-fr)
 
 
 (defn frame-transform [self new-rect]
@@ -411,38 +439,18 @@
       self)))
 
 
-(defn frame-get-layout [self]
-  (if (or (nil? self) (= :layout (in self :type)))
-    self
-    (frame-get-layout (in self :parent))))
-
-
 (set frame-proto
      (table/setproto
-      @{:add-child frame-add-child
-        :remove-child frame-remove-child
-        :split frame-split
+      @{:split frame-split
         :flatten frame-flatten
-        :transform frame-transform
-        :find-window frame-find-window
-        :find-frame-for-window frame-find-frame-for-window
-        :purge-windows frame-purge-windows
-        :get-current-window frame-get-current-window
-        :get-all-windows frame-get-all-windows
-        :get-current-frame frame-get-current-frame
-        :get-first-frame frame-get-first-frame
-        :get-last-frame frame-get-last-frame
-        :get-layout frame-get-layout}
+        :transform frame-transform}
       tree-node-proto))
 
 
 (varfn frame [rect &opt parent children]
   (default children @[])
-  (let [node (tree-node parent children
-                        :type :frame
-                        :rect rect
-                        :current-child (if-not (empty? children)
-                                         (in children 0)))]
+  (let [node (tree-node :frame parent children
+                        :rect rect)]
     (table/setproto node frame-proto)))
 
 
@@ -849,28 +857,25 @@
 
 (def- layout-proto
   (table/setproto
-   @{:split (fn [&] (error "unsupported operation"))
-     :flatten (fn [&] (error "unsupported operation"))
-     :transform (fn [&] (error "unsupported operation"))
-     :enumerate-frame layout-enumerate-frame
+   @{:enumerate-frame layout-enumerate-frame
      :get-adjacent-frame layout-get-adjacent-frame
      :resize-frame layout-resize-frame
      :balance-frames layout-balance-frames
      :close-frame layout-close-frame}
-   frame-proto))
+   tree-node-proto))
 
 
-(defn layout [id &opt children]
-  (def layout-obj (frame nil nil children))
-  (put layout-obj :type :layout)
-  (put layout-obj :id id)
+(defn layout [id &opt parent children]
+  (default children @[])
+  (def layout-obj (tree-node :layout parent children
+                             :id id))
   (table/setproto layout-obj layout-proto))
 
 
 ######### Virtual desktop container object #########
 
 (defn vdc-find-frame-for-window [self win]
-  (def wm (in self :window-man))
+  (def wm (in self :window-manager))
   (def vd (:get-hwnd-virtual-desktop wm (in win :hwnd)))
   (unless vd
     (break nil))
@@ -887,22 +892,19 @@
       (let [new-layout (:new-layout wm vd)]
         (:add-child self new-layout)
         new-layout)))
-  (:find-frame-for-window lo win))
+  (:get-current-frame lo))
 
 
 (def- virtual-desktop-container-proto
   (table/setproto
-   @{:split (fn [&] (error "unsupported operation"))
-     :flatten (fn [&] (error "unsupported operation"))
-     :transform (fn [&] (error "unsupported operation"))
-     :find-frame-for-window vdc-find-frame-for-window}
-   frame-proto))
+   @{:find-frame-for-window vdc-find-frame-for-window}
+   tree-node-proto))
 
 
-(defn virtual-desktop-container [wm]
-  (def vdc-obj (frame nil nil @[]))
-  (put vdc-obj :type :virtual-desktop-container)
-  (put vdc-obj :window-man wm)
+(defn virtual-desktop-container [wm &opt children]
+  (default children @[])
+  (def vdc-obj (tree-node :virtual-desktop-container nil children
+                          :window-manager wm))
   (table/setproto vdc-obj virtual-desktop-container-proto))
 
 
@@ -939,6 +941,7 @@
         hwnd (in win :hwnd)
         rect (in fr :rect)]
     (log/debug "transforming window: %n, rect = %n" hwnd rect)
+    (log/debug "fr = %n" fr)
     (try
       (with-uia [cr (:CreateCacheRequest uia-com)]
         (:AddPattern cr UIA_TransformPatternId)
@@ -1185,7 +1188,7 @@
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (def dead (:purge-windows (in self :root) self))
+  (def dead (:purge-windows (in self :root) |(not (:hwnd-alive? self (in $ :hwnd)))))
   (each dw dead
     (:call-hook (in self :hook-manager) :dead-window dw))
   (log/debug "purged %n dead windows" (length dead))
@@ -1199,7 +1202,7 @@
       
       (def hwnd (:get_CachedNativeWindowHandle uia-win))
 
-      (when-let [win (:find-window (in self :root) hwnd)]
+      (when-let [win (:find-hwnd (in self :root) hwnd)]
         #Already managed
         (:activate win)
         (break nil))
@@ -1217,7 +1220,7 @@
 
 
 (defn wm-window-opened [self hwnd]
-  (when-let [win (:find-window (in self :root) hwnd)]
+  (when-let [win (:find-hwnd (in self :root) hwnd)]
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break self))
 
@@ -1310,7 +1313,7 @@
 
 (defn wm-new-layout [self id]
   (def [work-areas main-idx] (wm-enumerate-monitors self))
-  (def new-layout (layout id (map |(frame $) work-areas)))
+  (def new-layout (layout id nil (map |(frame $) work-areas)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
   new-layout)
