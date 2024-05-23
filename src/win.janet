@@ -427,6 +427,21 @@
     (tree-node-get-layout (in self :parent))))
 
 
+(defn tree-node-get-top-frame [self]
+  (def parent (in self :parent))
+  (cond
+    (nil? parent)
+    (if (= :frame (in self :type))
+      self
+      nil)
+
+    (= :layout (in parent :type))
+    self
+
+    true
+    (:get-top-frame parent)))
+
+
 (def- tree-node-proto
   @{:activate tree-node-activate
     :get-next-child tree-node-get-next-child
@@ -444,7 +459,8 @@
     :get-adjacent-frame tree-node-get-adjacent-frame
     :find-hwnd tree-node-find-hwnd
     :purge-windows tree-node-purge-windows
-    :get-layout tree-node-get-layout})
+    :get-layout tree-node-get-layout
+    :get-top-frame tree-node-get-top-frame})
 
 
 (defn tree-node [node-type &opt parent children &keys extra-fields]

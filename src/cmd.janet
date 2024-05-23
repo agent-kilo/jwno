@@ -135,14 +135,10 @@
 
 (defn cmd-focus-mode [wm ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
+  (def cur-top (:get-top-frame cur-frame))
   (def cur-layout (:get-layout cur-frame))
-  (def cur-monitor (in cur-layout :current-child))
-  (when (= (in cur-frame :parent) cur-layout)
-    # It's a toplevel frame, which can't be resized
-    (break))
-
-  (def mon-width (- (get-in cur-monitor [:rect :right]) (get-in cur-monitor [:rect :left])))
-  (def mon-height (- (get-in cur-monitor [:rect :bottom]) (get-in cur-monitor [:rect :top])))
+  (def mon-width (- (get-in cur-top [:rect :right]) (get-in cur-top [:rect :left])))
+  (def mon-height (- (get-in cur-top [:rect :bottom]) (get-in cur-top [:rect :top])))
   (:resize-frame cur-layout
                  cur-frame
                  {:left 0
