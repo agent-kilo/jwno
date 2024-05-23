@@ -307,15 +307,15 @@
 
   (assert (= 3 (length (in dummy-frame :children))))
 
-  (assert (= (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 0]) :right)
+  (assert (= (:get-adjacent-frame (get-in dummy-frame [:children 0]) :right)
              (get-in dummy-frame [:children 1])))
-  (assert (= (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 1]) :right)
+  (assert (= (:get-adjacent-frame (get-in dummy-frame [:children 1]) :right)
              (get-in dummy-frame [:children 2])))
-  (assert (= (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 2]) :left)
+  (assert (= (:get-adjacent-frame (get-in dummy-frame [:children 2]) :left)
              (get-in dummy-frame [:children 1])))
-  (assert (nil? (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 2]) :right)))
-  (assert (nil? (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 0]) :up)))
-  (assert (nil? (:get-adjacent-frame dummy-layout (get-in dummy-frame [:children 0]) :down))))
+  (assert (nil? (:get-adjacent-frame (get-in dummy-frame [:children 2]) :right)))
+  (assert (nil? (:get-adjacent-frame (get-in dummy-frame [:children 0]) :up)))
+  (assert (nil? (:get-adjacent-frame (get-in dummy-frame [:children 0]) :down))))
 
 
 (defn main [&]
