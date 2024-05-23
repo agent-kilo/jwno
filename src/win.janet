@@ -17,6 +17,13 @@
 (import ./log)
 
 
+# Forward declarations
+(var frame nil)
+(var frame-proto nil)
+(var vertical-frame-proto nil)
+(var horizontal-frame-proto nil)
+
+
 (defmacro rect-width [rect]
   ~(- (in ,rect :right) (in ,rect :left)))
 
@@ -253,6 +260,107 @@
           (last (:get-all-windows node-to-check)))))))
 
 
+(defn- find-closest-child [children reference rect-key]
+  (var found (first children))
+  (var min-dist (math/abs (- (get-in found [:rect rect-key]) reference)))
+  (each child (slice children 1)
+    (def dist (math/abs (- (get-in child [:rect rect-key]) reference)))
+    (when (< dist min-dist)
+      (set min-dist dist)
+      (set found child)))
+  found)
+
+
+(defn- get-adjacent-frame-impl-descent [orig-node node dir]
+  (def children (in node :children))
+  (def {:top orig-top :left orig-left} (in orig-node :rect))
+
+  (cond
+    (empty? children)
+    node
+
+    (= :window (in (first children) :type))
+    node
+
+    (= :frame (in (first children) :type))
+    (get-adjacent-frame-impl-descent orig-node
+                                     (case [dir (table/getproto node)]
+                                       [:left horizontal-frame-proto]
+                                       (last children)
+
+                                       [:left vertical-frame-proto]
+                                       (find-closest-child children orig-top :top)
+
+                                       [:right horizontal-frame-proto]
+                                       (first children)
+
+                                       [:right vertical-frame-proto]
+                                       (find-closest-child children orig-top :top)
+
+                                       [:up horizontal-frame-proto]
+                                       (find-closest-child children orig-left :left)
+
+                                       [:up vertical-frame-proto]
+                                       (last children)
+
+                                       [:down horizontal-frame-proto]
+                                       (find-closest-child children orig-left :left)
+
+                                       [:down vertical-frame-proto]
+                                       (first children))
+                                     dir)
+
+    true
+    (error "inconsistent states for frame tree")))
+
+
+(defn- get-adjacent-frame-impl-ascent [orig-node node dir]
+  (let [parent (in node :parent)
+        all-siblings (in parent :children)
+        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
+                 idx
+                 (error "inconsistent states for frame tree"))]
+    (var adj-fr nil)
+    (case dir
+      :left
+      (loop [i :down-to [(- fr-idx 1) 0]]
+        (def sibling (in all-siblings i))
+        (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (set adj-fr sibling)
+          (break)))
+      :right
+      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+        (def sibling (in all-siblings i))
+        (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (set adj-fr sibling)
+          (break)))
+      :up
+      (loop [i :down-to [(- fr-idx 1) 0]]
+        (def sibling (in all-siblings i))
+        (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (set adj-fr sibling)
+          (break)))
+      :down
+      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+        (def sibling (in all-siblings i))
+        (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (set adj-fr sibling)
+          (break))))
+
+    (if adj-fr
+      (get-adjacent-frame-impl-descent orig-node adj-fr dir)
+      (if (= :layout (in parent :type))
+        nil # We reached the top level
+        (get-adjacent-frame-impl-ascent orig-node parent dir)))))
+
+
+(defn tree-node-get-adjacent-frame [self dir]
+  (if (= :window (in self :type))
+    (let [parent (in self :parent)]
+      (get-adjacent-frame-impl-ascent parent parent dir))
+    (get-adjacent-frame-impl-ascent self self dir)))
+
+
 (defn tree-node-find-hwnd [self hwnd]
   (cond
     (= :window (in self :type))
@@ -333,6 +441,7 @@
     :get-first-frame tree-node-get-first-frame
     :get-last-frame tree-node-get-last-frame
     :enumerate-node tree-node-enumerate-node
+    :get-adjacent-frame tree-node-get-adjacent-frame
     :find-hwnd tree-node-find-hwnd
     :purge-windows tree-node-purge-windows
     :get-layout tree-node-get-layout})
@@ -369,13 +478,6 @@
 
 
 ######### Frame object #########
-
-# Forward declarations
-(var frame nil)
-(var frame-proto nil)
-(var vertical-frame-proto nil)
-(var horizontal-frame-proto nil)
-
 
 (defn frame-split [self direction &opt n ratios]
   (default n 2)
@@ -588,104 +690,6 @@
    frame-proto))
 
 
-(defn- find-closest-child [children reference rect-key]
-  (var found (first children))
-  (var min-dist (math/abs (- (get-in found [:rect rect-key]) reference)))
-  (each child (slice children 1)
-    (def dist (math/abs (- (get-in child [:rect rect-key]) reference)))
-    (when (< dist min-dist)
-      (set min-dist dist)
-      (set found child)))
-  found)
-
-
-(defn layout-get-adjacent-frame-impl-descent [self orig-node node dir]
-  (def children (in node :children))
-  (def {:top orig-top :left orig-left} (in orig-node :rect))
-
-  (cond
-    (empty? children)
-    node
-
-    (= :window (get-in children [0 :type]))
-    node
-
-    (= :frame (get-in children [0 :type]))
-    (layout-get-adjacent-frame-impl-descent self
-                                            orig-node
-                                            (case [dir (table/getproto node)]
-                                              [:left horizontal-frame-proto]
-                                              (last children)
-
-                                              [:left vertical-frame-proto]
-                                              (find-closest-child children orig-top :top)
-
-                                              [:right horizontal-frame-proto]
-                                              (first children)
-
-                                              [:right vertical-frame-proto]
-                                              (find-closest-child children orig-top :top)
-
-                                              [:up horizontal-frame-proto]
-                                              (find-closest-child children orig-left :left)
-
-                                              [:up vertical-frame-proto]
-                                              (last children)
-
-                                              [:down horizontal-frame-proto]
-                                              (find-closest-child children orig-left :left)
-
-                                              [:down vertical-frame-proto]
-                                              (first children))
-                                            dir)
-
-    true
-    (error "inconsistent states for frame tree")))
-
-
-(defn layout-get-adjacent-frame-impl-ascent [self orig-node node dir]
-  (let [all-siblings (get-in node [:parent :children])
-        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
-                 idx
-                 (error "inconsistent states for frame tree"))]
-    (var adj-fr nil)
-    (case dir
-      :left
-      (loop [i :down-to [(- fr-idx 1) 0]]
-        (def sibling (in all-siblings i))
-        (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)
-          (break)))
-      :right
-      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
-        (def sibling (in all-siblings i))
-        (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)
-          (break)))
-      :up
-      (loop [i :down-to [(- fr-idx 1) 0]]
-        (def sibling (in all-siblings i))
-        (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling)
-          (break)))
-      :down
-      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
-        (def sibling (in all-siblings i))
-        (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling)
-          (break))))
-
-    (if adj-fr
-      (layout-get-adjacent-frame-impl-descent self orig-node adj-fr dir)
-      (if (= self (in node :parent))
-        nil
-        (layout-get-adjacent-frame-impl-ascent self orig-node (in node :parent) dir)))))
-
-
-(defn layout-get-adjacent-frame [self node dir]
-  (layout-get-adjacent-frame-impl-ascent self node node dir))
-
-
 (defn layout-balance-frames [self &opt fr recursive]
   (default recursive false)
   (cond
@@ -885,8 +889,7 @@
 
 (def- layout-proto
   (table/setproto
-   @{:get-adjacent-frame layout-get-adjacent-frame
-     :resize-frame layout-resize-frame
+   @{:resize-frame layout-resize-frame
      :balance-frames layout-balance-frames
      :close-frame layout-close-frame}
    tree-node-proto))

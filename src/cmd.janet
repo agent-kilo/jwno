@@ -96,7 +96,7 @@
 
 (defn cmd-adjacent-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (when-let [adj-fr (:get-adjacent-frame (:get-layout cur-frame) cur-frame dir)]
+  (when-let [adj-fr (:get-adjacent-frame cur-frame dir)]
     (:activate wm adj-fr)))
 
 
@@ -113,7 +113,7 @@
 
   (when (nil? cur-win) (break))
 
-  (when-let [adj-fr (:get-adjacent-frame (:get-layout cur-frame) cur-frame dir)]
+  (when-let [adj-fr (:get-adjacent-frame cur-frame dir)]
     (:add-child adj-fr cur-win)
     (:retile wm adj-fr)
     (:activate wm cur-win)))
