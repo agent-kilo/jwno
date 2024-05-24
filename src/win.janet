@@ -1103,53 +1103,93 @@
     path))
 
 
-(defn wm-get-hwnd-virtual-desktop [self hwnd]
-  (try
-    (:GetWindowDesktopId (in self :vdm-com) hwnd)
-    ((err fib)
-     (log/debug "GetWindowDesktopId failed: %n\n%s"
-                err
-                (get-stack-trace fib))
-     nil)))
+(defn- normalize-hwnd-and-uia-win [hwnd? uia-win? uia-man]
+  (cond
+    (nil? uia-win?)
+    (if (or (nil? hwnd?) (null? hwnd?))
+      (error "invalid hwnd and uia-win")
+      [hwnd? (try
+               (:ElementFromHandleBuildCache (in uia-man :com)
+                                             hwnd?
+                                             (in uia-man :focus-cr))
+               ((err fib)
+                (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                           err
+                           (get-stack-trace fib))
+                nil))])
+
+    (or (nil? hwnd?) (null? hwnd?))
+    [(try
+       (:get_CachedNativeWindowHandle uia-win?)
+       ((err fib)
+        (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
+                   err
+                   (get-stack-trace fib))
+        nil))
+     uia-win?]
+
+    true
+    [hwnd? uia-win?]))
+
+
+(defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
+  (def uia-man (in self :uia-manager))
+  (def [hwnd uia-win]
+    (normalize-hwnd-and-uia-win hwnd? uia-win? uia-man))
+
+  (cond
+    (nil? uia-win)
+    nil
+
+    (nil? hwnd)
+    (do
+      (when (nil? uia-win?)
+        # uia-win is constructed locally, release it
+        (:Release uia-win))
+      nil)
+
+    true
+    (do
+      (def desktop-id
+        (try
+          (:GetWindowDesktopId (in self :vdm-com) hwnd)
+          ((err fib)
+           (log/debug "GetWindowDesktopId failed: %n\n%s"
+                      err
+                      (get-stack-trace fib))
+           nil)))
+
+      (def desktop-name
+        (with-uia [root-elem (:get-root uia-man uia-win)]
+          (if root-elem
+            (do
+              (when (= root-elem uia-win)
+                # So that it won't be freed when leaving with-uia
+                (:AddRef uia-win))
+              (:get_CachedName root-elem))
+            nil)))
+
+      (when (nil? uia-win?)
+        # uia-win is constructed locally in this case, release it.
+        (:Release uia-win))
+
+      (if (or (nil? desktop-id)
+              (nil? desktop-name))
+        nil
+        {:id desktop-id :name desktop-name}))))
 
 
 (defn wm-should-manage-hwnd? [self hwnd? &opt uia-win?]
   (def uia-man (in self :uia-manager))
+
   (def [hwnd uia-win]
-    (cond
-      (nil? uia-win?)
-      (if (or (nil? hwnd?) (null? hwnd?))
-        (error "invalid hwnd and uia-win")
-        [hwnd? (try
-                 (:ElementFromHandleBuildCache (in uia-man :com)
-                                               hwnd?
-                                               (in uia-man :focus-cr))
-                 ((err fib)
-                  (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
-                             err
-                             (get-stack-trace fib))
-                  nil))])
-
-      (or (nil? hwnd?) (null? hwnd?))
-      [(try
-         (:get_CachedNativeWindowHandle uia-win?)
-         ((err fib)
-          (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
-                     err
-                     (get-stack-trace fib))
-          nil))
-       uia-win?]
-
-      true
-      [hwnd? uia-win?]))
-
+    (normalize-hwnd-and-uia-win hwnd? uia-win? uia-man))
   (def exe-path
     (unless (nil? hwnd)
       (wm-get-hwnd-path self hwnd)))
-
-  (def desktop-id
+  (def desktop-info
     (unless (nil? hwnd)
-      (wm-get-hwnd-virtual-desktop self hwnd)))
+      (wm-get-hwnd-virtual-desktop self hwnd uia-win)))
 
   (def result
     (cond
@@ -1165,12 +1205,12 @@
       # wm-get-hwnd-path failed
       false
 
-      (nil? desktop-id)
+      (nil? desktop-info)
       # wm-get-hwnd-virtual-desktop failed
       false
 
       true
-      (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path desktop-id)))
+      (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path desktop-info)))
 
   (when (and (nil? uia-win?)
              (not (nil? uia-win)))
@@ -1446,7 +1486,7 @@
   (put wm-obj :root (virtual-desktop-container wm-obj))
 
   (:add-hook hook-man :filter-window
-     (fn [hwnd uia-win exe-path _desktop-id]
+     (fn [hwnd uia-win exe-path _desktop-info]
        (default-window-filter hwnd uia-win exe-path wm-obj)))
 
   wm-obj)

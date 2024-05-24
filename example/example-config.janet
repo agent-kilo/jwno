@@ -96,11 +96,17 @@
 
 
 (:add-hook hook-man :filter-window
-   (fn [_hwnd uia-win exe-path _desktop-id]
+   (fn [_hwnd uia-win exe-path desktop-info]
      (def name (:get_CachedName uia-win))
      (def class-name (:get_CachedClassName uia-win))
+     (def desktop-name (in desktop-info :name))
+
      # Excluded windows
      (cond
+       (= "Desktop 2" desktop-name)
+       # A "floating" virtual desktop
+       false
+
        # The invisible pseudo window from the Terminal app.
        (= "PseudoConsoleWindow" class-name)
        false
