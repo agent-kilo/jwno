@@ -78,6 +78,10 @@
                      (get-stack-trace fib))
           nil)))
   (def root-hwnd (:get_CachedNativeWindowHandle root))
+  (def release-cur-elem
+    (fn []
+      (unless (= cur-elem uia-elem)
+        (:Release cur-elem))))
 
   (while true
     (def hwnd (:get_CachedNativeWindowHandle cur-elem))
@@ -94,15 +98,15 @@
 
       (nil? parent)
       (do
-        (:Release cur-elem)
+        (release-cur-elem)
         (break))
 
       (= root-hwnd (:get_CachedNativeWindowHandle parent))
       (do
-        (:Release cur-elem)
+        (release-cur-elem)
         (break)))
 
-    (:Release cur-elem)
+    (release-cur-elem)
     (set cur-elem parent)
     (set parent
          (try
@@ -120,19 +124,21 @@
         :focus-cr focus-cr}
     self)
 
-  (def focused
-    (try
-      (:GetFocusedElementBuildCache uia-com focus-cr)
-      ((err fib)
-       # This may fail due to e.g. insufficient privileges
-       (log/debug "GetFocusedElementBuildCache failed: %n\n%s"
-                  err
-                  (get-stack-trace fib))
-       nil)))
-  (if-not focused
-    (break nil))
-
-  (uia-manager-get-parent-window self focused))
+  (with-uia [focused (try
+                       (:GetFocusedElementBuildCache uia-com focus-cr)
+                       ((err fib)
+                        # This may fail due to e.g. insufficient privileges
+                        (log/debug "GetFocusedElementBuildCache failed: %n\n%s"
+                                   err
+                                   (get-stack-trace fib))
+                        nil))]
+    (if focused
+      (let [ret (uia-manager-get-parent-window self focused)]
+        (when (= ret focused)
+          # So that it won't be freed when returned
+          (:AddRef focused))
+        ret)
+      nil)))
 
 
 (defn uia-manager-get-window-info [self hwnd]
