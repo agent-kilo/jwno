@@ -60,28 +60,70 @@
   S_OK)
 
 
+(defn uia-manager-get-root [self uia-elem]
+  (def {:root root
+        :focus-cr focus-cr
+        :control-view-walker walker}
+    self)
+  (def root-hwnd (:get_CachedNativeWindowHandle root))
+
+  (def release
+    (fn [elem]
+      (unless (= elem uia-elem)
+        (:Release elem))))
+
+  (def get-parent
+    (fn [elem]
+      (try
+        (:GetParentElementBuildCache walker elem focus-cr)
+        ((err fib)
+         (log/debug "GetParentElementBuildCache failed: %n\n%s"
+                    err
+                    (get-stack-trace fib))
+         nil))))
+
+  (var cur-elem uia-elem)
+  (var parent (get-parent cur-elem))
+
+  (while (and (not= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
+              (not (nil? parent)))
+    (release cur-elem)
+    (set cur-elem parent)
+    (set parent (get-parent cur-elem)))
+
+  (if (= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
+    cur-elem
+    (do
+      (release cur-elem)
+      nil)))
+
+
 (defn uia-manager-get-parent-window [self uia-elem]
   (def {:root root
         :focus-cr focus-cr
         :control-view-walker walker}
     self)
+  (def root-hwnd (:get_CachedNativeWindowHandle root))
+
+  (def release
+    (fn [elem]
+      (unless (= elem uia-elem)
+        (:Release elem))))
+
+  (def get-parent
+    (fn [elem]
+      (try
+        (:GetParentElementBuildCache walker elem focus-cr)
+        ((err fib)
+         # The window or its parent may have vanished
+         (log/debug "GetParentElementBuildCache failed: %n\n%s"
+                    err
+                    (get-stack-trace fib))
+         nil))))
 
   (var ret nil)
   (var cur-elem uia-elem)
-  (var parent
-       (try
-         (:GetParentElementBuildCache walker cur-elem focus-cr)
-         ((err fib)
-          # The window or its parent may have vanished
-          (log/debug "GetParentElementBuildCache failed: %n\n%s"
-                     err
-                     (get-stack-trace fib))
-          nil)))
-  (def root-hwnd (:get_CachedNativeWindowHandle root))
-  (def release-cur-elem
-    (fn []
-      (unless (= cur-elem uia-elem)
-        (:Release cur-elem))))
+  (var parent (get-parent cur-elem))
 
   (while true
     (def hwnd (:get_CachedNativeWindowHandle cur-elem))
@@ -98,24 +140,18 @@
 
       (nil? parent)
       (do
-        (release-cur-elem)
+        (release cur-elem)
         (break))
 
       (= root-hwnd (:get_CachedNativeWindowHandle parent))
       (do
-        (release-cur-elem)
+        (release cur-elem)
         (break)))
 
-    (release-cur-elem)
+    (release cur-elem)
     (set cur-elem parent)
-    (set parent
-         (try
-           (:GetParentElementBuildCache walker cur-elem focus-cr)
-           ((err fib)
-            (log/debug "GetParentElementBuildCache failed: %n\n%s"
-                       err
-                       (get-stack-trace fib))
-            nil))))
+    (set parent (get-parent cur-elem)))
+
   ret)
 
 
@@ -202,7 +238,8 @@
 
 
 (def- uia-manager-proto
-  @{:get-parent-window uia-manager-get-parent-window
+  @{:get-root uia-manager-get-root
+    :get-parent-window uia-manager-get-parent-window
     :get-focused-window uia-manager-get-focused-window
     :get-window-info uia-manager-get-window-info
     :get-window-bounding-rect uia-manager-get-window-bounding-rect
