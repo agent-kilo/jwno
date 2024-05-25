@@ -906,31 +906,29 @@
    tree-node-proto))
 
 
-(defn layout [id &opt parent children]
+(defn layout [id &opt name parent children]
   (default children @[])
   (def layout-obj (tree-node :layout parent children
-                             :id id))
+                             :id id
+                             :name name))
   (table/setproto layout-obj layout-proto))
 
 
 ######### Virtual desktop container object #########
 
-(defn vdc-find-frame-for-window [self win]
+(defn vdc-find-frame-for-window [self win desktop-info]
   (def wm (in self :window-manager))
-  (def vd (:get-hwnd-virtual-desktop wm (in win :hwnd)))
-  (unless vd
-    (break nil))
 
   (var layout-found nil)
   (each lo (in self :children)
-    (when (= (in lo :id) vd)
+    (when (= (in lo :id) (in desktop-info :id))
       (set layout-found lo)
       (break)))
 
   (def lo
     (if layout-found
       layout-found
-      (let [new-layout (:new-layout wm vd)]
+      (let [new-layout (:new-layout wm desktop-info)]
         (:add-child self new-layout)
         new-layout)))
   (:get-current-frame lo))
@@ -1220,48 +1218,58 @@
   result)
 
 
-(defn wm-add-hwnd [self hwnd]
-  (log/debug "new window: %n" hwnd)
+(defn wm-add-hwnd [self hwnd? &opt uia-win?]
+  (log/debug "new window: %n" hwnd?)
 
-  (def exe-path (wm-get-hwnd-path self hwnd))
-  (unless exe-path
-    # The window disappeared just before wm-get-hwnd-path
-    (break nil))
-
-  (def new-win (window hwnd))
   (def uia-man (in self :uia-manager))
-  (def hwnd-still-valid
-    (with-uia [uia-win (try
-                         (:ElementFromHandleBuildCache (in uia-man :com) hwnd (in uia-man :focus-cr))
-                         ((err fib)
-                          (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
-                                     err
-                                     (get-stack-trace fib))
-                          nil))]
-      (if (nil? uia-win)
-        # The window may have disappeared between (wm-should-manage-hwnd? ...) and (wm-add-hwnd ...)
-        false
-        (do
-          (:call-hook (in self :hook-manager) :new-window new-win uia-win exe-path)
-          true))))
 
-  (when (not hwnd-still-valid)
-    (break nil))
+  (def [hwnd uia-win]
+    (normalize-hwnd-and-uia-win hwnd? uia-win? uia-man))
+  (def exe-path
+    (unless (nil? hwnd)
+      (wm-get-hwnd-path self hwnd)))
+  (def desktop-info
+    (unless (nil? hwnd)
+      (wm-get-hwnd-virtual-desktop self hwnd uia-win)))
 
-  (def tags (in new-win :tags))
+  (def ret
+    (cond
+      (nil? uia-win)
+      nil
 
-  # TODO: floating windows?
+      (nil? hwnd)
+      nil
 
-  (def frame-found
-    (if-let [override-frame (in tags :frame)]
-      (do 
-        (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
-        override-frame)
-      (:find-frame-for-window (in self :root) new-win)))
+      (nil? exe-path)
+      nil
 
-  (:add-child frame-found new-win)
-  (wm-transform-window self new-win frame-found)
-  new-win)
+      (nil? desktop-info)
+      nil
+
+      true
+      (let [new-win (window hwnd)]
+        (:call-hook (in self :hook-manager) :new-window new-win uia-win exe-path) # TODO: desktop-info
+        (def tags (in new-win :tags))
+
+        # TODO: floating windows?
+
+        (def frame-found
+          (if-let [override-frame (in tags :frame)]
+            (do 
+              (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
+              override-frame)
+            (:find-frame-for-window (in self :root) new-win desktop-info)))
+
+        (:add-child frame-found new-win)
+        (wm-transform-window self new-win frame-found)
+        new-win)))
+
+  (when (and (nil? uia-win?)
+             (not (nil? uia-win)))
+    # uia-win is constructed locally in this case, release it.
+    (:Release uia-win))
+
+  ret)
 
 
 (defn wm-focus-changed [self]
@@ -1290,7 +1298,7 @@
       (log/debug "Ignoring window: %n" hwnd)
       (break))
 
-    (if-let [new-win (wm-add-hwnd self hwnd)]
+    (if-let [new-win (wm-add-hwnd self hwnd uia-win)]
       (:activate new-win))))
 
 
@@ -1299,11 +1307,26 @@
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break self))
 
-  (when (not (wm-should-manage-hwnd? self hwnd))
-    (log/debug "Ignoring window: %n" hwnd)
-    (break self))
+  (def uia-man (in self :uia-manager))
+  (def uia-com (in uia-man :com))
+  (def cr (in uia-man :focus-cr))
 
-  (wm-add-hwnd self hwnd))
+  (with-uia [uia-win (try
+                       (:ElementFromHandleBuildCache uia-com hwnd cr)
+                       ((err fib)
+                        (log/debug "ElementFromHandleBuildCache failed for %n: %n\n%s"
+                                   hwnd
+                                   err
+                                   (get-stack-trace fib))
+                        nil))]
+    (unless uia-win
+      (break))
+
+    (unless (wm-should-manage-hwnd? self hwnd uia-win)
+      (log/debug "Ignoring window: %n" hwnd)
+      (break self))
+
+    (wm-add-hwnd self hwnd uia-win)))
 
 
 (defn wm-activate [self node]
@@ -1381,9 +1404,10 @@
   [work-areas main-idx])
 
 
-(defn wm-new-layout [self id]
+(defn wm-new-layout [self desktop-info]
   (def [work-areas main-idx] (wm-enumerate-monitors self))
-  (def new-layout (layout id nil (map |(frame $) work-areas)))
+  (def {:id id :name name} desktop-info)
+  (def new-layout (layout id name nil (map |(frame $) work-areas)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
   new-layout)
