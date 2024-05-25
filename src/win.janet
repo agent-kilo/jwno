@@ -1274,29 +1274,24 @@
   (log/debug "purged %n dead windows" (length dead))
 
   (def uia-man (in self :uia-manager))
-  (def hwnd-to-manage
-    (with-uia [uia-win (:get-focused-window uia-man)]
-      (when (nil? uia-win)
-        (log/debug "No focused window")
-        (break nil))
-      
-      (def hwnd (:get_CachedNativeWindowHandle uia-win))
+  (with-uia [uia-win (:get-focused-window uia-man)]
+    (when (nil? uia-win)
+      (log/debug "No focused window")
+      (break))
+    
+    (def hwnd (:get_CachedNativeWindowHandle uia-win))
 
-      (when-let [win (:find-hwnd (in self :root) hwnd)]
-        #Already managed
-        (:activate win)
-        (break nil))
+    (when-let [win (:find-hwnd (in self :root) hwnd)]
+      #Already managed
+      (:activate win)
+      (break))
 
-      (when (not (wm-should-manage-hwnd? self hwnd uia-win))
-        (log/debug "Ignoring window: %n" hwnd)
-        (break nil))
+    (when (not (wm-should-manage-hwnd? self hwnd uia-win))
+      (log/debug "Ignoring window: %n" hwnd)
+      (break))
 
-      hwnd))
-
-  (when hwnd-to-manage
-    (if-let [new-win (wm-add-hwnd self hwnd-to-manage)]
-      (:activate new-win)))
-  self)
+    (if-let [new-win (wm-add-hwnd self hwnd)]
+      (:activate new-win))))
 
 
 (defn wm-window-opened [self hwnd]
@@ -1308,8 +1303,7 @@
     (log/debug "Ignoring window: %n" hwnd)
     (break self))
 
-  (wm-add-hwnd self hwnd)
-  self)
+  (wm-add-hwnd self hwnd))
 
 
 (defn wm-activate [self node]
@@ -1337,9 +1331,7 @@
   (log/debug "setting focus to window: %n" hwnd)
   (if (= hwnd root-hwnd)
     (SetForegroundWindow hwnd) # The UIA SetFocus method doesn't work for the desktop window
-    (:set-focus-to-window uia-man hwnd))
-
-  self)
+    (:set-focus-to-window uia-man hwnd)))
 
 
 (defn wm-retile [self &opt fr]
@@ -1360,9 +1352,7 @@
       (or (= :frame (get-in fr [:children 0 :type]))
           (= :layout (get-in fr [:children 0 :type])))
       (each f (in fr :children)
-        (wm-retile self f))))
-
-  self)
+        (wm-retile self f)))))
 
 
 (defn wm-enumerate-monitors [self]
