@@ -912,27 +912,37 @@
 
 ######### Virtual desktop container object #########
 
-(defn vdc-find-frame-for-window [self win desktop-info]
-  (def wm (in self :window-manager))
+(defn vdc-get-current-frame-on-desktop [self desktop-info]
+  (def {:id desktop-id
+        :name desktop-name}
+    desktop-info)
 
   (var layout-found nil)
   (each lo (in self :children)
-    (when (= (in lo :id) (in desktop-info :id))
+    (when (= (in lo :id) desktop-id)
       (set layout-found lo)
       (break)))
+  (if layout-found
+    (:get-current-frame layout-found)
+    (let [new-layout (:new-layout self desktop-info)]
+      (:add-child self new-layout)
+      (:get-current-frame new-layout))))
 
-  (def lo
-    (if layout-found
-      layout-found
-      (let [new-layout (:new-layout wm desktop-info)]
-        (:add-child self new-layout)
-        new-layout)))
-  (:get-current-frame lo))
+
+(defn vdc-new-layout [self desktop-info]
+  (def wm (in self :window-manager))
+  (def [work-areas main-idx] (:enumerate-monitors wm))
+  (def {:id id :name name} desktop-info)
+  (def new-layout (layout id name nil (map |(frame $) work-areas)))
+  (def to-activate (or main-idx 0))
+  (:activate (get-in new-layout [:children to-activate]))
+  new-layout)
 
 
 (def- virtual-desktop-container-proto
   (table/setproto
-   @{:find-frame-for-window vdc-find-frame-for-window}
+   @{:new-layout vdc-new-layout
+     :get-current-frame-on-desktop vdc-get-current-frame-on-desktop}
    tree-node-proto))
 
 
@@ -1254,7 +1264,7 @@
       (do 
         (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
         override-frame)
-      (:find-frame-for-window (in self :root) new-win desktop-info)))
+      (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
   (:transform-window self new-win frame-found)
@@ -1389,15 +1399,6 @@
   [work-areas main-idx])
 
 
-(defn wm-new-layout [self desktop-info]
-  (def [work-areas main-idx] (:enumerate-monitors self))
-  (def {:id id :name name} desktop-info)
-  (def new-layout (layout id name nil (map |(frame $) work-areas)))
-  (def to-activate (or main-idx 0))
-  (:activate (get-in new-layout [:children to-activate]))
-  new-layout)
-
-
 (defn wm-close-hwnd [self hwnd]
   (PostMessage hwnd WM_CLOSE 0 0))
 
@@ -1437,8 +1438,6 @@
     :enumerate-monitors wm-enumerate-monitors
     :jwno-process-elevated? wm-jwno-process-elevated?
     :normalize-hwnd-and-uia-element wm-normalize-hwnd-and-uia-element
-
-    :new-layout wm-new-layout
 
     :destroy wm-destroy})
 
