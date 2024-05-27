@@ -1356,6 +1356,10 @@
         (:get-current-frame node)))
 
     (unless (= fr-to-signal old-frame)
+      (when-let [top-win (:get-top-window fr-to-signal)]
+        # Explicitly make the top window our current window, to
+        # prevent lower windows popping up when switching to a frame
+        (put fr-to-signal :current-child top-win))
       (:call-hook (in self :hook-manager) :frame-activated
          fr-to-signal)))
 

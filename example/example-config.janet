@@ -153,13 +153,6 @@
        (:close parent)
        (:retile window-man))))
 
-(:add-hook hook-man :frame-activated
-   (fn [frame]
-     (when-let [top-win (:get-top-window frame)]
-       (log/debug "++++++++ Setting current window to top window: %n"
-                  (in top-win :hwnd))
-       (put frame :current-child top-win))))
-
 
 (:add-command command-man :close-current-window-or-frame
    (fn []
