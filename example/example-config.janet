@@ -137,7 +137,7 @@
        true)))
 
 (:add-hook hook-man :new-window
-   (fn [win uia-win _exe-path]
+   (fn [win uia-win _exe-path _desktop-info]
      (def class-name (:get_CachedClassName uia-win))
      (cond
        (= "Emacs" class-name)

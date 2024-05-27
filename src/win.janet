@@ -1243,7 +1243,7 @@
 
   (def new-win (window hwnd))
   (:call-hook (in self :hook-manager) :new-window
-     new-win uia-win exe-path) # TODO: desktop-info
+     new-win uia-win exe-path desktop-info)
 
   (def tags (in new-win :tags))
 
