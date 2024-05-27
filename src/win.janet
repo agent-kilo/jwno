@@ -1101,20 +1101,25 @@
     path))
 
 
-(defn- normalize-hwnd-and-uia-win [hwnd? uia-win? uia-man]
+(defn wm-get-hwnd-uia-element [self hwnd]
+  (def uia-man (in self :uia-manager))
+  (try
+    (:ElementFromHandleBuildCache (in uia-man :com)
+                                  hwnd
+                                  (in uia-man :focus-cr))
+    ((err fib)
+     (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                err
+                (get-stack-trace fib))
+     nil)))
+
+
+(defn wm-normalize-hwnd-and-uia-element [self hwnd? uia-win?]
   (cond
     (nil? uia-win?)
     (if (or (nil? hwnd?) (null? hwnd?))
       (error "invalid hwnd and uia-win")
-      [hwnd? (try
-               (:ElementFromHandleBuildCache (in uia-man :com)
-                                             hwnd?
-                                             (in uia-man :focus-cr))
-               ((err fib)
-                (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
-                           err
-                           (get-stack-trace fib))
-                nil))])
+      [hwnd? (:get-hwnd-uia-element self hwnd?)])
 
     (or (nil? hwnd?) (null? hwnd?))
     [(try
@@ -1133,7 +1138,7 @@
 (defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
   (def uia-man (in self :uia-manager))
   (def [hwnd uia-win]
-    (normalize-hwnd-and-uia-win hwnd? uia-win? uia-man))
+    (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
 
   (cond
     (nil? uia-win)
@@ -1177,54 +1182,11 @@
         {:id desktop-id :name desktop-name}))))
 
 
-(defn wm-should-manage-hwnd? [self hwnd? &opt uia-win?]
+(defn wm-get-hwnd-info [self hwnd? &opt uia-win?]
   (def uia-man (in self :uia-manager))
 
   (def [hwnd uia-win]
-    (normalize-hwnd-and-uia-win hwnd? uia-win? uia-man))
-  (def exe-path
-    (unless (nil? hwnd)
-      (wm-get-hwnd-path self hwnd)))
-  (def desktop-info
-    (unless (nil? hwnd)
-      (wm-get-hwnd-virtual-desktop self hwnd uia-win)))
-
-  (def result
-    (cond
-      (nil? uia-win)
-      # ElementFromHandleBuildCache failed
-      false
-
-      (nil? hwnd)
-      # get_CachedNativeWindowHandle failed
-      false
-
-      (nil? exe-path)
-      # wm-get-hwnd-path failed
-      false
-
-      (nil? desktop-info)
-      # wm-get-hwnd-virtual-desktop failed
-      false
-
-      true
-      (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path desktop-info)))
-
-  (when (and (nil? uia-win?)
-             (not (nil? uia-win)))
-    # uia-win is constructed locally in this case, release it.
-    (:Release uia-win))
-
-  result)
-
-
-(defn wm-add-hwnd [self hwnd? &opt uia-win?]
-  (log/debug "new window: %n" hwnd?)
-
-  (def uia-man (in self :uia-manager))
-
-  (def [hwnd uia-win]
-    (normalize-hwnd-and-uia-win hwnd? uia-win? uia-man))
+    (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
   (def exe-path
     (unless (nil? hwnd)
       (wm-get-hwnd-path self hwnd)))
@@ -1235,41 +1197,72 @@
   (def ret
     (cond
       (nil? uia-win)
+      # ElementFromHandleBuildCache failed
       nil
 
       (nil? hwnd)
+      # get_CachedNativeWindowHandle failed
       nil
 
       (nil? exe-path)
+      # wm-get-hwnd-path failed
       nil
 
       (nil? desktop-info)
+      # wm-get-hwnd-virtual-desktop failed
       nil
 
       true
-      (let [new-win (window hwnd)]
-        (:call-hook (in self :hook-manager) :new-window new-win uia-win exe-path) # TODO: desktop-info
-        (def tags (in new-win :tags))
+      {:hwnd hwnd
+       :uia-element uia-win
+       :exe-path exe-path
+       :virtual-desktop desktop-info}))
 
-        # TODO: floating windows?
-
-        (def frame-found
-          (if-let [override-frame (in tags :frame)]
-            (do 
-              (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
-              override-frame)
-            (:find-frame-for-window (in self :root) new-win desktop-info)))
-
-        (:add-child frame-found new-win)
-        (wm-transform-window self new-win frame-found)
-        new-win)))
-
-  (when (and (nil? uia-win?)
-             (not (nil? uia-win)))
-    # uia-win is constructed locally in this case, release it.
+  (when (and (nil? ret)
+             (not (nil? uia-win))
+             (not= uia-win uia-win?))
     (:Release uia-win))
 
   ret)
+
+
+(defn wm-should-manage-hwnd? [self hwnd-info]
+  (def {:hwnd hwnd
+        :uia-element uia-win
+        :exe-path exe-path
+        :virtual-desktop desktop-info}
+    hwnd-info)
+  (:call-filter-hook (in self :hook-manager) :filter-window
+     hwnd uia-win exe-path desktop-info))
+
+
+(defn wm-add-hwnd [self hwnd-info]
+  (def {:hwnd hwnd
+        :uia-element uia-win
+        :exe-path exe-path
+        :virtual-desktop desktop-info}
+    hwnd-info)
+
+  (log/debug "new window: %n" hwnd)
+
+  (def new-win (window hwnd))
+  (:call-hook (in self :hook-manager) :new-window
+     new-win uia-win exe-path) # TODO: desktop-info
+
+  (def tags (in new-win :tags))
+
+  # TODO: floating windows?
+
+  (def frame-found
+    (if-let [override-frame (in tags :frame)]
+      (do 
+        (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
+        override-frame)
+      (:find-frame-for-window (in self :root) new-win desktop-info)))
+
+  (:add-child frame-found new-win)
+  (wm-transform-window self new-win frame-found)
+  new-win)
 
 
 (defn wm-focus-changed [self]
@@ -1294,39 +1287,35 @@
       (:activate win)
       (break))
 
-    (when (not (wm-should-manage-hwnd? self hwnd uia-win))
+    (def hwnd-info (:get-hwnd-info self hwnd uia-win))
+    (when (nil? hwnd-info)
+      (log/debug "Window %n vanished?" hwnd)
+      (break))
+
+    (when (not (:should-manage-hwnd? self hwnd-info))
       (log/debug "Ignoring window: %n" hwnd)
       (break))
 
-    (if-let [new-win (wm-add-hwnd self hwnd uia-win)]
+    (if-let [new-win (:add-hwnd self hwnd-info)]
       (:activate new-win))))
 
 
 (defn wm-window-opened [self hwnd]
   (when-let [win (:find-hwnd (in self :root) hwnd)]
     (log/debug "window-opened event for managed window: %n" hwnd)
-    (break self))
+    (break))
 
-  (def uia-man (in self :uia-manager))
-  (def uia-com (in uia-man :com))
-  (def cr (in uia-man :focus-cr))
+  (def hwnd-info (:get-hwnd-info self hwnd))
+  (when (nil? hwnd-info)
+    (log/debug "Window %n vanished?" hwnd)
+    (break))
 
-  (with-uia [uia-win (try
-                       (:ElementFromHandleBuildCache uia-com hwnd cr)
-                       ((err fib)
-                        (log/debug "ElementFromHandleBuildCache failed for %n: %n\n%s"
-                                   hwnd
-                                   err
-                                   (get-stack-trace fib))
-                        nil))]
-    (unless uia-win
+  (with-uia [_uia-win (in hwnd-info :uia-element)]
+    (unless (:should-manage-hwnd? self hwnd-info)
+      (log/debug "Ignoring window: %n" hwnd)
       (break))
 
-    (unless (wm-should-manage-hwnd? self hwnd uia-win)
-      (log/debug "Ignoring window: %n" hwnd)
-      (break self))
-
-    (wm-add-hwnd self hwnd uia-win)))
+    (:add-hwnd self hwnd-info)))
 
 
 (defn wm-activate [self node]
@@ -1435,26 +1424,27 @@
     :retile wm-retile
     :activate wm-activate
 
-    :add-hwnd wm-add-hwnd
-    :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
-    :should-manage-hwnd? wm-should-manage-hwnd?
     :get-hwnd-path wm-get-hwnd-path
-    :set-hwnd-alpha wm-set-hwnd-alpha
-    :close-hwnd wm-close-hwnd
+    :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
+    :get-hwnd-uia-element wm-get-hwnd-uia-element
+    :get-hwnd-info wm-get-hwnd-info
     :hwnd-alive? wm-hwnd-alive?
     :hwnd-process-elevated? wm-hwnd-process-elevated?
+
+    :should-manage-hwnd? wm-should-manage-hwnd?
+    :add-hwnd wm-add-hwnd
+
+    :set-hwnd-alpha wm-set-hwnd-alpha
+    :close-hwnd wm-close-hwnd
 
     :get-pid-path wm-get-pid-path
     :enumerate-monitors wm-enumerate-monitors
     :jwno-process-elevated? wm-jwno-process-elevated?
+    :normalize-hwnd-and-uia-element wm-normalize-hwnd-and-uia-element
 
     :new-layout wm-new-layout
 
     :destroy wm-destroy})
-
-
-(defn check-valid-uia-window [uia-win]
-  (is-valid-uia-window? uia-win))
 
 
 (defn default-window-filter [hwnd uia-win exe-path wm]
