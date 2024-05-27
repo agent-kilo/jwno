@@ -1078,7 +1078,7 @@
   (when (= (int/u64 0) pid)
     (break nil))
 
-  (def path (wm-get-pid-path self pid))
+  (def path (:get-pid-path self pid))
 
   (var uwp-pid nil)
   (when (and (not (nil? path))
@@ -1093,7 +1093,7 @@
                           (break FALSE))
                         TRUE)))
   (if uwp-pid
-    (wm-get-pid-path self uwp-pid)
+    (:get-pid-path self uwp-pid)
     path))
 
 
@@ -1185,10 +1185,10 @@
     (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
   (def exe-path
     (unless (nil? hwnd)
-      (wm-get-hwnd-path self hwnd)))
+      (:get-hwnd-path self hwnd)))
   (def desktop-info
     (unless (nil? hwnd)
-      (wm-get-hwnd-virtual-desktop self hwnd uia-win)))
+      (:get-hwnd-virtual-desktop self hwnd uia-win)))
 
   (def ret
     (cond
@@ -1257,7 +1257,7 @@
       (:find-frame-for-window (in self :root) new-win desktop-info)))
 
   (:add-child frame-found new-win)
-  (wm-transform-window self new-win frame-found)
+  (:transform-window self new-win frame-found)
   new-win)
 
 
@@ -1346,7 +1346,7 @@
   (cond
     (nil? fr)
     # Retile the whole tree
-    (wm-retile self (in self :root))
+    (:retile self (in self :root))
 
     true
     (cond
@@ -1355,12 +1355,12 @@
 
       (= :window (get-in fr [:children 0 :type]))
       (each w (in fr :children)
-        (wm-transform-window self w fr))
+        (:transform-window self w fr))
 
       (or (= :frame (get-in fr [:children 0 :type]))
           (= :layout (get-in fr [:children 0 :type])))
       (each f (in fr :children)
-        (wm-retile self f)))))
+        (:retile self f)))))
 
 
 (defn wm-enumerate-monitors [self]
@@ -1390,7 +1390,7 @@
 
 
 (defn wm-new-layout [self desktop-info]
-  (def [work-areas main-idx] (wm-enumerate-monitors self))
+  (def [work-areas main-idx] (:enumerate-monitors self))
   (def {:id id :name name} desktop-info)
   (def new-layout (layout id name nil (map |(frame $) work-areas)))
   (def to-activate (or main-idx 0))
