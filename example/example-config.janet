@@ -136,7 +136,7 @@
 
        true)))
 
-(:add-hook hook-man :new-window
+(:add-hook hook-man :window-created
    (fn [win uia-win _exe-path _desktop-info]
      (def class-name (:get_CachedClassName uia-win))
      (cond
@@ -146,7 +146,7 @@
        (= "#32770" class-name) # Dialog window class
        (put (in win :tags) :no-expand true))))
 
-(:add-hook hook-man :dead-window
+(:add-hook hook-man :window-removed
    (fn [dead-win]
      (def parent (in dead-win :parent))
      (when (empty? (in parent :children))

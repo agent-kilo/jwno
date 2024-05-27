@@ -1273,7 +1273,7 @@
   (log/debug "new window: %n" hwnd)
 
   (def new-win (window hwnd))
-  (:call-hook (in self :hook-manager) :new-window
+  (:call-hook (in self :hook-manager) :window-created
      new-win uia-win exe-path desktop-info)
 
   (def tags (in new-win :tags))
@@ -1298,7 +1298,7 @@
   # Maybe I shoud check the hwnds everytime a window is manipulated?
   (def dead (:purge-windows (in self :root) |(not (:hwnd-alive? self (in $ :hwnd)))))
   (each dw dead
-    (:call-hook (in self :hook-manager) :dead-window dw))
+    (:call-hook (in self :hook-manager) :window-removed dw))
   (log/debug "purged %n dead windows" (length dead))
 
   (def uia-man (in self :uia-manager))
