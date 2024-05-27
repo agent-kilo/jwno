@@ -136,6 +136,26 @@
       offsprings)))
 
 
+(defn tree-node-get-top-window [self]
+  (def win-set @{})
+  (each w (:get-all-windows self)
+    (put win-set (in w :hwnd) w))
+
+  (var top-win nil)
+  # XXX: EnumChildWindows() visits windows according to z-order,
+  # but it seems this behavior is not documented.
+  (EnumChildWindows nil
+                    (fn [hwnd]
+                      (if-let [w (in win-set hwnd)]
+                        (do
+                          (set top-win w)
+                          # Stop enumeration
+                          0)
+                        # Carry on
+                        1)))
+  top-win)
+
+
 (defn tree-node-get-current-window [self]
   (cond
     (= :window (in self :type))
@@ -450,6 +470,7 @@
     :add-child tree-node-add-child
     :remove-child tree-node-remove-child
     :get-all-windows tree-node-get-all-windows
+    :get-top-window tree-node-get-top-window
     :get-current-window tree-node-get-current-window
     :get-current-frame tree-node-get-current-frame
     :get-first-frame tree-node-get-first-frame
@@ -1326,7 +1347,17 @@
 
 (defn wm-activate [self node]
   (when node
-    (:activate node))
+    (def old-frame (:get-current-frame (in self :root)))
+    (:activate node)
+    
+    (def fr-to-signal
+      (if (= :window (in node :type))
+        (in node :parent)
+        (:get-current-frame node)))
+
+    (unless (= fr-to-signal old-frame)
+      (:call-hook (in self :hook-manager) :frame-activated
+         fr-to-signal)))
 
   (def uia-man (in self :uia-manager))
   (def root (in uia-man :root))
