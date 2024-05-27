@@ -1,7 +1,6 @@
 (use jw32/_winuser)
 (use jw32/_libloaderapi)
 (use jw32/_combaseapi)
-(use jw32/_uiautomation)
 
 (use ./key)
 (use ./cmd)
@@ -65,6 +64,11 @@
   (log/debug "in main")
   (log/debug "cli-args = %n" cli-args)
 
+  (try
+    (CoInitializeEx nil COINIT_MULTITHREADED)
+    ((err fib)
+     (show-error-and-exit err 1 (get-stack-trace fib))))
+
   (def context @{}) # Forward declaration
 
   (def hook-man (hook-manager))
@@ -105,5 +109,7 @@
   (main-loop cli-args context)
 
   (repl/stop-server repl-server)
+  (:destroy window-man)
   (:destroy uia-man)
+  (CoUninitialize)
   (log/deinit))

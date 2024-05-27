@@ -9,10 +9,26 @@
 (import ./log)
 
 
+(def DEBUG-REF-COUNT false)
+(var- with-uia-dtor-fn nil)
+(if DEBUG-REF-COUNT
+  (set with-uia-dtor-fn
+       ~(fn [x]
+          (when (not (nil? x))
+            (def refc (:Release x))
+            (log/debug "++++ After releasing %n, ref count = %n, stack:\n%s"
+                       x
+                       refc
+                       (get-stack-trace (fiber/current))))))
+  (set with-uia-dtor-fn
+       ~(fn [x]
+          (when (not (nil? x))
+            (:Release x)))))
+
 (defmacro with-uia [[binding ctor dtor] & body]
   ~(do
      (def ,binding ,ctor)
-     ,(apply defer [(or dtor ~(fn [x] (when (not (nil? x)) (:Release x)))) binding] body)))
+     ,(apply defer [(or dtor with-uia-dtor-fn) binding] body)))
 
 
 (defmacro is-valid-uia-window? [uia-win]
@@ -44,24 +60,70 @@
   S_OK)
 
 
+(defn uia-manager-get-root [self uia-elem]
+  (def {:root root
+        :focus-cr focus-cr
+        :control-view-walker walker}
+    self)
+  (def root-hwnd (:get_CachedNativeWindowHandle root))
+
+  (def release
+    (fn [elem]
+      (unless (= elem uia-elem)
+        (:Release elem))))
+
+  (def get-parent
+    (fn [elem]
+      (try
+        (:GetParentElementBuildCache walker elem focus-cr)
+        ((err fib)
+         (log/debug "GetParentElementBuildCache failed: %n\n%s"
+                    err
+                    (get-stack-trace fib))
+         nil))))
+
+  (var cur-elem uia-elem)
+  (var parent (get-parent cur-elem))
+
+  (while (and (not= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
+              (not (nil? parent)))
+    (release cur-elem)
+    (set cur-elem parent)
+    (set parent (get-parent cur-elem)))
+
+  (if (= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
+    cur-elem
+    (do
+      (release cur-elem)
+      nil)))
+
+
 (defn uia-manager-get-parent-window [self uia-elem]
   (def {:root root
         :focus-cr focus-cr
         :control-view-walker walker}
     self)
+  (def root-hwnd (:get_CachedNativeWindowHandle root))
+
+  (def release
+    (fn [elem]
+      (unless (= elem uia-elem)
+        (:Release elem))))
+
+  (def get-parent
+    (fn [elem]
+      (try
+        (:GetParentElementBuildCache walker elem focus-cr)
+        ((err fib)
+         # The window or its parent may have vanished
+         (log/debug "GetParentElementBuildCache failed: %n\n%s"
+                    err
+                    (get-stack-trace fib))
+         nil))))
 
   (var ret nil)
   (var cur-elem uia-elem)
-  (var parent
-       (try
-         (:GetParentElementBuildCache walker cur-elem focus-cr)
-         ((err fib)
-          # The window or its parent may have vanished
-          (log/debug "GetParentElementBuildCache failed: %n\n%s"
-                     err
-                     (get-stack-trace fib))
-          nil)))
-  (def root-hwnd (:get_CachedNativeWindowHandle root))
+  (var parent (get-parent cur-elem))
 
   (while true
     (def hwnd (:get_CachedNativeWindowHandle cur-elem))
@@ -78,24 +140,18 @@
 
       (nil? parent)
       (do
-        (:Release cur-elem)
+        (release cur-elem)
         (break))
 
       (= root-hwnd (:get_CachedNativeWindowHandle parent))
       (do
-        (:Release cur-elem)
+        (release cur-elem)
         (break)))
 
-    (:Release cur-elem)
+    (release cur-elem)
     (set cur-elem parent)
-    (set parent
-         (try
-           (:GetParentElementBuildCache walker cur-elem focus-cr)
-           ((err fib)
-            (log/debug "GetParentElementBuildCache failed: %n\n%s"
-                       err
-                       (get-stack-trace fib))
-            nil))))
+    (set parent (get-parent cur-elem)))
+
   ret)
 
 
@@ -104,19 +160,21 @@
         :focus-cr focus-cr}
     self)
 
-  (def focused
-    (try
-      (:GetFocusedElementBuildCache uia-com focus-cr)
-      ((err fib)
-       # This may fail due to e.g. insufficient privileges
-       (log/debug "GetFocusedElementBuildCache failed: %n\n%s"
-                  err
-                  (get-stack-trace fib))
-       nil)))
-  (if-not focused
-    (break nil))
-
-  (uia-manager-get-parent-window self focused))
+  (with-uia [focused (try
+                       (:GetFocusedElementBuildCache uia-com focus-cr)
+                       ((err fib)
+                        # This may fail due to e.g. insufficient privileges
+                        (log/debug "GetFocusedElementBuildCache failed: %n\n%s"
+                                   err
+                                   (get-stack-trace fib))
+                        nil))]
+    (if focused
+      (let [ret (uia-manager-get-parent-window self focused)]
+        (when (= ret focused)
+          # So that it won't be freed when returned
+          (:AddRef focused))
+        ret)
+      nil)))
 
 
 (defn uia-manager-get-window-info [self hwnd]
@@ -176,12 +234,12 @@
   (:Release control-view-walker)
   (:Release focus-cr)
   (:Release root)
-  (:Release uia-com)
-  (CoUninitialize))
+  (:Release uia-com))
 
 
 (def- uia-manager-proto
-  @{:get-parent-window uia-manager-get-parent-window
+  @{:get-root uia-manager-get-root
+    :get-parent-window uia-manager-get-parent-window
     :get-focused-window uia-manager-get-focused-window
     :get-window-info uia-manager-get-window-info
     :get-window-bounding-rect uia-manager-get-window-bounding-rect
@@ -230,7 +288,6 @@
 (defn uia-manager []
   (def chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
 
-  (CoInitializeEx nil COINIT_MULTITHREADED)
   (def uia-com
     (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
   (:put_AutoSetFocus uia-com false) # To reduce flicker

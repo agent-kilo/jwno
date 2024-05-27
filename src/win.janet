@@ -3,6 +3,7 @@
 (use jw32/_processthreadsapi)
 (use jw32/_securitybaseapi)
 (use jw32/_combaseapi)
+(use jw32/_shobjidl_core)
 (use jw32/_winnt)
 (use jw32/_handleapi)
 (use jw32/_uiautomation)
@@ -14,6 +15,13 @@
 (use ./util)
 
 (import ./log)
+
+
+# Forward declarations
+(var frame nil)
+(var frame-proto nil)
+(var vertical-frame-proto nil)
+(var horizontal-frame-proto nil)
 
 
 (defmacro rect-width [rect]
@@ -37,8 +45,7 @@
   (while parent
     (put parent :current-child child)
     (set child parent)
-    (set parent (in parent :parent)))
-  self)
+    (set parent (in parent :parent))))
 
 
 (defn tree-node-get-next-child [self child]
@@ -77,21 +84,393 @@
     (tree-node-get-prev-child (in self :parent) self)))
 
 
+(defn tree-node-add-child [self child]
+  (let [children (in self :children)
+        old-parent (in child :parent)]
+    (cond
+      (empty? children)
+      (do
+        (put child :parent self)
+        (array/push children child)
+        # This is the only child, activate it to avoid inconsistent states
+        (put self :current-child child))
+
+      (not= (in child :type) (in (first children) :type))
+      (error "cannot mix different types of children")
+
+      true
+      (do
+        (put child :parent self)
+        (array/push children child)))
+
+    # Do the removal after a successful insertion, so
+    # that we won't end up in an inconsistent state
+    (when old-parent
+      (:remove-child old-parent child))))
+
+
+(defn tree-node-remove-child [self child]
+  (def current-child (in self :current-child))
+  (when (= child current-child)
+    (def next-child (:get-next-child self child))
+    (if (= child next-child)
+      (put self :current-child nil) # There's no other child
+      (put self :current-child next-child)))
+  (put self :children
+     (filter |(not= $ child) (in self :children))))
+
+
+(defn tree-node-get-all-windows [self]
+  (def children (in self :children))
+  (cond
+    (or (nil? children) (empty? children))
+    []
+
+    (= :window (in (first children) :type))
+    (slice (in self :children))
+
+    true # children are other container nodes
+    (let [offsprings @[]]
+      (each c children
+        (array/push offsprings ;(:get-all-windows c)))
+      offsprings)))
+
+
+(defn tree-node-get-current-window [self]
+  (cond
+    (= :window (in self :type))
+    self
+
+    (nil? (in self :current-child))
+    nil
+
+    true
+    (:get-current-window (in self :current-child))))
+
+
+(defn tree-node-get-current-frame [self]
+  (def children (in self :children))
+  (def current-child (in self :current-child))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    self
+
+    (= :window (in (first children) :type))
+    self
+
+    (not (nil? current-child))
+    (:get-current-frame current-child)
+
+    true
+    # There are children, but no current-child
+    (error "inconsistent states for frame tree")))
+
+
+(defn tree-node-get-first-frame [self]
+  (def children (in self :children))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    self
+
+    (= :window (in (first children) :type))
+    self
+
+    true
+    (:get-first-frame (first children))))
+
+
+(defn tree-node-get-last-frame [self]
+  (def children (in self :children))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    self
+
+    (= :window (in (first children) :type))
+    self
+
+    true
+    (:get-last-frame (last children))))
+
+
+(defn tree-node-enumerate-node [self node dir &opt wrap-around node-type]
+  (default wrap-around true)
+  (default node-type (in node :type))
+
+  (when (= :window (in self :type))
+    (error "invalid operation"))
+
+  (let [parent (in node :parent)
+        all-siblings (in parent :children)
+        sibling-count (length all-siblings)
+        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
+                 idx
+                 (error "inconsistent states for frame tree"))
+        idx-to-check (case dir
+                       :next
+                       (if (and wrap-around (= self parent)) # Toplevel frames wrap around
+                         (% (+ fr-idx 1) sibling-count)
+                         (+ fr-idx 1))
+                       :prev
+                       (if (and wrap-around (= self parent))
+                         (% (+ fr-idx sibling-count -1) sibling-count)
+                         (- fr-idx 1)))]
+    (cond
+      (or (< idx-to-check 0)
+          (>= idx-to-check sibling-count))
+      # We reached the end of the sub-frame list
+      (if (= self parent)
+        nil # Stop at the top node
+        (:enumerate-node self parent dir wrap-around node-type))
+
+      (= dir :next)
+      (let [node-to-check (in all-siblings idx-to-check)]
+        (cond
+          (not= :window node-type)
+          (:get-first-frame node-to-check)
+
+          (= :window (in node-to-check :type))
+          node-to-check
+
+          true
+          (first (:get-all-windows node-to-check))))
+
+      (= dir :prev)
+      (let [node-to-check (in all-siblings idx-to-check)]
+        (cond
+          (not= :window node-type)
+          (:get-last-frame node-to-check)
+
+          (= :window (in node-to-check :type))
+          node-to-check
+
+          true
+          (last (:get-all-windows node-to-check)))))))
+
+
+(defn- find-closest-child [children reference rect-key]
+  (var found (first children))
+  (var min-dist (math/abs (- (get-in found [:rect rect-key]) reference)))
+  (each child (slice children 1)
+    (def dist (math/abs (- (get-in child [:rect rect-key]) reference)))
+    (when (< dist min-dist)
+      (set min-dist dist)
+      (set found child)))
+  found)
+
+
+(defn- get-adjacent-frame-impl-descent [orig-node node dir]
+  (def children (in node :children))
+  (def {:top orig-top :left orig-left} (in orig-node :rect))
+
+  (cond
+    (empty? children)
+    node
+
+    (= :window (in (first children) :type))
+    node
+
+    (= :frame (in (first children) :type))
+    (get-adjacent-frame-impl-descent orig-node
+                                     (case [dir (table/getproto node)]
+                                       [:left horizontal-frame-proto]
+                                       (last children)
+
+                                       [:left vertical-frame-proto]
+                                       (find-closest-child children orig-top :top)
+
+                                       [:right horizontal-frame-proto]
+                                       (first children)
+
+                                       [:right vertical-frame-proto]
+                                       (find-closest-child children orig-top :top)
+
+                                       [:up horizontal-frame-proto]
+                                       (find-closest-child children orig-left :left)
+
+                                       [:up vertical-frame-proto]
+                                       (last children)
+
+                                       [:down horizontal-frame-proto]
+                                       (find-closest-child children orig-left :left)
+
+                                       [:down vertical-frame-proto]
+                                       (first children))
+                                     dir)
+
+    true
+    (error "inconsistent states for frame tree")))
+
+
+(defn- get-adjacent-frame-impl-ascent [orig-node node dir]
+  (let [parent (in node :parent)
+        all-siblings (in parent :children)
+        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
+                 idx
+                 (error "inconsistent states for frame tree"))]
+    (var adj-fr nil)
+    (case dir
+      :left
+      (loop [i :down-to [(- fr-idx 1) 0]]
+        (def sibling (in all-siblings i))
+        (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (set adj-fr sibling)
+          (break)))
+      :right
+      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+        (def sibling (in all-siblings i))
+        (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (set adj-fr sibling)
+          (break)))
+      :up
+      (loop [i :down-to [(- fr-idx 1) 0]]
+        (def sibling (in all-siblings i))
+        (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (set adj-fr sibling)
+          (break)))
+      :down
+      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+        (def sibling (in all-siblings i))
+        (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (set adj-fr sibling)
+          (break))))
+
+    (if adj-fr
+      (get-adjacent-frame-impl-descent orig-node adj-fr dir)
+      (if (= :layout (in parent :type))
+        nil # We reached the top level
+        (get-adjacent-frame-impl-ascent orig-node parent dir)))))
+
+
+(defn tree-node-get-adjacent-frame [self dir]
+  (if (= :window (in self :type))
+    (let [parent (in self :parent)]
+      (get-adjacent-frame-impl-ascent parent parent dir))
+    (get-adjacent-frame-impl-ascent self self dir)))
+
+
+(defn tree-node-find-hwnd [self hwnd]
+  (cond
+    (= :window (in self :type))
+    (if (= hwnd (in self :hwnd))
+      self
+      nil)
+
+    true
+    (do
+      (var found nil)
+      (each c (in self :children)
+        (when-let [win-found (:find-hwnd c hwnd)]
+          (set found win-found)
+          (break)))
+      found)))
+
+
+(defn tree-node-purge-windows [self pred]
+  (def children (in self :children))
+
+  (cond
+    (= :window (in self :type))
+    (error "invalid operation")
+
+    (empty? children)
+    @[]
+
+    (= :window (in (first children) :type))
+    (let [[alive dead] (reduce
+                         (fn [[a d] w]
+                           (if (pred w)
+                             (array/push d w)
+                             (array/push a w))
+                           [a d])
+                         [@[] @[]]
+                         children)]
+      (put self :children alive)
+      (cond
+        (empty? alive)
+        (put self :current-child nil)
+
+        (in self :current-child)
+        (let [current-child (in self :current-child)]
+          (each dw dead
+            (when (= dw current-child)
+              # The previous active child is dead, fill in a new one
+              (put self :current-child (first alive))
+              (break))))
+
+        true # There are children, but none of them is active
+        (error "inconsistent states for frame tree"))
+      dead)
+
+    true # children are other container nodes
+    (let [dead @[]]
+      (each c children
+        (array/push dead ;(:purge-windows c pred)))
+      dead)))
+
+
+(defn tree-node-get-layout [self]
+  (if (or (nil? self) (= :layout (in self :type)))
+    self
+    (tree-node-get-layout (in self :parent))))
+
+
+(defn tree-node-get-top-frame [self]
+  (def parent (in self :parent))
+  (cond
+    (nil? parent)
+    (if (= :frame (in self :type))
+      self
+      nil)
+
+    (= :layout (in parent :type))
+    self
+
+    true
+    (:get-top-frame parent)))
+
+
 (def- tree-node-proto
   @{:activate tree-node-activate
     :get-next-child tree-node-get-next-child
     :get-prev-child tree-node-get-prev-child
     :get-next-sibling tree-node-get-next-sibling
-    :get-prev-sibling tree-node-get-prev-sibling})
+    :get-prev-sibling tree-node-get-prev-sibling
+    :add-child tree-node-add-child
+    :remove-child tree-node-remove-child
+    :get-all-windows tree-node-get-all-windows
+    :get-current-window tree-node-get-current-window
+    :get-current-frame tree-node-get-current-frame
+    :get-first-frame tree-node-get-first-frame
+    :get-last-frame tree-node-get-last-frame
+    :enumerate-node tree-node-enumerate-node
+    :get-adjacent-frame tree-node-get-adjacent-frame
+    :find-hwnd tree-node-find-hwnd
+    :purge-windows tree-node-purge-windows
+    :get-layout tree-node-get-layout
+    :get-top-frame tree-node-get-top-frame})
 
 
-(defn tree-node [parent children &keys extra-fields]
+(defn tree-node [node-type &opt parent children &keys extra-fields]
   (let [node (table/setproto
               @{:parent parent
-                :children children}
+                :children @[]
+                :type node-type}
               tree-node-proto)]
     (when children
       (each c children
+        (:add-child node c)
         (put c :parent node)))
     (eachp [k v] extra-fields
       (put node k v))
@@ -107,67 +486,13 @@
 
 
 (defn window [hwnd &opt parent]
-  (let [node (tree-node parent nil
-                        :type :window
+  (let [node (tree-node :window parent nil
                         :hwnd hwnd
                         :tags @{})]
     (table/setproto node window-proto)))
 
 
 ######### Frame object #########
-
-# Forward declarations
-(var frame nil)
-(var frame-proto nil)
-(var vertical-frame-proto nil)
-(var horizontal-frame-proto nil)
-
-
-(defn frame-remove-child [self child]
-  (def current-child (in self :current-child))
-  (def next-child
-    (when (= child current-child)
-      (:get-next-child self child)))
-  (put self :children
-     (filter |(not= $ child) (in self :children)))
-  (when (= child current-child)
-    (if (= child next-child)
-      (put self :current-child nil) # There's no other child
-      (put self :current-child next-child)))
-  self)
-
-
-(defn frame-add-child [self child]
-  (let [children (in self :children)
-        old-parent (in child :parent)]
-    (cond
-      (empty? children)
-      (do
-        (put child :parent self)
-        (array/push children child)
-        # This is the only child, activate it to avoid inconsistent states
-        (put self :current-child child))
-
-      (= (in child :type) :window)
-      (if (= (get-in children [0 :type]) :window)
-        (do
-          (put child :parent self)
-          (array/push children child))
-        (error "cannot mix frames and windows"))
-
-      (= (in child :type) :frame)
-      (if (= (get-in children [0 :type]) :frame)
-        (do
-          (put child :parent self)
-          (array/push children child))
-        (error "cannot mix frames and windows")))
-
-    # Do the removal after a successful insertion, so
-    # that we won't end up in an inconsistent state
-    (when old-parent
-      (frame-remove-child old-parent child)))
-  self)
-
 
 (defn frame-split [self direction &opt n ratios]
   (default n 2)
@@ -214,39 +539,44 @@
     # XXX: Move all window children to the first sub-frame by default
     (each win old-children
       (:add-child first-sub-frame win))
-    (put first-sub-frame :current-child old-active-child))
-
-  self)
+    (put first-sub-frame :current-child old-active-child)))
 
 
-(defn frame-get-all-windows [self]
+(defn frame-balance [self &opt recursive]
+  (default recursive false)
+
+  (def all-children (in self :children))
+
   (cond
-    (empty? (in self :children))
-    []
+    (empty? all-children)
+    nil
 
-    (= :window (get-in self [:children 0 :type]))
-    (slice (in self :children))
+    (not= :frame (get-in self [:children 0 :type]))
+    nil
 
-    (= :frame (get-in self [:children 0 :type]))
-    (let [offsprings @[]]
-      (each fr (in self :children)
-        (array/push offsprings ;(frame-get-all-windows fr)))
-      offsprings)))
-
-
-(defn frame-get-current-window [self]
-  (var parent self)
-  (var cur-child (in parent :current-child))
-  (while (and cur-child
-              (not= :window (in cur-child :type)))
-    (set parent cur-child)
-    (set cur-child (in parent :current-child)))
-  cur-child)
+    true
+    (let [child-count (length all-children)
+          [width height] (rect-size (in self :rect))
+          balanced-len (math/floor (/ (cond
+                                        (= vertical-frame-proto (table/getproto self)) height
+                                        (= horizontal-frame-proto (table/getproto self)) width)
+                                      child-count))]
+      (def new-rects (:calculate-sub-rects self (fn [_sub-fr _i] balanced-len)))
+      (if recursive
+        (map (fn [sub-fr rect]
+               (put sub-fr :rect rect)
+               (:balance sub-fr recursive))
+             all-children
+             new-rects)
+        (map (fn [sub-fr rect]
+               (:transform sub-fr rect))
+             all-children
+             new-rects)))))
 
 
 (defn frame-flatten [self]
-  (def cur-window (frame-get-current-window self))
-  (def all-windows (frame-get-all-windows self))
+  (def cur-window (:get-current-window self))
+  (def all-windows (:get-all-windows self))
   (each w all-windows
     (put w :parent self))
   (put self :children all-windows)
@@ -261,110 +591,9 @@
        nil
 
        true
-       (in all-windows 0)))
-  (table/setproto self frame-proto) # Clear vertical/horizontal settings
-  self)
-
-
-(defn frame-find-window [self hwnd]
-  (var found nil)
-  (each child (in self :children)
-    (cond
-      (and (= :window (in child :type))
-           (= hwnd (in child :hwnd)))
-      (do
-        (set found child)
-        (break))
-
-      (= :frame (in child :type))
-      (do
-        (set found (frame-find-window child hwnd))
-        (if found (break)))))
-  found)
-
-
-(defn frame-find-frame-for-window [self win]
-  (cond
-    (empty? (in self :children))
-    self
-
-    (= :window (get-in self [:children 0 :type]))
-    self
-
-    (in self :current-child)
-    (frame-find-frame-for-window (in self :current-child) win)
-
-    true
-    (error "inconsistent states for frame tree")))
-
-
-(defn frame-get-current-frame [self]
-  (frame-find-frame-for-window self nil))
-
-
-(defn frame-purge-windows [self wm]
-  (cond
-    (empty? (in self :children))
-    @[]
-
-    (= :frame (get-in self [:children 0 :type]))
-    (let [dead @[]]
-      (each f (in self :children)
-        (array/push dead ;(frame-purge-windows f wm)))
-      dead)
-
-    (= :window (get-in self [:children 0 :type]))
-    (let [[alive dead] 
-          (reduce
-            (fn [[a d] w]
-              (if (:hwnd-alive? wm (in w :hwnd))
-                (array/push a w)
-                (array/push d w))
-              [a d])
-            [@[] @[]]
-            (in self :children))]
-      (put self :children alive)
-      (cond
-        (empty? alive)
-        (put self :current-child nil)
-
-        (in self :current-child)
-        (each dw dead
-          (when (= dw (in self :current-child))
-            # The previous active child is dead, fill in a new one
-            (put self :current-child (in alive 0))
-            (break)))
-
-        true # There are children, but none of them is active
-        (error "inconsistent states for frame tree"))
-      dead)))
-
-
-(defn frame-get-first-frame [self]
-  (var cur-fr self)
-  (while true
-    (cond
-      (empty? (in cur-fr :children))
-      (break)
-
-      (= :window (get-in cur-fr [:children 0 :type]))
-      (break))
-    (set cur-fr (get-in cur-fr [:children 0])))
-  cur-fr)
-
-
-(defn frame-get-last-frame [self]
-  (var cur-fr self)
-  (while true
-    (cond
-      (empty? (in cur-fr :children))
-      (break)
-
-      (= :window (get-in cur-fr [:children 0 :type]))
-      (break))
-    (def child-count (length (in cur-fr :children)))
-    (set cur-fr (get-in cur-fr [:children (- child-count 1)])))
-  cur-fr)
+       (first all-windows)))
+  # Clear vertical/horizontal settings
+  (table/setproto self frame-proto))
 
 
 (defn frame-transform [self new-rect]
@@ -374,11 +603,11 @@
   (def all-children (in self :children))
   (cond
     (empty? all-children)
-    (break self)
+    (break)
 
     (= :window (get-in all-children [0 :type]))
     # Do not actually resize the windows until next retile
-    (break self)
+    (break)
 
     (= :frame (get-in all-children [0 :type]))
     (let [dx (- (in new-rect :left) (in old-rect :left))
@@ -407,37 +636,185 @@
               (+ h sub-dh)))))
       (def new-rects (:calculate-sub-rects self calc-fn))
       (map (fn [sub-fr rect]
-             (frame-transform sub-fr rect))
+             (:transform sub-fr rect))
            all-children
-           new-rects)
-      self)))
+           new-rects))))
+
+
+(defn frame-resize [self new-rect]
+  (def parent (in self :parent))
+  (when (= :layout (in parent :type))
+    # This is a toplevel frame, which tracks the monitor
+    # geometries and cannot be resized
+    (break))
+
+  (let [all-siblings (in parent :children)
+        parent-rect (in parent :rect)
+        [old-width old-height] (rect-size (in self :rect))
+        [new-width new-height] (rect-size new-rect)
+        [parent-width parent-height] (rect-size parent-rect)
+        dw (- new-width old-width)
+        dh (- new-height old-height)
+        avail-h (- parent-height old-height)
+        avail-w (- parent-width old-width)]
+    (cond
+      (= vertical-frame-proto (table/getproto parent))
+      (let [new-rects (:calculate-sub-rects
+                         parent
+                         (fn [sib-fr _i]
+                           (def sib-height (rect-height (in sib-fr :rect)))
+                           (def sib-dh
+                             (if (= sib-fr self)
+                               dh
+                               (math/floor (* (- dh) (/ sib-height avail-h)))))
+                           (+ sib-height sib-dh)))]
+        (map (fn [sib-fr rect]
+               (:transform sib-fr rect))
+             all-siblings
+             new-rects)
+        (when (not= dw 0)
+          (:resize parent
+                   {:left (in parent-rect :left)
+                    :top (in parent-rect :top)
+                    :right (+ dw (in parent-rect :right))
+                    :bottom (in parent-rect :bottom)})))
+
+      (= horizontal-frame-proto (table/getproto parent))
+      (let [new-rects (:calculate-sub-rects
+                         parent
+                         (fn [sib-fr _i]
+                           (def sib-width (rect-width (in sib-fr :rect)))
+                           (def sib-dw
+                             (if (= sib-fr self)
+                               dw
+                               (math/floor (* (- dw) (/ sib-width avail-w)))))
+                           (+ sib-width sib-dw)))]
+        (map (fn [sib-fr rect]
+               (:transform sib-fr rect))
+             all-siblings
+             new-rects)
+        (when (not= dh 0)
+          (:resize parent
+                   {:left (in parent-rect :left)
+                    :top (in parent-rect :top)
+                    :right (in parent-rect :right)
+                    :bottom (+ dh (in parent-rect :bottom))}))))))
+
+
+(defn frame-close [self]
+  (def parent (in self :parent))
+  (def children (in self :children))
+
+  (cond
+    (= :layout (in parent :type))
+    # This is a toplevel frame, which tracks the monitor
+    # geometries and cannot be closed
+    nil
+
+    (or (empty? children)
+        (= :window (in (first children) :type)))
+    (let [all-siblings (in parent :children)
+          [width height] (rect-size (in self :rect))
+          [parent-width parent-height] (rect-size (in parent :rect))]
+      (if (> (length all-siblings) 2)
+        (do
+          (:remove-child parent self)
+
+          (def calc-fn
+            (cond
+              (= horizontal-frame-proto (table/getproto parent))
+              (let [rest-width (- parent-width width)]
+                (fn [sib-fr _]
+                  (let [sib-width (rect-width (in sib-fr :rect))
+                        ratio (/ sib-width rest-width)]
+                    (math/floor (* ratio parent-width)))))
+
+              (= vertical-frame-proto (table/getproto parent))
+              (let [rest-height (- parent-height height)]
+                (fn [sib-fr _]
+                  (let [sib-height (rect-height (in sib-fr :rect))
+                        ratio (/ sib-height rest-height)]
+                    (math/floor (* ratio parent-height)))))))
+          (def new-rects (:calculate-sub-rects parent calc-fn))
+          (map (fn [sib-fr rect]
+                 (:transform sib-fr rect))
+               (in parent :children)
+               new-rects)
+
+          (def cur-frame (:get-current-frame parent))
+          (each child children
+            (put child :parent nil)
+            (:add-child cur-frame child)))
+
+        (do
+          # When the frame is closed, the parent will only have a single child.
+          # Remove that child too, and move all children to the parent,
+          # so that the tree stays consistent.
+          (def sibling (:get-next-sibling self))
+          (def sibling-rect (in sibling :rect))
+          (def [sibling-width sibling-height] (rect-size sibling-rect))
+
+          (def to-frame (:get-current-frame sibling))
+          (each child children
+            (put child :parent nil)
+            (:add-child to-frame child))
+
+          (put parent :children @[])
+          (table/setproto parent (table/getproto sibling)) # reset horizontal/vertical split states
+          (each child (in sibling :children)
+            (put child :parent nil)
+            (:add-child parent child))
+          (put parent :current-child (in sibling :current-child))
+
+          (cond
+            (empty? (in parent :children))
+            nil
+
+            (= :window (get-in parent [:children 0 :type]))
+            # Wait for retile to actually resize the windows
+            nil
+
+            (= :frame (get-in parent [:children 0 :type]))
+            (do
+              (def calc-fn
+                (cond
+                  (= horizontal-frame-proto (table/getproto parent))
+                  (fn [sub-fr _]
+                    (let [sub-width (rect-width (in sub-fr :rect))
+                          ratio (/ sub-width sibling-width)]
+                      (math/floor (* ratio parent-width))))
+
+                  (= vertical-frame-proto (table/getproto parent))
+                  (fn [sub-fr _]
+                    (let [sub-height (rect-height (in sub-fr :rect))
+                          ratio (/ sub-height sibling-height)]
+                      (math/floor (* ratio parent-height))))))
+
+              (def new-rects (:calculate-sub-rects parent calc-fn))
+              (map (fn [sib-fr rect]
+                     (:transform sib-fr rect))
+                   (in parent :children)
+                   new-rects))))))
+
+    (= :frame (in (first children) :type))
+    (error "cannot close frames containing sub-frames")))
 
 
 (set frame-proto
      (table/setproto
-      @{:add-child frame-add-child
-        :remove-child frame-remove-child
-        :split frame-split
+      @{:split frame-split
+        :balance frame-balance
         :flatten frame-flatten
         :transform frame-transform
-        :find-window frame-find-window
-        :find-frame-for-window frame-find-frame-for-window
-        :purge-windows frame-purge-windows
-        :get-current-window frame-get-current-window
-        :get-all-windows frame-get-all-windows
-        :get-current-frame frame-get-current-frame
-        :get-first-frame frame-get-first-frame
-        :get-last-frame frame-get-last-frame}
+        :resize frame-resize
+        :close frame-close}
       tree-node-proto))
 
 
 (varfn frame [rect &opt parent children]
   (default children @[])
-  (let [node (tree-node parent children
-                        :type :frame
-                        :rect rect
-                        :current-child (if-not (empty? children)
-                                         (in children 0)))]
+  (let [node (tree-node :frame parent children
+                        :rect rect)]
     (table/setproto node frame-proto)))
 
 
@@ -519,346 +896,61 @@
    frame-proto))
 
 
-(defn layout-enumerate-frame [self node dir]
-  (let [all-siblings (get-in node [:parent :children])
-        sibling-count (length all-siblings)
-        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
-                 idx
-                 (error "inconsistent states for frame tree"))
-        idx-to-check (case dir
-                       :next
-                       (if (= self (in node :parent)) # Toplevel frames wrap around
-                         (% (+ fr-idx 1) sibling-count)
-                         (+ fr-idx 1))
-                       :prev
-                       (if (= self (in node :parent))
-                         (% (+ fr-idx sibling-count -1) sibling-count)
-                         (- fr-idx 1)))]
-    (cond
-      (or (< idx-to-check 0)
-          (>= idx-to-check sibling-count))
-      # We reached the end of the sub-frame list, go up
-      (layout-enumerate-frame self (in node :parent) dir)
-
-      (= dir :next)
-      (:get-first-frame (in all-siblings idx-to-check))
-
-      (= dir :prev)
-      (:get-last-frame (in all-siblings idx-to-check)))))
-
-
-(defn- find-closest-child [children reference rect-key]
-  (var found (first children))
-  (var min-dist (math/abs (- (get-in found [:rect rect-key]) reference)))
-  (each child (slice children 1)
-    (def dist (math/abs (- (get-in child [:rect rect-key]) reference)))
-    (when (< dist min-dist)
-      (set min-dist dist)
-      (set found child)))
-  found)
-
-
-(defn layout-get-adjacent-frame-impl-descent [self orig-node node dir]
-  (def children (in node :children))
-  (def {:top orig-top :left orig-left} (in orig-node :rect))
-
-  (cond
-    (empty? children)
-    node
-
-    (= :window (get-in children [0 :type]))
-    node
-
-    (= :frame (get-in children [0 :type]))
-    (layout-get-adjacent-frame-impl-descent self
-                                            orig-node
-                                            (case [dir (table/getproto node)]
-                                              [:left horizontal-frame-proto]
-                                              (last children)
-
-                                              [:left vertical-frame-proto]
-                                              (find-closest-child children orig-top :top)
-
-                                              [:right horizontal-frame-proto]
-                                              (first children)
-
-                                              [:right vertical-frame-proto]
-                                              (find-closest-child children orig-top :top)
-
-                                              [:up horizontal-frame-proto]
-                                              (find-closest-child children orig-left :left)
-
-                                              [:up vertical-frame-proto]
-                                              (last children)
-
-                                              [:down horizontal-frame-proto]
-                                              (find-closest-child children orig-left :left)
-
-                                              [:down vertical-frame-proto]
-                                              (first children))
-                                            dir)
-
-    true
-    (error "inconsistent states for frame tree")))
-
-
-(defn layout-get-adjacent-frame-impl-ascent [self orig-node node dir]
-  (let [all-siblings (get-in node [:parent :children])
-        fr-idx (if-let [idx (find-index |(= $ node) all-siblings)]
-                 idx
-                 (error "inconsistent states for frame tree"))]
-    (var adj-fr nil)
-    (case dir
-      :left
-      (loop [i :down-to [(- fr-idx 1) 0]]
-        (def sibling (in all-siblings i))
-        (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)
-          (break)))
-      :right
-      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
-        (def sibling (in all-siblings i))
-        (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)
-          (break)))
-      :up
-      (loop [i :down-to [(- fr-idx 1) 0]]
-        (def sibling (in all-siblings i))
-        (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling)
-          (break)))
-      :down
-      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
-        (def sibling (in all-siblings i))
-        (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling)
-          (break))))
-
-    (if adj-fr
-      (layout-get-adjacent-frame-impl-descent self orig-node adj-fr dir)
-      (if (= self (in node :parent))
-        nil
-        (layout-get-adjacent-frame-impl-ascent self orig-node (in node :parent) dir)))))
-
-
-(defn layout-get-adjacent-frame [self node dir]
-  (layout-get-adjacent-frame-impl-ascent self node node dir))
-
-
-(defn layout-balance-frames [self &opt fr recursive]
-  (default recursive false)
-  (cond
-    (nil? fr)
-    (each toplevel-fr (in self :children)
-      (layout-balance-frames self toplevel-fr recursive))
-
-    (empty? (in fr :children))
-    nil
-
-    (not= :frame (get-in fr [:children 0 :type]))
-    nil
-
-    true
-    (let [all-children (in fr :children)
-          child-count (length all-children)
-          [fr-width fr-height] (rect-size (in fr :rect))
-          balanced-len (math/floor (/ (cond
-                                        (= vertical-frame-proto (table/getproto fr)) fr-height
-                                        (= horizontal-frame-proto (table/getproto fr)) fr-width)
-                                      child-count))]
-      (def new-rects (:calculate-sub-rects fr (fn [_sub-fr _i] balanced-len)))
-      (if recursive
-        (map (fn [sub-fr rect]
-               (put sub-fr :rect rect)
-               (layout-balance-frames self sub-fr recursive))
-             all-children
-             new-rects)
-        (map (fn [sub-fr rect]
-               (:transform sub-fr rect))
-             all-children
-             new-rects)))))
-
-
-(defn layout-resize-frame [self fr new-rect]
-  (when (= self (in fr :parent))
-    # This is a toplevel frame, which tracks the monitor
-    # geometries and cannot be resized
-    (break self))
-
-  (let [parent (in fr :parent)
-        all-siblings (in parent :children)
-        parent-rect (in parent :rect)
-        [old-width old-height] (rect-size (in fr :rect))
-        [new-width new-height] (rect-size new-rect)
-        [parent-width parent-height] (rect-size parent-rect)
-        dw (- new-width old-width)
-        dh (- new-height old-height)
-        avail-h (- parent-height old-height)
-        avail-w (- parent-width old-width)]
-    (cond
-      (= vertical-frame-proto (table/getproto parent))
-      (let [new-rects (:calculate-sub-rects
-                         parent
-                         (fn [sib-fr _i]
-                           (def sib-height (rect-height (in sib-fr :rect)))
-                           (def sib-dh
-                             (if (= sib-fr fr)
-                               dh
-                               (math/floor (* (- dh) (/ sib-height avail-h)))))
-                           (+ sib-height sib-dh)))]
-        (map (fn [sib-fr rect]
-               (:transform sib-fr rect))
-             all-siblings
-             new-rects)
-        (when (not= dw 0)
-          (layout-resize-frame self
-                               parent
-                               {:left (in parent-rect :left)
-                                :top (in parent-rect :top)
-                                :right (+ dw (in parent-rect :right))
-                                :bottom (in parent-rect :bottom)})))
-      
-
-      (= horizontal-frame-proto (table/getproto parent))
-      (let [new-rects (:calculate-sub-rects
-                         parent
-                         (fn [sib-fr _i]
-                           (def sib-width (rect-width (in sib-fr :rect)))
-                           (def sib-dw
-                             (if (= sib-fr fr)
-                               dw
-                               (math/floor (* (- dw) (/ sib-width avail-w)))))
-                           (+ sib-width sib-dw)))]
-        (map (fn [sib-fr rect]
-               (:transform sib-fr rect))
-             all-siblings
-             new-rects)
-        (when (not= dh 0)
-          (layout-resize-frame self
-                               parent
-                               {:left (in parent-rect :left)
-                                :top (in parent-rect :top)
-                                :right (in parent-rect :right)
-                                :bottom (+ dh (in parent-rect :bottom))}))))))
-
-
-(defn layout-close-frame [self fr]
-  (cond
-    (= self (in fr :parent))
-    # This is a toplevel frame, which tracks the monitor
-    # geometries and cannot be closed
-    nil
-
-    (or (empty? (in fr :children))
-        (= :window (get-in fr [:children 0 :type])))
-    (let [parent (in fr :parent)
-          all-children (in fr :children)
-          all-siblings (in parent :children)
-          [fr-width fr-height] (rect-size (in fr :rect))
-          [parent-width parent-height] (rect-size (in parent :rect))]
-      (if (> (length all-siblings) 2)
-        (do
-          (:remove-child parent fr)
-
-          (def calc-fn
-            (cond
-              (= horizontal-frame-proto (table/getproto parent))
-              (let [rest-width (- parent-width fr-width)]
-                (fn [sib-fr _]
-                  (let [sib-width (rect-width (in sib-fr :rect))
-                        ratio (/ sib-width rest-width)]
-                    (math/floor (* ratio parent-width)))))
-
-              (= vertical-frame-proto (table/getproto parent))
-              (let [rest-height (- parent-height fr-height)]
-                (fn [sib-fr _]
-                  (let [sib-height (rect-height (in sib-fr :rect))
-                        ratio (/ sib-height rest-height)]
-                    (math/floor (* ratio parent-height)))))))
-          (def new-rects (:calculate-sub-rects parent calc-fn))
-          (map (fn [sib-fr rect]
-                 (:transform sib-fr rect))
-               (in parent :children)
-               new-rects)
-
-          (def cur-frame (:get-current-frame parent))
-          (each child all-children
-            (put child :parent nil)
-            (:add-child cur-frame child)))
-
-        (do
-          # When fr is closed, the parent will only have a single child.
-          # Remove that child too, and move all children to the parent,
-          # so that the tree stays consistent.
-          (def sibling (:get-next-sibling fr))
-          (def sibling-rect (in sibling :rect))
-          (def [sibling-width sibling-height] (rect-size sibling-rect))
-
-          (def to-frame (:get-current-frame sibling))
-          (each child all-children
-            (put child :parent nil)
-            (:add-child to-frame child))
-
-          (put parent :children @[])
-          (table/setproto parent (table/getproto sibling)) # reset horizontal/vertical split states
-          (each child (in sibling :children)
-            (put child :parent nil)
-            (:add-child parent child))
-          (put parent :current-child (in sibling :current-child))
-
-          (cond
-            (empty? (in parent :children))
-            nil
-
-            (= :window (get-in parent [:children 0 :type]))
-            # Wait for retile to actually resize the windows
-            nil
-
-            (= :frame (get-in parent [:children 0 :type]))
-            (do
-              (def calc-fn
-                (cond
-                  (= horizontal-frame-proto (table/getproto parent))
-                  (fn [sub-fr _]
-                    (let [sub-width (rect-width (in sub-fr :rect))
-                          ratio (/ sub-width sibling-width)]
-                      (math/floor (* ratio parent-width))))
-
-                  (= vertical-frame-proto (table/getproto parent))
-                  (fn [sub-fr _]
-                    (let [sub-height (rect-height (in sub-fr :rect))
-                          ratio (/ sub-height sibling-height)]
-                      (math/floor (* ratio parent-height))))))
-
-              (def new-rects (:calculate-sub-rects parent calc-fn))
-              (map (fn [sib-fr rect]
-                     (:transform sib-fr rect))
-                   (in parent :children)
-                   new-rects))))))
-
-    (= :frame (get-in fr [:children 0 :type]))
-    (error "cannot close frames containing sub-frames"))
-
-  self)
-
-
 (def- layout-proto
   (table/setproto
-   @{:split (fn [&] (error "unsupported operation"))
-     :flatten (fn [&] (error "unsupported operation"))
-     :transform (fn [&] (error "unsupported operation"))
-     :enumerate-frame layout-enumerate-frame
-     :get-adjacent-frame layout-get-adjacent-frame
-     :resize-frame layout-resize-frame
-     :balance-frames layout-balance-frames
-     :close-frame layout-close-frame}
-   frame-proto))
+   @{}
+   tree-node-proto))
 
 
-(defn layout [&opt children]
-  (def layout-obj (frame nil nil children))
-  (put layout-obj :type :layout)
+(defn layout [id &opt name parent children]
+  (default children @[])
+  (def layout-obj (tree-node :layout parent children
+                             :id id
+                             :name name))
   (table/setproto layout-obj layout-proto))
+
+
+######### Virtual desktop container object #########
+
+(defn vdc-get-current-frame-on-desktop [self desktop-info]
+  (def {:id desktop-id
+        :name desktop-name}
+    desktop-info)
+
+  (var layout-found nil)
+  (each lo (in self :children)
+    (when (= (in lo :id) desktop-id)
+      (set layout-found lo)
+      (break)))
+  (if layout-found
+    (:get-current-frame layout-found)
+    (let [new-layout (:new-layout self desktop-info)]
+      (:add-child self new-layout)
+      (:get-current-frame new-layout))))
+
+
+(defn vdc-new-layout [self desktop-info]
+  (def wm (in self :window-manager))
+  (def [work-areas main-idx] (:enumerate-monitors wm))
+  (def {:id id :name name} desktop-info)
+  (def new-layout (layout id name nil (map |(frame $) work-areas)))
+  (def to-activate (or main-idx 0))
+  (:activate (get-in new-layout [:children to-activate]))
+  new-layout)
+
+
+(def- virtual-desktop-container-proto
+  (table/setproto
+   @{:new-layout vdc-new-layout
+     :get-current-frame-on-desktop vdc-get-current-frame-on-desktop}
+   tree-node-proto))
+
+
+(defn virtual-desktop-container [wm &opt children]
+  (default children @[])
+  (def vdc-obj (tree-node :virtual-desktop-container nil children
+                          :window-manager wm))
+  (table/setproto vdc-obj virtual-desktop-container-proto))
 
 
 ######### Window manager object #########
@@ -996,7 +1088,7 @@
   (when (= (int/u64 0) pid)
     (break nil))
 
-  (def path (wm-get-pid-path self pid))
+  (def path (:get-pid-path self pid))
 
   (var uwp-pid nil)
   (when (and (not (nil? path))
@@ -1011,91 +1103,157 @@
                           (break FALSE))
                         TRUE)))
   (if uwp-pid
-    (wm-get-pid-path self uwp-pid)
+    (:get-pid-path self uwp-pid)
     path))
 
 
-(defn wm-should-manage-hwnd? [self hwnd? &opt uia-win?]
+(defn wm-get-hwnd-uia-element [self hwnd]
+  (def uia-man (in self :uia-manager))
+  (try
+    (:ElementFromHandleBuildCache (in uia-man :com)
+                                  hwnd
+                                  (in uia-man :focus-cr))
+    ((err fib)
+     (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                err
+                (get-stack-trace fib))
+     nil)))
+
+
+(defn wm-normalize-hwnd-and-uia-element [self hwnd? uia-win?]
+  (cond
+    (nil? uia-win?)
+    (if (or (nil? hwnd?) (null? hwnd?))
+      (error "invalid hwnd and uia-win")
+      [hwnd? (:get-hwnd-uia-element self hwnd?)])
+
+    (or (nil? hwnd?) (null? hwnd?))
+    [(try
+       (:get_CachedNativeWindowHandle uia-win?)
+       ((err fib)
+        (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
+                   err
+                   (get-stack-trace fib))
+        nil))
+     uia-win?]
+
+    true
+    [hwnd? uia-win?]))
+
+
+(defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
   (def uia-man (in self :uia-manager))
   (def [hwnd uia-win]
-    (cond
-      (nil? uia-win?)
-      (if (or (nil? hwnd?) (null? hwnd?))
-        (error "invalid hwnd and uia-win")
-        [hwnd? (try
-                 (:ElementFromHandleBuildCache (in uia-man :com)
-                                               hwnd?
-                                               (in uia-man :focus-cr))
-                 ((err fib)
-                  (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
-                             err
-                             (get-stack-trace fib))
-                  nil))])
+    (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
 
-      (or (nil? hwnd?) (null? hwnd?))
-      [(try
-         (:get_CachedNativeWindowHandle uia-win?)
-         ((err fib)
-          (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
-                     err
-                     (get-stack-trace fib))
-          nil))
-       uia-win?]
+  (cond
+    (nil? uia-win)
+    nil
 
-      true
-      [hwnd? uia-win?]))
+    (nil? hwnd)
+    (do
+      (when (nil? uia-win?)
+        # uia-win is constructed locally, release it
+        (:Release uia-win))
+      nil)
 
+    true
+    (do
+      (def desktop-id
+        (try
+          (:GetWindowDesktopId (in self :vdm-com) hwnd)
+          ((err fib)
+           (log/debug "GetWindowDesktopId failed: %n\n%s"
+                      err
+                      (get-stack-trace fib))
+           nil)))
+
+      (def desktop-name
+        (with-uia [root-elem (:get-root uia-man uia-win)]
+          (if root-elem
+            (do
+              (when (= root-elem uia-win)
+                # So that it won't be freed when leaving with-uia
+                (:AddRef uia-win))
+              (:get_CachedName root-elem))
+            nil)))
+
+      (when (nil? uia-win?)
+        # uia-win is constructed locally in this case, release it.
+        (:Release uia-win))
+
+      (if (or (nil? desktop-id)
+              (nil? desktop-name))
+        nil
+        {:id desktop-id :name desktop-name}))))
+
+
+(defn wm-get-hwnd-info [self hwnd? &opt uia-win?]
+  (def uia-man (in self :uia-manager))
+
+  (def [hwnd uia-win]
+    (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
   (def exe-path
     (unless (nil? hwnd)
-      (wm-get-hwnd-path self hwnd)))
+      (:get-hwnd-path self hwnd)))
+  (def desktop-info
+    (unless (nil? hwnd)
+      (:get-hwnd-virtual-desktop self hwnd uia-win)))
 
-  (def result
+  (def ret
     (cond
       (nil? uia-win)
       # ElementFromHandleBuildCache failed
-      false
+      nil
 
       (nil? hwnd)
       # get_CachedNativeWindowHandle failed
-      false
+      nil
 
       (nil? exe-path)
       # wm-get-hwnd-path failed
-      false
+      nil
+
+      (nil? desktop-info)
+      # wm-get-hwnd-virtual-desktop failed
+      nil
 
       true
-      (:call-filter-hook (in self :hook-manager) :filter-window hwnd uia-win exe-path)))
+      {:hwnd hwnd
+       :uia-element uia-win
+       :exe-path exe-path
+       :virtual-desktop desktop-info}))
 
-  (when (and (nil? uia-win?)
-             (not (nil? uia-win)))
-    # uia-win is constructed locally in this case, release it.
+  (when (and (nil? ret)
+             (not (nil? uia-win))
+             (not= uia-win uia-win?))
     (:Release uia-win))
 
-  result)
+  ret)
 
 
-(defn wm-add-hwnd [self hwnd]
+(defn wm-should-manage-hwnd? [self hwnd-info]
+  (def {:hwnd hwnd
+        :uia-element uia-win
+        :exe-path exe-path
+        :virtual-desktop desktop-info}
+    hwnd-info)
+  (:call-filter-hook (in self :hook-manager) :filter-window
+     hwnd uia-win exe-path desktop-info))
+
+
+(defn wm-add-hwnd [self hwnd-info]
+  (def {:hwnd hwnd
+        :uia-element uia-win
+        :exe-path exe-path
+        :virtual-desktop desktop-info}
+    hwnd-info)
+
   (log/debug "new window: %n" hwnd)
-  (def new-win (window hwnd))
-  (def uia-man (in self :uia-manager))
-  (def exe-path (wm-get-hwnd-path self hwnd))
-  (def hwnd-still-valid
-    (with-uia [uia-win (try
-                         (:ElementFromHandleBuildCache (in uia-man :com) hwnd (in uia-man :focus-cr))
-                         ((err fib)
-                          (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
-                                     err
-                                     (get-stack-trace fib))
-                          nil))]
-      (if (nil? uia-win)
-        # The window may have disappeared between (wm-should-manage-hwnd? ...) and (wm-add-hwnd ...)
-        false
-        (do
-          (:call-hook (in self :hook-manager) :new-window new-win uia-win exe-path)
-          true))))
 
-  (when (not hwnd-still-valid)
-    (break nil))
+  (def new-win (window hwnd))
+  (:call-hook (in self :hook-manager) :new-window
+     new-win uia-win exe-path desktop-info)
 
   (def tags (in new-win :tags))
 
@@ -1106,10 +1264,10 @@
       (do 
         (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
         override-frame)
-      (:find-frame-for-window (in self :layout) new-win)))
+      (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
-  (wm-transform-window self new-win frame-found)
+  (:transform-window self new-win frame-found)
   new-win)
 
 
@@ -1117,48 +1275,53 @@
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (def dead (:purge-windows (in self :layout) self))
+  (def dead (:purge-windows (in self :root) |(not (:hwnd-alive? self (in $ :hwnd)))))
   (each dw dead
     (:call-hook (in self :hook-manager) :dead-window dw))
   (log/debug "purged %n dead windows" (length dead))
 
   (def uia-man (in self :uia-manager))
-  (def hwnd-to-manage
-    (with-uia [uia-win (:get-focused-window uia-man)]
-      (when (nil? uia-win)
-        (log/debug "No focused window")
-        (break nil))
-      
-      (def hwnd (:get_CachedNativeWindowHandle uia-win))
+  (with-uia [uia-win (:get-focused-window uia-man)]
+    (when (nil? uia-win)
+      (log/debug "No focused window")
+      (break))
+    
+    (def hwnd (:get_CachedNativeWindowHandle uia-win))
 
-      (when-let [win (:find-window (in self :layout) hwnd)]
-        #Already managed
-        (:activate win)
-        (break nil))
+    (when-let [win (:find-hwnd (in self :root) hwnd)]
+      #Already managed
+      (:activate win)
+      (break))
 
-      (when (not (wm-should-manage-hwnd? self hwnd uia-win))
-        (log/debug "Ignoring window: %n" hwnd)
-        (break nil))
+    (def hwnd-info (:get-hwnd-info self hwnd uia-win))
+    (when (nil? hwnd-info)
+      (log/debug "Window %n vanished?" hwnd)
+      (break))
 
-      hwnd))
+    (when (not (:should-manage-hwnd? self hwnd-info))
+      (log/debug "Ignoring window: %n" hwnd)
+      (break))
 
-  (when hwnd-to-manage
-    (if-let [new-win (wm-add-hwnd self hwnd-to-manage)]
-      (:activate new-win)))
-  self)
+    (if-let [new-win (:add-hwnd self hwnd-info)]
+      (:activate new-win))))
 
 
 (defn wm-window-opened [self hwnd]
-  (when-let [win (:find-window (in self :layout) hwnd)]
+  (when-let [win (:find-hwnd (in self :root) hwnd)]
     (log/debug "window-opened event for managed window: %n" hwnd)
-    (break self))
+    (break))
 
-  (when (not (wm-should-manage-hwnd? self hwnd))
-    (log/debug "Ignoring window: %n" hwnd)
-    (break self))
+  (def hwnd-info (:get-hwnd-info self hwnd))
+  (when (nil? hwnd-info)
+    (log/debug "Window %n vanished?" hwnd)
+    (break))
 
-  (wm-add-hwnd self hwnd)
-  self)
+  (with-uia [_uia-win (in hwnd-info :uia-element)]
+    (unless (:should-manage-hwnd? self hwnd-info)
+      (log/debug "Ignoring window: %n" hwnd)
+      (break))
+
+    (:add-hwnd self hwnd-info)))
 
 
 (defn wm-activate [self node]
@@ -1177,7 +1340,8 @@
       (= :window (in node :type))
       (in node :hwnd)
 
-      (= :frame (in node :type))
+      (or (= :frame (in node :type))
+          (= :layout (in node :type)))
       (if-let [cur-win (:get-current-window node)]
         (in cur-win :hwnd)
         root-hwnd)))
@@ -1185,16 +1349,14 @@
   (log/debug "setting focus to window: %n" hwnd)
   (if (= hwnd root-hwnd)
     (SetForegroundWindow hwnd) # The UIA SetFocus method doesn't work for the desktop window
-    (:set-focus-to-window uia-man hwnd))
-
-  self)
+    (:set-focus-to-window uia-man hwnd)))
 
 
 (defn wm-retile [self &opt fr]
   (cond
     (nil? fr)
     # Retile the whole tree
-    (wm-retile self (in self :layout))
+    (:retile self (in self :root))
 
     true
     (cond
@@ -1203,13 +1365,12 @@
 
       (= :window (get-in fr [:children 0 :type]))
       (each w (in fr :children)
-        (wm-transform-window self w fr))
+        (:transform-window self w fr))
 
-      (= :frame (get-in fr [:children 0 :type]))
+      (or (= :frame (get-in fr [:children 0 :type]))
+          (= :layout (get-in fr [:children 0 :type])))
       (each f (in fr :children)
-        (wm-retile self f))))
-
-  self)
+        (:retile self f)))))
 
 
 (defn wm-enumerate-monitors [self]
@@ -1247,6 +1408,11 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
+(defn wm-destroy [self]
+  (def {:vdm-com vdm-com} self)
+  (:Release vdm-com))
+
+
 (def- window-manager-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
@@ -1255,21 +1421,25 @@
     :retile wm-retile
     :activate wm-activate
 
-    :add-hwnd wm-add-hwnd
-    :should-manage-hwnd? wm-should-manage-hwnd?
     :get-hwnd-path wm-get-hwnd-path
-    :set-hwnd-alpha wm-set-hwnd-alpha
-    :close-hwnd wm-close-hwnd
+    :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
+    :get-hwnd-uia-element wm-get-hwnd-uia-element
+    :get-hwnd-info wm-get-hwnd-info
     :hwnd-alive? wm-hwnd-alive?
     :hwnd-process-elevated? wm-hwnd-process-elevated?
 
+    :should-manage-hwnd? wm-should-manage-hwnd?
+    :add-hwnd wm-add-hwnd
+
+    :set-hwnd-alpha wm-set-hwnd-alpha
+    :close-hwnd wm-close-hwnd
+
     :get-pid-path wm-get-pid-path
     :enumerate-monitors wm-enumerate-monitors
-    :jwno-process-elevated? wm-jwno-process-elevated?})
+    :jwno-process-elevated? wm-jwno-process-elevated?
+    :normalize-hwnd-and-uia-element wm-normalize-hwnd-and-uia-element
 
-
-(defn check-valid-uia-window [uia-win]
-  (is-valid-uia-window? uia-win))
+    :destroy wm-destroy})
 
 
 (defn default-window-filter [hwnd uia-win exe-path wm]
@@ -1301,21 +1471,21 @@
 
 
 (defn window-manager [uia-man hook-man]
+  (def vdm-com
+    (CoCreateInstance CLSID_VirtualDesktopManager
+                      nil
+                      CLSCTX_INPROC_SERVER
+                      IVirtualDesktopManager))
   (def wm-obj
     (table/setproto
-     @{:uia-manager uia-man
+     @{:vdm-com vdm-com
+       :uia-manager uia-man
        :hook-manager hook-man}
      window-manager-proto))
-
-  (def [work-areas main-idx] (:enumerate-monitors wm-obj))
-  (put wm-obj :layout
-     (layout (map |(frame $) work-areas)))
-  (if main-idx
-    (:activate (get-in wm-obj [:layout :children main-idx]))
-    (:activate (get-in wm-obj [:layout :children 0])))
+  (put wm-obj :root (virtual-desktop-container wm-obj))
 
   (:add-hook hook-man :filter-window
-     (fn [hwnd uia-win exe-path]
+     (fn [hwnd uia-win exe-path _desktop-info]
        (default-window-filter hwnd uia-win exe-path wm-obj)))
 
   wm-obj)

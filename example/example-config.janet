@@ -59,12 +59,12 @@
   (k "win + ," [:split-and-move-current-window :horizontal])
   (k "win + ." [:split-and-move-current-window :vertical])
   (k "win + =" :balance-frames)
-  (k "win + z" [:focus-mode 0.7])
+  (k "win + o" [:focus-mode 0.7])
 
   (k "win + n" [:enum-frame :next])
   (k "win + e" [:enum-frame :prev])
-  (k "win + i" :next-window-in-frame)
-  (k "win + m" :prev-window-in-frame)
+  (k "win + i" [:enum-window-in-frame :next])
+  (k "win + m" [:enum-window-in-frame :prev])
 
   (k "win + ctrl + n" [:adjacent-frame :down])
   (k "win + ctrl + e" [:adjacent-frame :up])
@@ -96,11 +96,17 @@
 
 
 (:add-hook hook-man :filter-window
-   (fn [_hwnd uia-win exe-path]
+   (fn [_hwnd uia-win exe-path desktop-info]
      (def name (:get_CachedName uia-win))
      (def class-name (:get_CachedClassName uia-win))
+     (def desktop-name (in desktop-info :name))
+
      # Excluded windows
      (cond
+       (= "Desktop 2" desktop-name)
+       # A "floating" virtual desktop
+       false
+
        # The invisible pseudo window from the Terminal app.
        (= "PseudoConsoleWindow" class-name)
        false
@@ -131,7 +137,7 @@
        true)))
 
 (:add-hook hook-man :new-window
-   (fn [win uia-win _exe-path]
+   (fn [win uia-win _exe-path _desktop-info]
      (def class-name (:get_CachedClassName uia-win))
      (cond
        (= "Emacs" class-name)
@@ -144,25 +150,25 @@
    (fn [dead-win]
      (def parent (in dead-win :parent))
      (when (empty? (in parent :children))
-       (:close-frame (in window-man :layout) parent)
+       (:close parent)
        (:retile window-man))))
 
 
 (:add-command command-man :close-current-window-or-frame
    (fn []
-     (def layout (in window-man :layout))
+     (def cur-frame (:get-current-frame (in window-man :root)))
      # cur-win will be nil if the current frame is empty.
-     (if-let [cur-win (:get-current-window layout)]
+     (if-let [cur-win (:get-current-window cur-frame)]
        (:close-hwnd window-man (in cur-win :hwnd))
-       (let [cur-frame (:get-current-frame layout)]
-         (:close-frame layout cur-frame)
+       (do
+         (:close cur-frame)
          (:retile window-man)
-         (:activate window-man (:get-current-window layout))))))
+         (:activate window-man (:get-current-window cur-frame))))))
 
 (:add-command command-man :split-and-move-current-window
    (fn [dir]
-     (def layout (in window-man :layout))
-     (def cur-frame (:get-current-frame layout))
+     (def root (in window-man :root))
+     (def cur-frame (:get-current-frame root))
      (def cur-win (:get-current-window cur-frame))
      (def win-count (length (in cur-frame :children)))
      # Existing windows are all moved to the first new frame
