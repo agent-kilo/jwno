@@ -45,8 +45,7 @@
   (while parent
     (put parent :current-child child)
     (set child parent)
-    (set parent (in parent :parent)))
-  self)
+    (set parent (in parent :parent))))
 
 
 (defn tree-node-get-next-child [self child]
@@ -540,9 +539,7 @@
     # XXX: Move all window children to the first sub-frame by default
     (each win old-children
       (:add-child first-sub-frame win))
-    (put first-sub-frame :current-child old-active-child))
-
-  self)
+    (put first-sub-frame :current-child old-active-child)))
 
 
 (defn frame-balance [self &opt recursive]
@@ -595,8 +592,8 @@
 
        true
        (first all-windows)))
-  (table/setproto self frame-proto) # Clear vertical/horizontal settings
-  self)
+  # Clear vertical/horizontal settings
+  (table/setproto self frame-proto))
 
 
 (defn frame-transform [self new-rect]
@@ -606,11 +603,11 @@
   (def all-children (in self :children))
   (cond
     (empty? all-children)
-    (break self)
+    (break)
 
     (= :window (get-in all-children [0 :type]))
     # Do not actually resize the windows until next retile
-    (break self)
+    (break)
 
     (= :frame (get-in all-children [0 :type]))
     (let [dx (- (in new-rect :left) (in old-rect :left))
@@ -641,8 +638,7 @@
       (map (fn [sub-fr rect]
              (:transform sub-fr rect))
            all-children
-           new-rects)
-      self)))
+           new-rects))))
 
 
 (defn frame-resize [self new-rect]
