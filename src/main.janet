@@ -26,7 +26,11 @@
        [:ui/initialized thread-id msg-hwnd]
        (do
          (:initialized (in context :ui-manager) thread-id msg-hwnd)
-         (def config-env (load-config-file [(in cli-args "config")] context))
+         (def config-env
+           (try
+             (load-config-file [(in cli-args "config")] context)
+             ((err fib)
+              (show-error-and-exit err 1 (get-stack-trace fib)))))
          (log/debug "config-env = %n" config-env))
 
        :ui/exit
