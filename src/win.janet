@@ -1318,14 +1318,34 @@
        win-to-signal)))
 
 
+(defn window-purge-pred [win wm layout]
+  (def hwnd (in win :hwnd))
+  (def layout-vd-id (in layout :id))
+  (def win-vd-id
+    (try
+      (:GetWindowDesktopId (in wm :vdm-com) hwnd)
+      ((err fib)
+       (log/debug "GetWindowDesktopId failed: %n\n%s"
+                  err
+                  (get-stack-trace fib))
+       nil)))
+  (or (not= win-vd-id layout-vd-id)
+      (not (:hwnd-alive? wm hwnd))))
+
+
 (defn wm-focus-changed [self]
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (def dead (:purge-windows (in self :root) |(not (:hwnd-alive? self (in $ :hwnd)))))
-  (each dw dead
-    (:call-hook (in self :hook-manager) :window-removed dw))
-  (log/debug "purged %n dead windows" (length dead))
+  (each layout (get-in self [:root :children])
+    (def dead
+      (:purge-windows layout
+                      |(window-purge-pred $ self layout)))
+    (each dw dead
+      (:call-hook (in self :hook-manager) :window-removed dw))
+    (log/debug "purged %n dead windows from desktop %n"
+               (length dead)
+               (in layout :id)))
 
   (def uia-man (in self :uia-manager))
   (with-uia [uia-win (:get-focused-window uia-man)]
