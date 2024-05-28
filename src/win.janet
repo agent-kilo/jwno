@@ -1292,6 +1292,32 @@
   new-win)
 
 
+(defn- activate-and-call-hooks [node wm]
+  (def old-frame (:get-current-frame (in wm :root)))
+  (def old-win (:get-current-window old-frame))
+  (:activate node)
+  
+  (def [fr-to-signal win-to-signal]
+    (if (= :window (in node :type))
+      [(in node :parent) node]
+      (let [fr (:get-current-frame node)
+            win (:get-current-window fr)]
+        [fr win])))
+
+  (unless (= fr-to-signal old-frame)
+    (when-let [top-win (:get-top-window fr-to-signal)]
+      # Explicitly make the top window our current window, to
+      # prevent lower windows popping up when switching to a frame
+      (put fr-to-signal :current-child top-win))
+    (:call-hook (in wm :hook-manager) :frame-activated
+       fr-to-signal))
+
+  (unless (or (nil? win-to-signal)
+              (= win-to-signal old-win))
+    (:call-hook (in wm :hook-manager) :window-activated
+       win-to-signal)))
+
+
 (defn wm-focus-changed [self]
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
@@ -1311,7 +1337,7 @@
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       #Already managed
-      (:activate win)
+      (activate-and-call-hooks win self)
       (break))
 
     (def hwnd-info (:get-hwnd-info self hwnd uia-win))
@@ -1324,7 +1350,7 @@
       (break))
 
     (if-let [new-win (:add-hwnd self hwnd-info)]
-      (:activate new-win))))
+      (activate-and-call-hooks new-win self))))
 
 
 (defn wm-window-opened [self hwnd]
@@ -1347,21 +1373,7 @@
 
 (defn wm-activate [self node]
   (when node
-    (def old-frame (:get-current-frame (in self :root)))
-    (:activate node)
-    
-    (def fr-to-signal
-      (if (= :window (in node :type))
-        (in node :parent)
-        (:get-current-frame node)))
-
-    (unless (= fr-to-signal old-frame)
-      (when-let [top-win (:get-top-window fr-to-signal)]
-        # Explicitly make the top window our current window, to
-        # prevent lower windows popping up when switching to a frame
-        (put fr-to-signal :current-child top-win))
-      (:call-hook (in self :hook-manager) :frame-activated
-         fr-to-signal)))
+    (activate-and-call-hooks node self))
 
   (def uia-man (in self :uia-manager))
   (def root (in uia-man :root))
