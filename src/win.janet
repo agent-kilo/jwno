@@ -1001,11 +1001,10 @@
       [fitted-x fitted-y fitted-width fitted-height])
     [x y win-width win-height]))
 
-(defn wm-transform-window [self win fr]
+(defn wm-transform-window [self win rect]
   (let [uia-man (in self :uia-manager)
         uia-com (in uia-man :com)
-        hwnd (in win :hwnd)
-        rect (in fr :rect)]
+        hwnd (in win :hwnd)]
     (log/debug "transforming window: %n, rect = %n" hwnd rect)
     (try
       (with-uia [cr (:CreateCacheRequest uia-com)]
@@ -1288,7 +1287,7 @@
       (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
-  (:transform-window self new-win frame-found)
+  (:transform-window self new-win (in frame-found :rect))
   new-win)
 
 
@@ -1432,7 +1431,7 @@
 
       (= :window (get-in fr [:children 0 :type]))
       (each w (in fr :children)
-        (:transform-window self w fr))
+        (:transform-window self w (in fr :rect)))
 
       (or (= :frame (get-in fr [:children 0 :type]))
           (= :layout (get-in fr [:children 0 :type])))
