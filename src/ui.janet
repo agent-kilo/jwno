@@ -21,6 +21,7 @@
 (def SET-KEYMAP-MSG (+ WM_APP 2))
 (def SET-HOOKS-MSG (+ WM_APP 3))
 (def REMOVE-HOOKS-MSG (+ WM_APP 4))
+(def SHOW-ERROR-AND-EXIT-MSG (+ WM_APP 5))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -239,6 +240,11 @@
       ID_MENU_RESET_KBD_HOOKS
       (PostMessage hwnd SET-HOOKS-MSG 0 0))
 
+    SHOW-ERROR-AND-EXIT-MSG
+    (let [msg (unmarshal-and-free wparam)]
+      (MessageBox hwnd msg "Error" (bor MB_ICONEXCLAMATION MB_OK))
+      (PostMessage hwnd WM_COMMAND ID_MENU_EXIT 0))
+
     WM_CLOSE
     (DestroyWindow hwnd)
 
@@ -354,6 +360,11 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
+(defn ui-manager-show-error-and-exit [self msg]
+  (def buf-ptr (alloc-and-marshal msg))
+  (ui-manager-post-message self SHOW-ERROR-AND-EXIT-MSG buf-ptr 0))
+
+
 (defn ui-manager-destroy [self]
   (ui-manager-post-message self WM_COMMAND ID_MENU_EXIT 0))
 
@@ -364,6 +375,7 @@
     :set-keymap ui-manager-set-keymap
     :set-hooks ui-manager-set-hooks
     :remove-hooks ui-manager-remove-hooks
+    :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
 
 

@@ -24,13 +24,20 @@
      [:take chan msg]
      (match msg
        [:ui/initialized thread-id msg-hwnd]
-       (do
-         (:initialized (in context :ui-manager) thread-id msg-hwnd)
+       (let [config-file-name (in cli-args "config")
+             ui-man (in context :ui-manager)]
+         (:initialized ui-man thread-id msg-hwnd)
          (def config-env
            (try
-             (load-config-file [(in cli-args "config")] context)
+             (load-config-file [config-file-name] context)
              ((err fib)
-              (show-error-and-exit err 1 (get-stack-trace fib)))))
+              (:show-error-and-exit
+                 ui-man
+                 (string/format "Failed to load config file: %s\n\n%s\n%s"
+                                config-file-name
+                                err
+                                (get-stack-trace fib)))
+              nil)))
          (log/debug "config-env = %n" config-env))
 
        :ui/exit
