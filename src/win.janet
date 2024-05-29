@@ -1333,18 +1333,7 @@
 
 
 (defn wm-focus-changed [self]
-  # XXX: If the focus change is caused by a closing window, that
-  # window may still be alive, so it won't be purged immediately.
-  # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (each layout (get-in self [:root :children])
-    (def dead
-      (:purge-windows layout
-                      |(window-purge-pred $ self layout)))
-    (each dw dead
-      (:call-hook (in self :hook-manager) :window-removed dw))
-    (log/debug "purged %n dead windows from desktop %n"
-               (length dead)
-               (in layout :id)))
+  (:call-hook (in self :hook-manager) :focus-changed)
 
   (def uia-man (in self :uia-manager))
   (with-uia [uia-win (:get-focused-window uia-man)]
@@ -1553,5 +1542,18 @@
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path _desktop-info]
        (default-window-filter hwnd uia-win exe-path wm-obj)))
+  (:add-hook hook-man :focus-changed
+     (fn []
+       # XXX: If the focus change is caused by a closing window, that
+       # window may still be alive, so it won't be purged immediately.
+       # Maybe I shoud check the hwnds everytime a window is manipulated?
+       (each layout (get-in wm-obj [:root :children])
+         (def dead
+           (:purge-windows layout |(window-purge-pred $ wm-obj layout)))
+         (each dw dead
+           (:call-hook hook-man :window-removed dw))
+         (log/debug "purged %n dead windows from desktop %n"
+                    (length dead)
+                    (in layout :id)))))
 
   wm-obj)
