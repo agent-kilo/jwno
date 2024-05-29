@@ -61,6 +61,8 @@
   (k "win + =" :balance-frames)
   (k "win + o" [:focus-mode 0.7])
 
+  (k "win + p" :peek-frame)
+
   (k "win + n" [:enum-frame :next])
   (k "win + e" [:enum-frame :prev])
   (k "win + i" [:enum-window-in-frame :next])
@@ -183,3 +185,20 @@
        (:add-child last-new-frame cur-win))
      (:retile window-man cur-frame)
      (:activate window-man last-new-frame)))
+
+(:add-command command-man :peek-frame
+   (fn []
+     (def root (in window-man :root))
+     (def cur-frame (:get-current-frame root))
+     (def cur-rect (struct/to-table (in cur-frame :rect)))
+     (def all-wins (in cur-frame :children))
+     (def dx 32)
+     (def dy 32)
+     (with-dyns [:jwno-no-hooks true]
+       (each w all-wins
+         (:transform-window window-man w cur-rect)
+         (put cur-rect :left (+ (in cur-rect :left) dx))
+         (put cur-rect :top (+ (in cur-rect :top) dy))
+         (:activate window-man w)))
+     # To trigger hooks
+     (:activate window-man (last all-wins))))
