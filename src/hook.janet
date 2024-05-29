@@ -4,6 +4,10 @@
 
 
 (defn hook-manager-call-hook [self hook-name & args]
+  (when (dyn :jwno-no-hooks)
+    (log/debug ":jwno-no-hooks set, skipping hooks: %n" hook-name)
+    (break))
+
   (def hooks (in self :hooks))
   (def hook-fn-list (in hooks hook-name @[]))
   (each hook-fn hook-fn-list
@@ -16,6 +20,10 @@
 
 
 (defn hook-manager-call-filter-hook [self hook-name & args]
+  (if (dyn :jwno-no-hooks)
+    (log/debug ":jwno-no-hooks set, skipping hooks: %n" hook-name)
+    (break true)) # XXX: Always pass the checks when no-hooks
+
   (def hooks (in self :hooks))
   (def hook-fn-list (in hooks hook-name @[]))
   (var result true)
