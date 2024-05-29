@@ -13,6 +13,31 @@
 (def hook-man (in jwno-context :hook-manager))
 
 
+(defn cascade-windows [&opt cur-win]
+  (default cur-win (:get-current-window (in window-man :root)))
+  (default no-hooks false)
+
+  (unless (nil? cur-win)
+    (def cur-frame (in cur-win :parent))
+    (def cur-rect (struct/to-table (in cur-frame :rect)))
+    (def all-wins (in cur-frame :children))
+
+    (def dx 32)
+    (def dy 32)
+
+    (var next-win (:get-next-child cur-frame cur-win))
+
+    (with-dyns [:jwno-no-hooks true]
+      (while (not= cur-win next-win)
+        (:transform-window window-man next-win cur-rect)
+        (:activate window-man next-win)
+        (put cur-rect :left (+ (in cur-rect :left) dx))
+        (put cur-rect :top (+ (in cur-rect :top) dy))
+        (set next-win (:get-next-child cur-frame next-win)))
+      (:transform-window window-man cur-win cur-rect)
+      (:activate window-man cur-win))))
+
+
 (defmacro k [key-seq cmd]
   ~(:define-key keymap ,key-seq ,cmd))
 
@@ -187,18 +212,4 @@
      (:activate window-man last-new-frame)))
 
 (:add-command command-man :peek-frame
-   (fn []
-     (def root (in window-man :root))
-     (def cur-frame (:get-current-frame root))
-     (def cur-rect (struct/to-table (in cur-frame :rect)))
-     (def all-wins (in cur-frame :children))
-     (def dx 32)
-     (def dy 32)
-     (with-dyns [:jwno-no-hooks true]
-       (each w all-wins
-         (:transform-window window-man w cur-rect)
-         (put cur-rect :left (+ (in cur-rect :left) dx))
-         (put cur-rect :top (+ (in cur-rect :top) dy))
-         (:activate window-man w)))
-     # To trigger hooks
-     (:activate window-man (last all-wins))))
+   (fn [] (cascade-windows)))
