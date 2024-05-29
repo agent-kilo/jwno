@@ -15,7 +15,6 @@
 
 (defn cascade-windows [&opt cur-win]
   (default cur-win (:get-current-window (in window-man :root)))
-  (default no-hooks false)
 
   (unless (nil? cur-win)
     (def cur-frame (in cur-win :parent))
