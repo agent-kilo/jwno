@@ -313,6 +313,21 @@
   ret)
 
 
+(defn- window-purge-pred [win wm layout]
+  (def hwnd (in win :hwnd))
+  (def layout-vd-id (in layout :id))
+  (def win-vd-id
+    (try
+      (:GetWindowDesktopId (in wm :vdm-com) hwnd)
+      ((err fib)
+       (log/debug "GetWindowDesktopId failed: %n\n%s"
+                  err
+                  (get-stack-trace fib))
+       nil)))
+  (or (not= win-vd-id layout-vd-id)
+      (not (:alive? win))))
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -794,6 +809,12 @@
   (PostMessage (in self :hwnd) WM_CLOSE 0 0))
 
 
+(defn window-alive? [self]
+  (def hwnd (in self :hwnd))
+  (and (not= FALSE (IsWindow hwnd))
+       (not= FALSE (IsWindowVisible hwnd))))
+
+
 (defn window-transform [self rect]
   (def wm (:get-window-manager self))
   (:transform-hwnd wm (in self :hwnd) rect (in self :tags)))
@@ -833,6 +854,7 @@
 (def- window-proto
   (table/setproto
    @{:close window-close
+     :alive? window-alive?
      :transform window-transform
      :get-alpha window-get-alpha
      :set-alpha window-set-alpha
@@ -1423,21 +1445,6 @@
               (= win-to-signal old-win))
     (:call-hook (in wm :hook-manager) :window-activated
        win-to-signal)))
-
-
-(defn window-purge-pred [win wm layout]
-  (def hwnd (in win :hwnd))
-  (def layout-vd-id (in layout :id))
-  (def win-vd-id
-    (try
-      (:GetWindowDesktopId (in wm :vdm-com) hwnd)
-      ((err fib)
-       (log/debug "GetWindowDesktopId failed: %n\n%s"
-                  err
-                  (get-stack-trace fib))
-       nil)))
-  (or (not= win-vd-id layout-vd-id)
-      (not (:hwnd-alive? wm hwnd))))
 
 
 (defn wm-focus-changed [self]
