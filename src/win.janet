@@ -134,6 +134,23 @@
       255)))
 
 
+(defn- hwnd-process-elevated? [hwnd]
+  (def [_tid pid] (GetWindowThreadProcessId hwnd))
+  (when (= (int/u64 0) pid)
+    (break false))
+
+  (with [proc
+         (OpenProcess PROCESS_QUERY_LIMITED_INFORMATION false pid)
+         CloseHandle]
+    (with [[ret token]
+           (OpenProcessToken proc TOKEN_QUERY)
+           (fn [[_ token]] (CloseHandle token))]
+      (when (= 0 ret)
+        (break false))
+      (def [_gti-ret elevated] (GetTokenInformation token TokenElevation))
+      elevated)))
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -615,12 +632,17 @@
   (get-hwnd-alpha (in self :hwnd)))
 
 
+(defn window-elevated? [self]
+  (hwnd-process-elevated? (in self :hwnd)))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
      :transform window-transform
      :get-alpha window-get-alpha
-     :set-alpha window-set-alpha}
+     :set-alpha window-set-alpha
+     :elevated? window-elevated?}
    tree-node-proto))
 
 
@@ -1099,20 +1121,7 @@
 
 
 (defn wm-hwnd-process-elevated? [self hwnd]
-  (def [_tid pid] (GetWindowThreadProcessId hwnd))
-  (when (= (int/u64 0) pid)
-    (break false))
-
-  (with [proc
-         (OpenProcess PROCESS_QUERY_LIMITED_INFORMATION false pid)
-         CloseHandle]
-    (with [[ret token]
-           (OpenProcessToken proc TOKEN_QUERY)
-           (fn [[_ token]] (CloseHandle token))]
-      (when (= 0 ret)
-        (break false))
-      (def [_gti-ret elevated] (GetTokenInformation token TokenElevation))
-      elevated)))
+  (hwnd-process-elevated? hwnd))
 
 
 (defn wm-jwno-process-elevated? [self]
@@ -1235,8 +1244,8 @@
         # uia-win is constructed locally in this case, release it.
         (:Release uia-win))
 
-      (if (or (nil? desktop-id)
-              (nil? desktop-name))
+      (if (and (nil? desktop-id)
+               (nil? desktop-name))
         nil
         {:id desktop-id :name desktop-name}))))
 
@@ -1557,7 +1566,7 @@
 
     # Exclude windows we are not privileged enough to manage
     (and (not (:jwno-process-elevated? wm))
-         (:hwnd-process-elevated? wm hwnd))
+         (hwnd-process-elevated? hwnd))
     false
 
     true))
