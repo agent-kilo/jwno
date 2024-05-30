@@ -240,13 +240,15 @@
     true
     (do
       (def desktop-id
-        (try
-          (:GetWindowDesktopId vdm-com hwnd)
-          ((err fib)
-           (log/debug "GetWindowDesktopId failed: %n\n%s"
-                      err
-                      (get-stack-trace fib))
-           nil)))
+        (let [top-level (GetAncestor hwnd GA_ROOTOWNER)]
+          (log/debug "top-level = %n" top-level)
+          (try
+            (:GetWindowDesktopId vdm-com top-level)
+            ((err fib)
+             (log/debug "GetWindowDesktopId failed: %n\n%s"
+                        err
+                        (get-stack-trace fib))
+             nil))))
 
       (def desktop-name
         (with-uia [root-elem (:get-root uia-man uia-win)]
@@ -265,7 +267,9 @@
       (if (and (nil? desktop-id)
                (nil? desktop-name))
         nil
-        {:id desktop-id :name desktop-name}))))
+        (let [ret {:id desktop-id :name desktop-name}]
+          (log/debug "desktop info = %n" ret)
+          ret)))))
 
 
 (defn- get-hwnd-info [hwnd? uia-man vdm-com &opt uia-win?]
@@ -1620,8 +1624,16 @@
     :destroy wm-destroy})
 
 
-(defn default-window-filter [hwnd uia-win exe-path wm]
+(defn default-window-filter [hwnd uia-win exe-path desktop-info wm]
+  (def desktop-id (in desktop-info :id))
+
   (cond
+    # Some windows are not managed by Virtual Desktops, we
+    # exclude them too.
+    (or (nil? desktop-id)
+        (= "{00000000-0000-0000-0000-000000000000}" (in desktop-info :id)))
+    false
+
     (not (is-valid-uia-window? uia-win))
     false
 
@@ -1663,8 +1675,8 @@
   (put wm-obj :root (virtual-desktop-container wm-obj))
 
   (:add-hook hook-man :filter-window
-     (fn [hwnd uia-win exe-path _desktop-info]
-       (default-window-filter hwnd uia-win exe-path wm-obj)))
+     (fn [hwnd uia-win exe-path desktop-info]
+       (default-window-filter hwnd uia-win exe-path desktop-info wm-obj)))
   (:add-hook hook-man :focus-changed
      (fn []
        # XXX: If the focus change is caused by a closing window, that
