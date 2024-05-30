@@ -81,8 +81,8 @@
     (k "win + shift + f" :close-frame)
     (k "win + ctrl + f" :flatten-parent)
 
-    (k "win + ," [:split-and-move-current-window :horizontal])
-    (k "win + ." [:split-and-move-current-window :vertical])
+    (k "win + ," [:split-and-move-window :horizontal])
+    (k "win + ." [:split-and-move-window :vertical])
     (k "win + =" :balance-frames)
     (k "win + o" [:zoom-in 0.7])
 
@@ -192,7 +192,7 @@
          (:retile window-man)
          (:activate window-man (:get-current-window cur-frame))))))
 
-(:add-command command-man :split-and-move-current-window
+(:add-command command-man :split-and-move-window
    (fn [dir]
      (def root (in window-man :root))
      (def cur-frame (:get-current-frame root))
