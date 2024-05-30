@@ -268,6 +268,51 @@
         {:id desktop-id :name desktop-name}))))
 
 
+(defn- get-hwnd-info [hwnd? uia-man vdm-com &opt uia-win?]
+  (def [hwnd uia-win]
+    (normalize-hwnd-and-uia-element hwnd?
+                                    uia-win?
+                                    (in uia-man :com)
+                                    (in uia-man :focus-cr)))
+  (def exe-path
+    (unless (nil? hwnd)
+      (get-hwnd-path hwnd)))
+  (def desktop-info
+    (unless (nil? hwnd)
+      (get-hwnd-virtual-desktop hwnd uia-man vdm-com uia-win)))
+
+  (def ret
+    (cond
+      (nil? uia-win)
+      # normalize-hwnd-and-uia-element failed
+      nil
+
+      (nil? hwnd)
+      # normalize-hwnd-and-uia-element failed
+      nil
+
+      (nil? exe-path)
+      # get-hwnd-path failed
+      nil
+
+      (nil? desktop-info)
+      # get-hwnd-virtual-desktop failed
+      nil
+
+      true
+      {:hwnd hwnd
+       :uia-element uia-win
+       :exe-path exe-path
+       :virtual-desktop desktop-info}))
+
+  (when (and (nil? ret)
+             (not (nil? uia-win))
+             (not= uia-win uia-win?))
+    (:Release uia-win))
+
+  ret)
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -780,6 +825,11 @@
   (:get-hwnd-virtual-desktop wm (in self :hwnd) uia-win))
 
 
+(defn window-get-info [self]
+  (def wm (:get-window-manager self))
+  (:get-hwnd-info wm (in self :hwnd)))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
@@ -789,7 +839,8 @@
      :elevated? window-elevated?
      :get-exe-path window-get-exe-path
      :get-uia-element window-get-uia-element
-     :get-virtual-desktop window-get-virtual-desktop}
+     :get-virtual-desktop window-get-virtual-desktop
+     :get-info window-get-info}
    tree-node-proto))
 
 
@@ -1303,53 +1354,7 @@
 
 
 (defn wm-get-hwnd-info [self hwnd? &opt uia-win?]
-  (def uia-man (in self :uia-manager))
-
-  (def [hwnd uia-win]
-    (normalize-hwnd-and-uia-element hwnd?
-                                    uia-win?
-                                    (in uia-man :com)
-                                    (in uia-man :focus-cr)))
-  (def exe-path
-    (unless (nil? hwnd)
-      (get-hwnd-path hwnd)))
-  (def desktop-info
-    (unless (nil? hwnd)
-      (get-hwnd-virtual-desktop hwnd
-                                (in self :uia-manager)
-                                (in self :vdm-com)
-                                uia-win)))
-
-  (def ret
-    (cond
-      (nil? uia-win)
-      # normalize-hwnd-and-uia-element failed
-      nil
-
-      (nil? hwnd)
-      # normalize-hwnd-and-uia-element failed
-      nil
-
-      (nil? exe-path)
-      # get-hwnd-path failed
-      nil
-
-      (nil? desktop-info)
-      # get-hwnd-virtual-desktop failed
-      nil
-
-      true
-      {:hwnd hwnd
-       :uia-element uia-win
-       :exe-path exe-path
-       :virtual-desktop desktop-info}))
-
-  (when (and (nil? ret)
-             (not (nil? uia-win))
-             (not= uia-win uia-win?))
-    (:Release uia-win))
-
-  ret)
+  (get-hwnd-info hwnd? (in self :uia-manager) (in self :vdm-com) uia-win?))
 
 
 (defn wm-should-manage-hwnd? [self hwnd-info]
@@ -1451,7 +1456,11 @@
       (activate-and-call-hooks win self)
       (break))
 
-    (def hwnd-info (:get-hwnd-info self hwnd uia-win))
+    (def hwnd-info
+      (get-hwnd-info hwnd
+                     (in self :uia-manager)
+                     (in self :vdm-com)
+                     uia-win))
     (when (nil? hwnd-info)
       (log/debug "Window %n vanished?" hwnd)
       (break))
@@ -1469,7 +1478,10 @@
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break))
 
-  (def hwnd-info (:get-hwnd-info self hwnd))
+  (def hwnd-info
+    (get-hwnd-info hwnd
+                   (in self :uia-manager)
+                   (in self :vdm-com)))
   (when (nil? hwnd-info)
     (log/debug "Window %n vanished?" hwnd)
     (break))
