@@ -173,7 +173,7 @@
      (def class-name (:get_CachedClassName uia-win))
      (cond
        (= "Emacs" class-name)
-       (:set-hwnd-alpha window-man (in win :hwnd) (math/floor (* 256 0.9)))
+       (:set-alpha win (math/floor (* 256 0.9)))
 
        (= "#32770" class-name) # Dialog window class
        (put (in win :tags) :no-expand true))))
