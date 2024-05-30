@@ -187,7 +187,7 @@
      (def cur-frame (:get-current-frame (in window-man :root)))
      # cur-win will be nil if the current frame is empty.
      (if-let [cur-win (:get-current-window cur-frame)]
-       (:close-hwnd window-man (in cur-win :hwnd))
+       (:close cur-win)
        (do
          (:close cur-frame)
          (:retile window-man)

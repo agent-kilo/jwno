@@ -500,9 +500,13 @@
 
 ######### Window object #########
 
+(defn window-close [self]
+  (PostMessage (in self :hwnd) WM_CLOSE 0 0))
+
+
 (def- window-proto
   (table/setproto
-   @{}
+   @{:close window-close}
    tree-node-proto))
 
 
