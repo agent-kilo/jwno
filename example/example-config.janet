@@ -72,6 +72,14 @@
     keymap))
 
 
+(defn move-window-after-split [frame]
+  (def all-sub-frames (in frame :children))
+  (def all-wins (in (first all-sub-frames) :children))
+  (def move-to-frame (in all-sub-frames 1))
+  (when (>= (length all-wins) 2)
+    (:add-child move-to-frame (:get-current-window frame))))
+
+
 (defn build-keymap [key-man]
   (let [keymap (:new-keymap key-man)]
 
@@ -82,8 +90,8 @@
     (k "win + shift + f" :close-frame)
     (k "win + ctrl + f" :flatten-parent)
 
-    (k "win + ," [:split-and-move-window :horizontal])
-    (k "win + ." [:split-and-move-window :vertical])
+    (k "win + ," [:split-frame :horizontal 2 [0.5] 1 move-window-after-split])
+    (k "win + ." [:split-frame :vertical 2 [0.5] 1 move-window-after-split])
     (k "win + =" :balance-frames)
     (k "win + o" [:zoom-in 0.7])
 
@@ -185,25 +193,6 @@
        (:close parent)
        (:retile window-man))))
 
-
-(:add-command command-man :split-and-move-window
-   (fn [dir]
-     (def root (in window-man :root))
-     (def cur-frame (:get-current-frame root))
-     (def cur-win (:get-current-window cur-frame))
-     (def win-count (length (in cur-frame :children)))
-     # Existing windows are all moved to the first new frame
-     # after splitting.
-     (:split cur-frame dir 2 [0.5])
-     (def last-new-frame (last (in cur-frame :children)))
-     # Only move the current window away when there's at
-     # least another window in the old frame
-     (when (>= win-count 2)
-       # The child will be automatically removed from its
-       # former parent.
-       (:add-child last-new-frame cur-win))
-     (:retile window-man cur-frame)
-     (:activate window-man last-new-frame)))
 
 (:add-command command-man :peek-frame
    (fn [] (cascade-windows)))

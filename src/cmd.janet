@@ -54,27 +54,24 @@
   (:retile wm))
 
 
-(defn cmd-split-frame [wm dir &opt nfr ratios to-activate move-win-to]
+(defn cmd-split-frame [wm dir &opt nfr ratios to-activate after-split-fn]
   (default nfr 2)
   (default ratios [0.5])
   (default to-activate 0)
-  (default move-win-to 0)
 
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
 
   (:split cur-frame dir nfr ratios)
-  (def all-sub-frames (in cur-frame :children))
-  (def all-wins (slice (in (first all-sub-frames) :children)))
-
-  (when (and (> move-win-to 0) (< move-win-to nfr))
-    (def move-to-fr (in all-sub-frames move-win-to))
-    (each w all-wins
-      (:add-child move-to-fr w)))
-  (:retile wm cur-frame)
-  # Do not actually focus this window, just mark it as activated
+  # Since we may activate a different frame below, do not actually
+  # focus this window here, just mark it as activated
   (when cur-win
     (:activate cur-win))
+
+  (when after-split-fn
+    (after-split-fn cur-frame))
+
+  (:retile wm cur-frame)
   (:activate wm (get-in cur-frame [:children to-activate])))
 
 
