@@ -43,30 +43,30 @@
 
 (def resize-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (k "n" [:resize-current-frame 0 100])
-    (k "e" [:resize-current-frame 0 -100])
-    (k "m" [:resize-current-frame -100 0])
-    (k "i" [:resize-current-frame 100 0])
+    (k "n" [:resize-frame 0 100])
+    (k "e" [:resize-frame 0 -100])
+    (k "m" [:resize-frame -100 0])
+    (k "i" [:resize-frame 100 0])
     (k "=" :balance-frames)
-    (k "o" [:zoom-in-on-current-frame 0.7])
+    (k "o" [:zoom-in 0.7])
     (k "enter" :pop-keymap)
     keymap))
 
 
 (def yank-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (k "n" [:move-current-window :down])
-    (k "e" [:move-current-window :up])
-    (k "m" [:move-current-window :left])
-    (k "i" [:move-current-window :right])
+    (k "n" [:move-window :down])
+    (k "e" [:move-window :up])
+    (k "m" [:move-window :left])
+    (k "i" [:move-window :right])
     (k "enter" :pop-keymap)
     keymap))
 
 
 (def alpha-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (k "n" [:change-current-window-alpha -25])
-    (k "e" [:change-current-window-alpha 25])
+    (k "n" [:change-window-alpha -25])
+    (k "e" [:change-window-alpha 25])
     (k "enter" :pop-keymap)
     keymap))
 
@@ -77,14 +77,14 @@
     (k "win + shift + q" :quit)
     (k "win + t" :retile)
 
-    (k "win + shift + c" :close-current-window-or-frame)
-    (k "win + shift + f" :close-current-frame)
+    (k "win + shift + c" :close-window-or-frame)
+    (k "win + shift + f" :close-frame)
     (k "win + ctrl + f" :flatten-parent)
 
     (k "win + ," [:split-and-move-current-window :horizontal])
     (k "win + ." [:split-and-move-current-window :vertical])
     (k "win + =" :balance-frames)
-    (k "win + o" [:zoom-in-on-current-frame 0.7])
+    (k "win + o" [:zoom-in 0.7])
 
     (k "win + p" :peek-frame)
 
@@ -98,15 +98,15 @@
     (k "win + ctrl + m" [:adjacent-frame :left])
     (k "win + ctrl + i" [:adjacent-frame :right])
 
-    (k "win + shift + n" [:move-current-window :down])
-    (k "win + shift + e" [:move-current-window :up])
-    (k "win + shift + m" [:move-current-window :left])
-    (k "win + shift + i" [:move-current-window :right])
+    (k "win + shift + n" [:move-window :down])
+    (k "win + shift + e" [:move-window :up])
+    (k "win + shift + m" [:move-window :left])
+    (k "win + shift + i" [:move-window :right])
 
     (k "win + s" [:push-keymap resize-mode-keymap])
     (k "win + y" [:push-keymap yank-mode-keymap])
 
-    (k "win + shift + s" :frame-to-current-window-size)
+    (k "win + shift + s" :frame-to-window-size)
 
     (k "win + a" [:push-keymap alpha-mode-keymap])
 
@@ -181,7 +181,7 @@
        (:retile window-man))))
 
 
-(:add-command command-man :close-current-window-or-frame
+(:add-command command-man :close-window-or-frame
    (fn []
      (def cur-frame (:get-current-frame (in window-man :root)))
      # cur-win will be nil if the current frame is empty.

@@ -56,7 +56,7 @@
   (:activate wm cur-win))
 
 
-(defn cmd-split [wm dir nfr ratios to-activate move-win-to]
+(defn cmd-split-frame [wm dir nfr ratios to-activate move-win-to]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (:split cur-frame dir nfr ratios)
@@ -107,7 +107,7 @@
     (:activate wm sibling)))
 
 
-(defn cmd-move-current-window [wm dir]
+(defn cmd-move-window [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
 
@@ -119,7 +119,7 @@
     (:activate wm cur-win)))
 
 
-(defn cmd-resize-current-frame [wm dw dh]
+(defn cmd-resize-frame [wm dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def rect (in cur-frame :rect))
   (:resize cur-frame
@@ -132,7 +132,7 @@
   (:activate wm cur-win))
 
 
-(defn cmd-zoom-in-on-current-frame [wm ratio]
+(defn cmd-zoom-in [wm ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-top (:get-top-frame cur-frame))
   (def mon-width (- (get-in cur-top [:rect :right]) (get-in cur-top [:rect :left])))
@@ -157,7 +157,7 @@
   (:activate wm cur-win))
 
 
-(defn cmd-close-current-frame [wm]
+(defn cmd-close-frame [wm]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (:close cur-frame)
@@ -167,7 +167,7 @@
     (:activate wm (:get-current-window cur-frame))))
 
 
-(defn cmd-frame-to-current-window-size [wm uia-man]
+(defn cmd-frame-to-window-size [wm uia-man]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (when (nil? cur-win)
@@ -183,14 +183,14 @@
   (:activate wm cur-win))
 
 
-(defn cmd-close-current-window [wm]
+(defn cmd-close-window [wm]
   (def cur-win (:get-current-window (in wm :root)))
   (when (nil? cur-win)
     (break))
   (:close cur-win))
 
 
-(defn cmd-change-current-window-alpha [wm delta]
+(defn cmd-change-window-alpha [wm delta]
   (def cur-win (:get-current-window (in wm :root)))
   (when (nil? cur-win)
     (break))
@@ -223,22 +223,22 @@
   (:add-command command-man :retile
      (fn [] (cmd-retile wm)))
 
-  (:add-command command-man :split
+  (:add-command command-man :split-frame
      (fn [dir nfr ratios to-activate move-win-to]
-       (cmd-split wm dir nfr ratios to-activate move-win-to)))
+       (cmd-split-frame wm dir nfr ratios to-activate move-win-to)))
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm)))
 
-  (:add-command command-man :resize-current-frame
-     (fn [dw dh] (cmd-resize-current-frame wm dw dh)))
-  (:add-command command-man :close-current-frame
-     (fn [] (cmd-close-current-frame wm)))
-  (:add-command command-man :frame-to-current-window-size
-     (fn [] (cmd-frame-to-current-window-size wm uia-man)))
+  (:add-command command-man :resize-frame
+     (fn [dw dh] (cmd-resize-frame wm dw dh)))
+  (:add-command command-man :close-frame
+     (fn [] (cmd-close-frame wm)))
+  (:add-command command-man :frame-to-window-size
+     (fn [] (cmd-frame-to-window-size wm uia-man)))
   (:add-command command-man :balance-frames
      (fn [] (cmd-balance-frames wm)))
-  (:add-command command-man :zoom-in-on-current-frame
-     (fn [ratio] (cmd-zoom-in-on-current-frame wm ratio)))
+  (:add-command command-man :zoom-in
+     (fn [ratio] (cmd-zoom-in wm ratio)))
 
   (:add-command command-man :enum-frame
      (fn [dir] (cmd-enum-frame wm dir)))
@@ -248,12 +248,12 @@
   (:add-command command-man :enum-window-in-frame
      (fn [dir] (cmd-enum-window-in-frame wm dir)))
 
-  (:add-command command-man :move-current-window
-     (fn [dir] (cmd-move-current-window wm dir)))
-  (:add-command command-man :close-current-window
-     (fn [] (cmd-close-current-window wm)))
-  (:add-command command-man :change-current-window-alpha
-     (fn [delta] (cmd-change-current-window-alpha wm delta))))
+  (:add-command command-man :move-window
+     (fn [dir] (cmd-move-window wm dir)))
+  (:add-command command-man :close-window
+     (fn [] (cmd-close-window wm)))
+  (:add-command command-man :change-window-alpha
+     (fn [delta] (cmd-change-window-alpha wm delta))))
 
 
 (defn command-manager-call-command [self cmd & args]
@@ -261,13 +261,18 @@
   (def found (in commands cmd))
   (if found
     (try
-      (found ;args)
+      (do
+        (found ;args)
+        true)
       ((err fib)
        (log/error "command %n failed: %n\n%s"
                   cmd
                   err
-                  (get-stack-trace fib))))
-    (log/warning "unknown command: %n, args: %n" cmd args)))
+                  (get-stack-trace fib))
+       false))
+    (do
+      (log/warning "unknown command: %n, args: %n" cmd args)
+      false)))
 
 
 (defn command-manager-dispatch-command [self cmd-and-args]
