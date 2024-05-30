@@ -7,10 +7,11 @@
 #(import spork/httpf)
 
 
-(def key-man (in jwno-context :key-manager))
-(def command-man (in jwno-context :command-manager))
-(def window-man (in jwno-context :window-manager))
-(def hook-man (in jwno-context :hook-manager))
+(def {:key-manager key-man
+      :command-manager command-man
+      :window-manager window-man
+      :hook-manager hook-man}
+  jwno-context)
 
 
 (defn cascade-windows [&opt cur-win]

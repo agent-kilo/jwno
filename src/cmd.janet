@@ -51,9 +51,7 @@
 
 
 (defn cmd-retile [wm]
-  (def cur-win (:get-current-window (in wm :root)))
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-split-frame [wm dir nfr ratios to-activate move-win-to]
