@@ -1631,7 +1631,7 @@
     # Some windows are not managed by Virtual Desktops, we
     # exclude them too.
     (or (nil? desktop-id)
-        (= "{00000000-0000-0000-0000-000000000000}" (in desktop-info :id)))
+        (= "{00000000-0000-0000-0000-000000000000}" desktop-id))
     false
 
     (not (is-valid-uia-window? uia-win))
