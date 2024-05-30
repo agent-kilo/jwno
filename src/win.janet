@@ -186,6 +186,18 @@
     path))
 
 
+(defn get-hwnd-uia-element [hwnd uia-com &opt cr]
+  (try
+    (if cr
+      (:ElementFromHandleBuildCache uia-com hwnd cr)
+      (:ElementFromHandle uia-com hwnd))
+    ((err fib)
+     (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
+                err
+                (get-stack-trace fib))
+     nil)))
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -675,6 +687,12 @@
   (get-hwnd-path (in self :hwnd)))
 
 
+(defn window-get-uia-element [self &opt cr]
+  (def layout (:get-layout self))
+  (def wm (get-in layout [:parent :window-manager]))
+  (:get-hwnd-uia-element wm (in self :hwnd) cr))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
@@ -682,7 +700,8 @@
      :get-alpha window-get-alpha
      :set-alpha window-set-alpha
      :elevated? window-elevated?
-     :get-exe-path window-get-exe-path}
+     :get-exe-path window-get-exe-path
+     :get-uia-element window-get-uia-element}
    tree-node-proto))
 
 
@@ -1182,17 +1201,10 @@
   (get-hwnd-path hwnd))
 
 
-(defn wm-get-hwnd-uia-element [self hwnd]
+(defn wm-get-hwnd-uia-element [self hwnd &opt cr]
+  (default cr (get-in self [:uia-manager :focus-cr]))
   (def uia-man (in self :uia-manager))
-  (try
-    (:ElementFromHandleBuildCache (in uia-man :com)
-                                  hwnd
-                                  (in uia-man :focus-cr))
-    ((err fib)
-     (log/debug "ElementFromHandleBuildCache failed: %n\n%s"
-                err
-                (get-stack-trace fib))
-     nil)))
+  (get-hwnd-uia-element hwnd (in uia-man :com) cr))
 
 
 (defn wm-normalize-hwnd-and-uia-element [self hwnd? uia-win?]
