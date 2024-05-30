@@ -14,7 +14,7 @@
 (if DEBUG-REF-COUNT
   (set with-uia-dtor-fn
        ~(fn [x]
-          (when (not (nil? x))
+          (unless (nil? x)
             (def refc (:Release x))
             (log/debug "++++ After releasing %n, ref count = %n, stack:\n%s"
                        x
@@ -22,7 +22,7 @@
                        (get-stack-trace (fiber/current))))))
   (set with-uia-dtor-fn
        ~(fn [x]
-          (when (not (nil? x))
+          (unless (nil? x)
             (:Release x)))))
 
 (defmacro with-uia [[binding ctor dtor] & body]

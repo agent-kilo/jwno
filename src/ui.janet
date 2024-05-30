@@ -46,7 +46,7 @@
            (do
              (log/debug "GC timer triggered")
              (set skip true))))
-       (when (not skip)
+       (unless skip
          (TranslateMessage msg)
          (DispatchMessage msg))))))
 
@@ -95,9 +95,9 @@
      :hIcon hIcon
      :szTip "Jwno"
      :uVersion NOTIFYICON_VERSION_4))
-  (when (not= TRUE (Shell_NotifyIcon NIM_ADD nid))
+  (unless (= TRUE (Shell_NotifyIcon NIM_ADD nid))
     (error "Failed to create notify icon"))
-  (when (not= TRUE (Shell_NotifyIcon NIM_SETVERSION nid))
+  (unless (= TRUE (Shell_NotifyIcon NIM_SETVERSION nid))
     (error "Failed to set notify icon version")))
 
 
@@ -106,7 +106,7 @@
     (NOTIFYICONDATA
      :hWnd hwnd
      :uID NOTIFY-ICON-ID))
-  (when (not= TRUE (Shell_NotifyIcon NIM_DELETE nid))
+  (unless (= TRUE (Shell_NotifyIcon NIM_DELETE nid))
     (error "Failed to delete notify icon")))
 
 

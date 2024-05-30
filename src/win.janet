@@ -1057,7 +1057,7 @@
                (:transform sib-fr rect))
              all-siblings
              new-rects)
-        (when (not= dw 0)
+        (unless (= dw 0)
           (:resize parent
                    {:left (in parent-rect :left)
                     :top (in parent-rect :top)
@@ -1078,7 +1078,7 @@
                (:transform sib-fr rect))
              all-siblings
              new-rects)
-        (when (not= dh 0)
+        (unless (= dh 0)
           (:resize parent
                    {:left (in parent-rect :left)
                     :top (in parent-rect :top)
@@ -1476,7 +1476,7 @@
       (log/debug "Window %n vanished?" hwnd)
       (break))
 
-    (when (not (:should-manage-hwnd? self hwnd-info))
+    (unless (:should-manage-hwnd? self hwnd-info)
       (log/debug "Ignoring window: %n" hwnd)
       (break))
 
