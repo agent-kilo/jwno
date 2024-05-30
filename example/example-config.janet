@@ -53,7 +53,7 @@
     keymap))
 
 
-(def move-mode-keymap
+(def yank-mode-keymap
   (let [keymap (:new-keymap key-man)]
     (k "n" [:move-current-window :down])
     (k "e" [:move-current-window :up])
@@ -67,55 +67,56 @@
   (let [keymap (:new-keymap key-man)]
     (k "n" [:change-current-window-alpha -25])
     (k "e" [:change-current-window-alpha 25])
-    (k "enter" :pop-keymap)))
+    (k "enter" :pop-keymap)
+    keymap))
 
 
 (defn build-keymap [key-man]
-  (def keymap (:new-keymap key-man))
+  (let [keymap (:new-keymap key-man)]
 
-  (k "win + shift + q" :quit)
-  (k "win + t" :retile)
+    (k "win + shift + q" :quit)
+    (k "win + t" :retile)
 
-  (k "win + shift + c" :close-current-window-or-frame)
-  (k "win + shift + f" :close-current-frame)
-  (k "win + ctrl + f" :flatten-parent)
+    (k "win + shift + c" :close-current-window-or-frame)
+    (k "win + shift + f" :close-current-frame)
+    (k "win + ctrl + f" :flatten-parent)
 
-  (k "win + ," [:split-and-move-current-window :horizontal])
-  (k "win + ." [:split-and-move-current-window :vertical])
-  (k "win + =" :balance-frames)
-  (k "win + o" [:focus-mode 0.7])
+    (k "win + ," [:split-and-move-current-window :horizontal])
+    (k "win + ." [:split-and-move-current-window :vertical])
+    (k "win + =" :balance-frames)
+    (k "win + o" [:focus-mode 0.7])
 
-  (k "win + p" :peek-frame)
+    (k "win + p" :peek-frame)
 
-  (k "win + n" [:enum-frame :next])
-  (k "win + e" [:enum-frame :prev])
-  (k "win + i" [:enum-window-in-frame :next])
-  (k "win + m" [:enum-window-in-frame :prev])
+    (k "win + n" [:enum-frame :next])
+    (k "win + e" [:enum-frame :prev])
+    (k "win + i" [:enum-window-in-frame :next])
+    (k "win + m" [:enum-window-in-frame :prev])
 
-  (k "win + ctrl + n" [:adjacent-frame :down])
-  (k "win + ctrl + e" [:adjacent-frame :up])
-  (k "win + ctrl + m" [:adjacent-frame :left])
-  (k "win + ctrl + i" [:adjacent-frame :right])
+    (k "win + ctrl + n" [:adjacent-frame :down])
+    (k "win + ctrl + e" [:adjacent-frame :up])
+    (k "win + ctrl + m" [:adjacent-frame :left])
+    (k "win + ctrl + i" [:adjacent-frame :right])
 
-  (k "win + shift + n" [:move-current-window :down])
-  (k "win + shift + e" [:move-current-window :up])
-  (k "win + shift + m" [:move-current-window :left])
-  (k "win + shift + i" [:move-current-window :right])
+    (k "win + shift + n" [:move-current-window :down])
+    (k "win + shift + e" [:move-current-window :up])
+    (k "win + shift + m" [:move-current-window :left])
+    (k "win + shift + i" [:move-current-window :right])
 
-  (k "win + s" [:push-keymap resize-mode-keymap])
-  (k "win + g" [:push-keymap move-mode-keymap])
+    (k "win + s" [:push-keymap resize-mode-keymap])
+    (k "win + y" [:push-keymap yank-mode-keymap])
 
-  (k "win + shift + s" :frame-to-current-window-size)
+    (k "win + shift + s" :frame-to-current-window-size)
 
-  (k "win + a" [:push-keymap alpha-mode-keymap])
+    (k "win + a" [:push-keymap alpha-mode-keymap])
 
-  # XXX: If a remapped key is used to trigger keymap switching, and
-  # the switched keymap doesn't have the same remap, the translated key
-  # will be stuck down.
-  (k "ralt" [:map-to (:get-key-code key-man "rwin")])
+    # XXX: If a remapped key is used to trigger keymap switching, and
+    # the switched keymap doesn't have the same remap, the translated key
+    # will be stuck down.
+    (k "ralt" [:map-to (:get-key-code key-man "rwin")])
 
-  (log/debug "keymap = %n" keymap)
-  keymap)
+    (log/debug "keymap = %n" keymap)
+    keymap))
 
 
 (:set-keymap key-man (build-keymap key-man))
