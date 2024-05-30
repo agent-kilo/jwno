@@ -789,7 +789,7 @@
      :elevated? window-elevated?
      :get-exe-path window-get-exe-path
      :get-uia-element window-get-uia-element
-     :get-virdual-desktop window-get-virtual-desktop}
+     :get-virtual-desktop window-get-virtual-desktop}
    tree-node-proto))
 
 
