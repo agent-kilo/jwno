@@ -149,6 +149,10 @@
        (= "PToyTrayIconWindow" class-name)
        false
 
+       #  Hidden window from AMD Software notify icon
+       (= "AMD:CCC-AEMCapturingWindow" name)
+       false
+
        (= "Mozilla_firefox_default_RemoteWindow" class-name)
        false
 
