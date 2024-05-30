@@ -29,12 +29,12 @@
 
     (with-dyns [:jwno-no-hooks true]
       (while (not= cur-win next-win)
-        (:transform-window window-man next-win cur-rect)
+        (:transform next-win cur-rect)
         (:activate window-man next-win)
         (put cur-rect :left (+ (in cur-rect :left) dx))
         (put cur-rect :top (+ (in cur-rect :top) dy))
         (set next-win (:get-next-child cur-frame next-win)))
-      (:transform-window window-man cur-win cur-rect)
+      (:transform cur-win cur-rect)
       (:activate window-man cur-win))))
 
 
