@@ -151,7 +151,7 @@
       elevated)))
 
 
-(defn get-pid-path [pid]
+(defn- get-pid-path [pid]
   (with [proc
          (OpenProcess (bor PROCESS_QUERY_INFORMATION
                            PROCESS_VM_READ)
@@ -162,7 +162,7 @@
     (QueryFullProcessImageName proc 0)))
 
 
-(defn get-hwnd-path [hwnd]
+(defn- get-hwnd-path [hwnd]
   (def [_tid pid] (GetWindowThreadProcessId hwnd))
   (when (= (int/u64 0) pid)
     (break nil))
@@ -186,7 +186,7 @@
     path))
 
 
-(defn get-hwnd-uia-element [hwnd uia-com &opt cr]
+(defn- get-hwnd-uia-element [hwnd uia-com &opt cr]
   (try
     (if cr
       (:ElementFromHandleBuildCache uia-com hwnd cr)
@@ -196,6 +196,76 @@
                 err
                 (get-stack-trace fib))
      nil)))
+
+
+(defn- normalize-hwnd-and-uia-element [hwnd? uia-win? uia-com cr]
+  (cond
+    (nil? uia-win?)
+    (if (or (nil? hwnd?) (null? hwnd?))
+      (error "invalid hwnd and uia-win")
+      [hwnd? (get-hwnd-uia-element hwnd? uia-com cr)])
+
+    (or (nil? hwnd?) (null? hwnd?))
+    [(try
+       (:get_CachedNativeWindowHandle uia-win?)
+       ((err fib)
+        (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
+                   err
+                   (get-stack-trace fib))
+        nil))
+     uia-win?]
+
+    true
+    [hwnd? uia-win?]))
+
+
+(defn- get-hwnd-virtual-desktop [hwnd? uia-man vdm-com &opt uia-win?]
+  (def [hwnd uia-win]
+    (normalize-hwnd-and-uia-element hwnd?
+                                    uia-win?
+                                    (in uia-man :com)
+                                    (in uia-man :focus-cr)))
+
+  (cond
+    (nil? uia-win)
+    nil
+
+    (nil? hwnd)
+    (do
+      (when (nil? uia-win?)
+        # uia-win is constructed locally, release it
+        (:Release uia-win))
+      nil)
+
+    true
+    (do
+      (def desktop-id
+        (try
+          (:GetWindowDesktopId vdm-com hwnd)
+          ((err fib)
+           (log/debug "GetWindowDesktopId failed: %n\n%s"
+                      err
+                      (get-stack-trace fib))
+           nil)))
+
+      (def desktop-name
+        (with-uia [root-elem (:get-root uia-man uia-win)]
+          (if root-elem
+            (do
+              (when (= root-elem uia-win)
+                # So that it won't be freed when leaving with-uia
+                (:AddRef uia-win))
+              (:get_CachedName root-elem))
+            nil)))
+
+      (when (nil? uia-win?)
+        # uia-win is constructed locally in this case, release it.
+        (:Release uia-win))
+
+      (if (and (nil? desktop-id)
+               (nil? desktop-name))
+        nil
+        {:id desktop-id :name desktop-name}))))
 
 
 ######### Generic tree node #########
@@ -607,6 +677,18 @@
     (tree-node-get-layout (in self :parent))))
 
 
+(defn tree-node-get-root [self]
+  (if-let [layout (:get-layout self)]
+    (in layout :parent)
+    nil))
+
+
+(defn tree-node-get-window-manager [self]
+  (if-let [root (:get-root self)]
+    (in root :window-manager)
+    nil))
+
+
 (defn tree-node-get-top-frame [self]
   (def parent (in self :parent))
   (cond
@@ -641,6 +723,8 @@
     :find-hwnd tree-node-find-hwnd
     :purge-windows tree-node-purge-windows
     :get-layout tree-node-get-layout
+    :get-root tree-node-get-root
+    :get-window-manager tree-node-get-window-manager
     :get-top-frame tree-node-get-top-frame})
 
 
@@ -666,8 +750,7 @@
 
 
 (defn window-transform [self rect]
-  (def layout (:get-layout self))
-  (def wm (get-in layout [:parent :window-manager]))
+  (def wm (:get-window-manager self))
   (:transform-hwnd wm (in self :hwnd) rect (in self :tags)))
 
 
@@ -688,9 +771,13 @@
 
 
 (defn window-get-uia-element [self &opt cr]
-  (def layout (:get-layout self))
-  (def wm (get-in layout [:parent :window-manager]))
+  (def wm (:get-window-manager self))
   (:get-hwnd-uia-element wm (in self :hwnd) cr))
+
+
+(defn window-get-virtual-desktop [self &opt uia-win]
+  (def wm (:get-window-manager self))
+  (:get-hwnd-virtual-desktop wm (in self :hwnd) uia-win))
 
 
 (def- window-proto
@@ -701,7 +788,8 @@
      :set-alpha window-set-alpha
      :elevated? window-elevated?
      :get-exe-path window-get-exe-path
-     :get-uia-element window-get-uia-element}
+     :get-uia-element window-get-uia-element
+     :get-virdual-desktop window-get-virtual-desktop}
    tree-node-proto))
 
 
@@ -1207,94 +1295,39 @@
   (get-hwnd-uia-element hwnd (in uia-man :com) cr))
 
 
-(defn wm-normalize-hwnd-and-uia-element [self hwnd? uia-win?]
-  (cond
-    (nil? uia-win?)
-    (if (or (nil? hwnd?) (null? hwnd?))
-      (error "invalid hwnd and uia-win")
-      [hwnd? (:get-hwnd-uia-element self hwnd?)])
-
-    (or (nil? hwnd?) (null? hwnd?))
-    [(try
-       (:get_CachedNativeWindowHandle uia-win?)
-       ((err fib)
-        (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
-                   err
-                   (get-stack-trace fib))
-        nil))
-     uia-win?]
-
-    true
-    [hwnd? uia-win?]))
-
-
 (defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
-  (def uia-man (in self :uia-manager))
-  (def [hwnd uia-win]
-    (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
-
-  (cond
-    (nil? uia-win)
-    nil
-
-    (nil? hwnd)
-    (do
-      (when (nil? uia-win?)
-        # uia-win is constructed locally, release it
-        (:Release uia-win))
-      nil)
-
-    true
-    (do
-      (def desktop-id
-        (try
-          (:GetWindowDesktopId (in self :vdm-com) hwnd)
-          ((err fib)
-           (log/debug "GetWindowDesktopId failed: %n\n%s"
-                      err
-                      (get-stack-trace fib))
-           nil)))
-
-      (def desktop-name
-        (with-uia [root-elem (:get-root uia-man uia-win)]
-          (if root-elem
-            (do
-              (when (= root-elem uia-win)
-                # So that it won't be freed when leaving with-uia
-                (:AddRef uia-win))
-              (:get_CachedName root-elem))
-            nil)))
-
-      (when (nil? uia-win?)
-        # uia-win is constructed locally in this case, release it.
-        (:Release uia-win))
-
-      (if (and (nil? desktop-id)
-               (nil? desktop-name))
-        nil
-        {:id desktop-id :name desktop-name}))))
+  (get-hwnd-virtual-desktop hwnd?
+                            (in self :uia-manager)
+                            (in self :vdm-com)
+                            uia-win?))
 
 
 (defn wm-get-hwnd-info [self hwnd? &opt uia-win?]
   (def uia-man (in self :uia-manager))
 
   (def [hwnd uia-win]
-    (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
+    (normalize-hwnd-and-uia-element hwnd?
+                                    uia-win?
+                                    (in uia-man :com)
+                                    (in uia-man :focus-cr)))
   (def exe-path
     (unless (nil? hwnd)
       (get-hwnd-path hwnd)))
   (def desktop-info
     (unless (nil? hwnd)
-      (:get-hwnd-virtual-desktop self hwnd uia-win)))
+      (get-hwnd-virtual-desktop hwnd
+                                (in self :uia-manager)
+                                (in self :vdm-com)
+                                uia-win)))
 
   (def ret
     (cond
       (nil? uia-win)
-      # ElementFromHandleBuildCache failed
+      # normalize-hwnd-and-uia-element failed
       nil
 
       (nil? hwnd)
-      # get_CachedNativeWindowHandle failed
+      # normalize-hwnd-and-uia-element failed
       nil
 
       (nil? exe-path)
@@ -1302,7 +1335,7 @@
       nil
 
       (nil? desktop-info)
-      # wm-get-hwnd-virtual-desktop failed
+      # get-hwnd-virtual-desktop failed
       nil
 
       true
@@ -1564,7 +1597,6 @@
     :get-pid-path wm-get-pid-path
     :enumerate-monitors wm-enumerate-monitors
     :jwno-process-elevated? wm-jwno-process-elevated?
-    :normalize-hwnd-and-uia-element wm-normalize-hwnd-and-uia-element
 
     :destroy wm-destroy})
 
