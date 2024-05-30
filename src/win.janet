@@ -120,6 +120,20 @@
                 (get-stack-trace fib)))))
 
 
+(defn- set-hwnd-alpha [hwnd alpha]
+  (def ex-style (GetWindowLong hwnd GWL_EXSTYLE))
+  (SetWindowLong hwnd GWL_EXSTYLE (unsigned-to-signed-32 (bor ex-style WS_EX_LAYERED)))
+  (SetLayeredWindowAttributes hwnd 0 alpha LWA_ALPHA))
+
+
+(defn- get-hwnd-alpha [hwnd]
+  (if-let [attrs (GetLayeredWindowAttributes hwnd)]
+    (in attrs 1)
+    (do
+      (log/debug "GetLayeredWindowAttributes failed: %n" (GetLastError))
+      255)))
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -593,10 +607,20 @@
   (:transform-hwnd wm (in self :hwnd) rect (in self :tags)))
 
 
+(defn window-set-alpha [self alpha]
+  (set-hwnd-alpha (in self :hwnd) alpha))
+
+
+(defn window-get-alpha [self]
+  (get-hwnd-alpha (in self :hwnd)))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
-     :transform window-transform}
+     :transform window-transform
+     :get-alpha window-get-alpha
+     :set-alpha window-set-alpha}
    tree-node-proto))
 
 
@@ -1074,12 +1098,6 @@
   (transform-hwnd hwnd rect (in self :uia-manager) tags))
 
 
-(defn wm-set-hwnd-alpha [self hwnd alpha]
-  (def ex-style (GetWindowLong hwnd GWL_EXSTYLE))
-  (SetWindowLong hwnd GWL_EXSTYLE (unsigned-to-signed-32 (bor ex-style WS_EX_LAYERED)))
-  (SetLayeredWindowAttributes hwnd 0 alpha LWA_ALPHA))
-
-
 (defn wm-hwnd-process-elevated? [self hwnd]
   (def [_tid pid] (GetWindowThreadProcessId hwnd))
   (when (= (int/u64 0) pid)
@@ -1507,7 +1525,6 @@
     :should-manage-hwnd? wm-should-manage-hwnd?
     :add-hwnd wm-add-hwnd
 
-    :set-hwnd-alpha wm-set-hwnd-alpha
     :close-hwnd wm-close-hwnd
 
     :get-pid-path wm-get-pid-path

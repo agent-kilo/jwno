@@ -193,12 +193,7 @@
   (when (nil? cur-win)
     (break))
 
-  (def old-alpha
-    (if-let [attrs (GetLayeredWindowAttributes (in cur-win :hwnd))]
-      (in attrs 1)
-      (do
-        (log/debug "GetLayeredWindowAttributes failed: %n" (GetLastError))
-        255)))
+  (def old-alpha (:get-alpha cur-win))
   (def new-alpha
     (let [val (math/floor (+ old-alpha delta))]
       (cond
@@ -206,7 +201,7 @@
         (> val 255) 255
         true val)))
   (log/debug "Setting window alpha from %n to %n" old-alpha new-alpha)
-  (:set-hwnd-alpha wm (in cur-win :hwnd) new-alpha))
+  (:set-alpha cur-win new-alpha))
 
 
 (defn add-default-commands [command-man context]
