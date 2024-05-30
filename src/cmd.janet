@@ -54,13 +54,22 @@
   (:retile wm))
 
 
-(defn cmd-split-frame [wm dir nfr ratios to-activate move-win-to]
+(defn cmd-split-frame [wm dir &opt nfr ratios to-activate move-win-to]
+  (default nfr 2)
+  (default ratios [0.5])
+  (default to-activate 0)
+  (default move-win-to 0)
+
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
+
   (:split cur-frame dir nfr ratios)
+  (def all-sub-frames (in cur-frame :children))
+  (def all-wins (slice (in (first all-sub-frames) :children)))
+
   (when (and (> move-win-to 0) (< move-win-to nfr))
-    (def move-to-fr (get-in cur-frame [:children move-win-to]))
-    (each w (slice (in (:get-first-frame cur-frame) :children))
+    (def move-to-fr (in all-sub-frames move-win-to))
+    (each w all-wins
       (:add-child move-to-fr w)))
   (:retile wm cur-frame)
   # Do not actually focus this window, just mark it as activated
@@ -188,6 +197,17 @@
   (:close cur-win))
 
 
+(defn cmd-close-window-or-frame [wm]
+  (def root (in wm :root))
+  (def cur-frame (:get-current-frame root))
+  (if-let [cur-win (:get-current-window cur-frame)]
+    (:close cur-win)
+    (do
+      (:close cur-frame)
+      (:retile wm)
+      (:activate wm (:get-current-window root)))))
+
+
 (defn cmd-change-window-alpha [wm delta]
   (def cur-win (:get-current-window (in wm :root)))
   (when (nil? cur-win)
@@ -217,7 +237,7 @@
      (fn [] (cmd-retile wm)))
 
   (:add-command command-man :split-frame
-     (fn [dir nfr ratios to-activate move-win-to]
+     (fn [dir &opt nfr ratios to-activate move-win-to]
        (cmd-split-frame wm dir nfr ratios to-activate move-win-to)))
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm)))
@@ -246,7 +266,10 @@
   (:add-command command-man :close-window
      (fn [] (cmd-close-window wm)))
   (:add-command command-man :change-window-alpha
-     (fn [delta] (cmd-change-window-alpha wm delta))))
+     (fn [delta] (cmd-change-window-alpha wm delta)))
+
+  (:add-command command-man :close-window-or-frame
+     (fn [] (cmd-close-window-or-frame wm))))
 
 
 (defn command-manager-call-command [self cmd & args]

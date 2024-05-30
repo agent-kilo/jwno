@@ -186,17 +186,6 @@
        (:retile window-man))))
 
 
-(:add-command command-man :close-window-or-frame
-   (fn []
-     (def cur-frame (:get-current-frame (in window-man :root)))
-     # cur-win will be nil if the current frame is empty.
-     (if-let [cur-win (:get-current-window cur-frame)]
-       (:close cur-win)
-       (do
-         (:close cur-frame)
-         (:retile window-man)
-         (:activate window-man (:get-current-window cur-frame))))))
-
 (:add-command command-man :split-and-move-window
    (fn [dir]
      (def root (in window-man :root))
