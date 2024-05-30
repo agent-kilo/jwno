@@ -132,7 +132,7 @@
   (:activate wm cur-win))
 
 
-(defn cmd-focus-mode [wm ratio]
+(defn cmd-zoom-in-on-current-frame [wm ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-top (:get-top-frame cur-frame))
   (def mon-width (- (get-in cur-top [:rect :right]) (get-in cur-top [:rect :left])))
@@ -237,8 +237,8 @@
      (fn [] (cmd-frame-to-current-window-size wm uia-man)))
   (:add-command command-man :balance-frames
      (fn [] (cmd-balance-frames wm)))
-  (:add-command command-man :focus-mode
-     (fn [ratio] (cmd-focus-mode wm ratio)))
+  (:add-command command-man :zoom-in-on-current-frame
+     (fn [ratio] (cmd-zoom-in-on-current-frame wm ratio)))
 
   (:add-command command-man :enum-frame
      (fn [dir] (cmd-enum-frame wm dir)))

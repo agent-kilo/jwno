@@ -48,7 +48,7 @@
     (k "m" [:resize-current-frame -100 0])
     (k "i" [:resize-current-frame 100 0])
     (k "=" :balance-frames)
-    (k "z" [:focus-mode 0.7])
+    (k "o" [:zoom-in-on-current-frame 0.7])
     (k "enter" :pop-keymap)
     keymap))
 
@@ -84,7 +84,7 @@
     (k "win + ," [:split-and-move-current-window :horizontal])
     (k "win + ." [:split-and-move-current-window :vertical])
     (k "win + =" :balance-frames)
-    (k "win + o" [:focus-mode 0.7])
+    (k "win + o" [:zoom-in-on-current-frame 0.7])
 
     (k "win + p" :peek-frame)
 
