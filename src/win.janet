@@ -151,6 +151,41 @@
       elevated)))
 
 
+(defn get-pid-path [pid]
+  (with [proc
+         (OpenProcess (bor PROCESS_QUERY_INFORMATION
+                           PROCESS_VM_READ)
+                      true
+                      pid)
+         CloseHandle]
+    (log/debug "proc = %n" proc)
+    (QueryFullProcessImageName proc 0)))
+
+
+(defn get-hwnd-path [hwnd]
+  (def [_tid pid] (GetWindowThreadProcessId hwnd))
+  (when (= (int/u64 0) pid)
+    (break nil))
+
+  (def path (get-pid-path pid))
+
+  (var uwp-pid nil)
+  (when (and (not (nil? path))
+             (string/has-suffix? "ApplicationFrameHost.exe" path))
+    # Executables for UWP apps live somewhere else
+    (EnumChildWindows hwnd
+                      (fn [child-hwnd]
+                        (def [_tid child-pid] (GetWindowThreadProcessId child-hwnd))
+                        (when (and (not= (int/u64 0) child-pid)
+                                   (not= pid child-pid))
+                          (set uwp-pid child-pid)
+                          (break FALSE))
+                        TRUE)))
+  (if uwp-pid
+    (get-pid-path uwp-pid)
+    path))
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -636,13 +671,18 @@
   (hwnd-process-elevated? (in self :hwnd)))
 
 
+(defn window-get-exe-path [self]
+  (get-hwnd-path (in self :hwnd)))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
      :transform window-transform
      :get-alpha window-get-alpha
      :set-alpha window-set-alpha
-     :elevated? window-elevated?}
+     :elevated? window-elevated?
+     :get-exe-path window-get-exe-path}
    tree-node-proto))
 
 
@@ -1135,38 +1175,11 @@
 
 
 (defn wm-get-pid-path [self pid]
-  (with [proc
-         (OpenProcess (bor PROCESS_QUERY_INFORMATION
-                           PROCESS_VM_READ)
-                      true
-                      pid)
-         CloseHandle]
-    (log/debug "proc = %n" proc)
-    (QueryFullProcessImageName proc 0)))
+  (get-pid-path pid))
 
 
 (defn wm-get-hwnd-path [self hwnd]
-  (def [_tid pid] (GetWindowThreadProcessId hwnd))
-  (when (= (int/u64 0) pid)
-    (break nil))
-
-  (def path (:get-pid-path self pid))
-
-  (var uwp-pid nil)
-  (when (and (not (nil? path))
-             (string/has-suffix? "ApplicationFrameHost.exe" path))
-    # Executables for UWP apps live somewhere else
-    (EnumChildWindows hwnd
-                      (fn [child-hwnd]
-                        (def [_tid child-pid] (GetWindowThreadProcessId child-hwnd))
-                        (when (and (not= (int/u64 0) child-pid)
-                                   (not= pid child-pid))
-                          (set uwp-pid child-pid)
-                          (break FALSE))
-                        TRUE)))
-  (if uwp-pid
-    (:get-pid-path self uwp-pid)
-    path))
+  (get-hwnd-path hwnd))
 
 
 (defn wm-get-hwnd-uia-element [self hwnd]
@@ -1257,7 +1270,7 @@
     (:normalize-hwnd-and-uia-element self hwnd? uia-win?))
   (def exe-path
     (unless (nil? hwnd)
-      (:get-hwnd-path self hwnd)))
+      (get-hwnd-path hwnd)))
   (def desktop-info
     (unless (nil? hwnd)
       (:get-hwnd-virtual-desktop self hwnd uia-win)))
@@ -1273,7 +1286,7 @@
       nil
 
       (nil? exe-path)
-      # wm-get-hwnd-path failed
+      # get-hwnd-path failed
       nil
 
       (nil? desktop-info)
