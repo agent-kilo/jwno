@@ -24,6 +24,8 @@
 (var horizontal-frame-proto nil)
 
 
+######### Helpers #########
+
 (defmacro rect-width [rect]
   ~(- (in ,rect :right) (in ,rect :left)))
 
@@ -35,6 +37,87 @@
 (defmacro rect-size [rect]
   ~[(- (in ,rect :right) (in ,rect :left))
     (- (in ,rect :bottom) (in ,rect :top))])
+
+
+(defn- calc-centered-coords [win-rect fr-rect fit]
+  (def [fr-width fr-height] (rect-size fr-rect))
+  (def [win-width win-height] (rect-size win-rect))
+
+  (def x
+    (math/floor
+     (+ (in fr-rect :left)
+        (/ fr-width 2)
+        (/ win-width -2))))
+  (def y
+    (math/floor
+     (+ (in fr-rect :top)
+        (/ fr-height 2)
+        (/ win-height -2))))
+
+  (if fit
+    (let [[fitted-x fitted-width] (if (< x (in fr-rect :left))
+                                    [(in fr-rect :left) fr-width]
+                                    [x win-width])
+          [fitted-y fitted-height] (if (< y (in fr-rect :top))
+                                     [(in fr-rect :top) fr-height]
+                                     [y win-height])]
+      [fitted-x fitted-y fitted-width fitted-height])
+    [x y win-width win-height]))
+
+
+(defn- transform-hwnd [hwnd rect uia-man &opt tags]
+  (default tags @{})
+
+  (log/debug "transforming window: %n, rect = %n" hwnd rect)
+
+  (def {:com uia-com
+        :transform-cr cr}
+    uia-man)
+
+  (try
+    (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
+      (with-uia [pat (:GetCachedPatternAs uia-win
+                                          UIA_TransformPatternId
+                                          IUIAutomationTransformPattern)]
+        # TODO: restore maximized windows first
+        (when (and pat
+                   (not= 0 (:get_CachedCanMove pat)))
+          (def no-resize (in tags :no-resize))
+          (def no-expand (in tags :no-expand))
+
+          (cond
+            (= 0 (:get_CachedCanResize pat))
+            (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+              # Move the window to the frame's center
+              (def [x y _w _h]
+                (calc-centered-coords win-rect rect false))
+              (:Move pat x y))
+
+            no-resize
+            (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+              # Move the window to the frame's center
+              (def [x y _w _h]
+                (calc-centered-coords win-rect rect false))
+              (:Move pat x y))
+
+            no-expand
+            (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+              # Move the window to the frame's center
+              (def [x y w h]
+                (calc-centered-coords win-rect rect true))
+              (:Move pat x y)
+              (:Resize pat w h))
+
+            true
+            (do
+              (:Move pat (in rect :left) (in rect :top))
+              (:Resize pat ;(rect-size rect)))))))
+    ((err fib)
+     # XXX: Don't manage a window which cannot be transformed?
+     (log/error "window transformation failed for %n: %n\n%s"
+                hwnd
+                err
+                (get-stack-trace fib)))))
 
 
 ######### Generic tree node #########
@@ -504,9 +587,16 @@
   (PostMessage (in self :hwnd) WM_CLOSE 0 0))
 
 
+(defn window-transform [self rect]
+  (def layout (:get-layout self))
+  (def wm (get-in layout [:parent :window-manager]))
+  (:transform-hwnd wm (in self :hwnd) rect (in self :tags)))
+
+
 (def- window-proto
   (table/setproto
-   @{:close window-close}
+   @{:close window-close
+     :transform window-transform}
    tree-node-proto))
 
 
@@ -980,87 +1070,8 @@
 
 ######### Window manager object #########
 
-(defn- calc-centered-coords [win-rect fr-rect fit]
-  (def [fr-width fr-height] (rect-size fr-rect))
-  (def [win-width win-height] (rect-size win-rect))
-
-  (def x
-    (math/floor
-     (+ (in fr-rect :left)
-        (/ fr-width 2)
-        (/ win-width -2))))
-  (def y
-    (math/floor
-     (+ (in fr-rect :top)
-        (/ fr-height 2)
-        (/ win-height -2))))
-
-  (if fit
-    (let [[fitted-x fitted-width] (if (< x (in fr-rect :left))
-                                    [(in fr-rect :left) fr-width]
-                                    [x win-width])
-          [fitted-y fitted-height] (if (< y (in fr-rect :top))
-                                     [(in fr-rect :top) fr-height]
-                                     [y win-height])]
-      [fitted-x fitted-y fitted-width fitted-height])
-    [x y win-width win-height]))
-
-(defn wm-transform-window [self win rect]
-  (let [uia-man (in self :uia-manager)
-        uia-com (in uia-man :com)
-        hwnd (in win :hwnd)]
-    (log/debug "transforming window: %n, rect = %n" hwnd rect)
-    (try
-      (with-uia [cr (:CreateCacheRequest uia-com)]
-        (:AddPattern cr UIA_TransformPatternId)
-        (:AddPattern cr UIA_WindowPatternId)
-        (:AddProperty cr UIA_TransformCanMovePropertyId)
-        (:AddProperty cr UIA_TransformCanResizePropertyId)
-        (:AddProperty cr UIA_BoundingRectanglePropertyId)
-
-        (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
-          (with-uia [pat (:GetCachedPatternAs uia-win UIA_TransformPatternId IUIAutomationTransformPattern)]
-            # TODO: restore maximized windows first
-            (when (and pat
-                       (not= 0 (:get_CachedCanMove pat)))
-              (def tags (in win :tags))
-
-              (def no-resize (in tags :no-resize))
-              (def no-expand (in tags :no-expand))
-
-              (cond
-                (= 0 (:get_CachedCanResize pat))
-                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-                  # Move the window to the frame's center
-                  (def [x y _w _h]
-                    (calc-centered-coords win-rect rect false))
-                  (:Move pat x y))
-
-                no-resize
-                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-                  # Move the window to the frame's center
-                  (def [x y _w _h]
-                    (calc-centered-coords win-rect rect false))
-                  (:Move pat x y))
-
-                no-expand
-                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-                  # Move the window to the frame's center
-                  (def [x y w h]
-                    (calc-centered-coords win-rect rect true))
-                  (:Move pat x y)
-                  (:Resize pat w h))
-
-                true
-                (do
-                  (:Move pat (in rect :left) (in rect :top))
-                  (:Resize pat ;(rect-size rect))))))))
-      ((err fib)
-       # XXX: Don't manage a window which cannot be transformed?
-       (log/error "window transformation failed for %n: %n\n%s"
-                  (in win :hwnd)
-                  err
-                  (get-stack-trace fib))))))
+(defn wm-transform-hwnd [self hwnd rect &opt tags]
+  (transform-hwnd hwnd rect (in self :uia-manager) tags))
 
 
 (defn wm-set-hwnd-alpha [self hwnd alpha]
@@ -1291,7 +1302,10 @@
       (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
-  (:transform-window self new-win (in frame-found :rect))
+  (:transform-hwnd self
+                   (in new-win :hwnd)
+                   (in frame-found :rect)
+                   (in new-win :tags))
   new-win)
 
 
@@ -1424,7 +1438,10 @@
 
       (= :window (get-in fr [:children 0 :type]))
       (each w (in fr :children)
-        (:transform-window self w (in fr :rect)))
+        (:transform-hwnd self
+                         (in w :hwnd)
+                         (in fr :rect)
+                         (in w :tags)))
 
       (or (= :frame (get-in fr [:children 0 :type]))
           (= :layout (get-in fr [:children 0 :type])))
@@ -1476,7 +1493,7 @@
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
 
-    :transform-window wm-transform-window
+    :transform-hwnd wm-transform-hwnd
     :retile wm-retile
     :activate wm-activate
 

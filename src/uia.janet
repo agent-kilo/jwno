@@ -227,12 +227,14 @@
         :root root
         :deinit-fns deinit-fns
         :focus-cr focus-cr
+        :transform-cr transform-cr
         :control-view-walker control-view-walker}
     self)
   (each df deinit-fns
     (df))
   (:Release control-view-walker)
   (:Release focus-cr)
+  (:Release transform-cr)
   (:Release root)
   (:Release uia-com))
 
@@ -300,14 +302,25 @@
   (def deinit-fns
     (uia-init-event-handlers uia-com root chan))
 
-  (def focus-cr (:CreateCacheRequest uia-com))
-  (:AddProperty focus-cr UIA_NativeWindowHandlePropertyId)
-  (:AddProperty focus-cr UIA_NamePropertyId)
-  (:AddProperty focus-cr UIA_ClassNamePropertyId)
-  (:AddProperty focus-cr UIA_BoundingRectanglePropertyId)
-  (:AddProperty focus-cr UIA_IsTransformPatternAvailablePropertyId)
-  (:AddProperty focus-cr UIA_TransformCanMovePropertyId)
-  (:AddProperty focus-cr UIA_IsWindowPatternAvailablePropertyId)
+  (def focus-cr
+    (let [cr (:CreateCacheRequest uia-com)]
+      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
+      (:AddProperty cr UIA_NamePropertyId)
+      (:AddProperty cr UIA_ClassNamePropertyId)
+      (:AddProperty cr UIA_BoundingRectanglePropertyId)
+      (:AddProperty cr UIA_IsTransformPatternAvailablePropertyId)
+      (:AddProperty cr UIA_TransformCanMovePropertyId)
+      (:AddProperty cr UIA_IsWindowPatternAvailablePropertyId)
+      cr))
+
+  (def transform-cr
+    (let [cr (:CreateCacheRequest uia-com)]
+      (:AddPattern cr UIA_TransformPatternId)
+      (:AddPattern cr UIA_WindowPatternId)
+      (:AddProperty cr UIA_TransformCanMovePropertyId)
+      (:AddProperty cr UIA_TransformCanResizePropertyId)
+      (:AddProperty cr UIA_BoundingRectanglePropertyId)
+      cr))
 
   (def control-view-walker (:get_ControlViewWalker uia-com))
 
@@ -316,6 +329,7 @@
      :root root
      :deinit-fns deinit-fns
      :focus-cr focus-cr
+     :transform-cr transform-cr
      :control-view-walker control-view-walker
      :chan chan}
    uia-manager-proto))
