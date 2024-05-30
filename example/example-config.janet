@@ -77,7 +77,8 @@
   (def all-wins (in (first all-sub-frames) :children))
   (def move-to-frame (in all-sub-frames 1))
   (when (>= (length all-wins) 2)
-    (:add-child move-to-frame (:get-current-window frame))))
+    (:add-child move-to-frame (:get-current-window frame)))
+  (:activate move-to-frame))
 
 
 (defn build-keymap [key-man]
@@ -90,8 +91,8 @@
     (k "win + shift + f" :close-frame)
     (k "win + ctrl + f" :flatten-parent)
 
-    (k "win + ," [:split-frame :horizontal 2 [0.5] 1 move-window-after-split])
-    (k "win + ." [:split-frame :vertical 2 [0.5] 1 move-window-after-split])
+    (k "win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split])
+    (k "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split])
     (k "win + =" :balance-frames)
     (k "win + o" [:zoom-in 0.7])
 

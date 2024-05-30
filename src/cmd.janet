@@ -54,10 +54,9 @@
   (:retile wm))
 
 
-(defn cmd-split-frame [wm dir &opt nfr ratios to-activate after-split-fn]
+(defn cmd-split-frame [wm dir &opt nfr ratios after-split-fn]
   (default nfr 2)
   (default ratios [0.5])
-  (default to-activate 0)
 
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
@@ -72,7 +71,7 @@
     (after-split-fn cur-frame))
 
   (:retile wm cur-frame)
-  (:activate wm (get-in cur-frame [:children to-activate])))
+  (:activate wm cur-frame))
 
 
 (defn cmd-flatten-parent [wm]
@@ -234,8 +233,8 @@
      (fn [] (cmd-retile wm)))
 
   (:add-command command-man :split-frame
-     (fn [dir &opt nfr ratios to-activate move-win-to]
-       (cmd-split-frame wm dir nfr ratios to-activate move-win-to)))
+     (fn [dir &opt nfr ratios after-split-fn]
+       (cmd-split-frame wm dir nfr ratios after-split-fn)))
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm)))
 
