@@ -1,0 +1,143 @@
+name: Jwno Release
+
+run-name: Release Process for ${{ github.ref }} (${{ github.sha }})
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  BUILD_IS_VERSIONED: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+  WIN_SDK_VERSION: "10.0.22621.0"
+
+  JANET_VERSION: "1.34.0"
+  JANET_DIR: "${{ github.workspace }}\\janet"
+  JANET_PATH: "${{ github.workspace }}\\janet\\Library"
+  JANET_SOURCE_PATH: "${{ github.workspace }}\\janet_src"
+  JANET_BINPATH: "${{ github.workspace }}\\janet\\bin"
+  JANET_HEADERPATH: "${{ github.workspace }}\\janet\\C"
+  JANET_LIBPATH: "${{ github.workspace }}\\janet\\C"
+  JANET_MANPATH: "${{ github.workspace }}\\janet\\docs"
+
+  JPM_VERSION: "d93b7c243645d31410a81fb9ab8f7a5e5608f0d0"
+  JPM_DIR: "${{ github.workspace }}\\jpm"
+  JPM_CMD: "${{ github.workspace }}\\janet\\bin\\janet.exe ${{ github.workspace }}\\janet\\bin\\jpm"
+
+  JW32_VERSION: "master"
+  JW32_DIR: "${{ github.workspace }}\\jw32"
+
+  JWNO_DIR: "${{ github.workspace }}\\jwno"
+
+  MSI_INSTALL_SCRIPT: "${{ github.workspace }}\\jwno\\.github\\workflows\\install_janet_msi.ps1"
+
+jobs:
+  Jwno-Release:
+    runs-on: windows-2022
+    steps:
+      - run: echo "Working in directory ${{ github.workspace }}."
+
+      - name: Checkout Jwno Source
+        uses: actions/checkout@v4
+        with:
+          repository: agent-kilo/jwno
+          path: ${{ env.JWNO_DIR }}
+          ref: ${{ github.sha }}
+          token: ${{ secrets.CHECKOUT_PAT }}
+
+      - name: Setup MSVC Developer Command Prompt
+        uses: TheMrMilchmann/setup-msvc-dev@v3.0.0
+        with:
+          arch: x64
+          sdk: ${{ env.WIN_SDK_VERSION }}
+
+      - name: Checkout Janet Source
+        uses: actions/checkout@v4
+        with:
+          repository: janet-lang/janet
+          path: ${{ env.JANET_SOURCE_PATH }}
+          ref: v${{ env.JANET_VERSION }}
+
+      - name: Download Janet Installer
+        uses: robinraju/release-downloader@v1.10
+        with:
+          repository: janet-lang/janet
+          tag: v${{ env.JANET_VERSION }}
+          fileName: janet-${{ env.JANET_VERSION }}-windows-x64-installer.msi
+          out-file-path: ${{ github.workspace }}
+
+      - name: Install Janet
+        run: powershell -file "${{ env.MSI_INSTALL_SCRIPT }}" -msi_file janet-${{ env.JANET_VERSION }}-windows-x64-installer.msi -app_folder "${{ env.JANET_DIR }}"
+
+      - name: Checkout JPM Source
+        uses: actions/checkout@v4
+        with:
+          repository: janet-lang/jpm
+          path: ${{ env.JPM_DIR }}
+          ref: ${{ env.JPM_VERSION }}
+
+      - name: Bootstrap JPM
+        working-directory: ${{ env.JPM_DIR }}
+        run: ${{ env.JANET_DIR }}\bin\janet.exe ${{ env.JPM_DIR }}\bootstrap.janet
+
+      - name: JPM show-paths
+        run: ${{ env.JPM_CMD }} show-paths
+
+      - name: Show Janet Installation
+        working-directory: ${{ env.JANET_DIR }}
+        run: tree /f /a
+
+      - name: Checkout Jw32 Source
+        uses: actions/checkout@v4
+        with:
+          repository: agent-kilo/jw32
+          path: ${{ env.JW32_DIR }}
+          ref: ${{ env.JW32_VERSION }}
+          token: ${{ secrets.CHECKOUT_PAT }}
+
+      - name: Build Jw32
+        working-directory: ${{ env.JW32_DIR }}
+        run: ${{ env.JPM_CMD }} -l build
+
+      - name: Jwno Deps
+        working-directory: ${{ env.JWNO_DIR }}
+        run: ${{ env.JPM_CMD }} --update-pkgs -l deps
+
+      - name: Install Jw32 as Jwno Dependency
+        working-directory: ${{ env.JW32_DIR }}
+        run: ${{ env.JPM_CMD }} --tree=${{ env.JWNO_DIR }}\jpm_tree install
+
+      - name: Build Jwno
+        working-directory: ${{ env.JWNO_DIR }}
+        run: ${{ env.JPM_CMD }} -l run embed-manifest
+
+      - name: SHA256 Checksum for Jwno.exe
+        working-directory: ${{ env.JWNO_DIR }}\build
+        run: $(CertUtil -hashfile jwno.exe SHA256)[1] -replace " ","" > jwno.exe.sha256
+
+      - name: List Built Artifacts
+        run: dir ${{ env.JWNO_DIR }}\build
+
+      - name: Upload Built Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: jwno-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            ${{ env.JWNO_DIR }}\build\*.exe
+            ${{ env.JWNO_DIR }}\build\*.exe.sha256
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+      - name: Release Draft
+        if: ${{ fromJSON(env.BUILD_IS_VERSIONED) }}
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          fail_on_unmatched_files: true
+          files: |
+            ./jwno/build/jwno.exe
+            ./jwno/build/jwno.exe.sha256
+          token: ${{ secrets.RELEASE_PAT }}
