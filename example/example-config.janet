@@ -95,6 +95,7 @@
     (k "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split])
     (k "win + =" :balance-frames)
     (k "win + o" [:zoom-in 0.7])
+    (k "win + f" :fill-monitor)
 
     (k "win + p" :peek-frame)
 
@@ -197,3 +198,12 @@
 
 (:add-command command-man :peek-frame
    (fn [] (cascade-windows)))
+
+(:add-command command-man :fill-monitor
+   (fn []
+     (def cur-win (:get-current-window (in window-man :root)))
+     (when cur-win
+       (def cur-frame (in cur-win :parent))
+       (def mon-frame (:get-top-frame cur-frame))
+       (def rect (in mon-frame :rect))
+       (:transform cur-win rect))))
