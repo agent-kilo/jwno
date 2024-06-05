@@ -68,8 +68,41 @@
    "lshift" VK_LSHIFT
    "rshift" VK_RSHIFT
 
+   "backspace" VK_BACK
+   "tab" VK_TAB
    "enter" VK_RETURN
+   "pause" VK_PAUSE
+   "capslock" VK_CAPITAL
    "esc"   VK_ESCAPE
+   "space" VK_SPACE
+   "pageup" VK_PRIOR
+   "pagedown" VK_NEXT
+   "end" VK_END
+   "home" VK_HOME
+   "left" VK_LEFT
+   "up" VK_UP
+   "right" VK_RIGHT
+   "down" VK_DOWN
+   "insert" VK_INSERT
+   "delete" VK_DELETE
+   "app" VK_APPS
+   "scrolllock" VK_SCROLL
+
+   "numpad0" VK_NUMPAD0
+   "numpad1" VK_NUMPAD1
+   "numpad2" VK_NUMPAD2
+   "numpad3" VK_NUMPAD3
+   "numpad4" VK_NUMPAD4
+   "numpad5" VK_NUMPAD5
+   "numpad6" VK_NUMPAD6
+   "numpad7" VK_NUMPAD7
+   "numpad8" VK_NUMPAD8
+   "numpad9" VK_NUMPAD9
+   "numpad*" VK_MULTIPLY
+   "numpad+" VK_ADD
+   "numpad-" VK_SUBTRACT
+   "numpad." VK_DECIMAL
+   "numpad/" VK_DIVIDE
 
    "a" (ascii "A")
    "b" (ascii "B")
@@ -138,6 +171,11 @@
    "=" VK_OEM_PLUS
    ";" VK_OEM_1
    "/" VK_OEM_2
+   "`" VK_OEM_3
+   "[" VK_OEM_4
+   "\\" VK_OEM_5
+   "]" VK_OEM_6
+   "'" VK_OEM_7
   })
 
 
@@ -159,9 +197,31 @@
                       (choice (sequence "2" (range "04"))
                               (sequence "1" (range "09"))
                               (range "19")))
-     :non-ascii-key (choice "enter" "esc" :f-key)
+     :numpad-key (sequence "numpad"
+                           (choice (range "09") "*" "+" "-" "." "/"))
+     :non-ascii-key (choice "backspace"
+                            "tab"
+                            "enter"
+                            "pause"
+                            "capslock"
+                            "esc"
+                            "space"
+                            "pageup"
+                            "pagedown"
+                            "end"
+                            "home"
+                            "left"
+                            "up"
+                            "right"
+                            "down"
+                            "insert"
+                            "delete"
+                            "app"
+                            "scrolllock"
+                            :numpad-key
+                            :f-key)
 
-     :punctuation-key (choice "," "." "=" ";" "/")
+     :punctuation-key (choice "," "." "=" ";" "/" "`" "[" "\\" "]" "'")
      :ascii-key (choice (range "az" "09") :punctuation-key)
 
      :trigger-key (choice :mod-with-sides :non-ascii-key :ascii-key) # TODO
