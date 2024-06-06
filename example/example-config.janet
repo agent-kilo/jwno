@@ -1,17 +1,18 @@
+#
+# One may call (log/<level> "format string" arg0 arg1 ...) to generate logs.
+# To see the logs in a console, run Jwno with the `--log-level <level>` flag.
+# Supported levels are: debug, info, warning, error, quiet.
+# Jwno will start with the log level set to "quiet" by default.
+#
 (log/info "++++++++ HELLO THERE ++++++++")
 (log/info "++++++++ Keys in jwno-context: %n ++++++++" (keys jwno-context))
-
-
-# When running from a compiled binary, this needs the Janet
-# env be set up properly beforehand
-#(import spork/httpf)
 
 
 #
 # A convenience provided by this config to set the navigation keys
 # according to the keyboard layout. You can copy this config file,
-# change the layout into something you prefer, and off you go.
-# Check dir-keys below for supported layouts.
+# change the keyboard-layout into something you prefer, and off you
+# go. Check dir-keys below for layouts supported by this config.
 #
 (def keyboard-layout :colemak-dh)
 
@@ -48,6 +49,11 @@
     (errorf "unsupported layout: %n" keyboard-layout)))
 
 
+#
+# Most of Jwno's APIs are exported as methods in these "manager" objects.
+# You can inspect them in the Jwno REPL by looking into their prototypes.
+# For example: `(table/getproto (in jwno-context :window-manager))`
+#
 (def {:key-manager key-man
       :command-manager command-man
       :window-manager window-man
@@ -79,10 +85,21 @@
       (:activate window-man cur-win))))
 
 
+#
+# A macro to simplify key map definitions. Of course you can call
+# :define-key method from the keymap object directly instead.
+#
 (defmacro k [key-seq cmd]
   ~(:define-key keymap ,key-seq ,cmd))
 
 
+#
+# A transient key map for resizing frames, so that we don't have
+# to hold the modifier keys all the time.
+# Transient key maps are activated by :push-keymap commands, and
+# deactivated by :pop-keymap commands. See the definition for
+# Win+S key combo below.
+#
 (def resize-mode-keymap
   (let [keymap (:new-keymap key-man)]
     (k (in dir-keys :down) [:resize-frame 0 -100])
@@ -91,10 +108,18 @@
     (k (in dir-keys :right) [:resize-frame 100 0])
     (k "=" :balance-frames)
     (k ";" [:zoom-in 0.7])
+    #
+    # In a transient key map, make sure a :pop-keymap binding is defined,
+    # or there will be no way to deactivate this key map.
+    #
     (k "enter" :pop-keymap)
     keymap))
 
 
+#
+# A transient key map for moving windows around.
+# See the definition for Win+K key combo below.
+#
 (def yank-mode-keymap
   (let [keymap (:new-keymap key-man)]
     (each dir [:down :up :left :right]
@@ -103,6 +128,11 @@
     keymap))
 
 
+#
+# A transient key map for adjusting transparency for the
+# current window. See the definition for Win+A key combo
+# below.
+#
 (def alpha-mode-keymap
   (let [keymap (:new-keymap key-man)]
     (k (in dir-keys :down) [:change-window-alpha -25])
@@ -111,6 +141,14 @@
     keymap))
 
 
+#
+# Jwno commands can accept closures/functions as arguments.
+# For example, the :split-frame command accepts a function
+# to adjust windows/frames after the splitting is done. Below
+# is such a function to move the activated window into the
+# new empty frame, and activate (move focus to) that frame.
+# See the definitions for Win+, and Win+. key combos below.
+#
 (defn move-window-after-split [frame]
   (def all-sub-frames (in frame :children))
   (def all-wins (in (first all-sub-frames) :children))
@@ -120,6 +158,15 @@
   (:activate move-to-frame))
 
 
+#
+# We build our main key map below. Make sure to call the :set-keymap
+# method from the key-manager object with the new key map, or Jwno
+# will not respond to any key events at all.
+#
+# The most straightforward way to understand Jwno commands is to
+# simply try out the bindings below. Some commands need more than
+# one window or frame to have any effect, though.
+#
 (defn build-keymap [key-man]
   (let [keymap (:new-keymap key-man)]
 
@@ -229,6 +276,12 @@
        (:retile window-man))))
 
 
+#
+# You can easily define your own command. When defining key maps,
+# use `[:command-name arg0 arg1 ...]` to invoke commands that
+# require arguments, or simply `:command-name` for commands without
+# any argument.
+#
 (:add-command command-man :peek-frame
    (fn [] (cascade-windows)))
 
