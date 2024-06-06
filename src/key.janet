@@ -193,38 +193,7 @@
                            ,(fn [mod-str] (keyword mod-str)))
      :mod-prefix (sequence :mod-capture :s* (choice "+" "-") :s*)
 
-     :f-key (sequence "f"
-                      (choice (sequence "2" (range "04"))
-                              (sequence "1" (range "09"))
-                              (range "19")))
-     :numpad-key (sequence "numpad"
-                           (choice (range "09") "*" "+" "-" "." "/"))
-     :non-ascii-key (choice "backspace"
-                            "tab"
-                            "enter"
-                            "pause"
-                            "capslock"
-                            "esc"
-                            "space"
-                            "pageup"
-                            "pagedown"
-                            "end"
-                            "home"
-                            "left"
-                            "up"
-                            "right"
-                            "down"
-                            "insert"
-                            "delete"
-                            "app"
-                            "scrolllock"
-                            :numpad-key
-                            :f-key)
-
-     :punctuation-key (choice "," "." "=" ";" "/" "`" "[" "\\" "]" "'")
-     :ascii-key (choice (range "az" "09") :punctuation-key)
-
-     :trigger-key (choice :mod-with-sides :non-ascii-key :ascii-key) # TODO
+     :trigger-key  (some :S)
      :trigger-capture (replace (capture :trigger-key)
                                ,(fn [trig-str]
                                   (if-let [code (in key-name-to-code trig-str)]
