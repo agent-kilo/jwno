@@ -302,7 +302,7 @@
 
 (defn test-layout-get-adjacent-frame []
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (var dummy-layout (layout :dummy-id nil [dummy-frame]))
+  (var dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
   (:split dummy-frame :horizontal 3 [0.3 0.4 0.3])
 
   (assert (= 3 (length (in dummy-frame :children))))
