@@ -7,6 +7,47 @@
 #(import spork/httpf)
 
 
+#
+# A convenience provided by this config to set the navigation keys
+# according to the keyboard layout. You can copy this config file,
+# change the layout into something you prefer, and off you go.
+# Check dir-keys below for supported layouts.
+#
+(def keyboard-layout :colemak-dh)
+
+
+(def dir-keys
+  (case keyboard-layout
+    :qwerty
+    # Sorry, no HJKL for QWERTY, since Win+L means "Lock the Screen", and it
+    # cannot be overridden. You can use HJKL if a modifier key other
+    # than the Win key is used, though.
+    {:left "y"
+     :down "u"
+     :up "i"
+     :right "o"}
+
+    :colemak
+    {:left "h"
+     :down "n"
+     :up "e"
+     :right "i"}
+
+    :colemak-dh
+    {:left "m"
+     :down "n"
+     :up "e"
+     :right "i"}
+
+    :dvorak
+    {:left "d"
+     :down "h"
+     :up "t"
+     :right "n"}
+
+    (errorf "unsupported layout: %n" keyboard-layout)))
+
+
 (def {:key-manager key-man
       :command-manager command-man
       :window-manager window-man
@@ -44,30 +85,28 @@
 
 (def resize-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (k "n" [:resize-frame 0 100])
-    (k "e" [:resize-frame 0 -100])
-    (k "m" [:resize-frame -100 0])
-    (k "i" [:resize-frame 100 0])
+    (k (in dir-keys :down) [:resize-frame 0 -100])
+    (k (in dir-keys :up) [:resize-frame 0 100])
+    (k (in dir-keys :left) [:resize-frame -100 0])
+    (k (in dir-keys :right) [:resize-frame 100 0])
     (k "=" :balance-frames)
-    (k "o" [:zoom-in 0.7])
+    (k ";" [:zoom-in 0.7])
     (k "enter" :pop-keymap)
     keymap))
 
 
 (def yank-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (k "n" [:move-window :down])
-    (k "e" [:move-window :up])
-    (k "m" [:move-window :left])
-    (k "i" [:move-window :right])
+    (each dir [:down :up :left :right]
+      (k (in dir-keys dir) [:move-window dir]))
     (k "enter" :pop-keymap)
     keymap))
 
 
 (def alpha-mode-keymap
   (let [keymap (:new-keymap key-man)]
-    (k "n" [:change-window-alpha -25])
-    (k "e" [:change-window-alpha 25])
+    (k (in dir-keys :down) [:change-window-alpha -25])
+    (k (in dir-keys :up) [:change-window-alpha 25])
     (k "enter" :pop-keymap)
     keymap))
 
@@ -85,7 +124,7 @@
   (let [keymap (:new-keymap key-man)]
 
     (k "win + shift + q" :quit)
-    (k "win + t" :retile)
+    (k "win + r" :retile)
 
     (k "win + shift + c" :close-window-or-frame)
     (k "win + shift + f" :close-frame)
@@ -94,28 +133,22 @@
     (k "win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split])
     (k "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split])
     (k "win + =" :balance-frames)
-    (k "win + o" [:zoom-in 0.7])
+    (k "win + ;" [:zoom-in 0.7])
     (k "win + f" :fill-monitor)
 
     (k "win + p" :peek-frame)
 
-    (k "win + n" [:enum-frame :next])
-    (k "win + e" [:enum-frame :prev])
-    (k "win + i" [:enum-window-in-frame :next])
-    (k "win + m" [:enum-window-in-frame :prev])
+    (k (string "win + " (in dir-keys :down)) [:enum-frame :next])
+    (k (string "win + " (in dir-keys :up)) [:enum-frame :prev])
+    (k (string "win + " (in dir-keys :left)) [:enum-window-in-frame :prev])
+    (k (string "win + " (in dir-keys :right)) [:enum-window-in-frame :next])
 
-    (k "win + ctrl + n" [:adjacent-frame :down])
-    (k "win + ctrl + e" [:adjacent-frame :up])
-    (k "win + ctrl + m" [:adjacent-frame :left])
-    (k "win + ctrl + i" [:adjacent-frame :right])
-
-    (k "win + shift + n" [:move-window :down])
-    (k "win + shift + e" [:move-window :up])
-    (k "win + shift + m" [:move-window :left])
-    (k "win + shift + i" [:move-window :right])
+    (each dir [:down :up :left :right]
+      (k (string "win + ctrl + " (in dir-keys dir)) [:adjacent-frame dir])
+      (k (string "win + shift + " (in dir-keys dir)) [:move-window dir]))
 
     (k "win + s" [:push-keymap resize-mode-keymap])
-    (k "win + y" [:push-keymap yank-mode-keymap])
+    (k "win + k" [:push-keymap yank-mode-keymap])
 
     (k "win + shift + s" :frame-to-window-size)
 
