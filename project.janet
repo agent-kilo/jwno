@@ -57,6 +57,13 @@
   (spawn-and-wait "cvtres.exe" "/machine:x64" (string "/out:" _target) (_deps 0)))
 
 
+(gen-rule (generated "winmain_stub.o") []
+  (spawn-and-wait "cl.exe" "/c" "/nologo" "/MD" "/O2" (string "/Fo" _target) "c/winmain_stub.c"))
+
+(add-dep (generated "winmain_stub.o")
+         "c/winmain_stub.c")
+
+
 (task "embed-manifest" [(generated "jwno.exe")]
   (let [manifest "manifest/jwno.manifest"
         exe-file (generated "jwno.exe")]
@@ -81,5 +88,8 @@
  #         "/manifest:embed"
  #         "/manifestinput:manifest/jwno.manifest"]
 
- :ldflags [(generated "resource.obj")]
+ :ldflags [(generated "winmain_stub.o") (generated "resource.obj") "/subsystem:windows"]
  )
+
+(add-dep (generated "jwno.exe")
+         (generated "winmain_stub.o"))
