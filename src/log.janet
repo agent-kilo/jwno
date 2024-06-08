@@ -1,4 +1,5 @@
 (use jw32/_consoleapi)
+(use jw32/_util)
 
 
 (defn log-thread [chan logger-factories]
@@ -47,16 +48,12 @@
       [print-logger]
       factories))
 
-  (cond
-    (<= (in log-levels level) (in log-levels :quiet))
+  (when (<= (in log-levels level) (in log-levels :quiet))
     # No log at all
-    (do
-      (FreeConsole)
-      (break))
+    (break))
 
-    (nil? (find |(= $ print-logger) logger-factories))
-    # No console log
-    (FreeConsole))
+  (when (find |(= $ print-logger) logger-factories)
+    (alloc-console-and-reopen-streams))
 
   # XXX: If this channel is full, log functions called in win32 callbacks would
   # try to trap into the Janet event loop, and break the callback control flow.

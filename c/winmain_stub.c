@@ -2,6 +2,9 @@
 
 #include <windows.h>
 
+/* For debugging */
+//#define EARLY_CONSOLE_ALLOC
+
 
 int main(int argc, const char **argv);
 
@@ -45,6 +48,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance,
     (void)lpCmdLine;
     (void)nCmdShow;
 
+#ifdef EARLY_CONSOLE_ALLOC
     int err = early_console_alloc();
     if (err) {
         char msg_buf[128];
@@ -52,6 +56,7 @@ int APIENTRY WinMain(_In_ HINSTANCE hInstance,
         MessageBox(NULL, msg_buf, "Error", MB_ICONEXCLAMATION | MB_OK);
         return 1;
     }
+#endif /* EARLY_CONSOLE_ALLOC */
 
     return main(__argc, __argv);
 }
