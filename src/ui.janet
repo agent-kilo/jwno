@@ -27,6 +27,8 @@
 
 (def TT-ID-CURRENT-FRAME 1)
 
+(def TIMER-ID-CURRENT-FRAME-TOOLTIP (int/u64 1))
+
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
   (def msg (MSG))
@@ -256,17 +258,19 @@
 
     SHOW-CURRENT-FRAME-TOOLTIP-MSG
     (let [tooltip (in state :cur-frame-tooltip)
-          [x y] (unmarshal-and-free wparam)]
+          [x y timeout center?] (unmarshal-and-free wparam)]
       (def tooltip-info
         (if tooltip
           tooltip
-          (create-tooltip-window hwnd TT-ID-CURRENT-FRAME true "Current Frame")))
+          (create-tooltip-window hwnd TT-ID-CURRENT-FRAME center? "Current Frame")))
       (put state :cur-frame-tooltip tooltip-info)
 
       (when tooltip-info
         (def [tt-hwnd tt-info] tooltip-info)
         (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
-        (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))))
+        (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
+        (when (> timeout 0)
+          (SetTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP timeout nil))))
 
     HIDE-CURRENT-FRAME-TOOLTIP-MSG
     (when-let [tooltip (in state :cur-frame-tooltip)]
@@ -304,6 +308,15 @@
 
       ID_MENU_RESET_KBD_HOOKS
       (PostMessage hwnd SET-HOOKS-MSG 0 0))
+
+    WM_TIMER
+    (case wparam
+      TIMER-ID-CURRENT-FRAME-TOOLTIP
+      (do
+        (KillTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP)
+        (PostMessage hwnd HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
+
+      (log/warning "Unknown timer: %n" wparam))
 
     SHOW-ERROR-AND-EXIT-MSG
     (let [msg (unmarshal-and-free wparam)]
@@ -426,8 +439,11 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
-(defn ui-manager-show-current-frame-tooltip [self x y]
-  (ui-manager-post-message self SHOW-CURRENT-FRAME-TOOLTIP-MSG (alloc-and-marshal [x y]) 0))
+(defn ui-manager-show-current-frame-tooltip [self x y timeout center?]
+  (ui-manager-post-message self
+                           SHOW-CURRENT-FRAME-TOOLTIP-MSG
+                           (alloc-and-marshal [x y timeout center?])
+                           0))
 
 
 (defn ui-manager-hide-current-frame-tooltip [self]

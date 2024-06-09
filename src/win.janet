@@ -1660,7 +1660,7 @@
     true))
 
 
-(defn window-manager [uia-man hook-man]
+(defn window-manager [uia-man ui-man hook-man]
   (def vdm-com
     (CoCreateInstance CLSID_VirtualDesktopManager
                       nil
@@ -1670,6 +1670,7 @@
     (table/setproto
      @{:vdm-com vdm-com
        :uia-manager uia-man
+       :ui-man ui-man
        :hook-manager hook-man}
      window-manager-proto))
   (put wm-obj :root (virtual-desktop-container wm-obj))
@@ -1690,5 +1691,11 @@
          (log/debug "purged %n dead windows from desktop %n"
                     (length dead)
                     (in layout :id)))))
+  (:add-hook hook-man :frame-activated
+     (fn [fr]
+       (def rect (in fr :rect))
+       (def center-x (brshift (+ (in rect :left) (in rect :right)) 1))
+       (def center-y (brshift (+ (in rect :top) (in rect :bottom)) 1))
+       (:show-current-frame-tooltip ui-man center-x center-y 1000 true)))
 
   wm-obj)

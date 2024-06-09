@@ -98,7 +98,7 @@
 
   (def window-man
     (try
-      (window-manager uia-man hook-man)
+      (window-manager uia-man ui-man hook-man)
       ((err fib)
        (show-error-and-exit err 1 (get-stack-trace fib)))))
 
