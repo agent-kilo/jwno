@@ -272,7 +272,9 @@
    (fn [dead-win]
      (def parent (in dead-win :parent))
      (when (empty? (in parent :children))
-       (:close parent)
+       (:with-activation-hooks
+          window-man
+          (fn [] (:close parent)))
        (:retile window-man))))
 
 

@@ -39,6 +39,11 @@
     (- (in ,rect :bottom) (in ,rect :top))])
 
 
+# XXX: Not available in the REPL or config env
+(defmacro with-activation-hooks [wm & body]
+  ~(:with-activation-hooks ,wm (fn [] ,;body)))
+
+
 (defn- calc-centered-coords [win-rect fr-rect fit]
   (def [fr-width fr-height] (rect-size fr-rect))
   (def [win-width win-height] (rect-size win-rect))
@@ -1425,32 +1430,6 @@
   new-win)
 
 
-(defn- activate-and-call-hooks [node wm]
-  (def old-frame (:get-current-frame (in wm :root)))
-  (def old-win (:get-current-window old-frame))
-  (:activate node)
-  
-  (def [fr-to-signal win-to-signal]
-    (if (= :window (in node :type))
-      [(in node :parent) node]
-      (let [fr (:get-current-frame node)
-            win (:get-current-window fr)]
-        [fr win])))
-
-  (unless (= fr-to-signal old-frame)
-    (when-let [top-win (:get-top-window fr-to-signal)]
-      # Explicitly make the top window our current window, to
-      # prevent lower windows popping up when switching to a frame
-      (put fr-to-signal :current-child top-win))
-    (:call-hook (in wm :hook-manager) :frame-activated
-       fr-to-signal))
-
-  (unless (or (nil? win-to-signal)
-              (= win-to-signal old-win))
-    (:call-hook (in wm :hook-manager) :window-activated
-       win-to-signal)))
-
-
 (defn wm-focus-changed [self]
   (:call-hook (in self :hook-manager) :focus-changed)
 
@@ -1464,7 +1443,7 @@
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       #Already managed
-      (activate-and-call-hooks win self)
+      (:activate win)
       (break))
 
     (def hwnd-info
@@ -1481,7 +1460,7 @@
       (break))
 
     (if-let [new-win (:add-hwnd self hwnd-info)]
-      (activate-and-call-hooks new-win self))))
+      (:activate new-win))))
 
 
 (defn wm-window-opened [self hwnd]
@@ -1507,7 +1486,7 @@
 
 (defn wm-activate [self node]
   (when node
-    (activate-and-call-hooks node self))
+    (:activate node))
 
   (def uia-man (in self :uia-manager))
   (def root (in uia-man :root))
@@ -1592,6 +1571,30 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
+(defn wm-with-activation-hooks [self op-fn]
+  (def root (in self :root))
+  (def old-frame (:get-current-frame root))
+  (def old-win (:get-current-window old-frame))
+
+  (def ret (op-fn))
+
+  (def new-frame (:get-current-frame root))
+  # XXX: Always reset the active window to the top window,
+  # so that the active window is consistent with z-orders
+  (def new-win (:get-top-window new-frame))
+  (when new-win
+    (put new-frame :current-child new-win))
+
+  (def hook-man (in self :hook-manager))
+  (unless (= new-frame old-frame)
+    (:call-hook hook-man :frame-activated new-frame))
+  (unless (or (nil? new-win)
+              (= new-win old-win))
+    (:call-hook hook-man :window-activated new-win))
+
+  ret)
+
+
 (defn wm-destroy [self]
   (def {:vdm-com vdm-com} self)
   (:Release vdm-com))
@@ -1620,6 +1623,8 @@
     :get-pid-path wm-get-pid-path
     :enumerate-monitors wm-enumerate-monitors
     :jwno-process-elevated? wm-jwno-process-elevated?
+
+    :with-activation-hooks wm-with-activation-hooks
 
     :destroy wm-destroy})
 
