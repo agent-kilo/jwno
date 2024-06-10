@@ -131,9 +131,7 @@
             :top (in rect :top)
             :right (+ dw (in rect :right))
             :bottom (+ dh (in rect :bottom))})
-  (def cur-win (:get-current-window cur-frame))
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-zoom-in [wm ratio]
@@ -146,9 +144,7 @@
             :top 0
             :right (math/floor (* ratio mon-width))
             :bottom (math/floor (* ratio mon-height))})
-  (def cur-win (:get-current-window cur-frame))
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-balance-frames [wm]
@@ -156,20 +152,19 @@
   (def cur-layout (:get-layout cur-frame))
   (each fr (in cur-layout :children)
     (:balance fr true))
-  (def cur-win (:get-current-window cur-frame))
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-close-frame [wm]
-  (def cur-frame (:get-current-frame (in wm :root)))
+  (def root (in wm :root))
+  (def cur-frame (:get-current-frame root))
   (def cur-win (:get-current-window cur-frame))
   (with-activation-hooks wm
     (:close cur-frame)
     (:retile wm)
     (if cur-win
       (:activate wm cur-win)
-      (:activate wm (:get-current-window cur-frame)))))
+      (:activate wm (:get-current-window root)))))
 
 
 (defn cmd-frame-to-window-size [wm uia-man]
@@ -184,8 +179,7 @@
     (break))
 
   (:resize cur-frame win-rect)
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-close-window [wm]
