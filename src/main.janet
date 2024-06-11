@@ -102,9 +102,12 @@
       ((err fib)
        (show-error-and-exit err 1 (get-stack-trace fib)))))
 
-  # context will only get referenced after the main-loop is running
-  # and when the first REPL client connects.
-  (def repl-server (repl/start-server context))
+  (def repl-server
+    (if-let [repl-addr (in cli-args "repl")]
+      # context will only get referenced after the main-loop is running
+      # and when the first REPL client connects.
+      (repl/start-server context ;repl-addr)
+      nil))
 
   (put context :hook-manager hook-man)
   (put context :command-manager command-man)
@@ -119,7 +122,8 @@
 
   (main-loop cli-args context)
 
-  (repl/stop-server repl-server)
+  (when repl-server
+    (repl/stop-server repl-server))
   (:destroy window-man)
   (:destroy uia-man)
   (CoUninitialize)
