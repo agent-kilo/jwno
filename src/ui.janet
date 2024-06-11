@@ -22,6 +22,12 @@
 (def SET-HOOKS-MSG (+ WM_APP 3))
 (def REMOVE-HOOKS-MSG (+ WM_APP 4))
 (def SHOW-ERROR-AND-EXIT-MSG (+ WM_APP 5))
+(def SHOW-CURRENT-FRAME-TOOLTIP-MSG (+ WM_APP 6))
+(def HIDE-CURRENT-FRAME-TOOLTIP-MSG (+ WM_APP 7))
+
+(def TT-ID-CURRENT-FRAME 1)
+
+(def TIMER-ID-CURRENT-FRAME-TOOLTIP (int/u64 1))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -173,7 +179,46 @@
       (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
-(defn- msg-wndproc [hwnd msg wparam lparam hook-handler]
+(defn- create-tooltip-window [parent-hwnd tt-id &opt center? text]
+  (default center? false)
+  (default text "")
+
+  (def tt-hwnd
+    (CreateWindowEx WS_EX_TOPMOST
+                    TOOLTIPS_CLASS
+                    nil
+                    (bor WS_POPUP TTS_NOPREFIX TTS_ALWAYSTIP)
+                    CW_USEDEFAULT CW_USEDEFAULT CW_USEDEFAULT CW_USEDEFAULT
+                    parent-hwnd
+                    nil nil nil))
+
+  (when (null? tt-hwnd)
+    (log/warning "Failed to create tooltip window: %n" (GetLastError))
+    (break nil))
+
+  (def t-info (TTTOOLINFO :uFlags (bor TTF_ABSOLUTE
+                                       TTF_TRACK
+                                       (if center?
+                                         TTF_CENTERTIP
+                                         0))
+                          :hwnd parent-hwnd
+                          :hinst nil
+                          :uId tt-id
+                          :lpszText (buffer text "\0")))
+
+  (def ret
+    (SendMessage tt-hwnd TTM_ADDTOOL 0 (in t-info :address)))
+  (when (= ret 0)
+    (log/warning "TTM_ADDTOOL failed")
+    (DestroyWindow tt-hwnd)
+    (break nil))
+
+  # For multi-line tooltip text. XXX: arbitrary value
+  (SendMessage tt-hwnd TTM_SETMAXTIPWIDTH 0 1000)
+  [tt-hwnd t-info])
+
+
+(defn- msg-wndproc [hwnd msg wparam lparam hook-handler state]
   (log/debug "################## msg-wndproc ##################")
   (log/debug "hwnd = %p" hwnd)
   (log/debug "msg = %p" msg)
@@ -211,6 +256,27 @@
       (UnhookWindowsHookEx old-hook)
       (put hook-handler :hook-id nil))
 
+    SHOW-CURRENT-FRAME-TOOLTIP-MSG
+    (let [tooltip (in state :cur-frame-tooltip)
+          [x y timeout center?] (unmarshal-and-free wparam)]
+      (def tooltip-info
+        (if tooltip
+          tooltip
+          (create-tooltip-window hwnd TT-ID-CURRENT-FRAME center? "Current Frame")))
+      (put state :cur-frame-tooltip tooltip-info)
+
+      (when tooltip-info
+        (def [tt-hwnd tt-info] tooltip-info)
+        (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
+        (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
+        (when (> timeout 0)
+          (SetTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP timeout nil))))
+
+    HIDE-CURRENT-FRAME-TOOLTIP-MSG
+    (when-let [tooltip (in state :cur-frame-tooltip)]
+      (def [tt-hwnd tt-info] tooltip)
+      (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address)))
+
     NOTIFY-ICON-CALLBACK-MSG
     (do
       (def notif-event (LOWORD lparam))
@@ -235,10 +301,22 @@
           (remove-notify-icon hwnd)
           ((err fib)
            (show-error-and-exit err 1 (get-stack-trace fib))))
+        (when-let [tooltip (in state :cur-frame-tooltip)]
+          (def [tt-hwnd _tt-info] tooltip)
+          (DestroyWindow tt-hwnd))
         (DestroyWindow hwnd))
 
       ID_MENU_RESET_KBD_HOOKS
       (PostMessage hwnd SET-HOOKS-MSG 0 0))
+
+    WM_TIMER
+    (case wparam
+      TIMER-ID-CURRENT-FRAME-TOOLTIP
+      (do
+        (KillTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP)
+        (PostMessage hwnd HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
+
+      (log/warning "Unknown timer: %n" wparam))
 
     SHOW-ERROR-AND-EXIT-MSG
     (let [msg (unmarshal-and-free wparam)]
@@ -258,10 +336,11 @@
 
 (defn- create-msg-window [hInstance hook-handler]
   (def class-name "JwnoMsgWinClass")
+  (def msg-wndproc-state @{})
   (def wc
     (WNDCLASSEX
      :lpfnWndProc (fn [hwnd msg wparam lparam]
-                    (msg-wndproc hwnd msg wparam lparam hook-handler))
+                    (msg-wndproc hwnd msg wparam lparam hook-handler msg-wndproc-state))
      :hInstance hInstance
      :lpszClassName class-name))
   (when (null? (RegisterClassEx wc))
@@ -360,6 +439,17 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
+(defn ui-manager-show-current-frame-tooltip [self x y timeout center?]
+  (ui-manager-post-message self
+                           SHOW-CURRENT-FRAME-TOOLTIP-MSG
+                           (alloc-and-marshal [x y timeout center?])
+                           0))
+
+
+(defn ui-manager-hide-current-frame-tooltip [self]
+  (ui-manager-post-message self HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
+
+
 (defn ui-manager-show-error-and-exit [self msg]
   (def buf-ptr (alloc-and-marshal msg))
   (ui-manager-post-message self SHOW-ERROR-AND-EXIT-MSG buf-ptr 0))
@@ -375,6 +465,8 @@
     :set-keymap ui-manager-set-keymap
     :set-hooks ui-manager-set-hooks
     :remove-hooks ui-manager-remove-hooks
+    :show-current-frame-tooltip ui-manager-show-current-frame-tooltip
+    :hide-current-frame-tooltip ui-manager-hide-current-frame-tooltip
     :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
 

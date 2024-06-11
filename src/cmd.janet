@@ -1,6 +1,7 @@
 (use jw32/_winuser)
 (use jw32/_errhandlingapi)
 
+(use ./win)
 (use ./input)
 (use ./resource)
 (use ./util)
@@ -59,19 +60,15 @@
   (default ratios [0.5])
 
   (def cur-frame (:get-current-frame (in wm :root)))
-  (def cur-win (:get-current-window cur-frame))
 
-  (:split cur-frame dir nfr ratios)
-  # Since we may activate a different frame below, do not actually
-  # focus this window here, just mark it as activated
-  (when cur-win
-    (:activate cur-win))
+  (with-activation-hooks wm
+    (:split cur-frame dir nfr ratios)
 
-  (when after-split-fn
-    (after-split-fn cur-frame))
+    (when after-split-fn
+      (after-split-fn cur-frame))
 
-  (:retile wm cur-frame)
-  (:activate wm cur-frame))
+    (:retile wm cur-frame)
+    (:activate wm cur-frame)))
 
 
 (defn cmd-flatten-parent [wm]
@@ -85,7 +82,7 @@
     (break)
 
     true
-    (do
+    (with-activation-hooks wm
       (:flatten parent)
       (:retile wm parent)
       (:activate wm (:get-current-window parent)))))
@@ -94,20 +91,23 @@
 (defn cmd-enum-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when-let [fr (:enumerate-node (:get-layout cur-frame) cur-frame dir)]
-    (:activate wm fr)))
+    (with-activation-hooks wm
+      (:activate wm fr))))
 
 
 (defn cmd-adjacent-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when-let [adj-fr (:get-adjacent-frame cur-frame dir)]
-    (:activate wm adj-fr)))
+    (with-activation-hooks wm
+      (:activate wm adj-fr))))
 
 
 (defn cmd-enum-window-in-frame [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when-let [cur-win (:get-current-window cur-frame)]
     (def sibling (:enumerate-node cur-frame cur-win dir))
-    (:activate wm sibling)))
+    (with-activation-hooks wm
+      (:activate wm sibling))))
 
 
 (defn cmd-move-window [wm dir]
@@ -117,9 +117,10 @@
   (when (nil? cur-win) (break))
 
   (when-let [adj-fr (:get-adjacent-frame cur-frame dir)]
-    (:add-child adj-fr cur-win)
-    (:retile wm adj-fr)
-    (:activate wm cur-win)))
+    (with-activation-hooks wm
+      (:add-child adj-fr cur-win)
+      (:retile wm adj-fr)
+      (:activate wm cur-win))))
 
 
 (defn cmd-resize-frame [wm dw dh]
@@ -130,9 +131,7 @@
             :top (in rect :top)
             :right (+ dw (in rect :right))
             :bottom (+ dh (in rect :bottom))})
-  (def cur-win (:get-current-window cur-frame))
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-zoom-in [wm ratio]
@@ -145,9 +144,7 @@
             :top 0
             :right (math/floor (* ratio mon-width))
             :bottom (math/floor (* ratio mon-height))})
-  (def cur-win (:get-current-window cur-frame))
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-balance-frames [wm]
@@ -155,19 +152,19 @@
   (def cur-layout (:get-layout cur-frame))
   (each fr (in cur-layout :children)
     (:balance fr true))
-  (def cur-win (:get-current-window cur-frame))
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-close-frame [wm]
-  (def cur-frame (:get-current-frame (in wm :root)))
+  (def root (in wm :root))
+  (def cur-frame (:get-current-frame root))
   (def cur-win (:get-current-window cur-frame))
-  (:close cur-frame)
-  (:retile wm)
-  (if cur-win
-    (:activate wm cur-win)
-    (:activate wm (:get-current-window cur-frame))))
+  (with-activation-hooks wm
+    (:close cur-frame)
+    (:retile wm)
+    (if cur-win
+      (:activate wm cur-win)
+      (:activate wm (:get-current-window root)))))
 
 
 (defn cmd-frame-to-window-size [wm uia-man]
@@ -182,26 +179,27 @@
     (break))
 
   (:resize cur-frame win-rect)
-  (:retile wm)
-  (:activate wm cur-win))
+  (:retile wm))
 
 
 (defn cmd-close-window [wm]
   (def cur-win (:get-current-window (in wm :root)))
   (when (nil? cur-win)
     (break))
-  (:close cur-win))
+  (with-activation-hooks wm
+    (:close cur-win)))
 
 
 (defn cmd-close-window-or-frame [wm]
   (def root (in wm :root))
   (def cur-frame (:get-current-frame root))
-  (if-let [cur-win (:get-current-window cur-frame)]
-    (:close cur-win)
-    (do
-      (:close cur-frame)
-      (:retile wm)
-      (:activate wm (:get-current-window root)))))
+  (with-activation-hooks wm
+    (if-let [cur-win (:get-current-window cur-frame)]
+      (:close cur-win)
+      (do
+        (:close cur-frame)
+        (:retile wm)
+        (:activate wm (:get-current-window root))))))
 
 
 (defn cmd-change-window-alpha [wm delta]
