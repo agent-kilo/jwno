@@ -50,7 +50,15 @@
    {:short "r"
     :help "Specifies the address the REPL should be listening on. The REPL will not be started if this option is omitted."
     :kind :option
-    :map |(peg/match repl-addr-peg $)}
+    :map (fn [addr-str]
+           (if-let [repl-addr (peg/match repl-addr-peg addr-str)]
+             repl-addr
+             (errorf "Malformed REPL address: %n" addr-str)))}
+
+   "client"
+   {:short "C"
+    :help "Starts in REPL client mode. Connects to the REPL address specified by the `--repl` option."
+    :kind :flag}
 
    "log-level"
    {:help "The log level. Can be quiet, error, warning, info or debug. Default: quiet"

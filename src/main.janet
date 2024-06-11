@@ -1,6 +1,9 @@
+(import spork/netrepl)
+
 (use jw32/_winuser)
 (use jw32/_libloaderapi)
 (use jw32/_combaseapi)
+(use jw32/_util)
 
 (use ./key)
 (use ./cmd)
@@ -59,9 +62,27 @@
 
 
 (defn main [& args]
-  (def cli-args (parse-command-line))
+  (def out-buf @"")
+  (def cli-args
+    (try
+      (with-dyns [:out out-buf]
+        (parse-command-line))
+      ((err fib)
+       (show-error-and-exit err 1 (get-stack-trace fib)))))
+
   (when (nil? cli-args)
-    (os/exit 1))
+    (show-error-and-exit out-buf 1))
+
+  (when (in cli-args "client")
+    (def repl-addr (in cli-args "repl"))
+    (when (nil? repl-addr)
+      (show-error-and-exit "Jwno is started in client mode, but `--repl` is not specified." 1))
+    (alloc-console-and-reopen-streams)
+    (try
+      (netrepl/client ;repl-addr)
+      ((err fib)
+       (show-error-and-exit err 1 (get-stack-trace fib))))
+    (os/exit 0))
 
   (let [log-path (in cli-args "log-file")
         loggers (if (nil? log-path)
