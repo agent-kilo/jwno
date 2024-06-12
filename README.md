@@ -57,9 +57,9 @@ All key names are case-insensitive. Modifier keys has left and right variants (l
 
 ## Debugging ##
 
-You can pass the `--log-level debug` and `--log-file <file-name>` flags to enable logging.
+You can pass the `--log-level debug` and `--log-file <file-name>` flags to enable logging. **Note** that debug logs will output all keyboard events by default.
 
-To inspect Jwno's internal states, run `janet -e '(import spork/netrepl) (netrepl/client ""127.0.0.1"" 9527)'` to start an REPL. You'll need [spork](https://github.com/janet-lang/spork) for this.
+To inspect Jwno's internal states, start it with the option `--repl 127.0.0.1:9999`, then use `jwno.exe -C --repl 127.0.0.1:9999` to connect.
 
 ## Terminology ##
 
