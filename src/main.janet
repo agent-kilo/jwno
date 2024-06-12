@@ -79,7 +79,7 @@
 (defn run-repl-client [cli-args]
   (def repl-addr (in cli-args "repl"))
   (when (nil? repl-addr)
-    (show-error-and-exit "Jwno is started in client mode, but `--repl` is not specified." 1))
+    (show-error-and-exit "Jwno is started in client mode, but REPL address is not specified." 1))
   (try
     (do
       (alloc-console-and-reopen-streams)
