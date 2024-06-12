@@ -88,7 +88,8 @@
 (defn load-config-file [paths-to-try context]
   (def config-path (look-for-config-file paths-to-try))
   (when (nil? config-path)
-    (break))
+    (errorf "No config file found in these locations:\n%s\n"
+            (string/join paths-to-try "\n")))
 
   (def new-env (make-env config-env))
   (put new-env 'jwno-context @{:value context
