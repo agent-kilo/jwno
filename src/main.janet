@@ -61,6 +61,24 @@
      (log/warning "Unhandled ev/select event: %n" event))))
 
 
+(defn format-help-msg [msg]
+  (->> msg
+       # Add a new line after "Optional:", so that it's clearly separated
+       # from the actual help text
+       (peg/replace-all
+        ~{:main " Optional:"}
+        "Optional:\n")
+       # Fix the help text for "--help" flag, which we can't control at all
+       (peg/replace-all
+        ~{:main (sequence (capture "-h, --help") (some (set " \t\f\v")) (capture (some (if-not "\n" 1))))}
+        (fn [_str flags text]
+          (string flags "\n" text "\n")))
+       # Remove excessive spaces before flag names
+       (peg/replace-all
+        ~{:main (sequence "\n" (some (set " \t\f\v")) "-")}
+        "\n-")))
+
+
 (defn parse-args []
   (def out-buf @"")
   (def cli-args
@@ -71,7 +89,12 @@
        (show-error-and-exit err 1 (get-stack-trace fib)))))
 
   (when (nil? cli-args)
-    (show-error-and-exit out-buf 1))
+    # out-buf contains the help message built by spork/argparse.
+    # Re-format it so that it looks nicer on MessageBox.
+    # It's a workaround until we get a proper message box with
+    # monospaced fonts.
+    (def formatted (format-help-msg out-buf))
+    (show-error-and-exit formatted 1))
 
   cli-args)
 

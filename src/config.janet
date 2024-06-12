@@ -42,13 +42,13 @@
 
    "config"
    {:short "c"
-    :help (string "The config file to run. Default: " default-config-file-path)
+    :help (string "\nThe config file to run. Default: " default-config-file-path "\n")
     :default default-config-file-path
     :kind :option}
 
    "repl"
    {:short "r"
-    :help "Specifies the address the REPL should be listening on. The REPL will not be started if this option is omitted."
+    :help "\nSpecifies the address the REPL should be listening on. The REPL will not be started if this option is omitted.\n"
     :kind :option
     :map (fn [addr-str]
            (if-let [repl-addr (peg/match repl-addr-peg addr-str)]
@@ -57,17 +57,17 @@
 
    "client"
    {:short "C"
-    :help "Starts in REPL client mode. Connects to the REPL address specified by the `--repl` option."
+    :help "\nStarts in REPL client mode. Connects to the REPL address specified by the repl option.\n"
     :kind :flag}
 
    "log-level"
-   {:help "The log level. Can be quiet, error, warning, info or debug. Default: quiet"
+   {:help "\nThe log level. Can be quiet, error, warning, info or debug. Default: quiet\n"
     :default "quiet"
     :kind :option
     :map keyword}
 
    "log-file"
-   {:help "Specifies a log file to write to. No log file will be generated if this option is omitted."
+   {:help "\nSpecifies a log file to write to. No log file will be generated if this option is omitted.\n"
     :kind :option}
 
    ))
