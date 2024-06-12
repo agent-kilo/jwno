@@ -61,7 +61,7 @@
      (log/warning "Unhandled ev/select event: %n" event))))
 
 
-(defn main [& args]
+(defn parse-args []
   (def out-buf @"")
   (def cli-args
     (try
@@ -73,17 +73,22 @@
   (when (nil? cli-args)
     (show-error-and-exit out-buf 1))
 
-  (when (in cli-args "client")
-    (def repl-addr (in cli-args "repl"))
-    (when (nil? repl-addr)
-      (show-error-and-exit "Jwno is started in client mode, but `--repl` is not specified." 1))
-    (alloc-console-and-reopen-streams)
-    (try
-      (netrepl/client ;repl-addr)
-      ((err fib)
-       (show-error-and-exit err 1 (get-stack-trace fib))))
-    (os/exit 0))
+  cli-args)
 
+
+(defn run-repl-client [cli-args]
+  (def repl-addr (in cli-args "repl"))
+  (when (nil? repl-addr)
+    (show-error-and-exit "Jwno is started in client mode, but `--repl` is not specified." 1))
+  (try
+    (do
+      (alloc-console-and-reopen-streams)
+      (netrepl/client ;repl-addr))
+    ((err fib)
+     (show-error-and-exit err 1 (get-stack-trace fib)))))
+
+
+(defn init-log [cli-args]
   (let [log-path (in cli-args "log-file")
         loggers (if (nil? log-path)
                   [log/print-logger]
@@ -91,15 +96,28 @@
     (try
       (log/init (in cli-args "log-level") ;loggers)
       ((err fib)
-       (show-error-and-exit err 1 (get-stack-trace fib)))))
+       (show-error-and-exit err 1 (get-stack-trace fib))))))
 
-  (log/debug "in main")
-  (log/debug "cli-args = %n" cli-args)
 
+(defn init-com []
   (try
     (CoInitializeEx nil COINIT_MULTITHREADED)
     ((err fib)
-     (show-error-and-exit err 1 (get-stack-trace fib))))
+     (show-error-and-exit err 1 (get-stack-trace fib)))))
+
+
+(defn main [& args]
+  (def cli-args (parse-args))
+
+  (when (in cli-args "client")
+    (run-repl-client cli-args)
+    (os/exit 0))
+
+  (init-log cli-args)
+
+  (log/debug "cli-args = %n" cli-args)
+
+  (init-com)
 
   (def context @{}) # Forward declaration
 
