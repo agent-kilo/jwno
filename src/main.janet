@@ -27,17 +27,21 @@
      [:take chan msg]
      (match msg
        [:ui/initialized thread-id msg-hwnd]
-       (let [config-file-name (in cli-args "config")
+       (let [default-config-file-path (string (get-exe-dir) const/DEFAULT-CONFIG-FILE-NAME)
+             paths (in cli-args "config")
+             config-file-paths (if (or (nil? paths) (empty? paths))
+                                 [default-config-file-path]
+                                 paths)
              ui-man (in context :ui-manager)]
          (:initialized ui-man thread-id msg-hwnd)
          (def config-env
            (try
-             (load-config-file [config-file-name] context)
+             (load-config-file config-file-paths context)
              ((err fib)
               (:show-error-and-exit
                  ui-man
-                 (string/format "Failed to load config file: %s\n\n%s\n%s"
-                                config-file-name
+                 (string/format "Failed to load config file: %n\n\n%s\n%s"
+                                config-file-paths
                                 err
                                 (get-stack-trace fib)))
               nil)))

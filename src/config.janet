@@ -43,8 +43,7 @@
    "config"
    {:short "c"
     :help (string "\nThe config file to run. Default: " default-config-file-path "\n")
-    :default default-config-file-path
-    :kind :option}
+    :kind :accumulate}
 
    "repl"
    {:short "r"
