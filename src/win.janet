@@ -1190,6 +1190,24 @@
     (error "cannot close frames containing sub-frames")))
 
 
+(defn frame-sync-current-window [self]
+  (def children (in self :children))
+  (cond
+    (empty? children)
+    nil
+
+    (= :window (get-in children [0 :type]))
+    (if-let [top-win (:get-top-window self)]
+      (when (not= top-win (in self :current-child))
+        (log/debug "Resetting current window to %n" (in top-win :hwnd))
+        (put self :current-child top-win))
+      (error "inconsistent states for frame tree"))
+
+    true
+    (each c children
+      (:sync-current-window c))))
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
@@ -1197,7 +1215,8 @@
         :flatten frame-flatten
         :transform frame-transform
         :resize frame-resize
-        :close frame-close}
+        :close frame-close
+        :sync-current-window frame-sync-current-window}
       tree-node-proto))
 
 
@@ -1579,11 +1598,7 @@
   (def ret (op-fn))
 
   (def new-frame (:get-current-frame root))
-  # XXX: Always reset the active window to the top window,
-  # so that the active window is consistent with z-orders
-  (def new-win (:get-top-window new-frame))
-  (when new-win
-    (put new-frame :current-child new-win))
+  (def new-win (:get-current-window new-frame))
 
   (def hook-man (in self :hook-manager))
   (unless (= new-frame old-frame)

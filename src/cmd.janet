@@ -92,6 +92,7 @@
   (def cur-frame (:get-current-frame (in wm :root)))
   (when-let [fr (:enumerate-node (:get-layout cur-frame) cur-frame dir)]
     (with-activation-hooks wm
+      (:sync-current-window fr)
       (:activate wm fr))))
 
 
@@ -99,6 +100,7 @@
   (def cur-frame (:get-current-frame (in wm :root)))
   (when-let [adj-fr (:get-adjacent-frame cur-frame dir)]
     (with-activation-hooks wm
+      (:sync-current-window adj-fr)
       (:activate wm adj-fr))))
 
 
