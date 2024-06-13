@@ -223,6 +223,195 @@
   [tt-hwnd t-info])
 
 
+(defn- msg-wnd-handle-set-keymap [_hwnd wparam _lparam hook-handler _state]
+  (let [keymap (unmarshal-and-free wparam)]
+    (:set-keymap hook-handler keymap)))
+
+
+(defn- msg-wnd-handle-set-hooks [_hwnd _wparam _lparam hook-handler _state]
+  (let [old-hook (in hook-handler :hook-id)]
+    (when (and (not (nil? old-hook))
+               (not (null? old-hook)))
+      (log/debug "Removing old hook: %n" old-hook)
+      (UnhookWindowsHookEx old-hook))
+    (def new-hook
+      (SetWindowsHookEx WH_KEYBOARD_LL
+                        (fn [code wparam hook-struct]
+                          (keyboard-hook-proc code
+                                              wparam
+                                              hook-struct
+                                              hook-handler))
+                        nil
+                        0))
+    (when (null? new-hook)
+      (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
+    (log/debug "Registered new hook: %n" new-hook)
+    (put hook-handler :hook-id new-hook)))
+
+
+(defn- msg-wnd-handle-remove-hooks [_hwnd _wparam _lparam hook-handler _state]
+  (when-let [old-hook (in hook-handler :hook-id)]
+    (log/debug "Removing old hook: %n" old-hook)
+    (UnhookWindowsHookEx old-hook)
+    (put hook-handler :hook-id nil)))
+
+
+(defn- msg-wnd-handle-show-current-frame-tooltip [hwnd wparam _lparam _hook-handler state]
+  (let [tooltip (in state :cur-frame-tooltip)
+        [x y opt-timeout opt-center?] (unmarshal-and-free wparam)]
+    (def timeout
+      (if (nil? opt-timeout)
+        (get-in state [:tooltip-timeouts :current-frame])
+        opt-timeout))
+    (def center?
+      (if (nil? opt-center?)
+        true
+        opt-center?))
+
+    (def tooltip-info
+      (if tooltip
+        tooltip
+        (create-tooltip-window hwnd TT-ID-CURRENT-FRAME center? "Current Frame")))
+    (put state :cur-frame-tooltip tooltip-info)
+
+    (when tooltip-info
+      (def [tt-hwnd tt-info] tooltip-info)
+      (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
+      (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
+      (when (> timeout 0)
+        (SetTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP timeout nil)))))
+
+
+(defn- msg-wnd-handle-hide-current-frame-tooltip [_hwnd _wparam _lparam _hook-handler state]
+  (when-let [tooltip (in state :cur-frame-tooltip)]
+    (def [tt-hwnd tt-info] tooltip)
+    (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))))
+
+
+(defn- msg-wnd-handle-show-tooltip [hwnd wparam _lparam _hook-handler state]
+  (let [[text x y opt-timeout opt-center?] (unmarshal-and-free wparam)]
+    (def timeout
+      (if (nil? opt-timeout)
+        (get-in state [:tooltip-timeouts :generic])
+        opt-timeout))
+    (def center?
+      (if (nil? opt-center?)
+        false
+        opt-center?))
+
+    (when-let [tooltip (in state :tooltip)]
+      (def [tt-hwnd tt-info] tooltip)
+      (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
+      (DestroyWindow tt-hwnd))
+
+    (def tooltip-info
+      (create-tooltip-window hwnd TT-ID-GENERIC center? text))
+    (put state :tooltip tooltip-info)
+
+    (when tooltip-info
+      (def [tt-hwnd tt-info] tooltip-info)
+      (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
+      (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
+      (when (> timeout 0)
+        (SetTimer hwnd TIMER-ID-GENERIC-TOOLTIP timeout nil)))))
+
+
+(defn- msg-wnd-handle-hide-tooltip [_hwnd _wparam _lparam _hook-handler state]
+  (when-let [tooltip (in state :tooltip)]
+    (def [tt-hwnd tt-info] tooltip)
+    (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
+    (DestroyWindow tt-hwnd)
+    (put state :tooltip nil)))
+
+
+(defn- msg-wnd-handle-set-tooltip-timeouts [_hwnd wparam _lparam _hook-handler state]
+  (let [timeouts (unmarshal-and-free wparam)]
+    (eachp [tt-type tt-timeout] timeouts
+      (put (in state :tooltip-timeouts) tt-type tt-timeout))))
+
+
+(defn- msg-wnd-handle-notify-icon-callback [hwnd wparam lparam _hook-handler _state]
+  (def notif-event (LOWORD lparam))
+  (def anchor-x (GET_X_LPARAM wparam))
+  (def anchor-y (GET_Y_LPARAM wparam))
+
+  (case (int/u64 notif-event)
+    WM_CONTEXTMENU
+    (show-notify-icon-menu hwnd anchor-x anchor-y)))
+
+
+(defn- msg-wnd-handle-wm-command [hwnd wparam _lparam _hook-handler state]
+  (case wparam
+    ID_MENU_EXIT
+    (do
+      (try
+        (remove-notify-icon hwnd)
+        ((err fib)
+         (show-error-and-exit err 1 (get-stack-trace fib))))
+      (when-let [tooltip (in state :cur-frame-tooltip)]
+        (def [tt-hwnd _tt-info] tooltip)
+        (DestroyWindow tt-hwnd))
+      (when-let [tooltip (in state :tooltip)]
+        (def [tt-hwnd _tt-info] tooltip)
+        (DestroyWindow tt-hwnd))
+      (DestroyWindow hwnd))
+
+    ID_MENU_RESET_KBD_HOOKS
+    (PostMessage hwnd SET-HOOKS-MSG 0 0)))
+
+
+(defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam _hook-handler _state]
+  (case wparam
+    TIMER-ID-CURRENT-FRAME-TOOLTIP
+    (do
+      (KillTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP)
+      (PostMessage hwnd HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
+
+    TIMER-ID-GENERIC-TOOLTIP
+    (do
+      (KillTimer hwnd TIMER-ID-GENERIC-TOOLTIP)
+      (PostMessage hwnd HIDE-TOOLTIP-MSG 0 0))
+
+    (log/warning "Unknown timer: %n" wparam)))
+
+
+(defn- msg-wnd-handle-show-error-and-exit [hwnd wparam _lparam _hook-handler _state]
+  (let [msg (unmarshal-and-free wparam)]
+    (MessageBox hwnd msg "Error" (bor MB_ICONEXCLAMATION MB_OK))
+    (PostMessage hwnd WM_COMMAND ID_MENU_EXIT 0)))
+
+
+(defn- msg-wnd-handle-wm-close [hwnd _wparam _lparam _hook-handler _state]
+  (DestroyWindow hwnd))
+
+
+(defn- msg-wnd-handle-wm-destroy [_hwnd _wparam _lparam _hook-handler _state]
+  (PostQuitMessage 0))
+
+
+(def msg-wnd-handlers
+  {SET-KEYMAP-MSG msg-wnd-handle-set-keymap
+
+   SET-HOOKS-MSG msg-wnd-handle-set-hooks
+   REMOVE-HOOKS-MSG msg-wnd-handle-remove-hooks
+
+   SHOW-CURRENT-FRAME-TOOLTIP-MSG msg-wnd-handle-show-current-frame-tooltip
+   HIDE-CURRENT-FRAME-TOOLTIP-MSG msg-wnd-handle-hide-current-frame-tooltip
+   SHOW-TOOLTIP-MSG msg-wnd-handle-show-tooltip
+   HIDE-TOOLTIP-MSG msg-wnd-handle-hide-tooltip
+   SET-TOOLTIP-TIMEOUTS-MSG msg-wnd-handle-set-tooltip-timeouts
+
+   NOTIFY-ICON-CALLBACK-MSG msg-wnd-handle-notify-icon-callback
+
+   WM_COMMAND msg-wnd-handle-wm-command
+   WM_TIMER msg-wnd-handle-wm-timer
+
+   SHOW-ERROR-AND-EXIT-MSG msg-wnd-handle-show-error-and-exit
+
+   WM_CLOSE msg-wnd-handle-wm-close
+   WM_DESTROY msg-wnd-handle-wm-destroy})
+
+
 (defn- msg-wndproc [hwnd msg wparam lparam hook-handler state]
   (log/debug "################## msg-wndproc ##################")
   (log/debug "hwnd = %p" hwnd)
@@ -230,169 +419,11 @@
   (log/debug "wparam = %p" wparam)
   (log/debug "lparam = %p" lparam)
 
-  (case msg
-    SET-KEYMAP-MSG
-    (let [keymap (unmarshal-and-free wparam)]
-      (:set-keymap hook-handler keymap))
-
-    SET-HOOKS-MSG
-    (let [old-hook (in hook-handler :hook-id)]
-      (when (and (not (nil? old-hook))
-                 (not (null? old-hook)))
-        (log/debug "Removing old hook: %n" old-hook)
-        (UnhookWindowsHookEx old-hook))
-      (def new-hook
-        (SetWindowsHookEx WH_KEYBOARD_LL
-                          (fn [code wparam hook-struct]
-                            (keyboard-hook-proc code
-                                                wparam
-                                                hook-struct
-                                                hook-handler))
-                          nil
-                          0))
-      (when (null? new-hook)
-        (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
-      (log/debug "Registered new hook: %n" new-hook)
-      (put hook-handler :hook-id new-hook))
-
-    REMOVE-HOOKS-MSG
-    (when-let [old-hook (in hook-handler :hook-id)]
-      (log/debug "Removing old hook: %n" old-hook)
-      (UnhookWindowsHookEx old-hook)
-      (put hook-handler :hook-id nil))
-
-    SHOW-CURRENT-FRAME-TOOLTIP-MSG
-    (let [tooltip (in state :cur-frame-tooltip)
-          [x y opt-timeout opt-center?] (unmarshal-and-free wparam)]
-      (def timeout
-        (if (nil? opt-timeout)
-          (get-in state [:tooltip-timeouts :current-frame])
-          opt-timeout))
-      (def center?
-        (if (nil? opt-center?)
-          true
-          opt-center?))
-
-      (def tooltip-info
-        (if tooltip
-          tooltip
-          (create-tooltip-window hwnd TT-ID-CURRENT-FRAME center? "Current Frame")))
-      (put state :cur-frame-tooltip tooltip-info)
-
-      (when tooltip-info
-        (def [tt-hwnd tt-info] tooltip-info)
-        (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
-        (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
-        (when (> timeout 0)
-          (SetTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP timeout nil))))
-
-    HIDE-CURRENT-FRAME-TOOLTIP-MSG
-    (when-let [tooltip (in state :cur-frame-tooltip)]
-      (def [tt-hwnd tt-info] tooltip)
-      (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address)))
-
-    SHOW-TOOLTIP-MSG
-    (let [[text x y opt-timeout opt-center?] (unmarshal-and-free wparam)]
-      (def timeout
-        (if (nil? opt-timeout)
-          (get-in state [:tooltip-timeouts :generic])
-          opt-timeout))
-      (def center?
-        (if (nil? opt-center?)
-          false
-          opt-center?))
-
-      (when-let [tooltip (in state :tooltip)]
-        (def [tt-hwnd tt-info] tooltip)
-        (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
-        (DestroyWindow tt-hwnd))
-
-      (def tooltip-info
-        (create-tooltip-window hwnd TT-ID-GENERIC center? text))
-      (put state :tooltip tooltip-info)
-
-      (when tooltip-info
-        (def [tt-hwnd tt-info] tooltip-info)
-        (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
-        (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
-        (when (> timeout 0)
-          (SetTimer hwnd TIMER-ID-GENERIC-TOOLTIP timeout nil))))
-
-    HIDE-TOOLTIP-MSG
-    (when-let [tooltip (in state :tooltip)]
-      (def [tt-hwnd tt-info] tooltip)
-      (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
-      (DestroyWindow tt-hwnd)
-      (put state :tooltip nil))
-
-    SET-TOOLTIP-TIMEOUTS-MSG
-    (let [timeouts (unmarshal-and-free wparam)]
-      (eachp [tt-type tt-timeout] timeouts
-        (put (in state :tooltip-timeouts) tt-type tt-timeout)))
-
-    NOTIFY-ICON-CALLBACK-MSG
+  (if-let [handler (in msg-wnd-handlers msg)]
     (do
-      (def notif-event (LOWORD lparam))
-      (def notif-icon-id (HIWORD lparam))
-      (def anchor-x (GET_X_LPARAM wparam))
-      (def anchor-y (GET_Y_LPARAM wparam))
-      (log/debug "================== notify icon callback ==================")
-      (log/debug "notif-event = %p" notif-event)
-      (log/debug "notif-icon-id = %p" notif-icon-id)
-      (log/debug "anchor-x = %p" anchor-x)
-      (log/debug "anchor-y = %p" anchor-y)
-
-      (case (int/u64 notif-event)
-        WM_CONTEXTMENU
-        (show-notify-icon-menu hwnd anchor-x anchor-y)))
-
-    WM_COMMAND
-    (case wparam
-      ID_MENU_EXIT
-      (do
-        (try
-          (remove-notify-icon hwnd)
-          ((err fib)
-           (show-error-and-exit err 1 (get-stack-trace fib))))
-        (when-let [tooltip (in state :cur-frame-tooltip)]
-          (def [tt-hwnd _tt-info] tooltip)
-          (DestroyWindow tt-hwnd))
-        (when-let [tooltip (in state :tooltip)]
-          (def [tt-hwnd _tt-info] tooltip)
-          (DestroyWindow tt-hwnd))
-        (DestroyWindow hwnd))
-
-      ID_MENU_RESET_KBD_HOOKS
-      (PostMessage hwnd SET-HOOKS-MSG 0 0))
-
-    WM_TIMER
-    (case wparam
-      TIMER-ID-CURRENT-FRAME-TOOLTIP
-      (do
-        (KillTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP)
-        (PostMessage hwnd HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
-
-      TIMER-ID-GENERIC-TOOLTIP
-      (do
-        (KillTimer hwnd TIMER-ID-GENERIC-TOOLTIP)
-        (PostMessage hwnd HIDE-TOOLTIP-MSG 0 0))
-
-      (log/warning "Unknown timer: %n" wparam))
-
-    SHOW-ERROR-AND-EXIT-MSG
-    (let [msg (unmarshal-and-free wparam)]
-      (MessageBox hwnd msg "Error" (bor MB_ICONEXCLAMATION MB_OK))
-      (PostMessage hwnd WM_COMMAND ID_MENU_EXIT 0))
-
-    WM_CLOSE
-    (DestroyWindow hwnd)
-
-    WM_DESTROY
-    (PostQuitMessage 0)
-
-    (break (DefWindowProc hwnd msg wparam lparam)))
-
-  0)
+      (handler hwnd wparam lparam hook-handler state)
+      0)
+    (DefWindowProc hwnd msg wparam lparam)))
 
 
 (defn- create-msg-window [hInstance hook-handler]
