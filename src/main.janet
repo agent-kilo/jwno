@@ -150,7 +150,7 @@
 
   (def hook-man (hook-manager))
 
-  (def command-man (command-manager))
+  (def command-man (command-manager hook-man))
 
   (def ui-man (ui-manager (GetModuleHandle nil) (in args 0) nil))
 

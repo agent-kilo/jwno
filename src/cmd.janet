@@ -356,18 +356,25 @@
 
 (defn command-manager-call-command [self cmd & args]
   (def commands (in self :commands))
+  (def hook-man (in self :hook-manager))
   (def found (in commands cmd))
+
   (if found
-    (try
-      (do
-        (found ;args)
-        true)
-      ((err fib)
-       (log/error "command %n failed: %n\n%s"
-                  cmd
-                  err
-                  (get-stack-trace fib))
-       false))
+    (if (:call-filter-hook hook-man :filter-command cmd args)
+      (let [ret (try
+                  (do
+                    (found ;args)
+                    true)
+                  ((err fib)
+                   (log/error "command %n failed: %n\n%s"
+                              cmd
+                              err
+                              (get-stack-trace fib))
+                   false))]
+        (when ret
+          (:call-hook hook-man :command-executed cmd args))
+        ret)
+      false)
     (do
       (log/warning "unknown command: %n, args: %n" cmd args)
       false)))
@@ -396,7 +403,8 @@
     :remove-command command-manager-remove-command})
 
 
-(defn command-manager []
+(defn command-manager [hook-man]
   (table/setproto
-   @{:commands @{}}
+   @{:commands @{}
+     :hook-manager hook-man}
    command-manager-proto))
