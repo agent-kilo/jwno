@@ -173,6 +173,15 @@
     (k "win + shift + q" :quit)
     (k "win + r" :retile)
 
+    (k "win + enter  t" [:exec true "wt.exe" "powershell.exe"])
+    (k "win + enter  e" [:exec true "runemacs.exe"])
+    (k "win + enter  d" [:exec true
+                         "wt.exe"
+                         "powershell.exe"
+                         "-NoExit"
+                         "-Command"
+                         "& $Env:SCRIPTS_DIR\\jw32_dev_shell.ps1"])
+
     (k "win + shift + c" :close-window-or-frame)
     (k "win + shift + f" :close-frame)
     (k "win + ctrl + f" :flatten-parent)

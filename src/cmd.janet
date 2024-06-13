@@ -259,6 +259,56 @@
                          false))))))
 
 
+(defn cmd-exec [wm ui-man verbose? cli]
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (def mon-frame (:get-top-frame cur-frame))
+  (def mon-rect (in mon-frame :rect))
+  (def tt-x (in mon-rect :left))
+  (def tt-y (in mon-rect :top))
+
+  (when verbose?
+    (:show-tooltip ui-man
+                   (string/format "Running command: %n" cli)
+                   tt-x tt-y
+                   5000
+                   false))
+
+  # ev/spawn So that waiting for the command won't block the main loop
+  (ev/spawn
+   (def env (os/environ))
+   (put env :out :pipe)
+   (put env :err :pipe)
+   (when-let [proc (try
+                     (os/spawn cli :ep env)
+                     ((err fib)
+                      (:show-tooltip ui-man
+                                     (string/format "Failed to start command: %n\n%s\n%s"
+                                                    cli
+                                                    err
+                                                    (get-stack-trace fib))
+                                     tt-x tt-y
+                                     5000
+                                     false)
+                      nil))]
+     # XXX: No limit on the output text
+     (def out (:read (in proc :out) :all))
+     (def err (:read (in proc :err) :all))
+     (os/proc-wait proc)
+
+     (def ret (in proc :return-code))
+     (log/debug "Exit code of command %n: %n" cli ret)
+
+     (when (not= 0 ret)
+       (:show-tooltip ui-man
+                      (string/format "Command: %n\nExit code %d:\n%s"
+                                     cli
+                                     ret
+                                     (string out "\n" err))
+                      tt-x tt-y
+                      5000
+                      false)))))
+
+
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
         :uia-manager uia-man
@@ -270,6 +320,10 @@
      (fn [] (cmd-quit ui-man)))
   (:add-command command-man :retile
      (fn [] (cmd-retile wm)))
+
+  (:add-command command-man :exec
+     (fn [verbose? & cli]
+       (cmd-exec wm ui-man verbose? cli)))
 
   (:add-command command-man :split-frame
      (fn [dir &opt nfr ratios after-split-fn]
