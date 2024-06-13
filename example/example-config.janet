@@ -57,8 +57,20 @@
 (def {:key-manager key-man
       :command-manager command-man
       :window-manager window-man
+      :ui-manager ui-man
       :hook-manager hook-man}
   jwno-context)
+
+
+#
+# Jwno uses different types of tooltip windows to show info or
+# get your attention. The :generic tooltip is used to display
+# general info, and the :current-frame tooltip is used to show
+# which frame is activated. The duration they stay on the screen
+# can be set separately:
+#
+(:set-tooltip-timeout ui-man :generic 5000) # In milliseconds
+(:set-tooltip-timeout ui-man :current-frame 1500)
 
 
 (defn cascade-windows [&opt cur-win]

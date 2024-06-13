@@ -26,6 +26,7 @@
 (def HIDE-CURRENT-FRAME-TOOLTIP-MSG (+ WM_APP 7))
 (def SHOW-TOOLTIP-MSG (+ WM_APP 8))
 (def HIDE-TOOLTIP-MSG (+ WM_APP 9))
+(def SET-TOOLTIP-TIMEOUTS-MSG (+ WM_APP 10))
 
 (def TT-ID-CURRENT-FRAME 1)
 (def TT-ID-GENERIC 2)
@@ -262,7 +263,16 @@
 
     SHOW-CURRENT-FRAME-TOOLTIP-MSG
     (let [tooltip (in state :cur-frame-tooltip)
-          [x y timeout center?] (unmarshal-and-free wparam)]
+          [x y opt-timeout opt-center?] (unmarshal-and-free wparam)]
+      (def timeout
+        (if (nil? opt-timeout)
+          (get-in state [:tooltip-timeouts :current-frame])
+          opt-timeout))
+      (def center?
+        (if (nil? opt-center?)
+          true
+          opt-center?))
+
       (def tooltip-info
         (if tooltip
           tooltip
@@ -282,7 +292,16 @@
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address)))
 
     SHOW-TOOLTIP-MSG
-    (let [[text x y timeout center?] (unmarshal-and-free wparam)]
+    (let [[text x y opt-timeout opt-center?] (unmarshal-and-free wparam)]
+      (def timeout
+        (if (nil? opt-timeout)
+          (get-in state [:tooltip-timeouts :generic])
+          opt-timeout))
+      (def center?
+        (if (nil? opt-center?)
+          false
+          opt-center?))
+
       (when-let [tooltip (in state :tooltip)]
         (def [tt-hwnd tt-info] tooltip)
         (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
@@ -305,6 +324,11 @@
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
       (DestroyWindow tt-hwnd)
       (put state :tooltip nil))
+
+    SET-TOOLTIP-TIMEOUTS-MSG
+    (let [timeouts (unmarshal-and-free wparam)]
+      (eachp [tt-type tt-timeout] timeouts
+        (put (in state :tooltip-timeouts) tt-type tt-timeout)))
 
     NOTIFY-ICON-CALLBACK-MSG
     (do
@@ -373,7 +397,9 @@
 
 (defn- create-msg-window [hInstance hook-handler]
   (def class-name "JwnoMsgWinClass")
-  (def msg-wndproc-state @{})
+  (def msg-wndproc-state
+    @{:tooltip-timeouts @{:generic const/DEFAULT-GENERIC-TOOLTIP-TIMEOUT
+                          :current-frame const/DEFAULT-CURRENT-FRAME-TOOLTIP-TIMEOUT}})
   (def wc
     (WNDCLASSEX
      :lpfnWndProc (fn [hwnd msg wparam lparam]
@@ -476,7 +502,7 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
-(defn ui-manager-show-current-frame-tooltip [self x y timeout center?]
+(defn ui-manager-show-current-frame-tooltip [self x y &opt timeout center?]
   (ui-manager-post-message self
                            SHOW-CURRENT-FRAME-TOOLTIP-MSG
                            (alloc-and-marshal [x y timeout center?])
@@ -487,7 +513,7 @@
   (ui-manager-post-message self HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
 
 
-(defn ui-manager-show-tooltip [self text x y timeout center?]
+(defn ui-manager-show-tooltip [self text x y &opt timeout center?]
   (ui-manager-post-message self
                            SHOW-TOOLTIP-MSG
                            (alloc-and-marshal [text x y timeout center?])
@@ -496,6 +522,13 @@
 
 (defn ui-manager-hide-tooltip [self]
   (ui-manager-post-message self HIDE-TOOLTIP-MSG 0 0))
+
+
+(defn ui-manager-set-tooltip-timeout [self type timeout]
+  (ui-manager-post-message self
+                           SET-TOOLTIP-TIMEOUTS-MSG
+                           (alloc-and-marshal {type timeout})
+                           0))
 
 
 (defn ui-manager-show-error-and-exit [self msg]
@@ -517,6 +550,7 @@
     :hide-current-frame-tooltip ui-manager-hide-current-frame-tooltip
     :show-tooltip ui-manager-show-tooltip
     :hide-tooltip ui-manager-hide-tooltip
+    :set-tooltip-timeout ui-manager-set-tooltip-timeout
     :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
 

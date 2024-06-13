@@ -1716,6 +1716,6 @@
        (def rect (in fr :rect))
        (def center-x (brshift (+ (in rect :left) (in rect :right)) 1))
        (def center-y (brshift (+ (in rect :top) (in rect :bottom)) 1))
-       (:show-current-frame-tooltip ui-man center-x center-y 1000 true)))
+       (:show-current-frame-tooltip ui-man center-x center-y)))
 
   wm-obj)

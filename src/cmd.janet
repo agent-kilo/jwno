@@ -224,7 +224,7 @@
 (defn cmd-describe-window [wm ui-man]
   (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
     (if (nil? uia-win)
-      (:show-tooltip ui-man "No focused window." 0 0 5000 false)
+      (:show-tooltip ui-man "No focused window." 0 0)
       (do
         (def hwnd (:get_CachedNativeWindowHandle uia-win))
         (if-let [win-info (:get-hwnd-info wm hwnd uia-win)]
@@ -249,14 +249,10 @@
                                           (in desktop-info :name)
                                           (in desktop-info :id))
                            (in rect :left)
-                           (in rect :top)
-                           5000
-                           false))
+                           (in rect :top)))
           (:show-tooltip ui-man
                          (string/format "Failed to get window info for %n." hwnd)
-                         0 0
-                         5000
-                         false))))))
+                         0 0))))))
 
 
 (defn cmd-exec [wm ui-man verbose? cli]
@@ -269,9 +265,7 @@
   (when verbose?
     (:show-tooltip ui-man
                    (string/format "Running command: %n" cli)
-                   tt-x tt-y
-                   5000
-                   false))
+                   tt-x tt-y))
 
   # ev/spawn So that waiting for the command won't block the main loop
   (ev/spawn
@@ -286,9 +280,7 @@
                                                     cli
                                                     err
                                                     (get-stack-trace fib))
-                                     tt-x tt-y
-                                     5000
-                                     false)
+                                     tt-x tt-y)
                       nil))]
      # XXX: No limit on the output text
      (def out (:read (in proc :out) :all))
@@ -304,9 +296,7 @@
                                      cli
                                      ret
                                      (string out "\n" err))
-                      tt-x tt-y
-                      5000
-                      false)))))
+                      tt-x tt-y)))))
 
 
 (defn add-default-commands [command-man context]
