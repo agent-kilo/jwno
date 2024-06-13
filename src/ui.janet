@@ -24,10 +24,14 @@
 (def SHOW-ERROR-AND-EXIT-MSG (+ WM_APP 5))
 (def SHOW-CURRENT-FRAME-TOOLTIP-MSG (+ WM_APP 6))
 (def HIDE-CURRENT-FRAME-TOOLTIP-MSG (+ WM_APP 7))
+(def SHOW-TOOLTIP-MSG (+ WM_APP 8))
+(def HIDE-TOOLTIP-MSG (+ WM_APP 9))
 
 (def TT-ID-CURRENT-FRAME 1)
+(def TT-ID-GENERIC 2)
 
 (def TIMER-ID-CURRENT-FRAME-TOOLTIP (int/u64 1))
+(def TIMER-ID-GENERIC-TOOLTIP (int/u64 2))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -277,6 +281,31 @@
       (def [tt-hwnd tt-info] tooltip)
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address)))
 
+    SHOW-TOOLTIP-MSG
+    (let [[text x y timeout center?] (unmarshal-and-free wparam)]
+      (when-let [tooltip (in state :tooltip)]
+        (def [tt-hwnd tt-info] tooltip)
+        (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
+        (DestroyWindow tt-hwnd))
+
+      (def tooltip-info
+        (create-tooltip-window hwnd TT-ID-GENERIC center? text))
+      (put state :tooltip tooltip-info)
+
+      (when tooltip-info
+        (def [tt-hwnd tt-info] tooltip-info)
+        (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
+        (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
+        (when (> timeout 0)
+          (SetTimer hwnd TIMER-ID-GENERIC-TOOLTIP timeout nil))))
+
+    HIDE-TOOLTIP-MSG
+    (when-let [tooltip (in state :tooltip)]
+      (def [tt-hwnd tt-info] tooltip)
+      (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))
+      (DestroyWindow tt-hwnd)
+      (put state :tooltip nil))
+
     NOTIFY-ICON-CALLBACK-MSG
     (do
       (def notif-event (LOWORD lparam))
@@ -304,6 +333,9 @@
         (when-let [tooltip (in state :cur-frame-tooltip)]
           (def [tt-hwnd _tt-info] tooltip)
           (DestroyWindow tt-hwnd))
+        (when-let [tooltip (in state :tooltip)]
+          (def [tt-hwnd _tt-info] tooltip)
+          (DestroyWindow tt-hwnd))
         (DestroyWindow hwnd))
 
       ID_MENU_RESET_KBD_HOOKS
@@ -315,6 +347,11 @@
       (do
         (KillTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP)
         (PostMessage hwnd HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
+
+      TIMER-ID-GENERIC-TOOLTIP
+      (do
+        (KillTimer hwnd TIMER-ID-GENERIC-TOOLTIP)
+        (PostMessage hwnd HIDE-TOOLTIP-MSG 0 0))
 
       (log/warning "Unknown timer: %n" wparam))
 
@@ -450,6 +487,17 @@
   (ui-manager-post-message self HIDE-CURRENT-FRAME-TOOLTIP-MSG 0 0))
 
 
+(defn ui-manager-show-tooltip [self text x y timeout center?]
+  (ui-manager-post-message self
+                           SHOW-TOOLTIP-MSG
+                           (alloc-and-marshal [text x y timeout center?])
+                           0))
+
+
+(defn ui-manager-hide-tooltip [self]
+  (ui-manager-post-message self HIDE-TOOLTIP-MSG 0 0))
+
+
 (defn ui-manager-show-error-and-exit [self msg]
   (def buf-ptr (alloc-and-marshal msg))
   (ui-manager-post-message self SHOW-ERROR-AND-EXIT-MSG buf-ptr 0))
@@ -467,6 +515,8 @@
     :remove-hooks ui-manager-remove-hooks
     :show-current-frame-tooltip ui-manager-show-current-frame-tooltip
     :hide-current-frame-tooltip ui-manager-hide-current-frame-tooltip
+    :show-tooltip ui-manager-show-tooltip
+    :hide-tooltip ui-manager-hide-tooltip
     :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
 

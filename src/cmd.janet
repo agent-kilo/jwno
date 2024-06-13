@@ -2,6 +2,7 @@
 (use jw32/_errhandlingapi)
 
 (use ./win)
+(use ./uia)
 (use ./input)
 (use ./resource)
 (use ./util)
@@ -220,6 +221,44 @@
   (:set-alpha cur-win new-alpha))
 
 
+(defn cmd-describe-window [wm ui-man]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+    (if (nil? uia-win)
+      (:show-tooltip ui-man "No focused window." 0 0 5000 false)
+      (do
+        (def hwnd (:get_CachedNativeWindowHandle uia-win))
+        (if-let [win-info (:get-hwnd-info wm hwnd uia-win)]
+          (do
+            (def {:exe-path exe-path
+                  :virtual-desktop desktop-info}
+              win-info)
+            (def rect (:get_CachedBoundingRectangle uia-win))
+            (:show-tooltip ui-man
+                           (string/format (string/join
+                                           ["HWND: %n"
+                                            "EXE: %s"
+                                            "Name: %s"
+                                            "Class Name: %s"
+                                            "Virtual Desktop Name: %s"
+                                            "Virtual Desktop ID: %s"]
+                                           "\n")
+                                          hwnd
+                                          exe-path
+                                          (:get_CachedName uia-win)
+                                          (:get_CachedClassName uia-win)
+                                          (in desktop-info :name)
+                                          (in desktop-info :id))
+                           (in rect :left)
+                           (in rect :top)
+                           5000
+                           false))
+          (:show-tooltip ui-man
+                         (string/format "Failed to get window info for %n." hwnd)
+                         0 0
+                         5000
+                         false))))))
+
+
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
         :uia-manager uia-man
@@ -265,7 +304,10 @@
      (fn [delta] (cmd-change-window-alpha wm delta)))
 
   (:add-command command-man :close-window-or-frame
-     (fn [] (cmd-close-window-or-frame wm))))
+     (fn [] (cmd-close-window-or-frame wm)))
+
+  (:add-command command-man :describe-window
+     (fn [] (cmd-describe-window wm ui-man))))
 
 
 (defn command-manager-call-command [self cmd & args]

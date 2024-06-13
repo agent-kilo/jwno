@@ -201,6 +201,8 @@
 
     (k "win + a" [:push-keymap alpha-mode-keymap])
 
+    (k "win + b" :describe-window)
+
     # XXX: If a remapped key is used to trigger keymap switching, and
     # the switched keymap doesn't have the same remap, the translated key
     # will be stuck down.
