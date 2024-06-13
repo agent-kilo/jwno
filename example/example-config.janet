@@ -67,10 +67,21 @@
 # get your attention. The :generic tooltip is used to display
 # general info, and the :current-frame tooltip is used to show
 # which frame is activated. The duration they stay on the screen
-# can be set separately:
+# can be set separately.
 #
-(:set-tooltip-timeout ui-man :generic 5000) # In milliseconds
-(:set-tooltip-timeout ui-man :current-frame 1500)
+(:set-tooltip-timeout ui-man :current-frame 1500) # In milliseconds
+#
+# Set the timeout to zero to indicate that the tooltip should
+# not automatically disappear.
+#
+(:set-tooltip-timeout ui-man :generic 0)
+#
+# And this will hide the generic tooltip whenever you issue a command.
+#
+(:add-hook hook-man :filter-command
+   (fn [_cmd _args]
+     (:hide-tooltip ui-man)
+     true))
 
 
 (defn cascade-windows [&opt cur-win]
