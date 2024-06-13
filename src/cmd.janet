@@ -359,25 +359,25 @@
   (def hook-man (in self :hook-manager))
   (def found (in commands cmd))
 
-  (if found
-    (if (:call-filter-hook hook-man :filter-command cmd args)
-      (let [ret (try
-                  (do
-                    (found ;args)
-                    true)
-                  ((err fib)
-                   (log/error "command %n failed: %n\n%s"
-                              cmd
-                              err
-                              (get-stack-trace fib))
-                   false))]
-        (when ret
-          (:call-hook hook-man :command-executed cmd args))
-        ret)
-      false)
+  (cond
+    (not found)
     (do
       (log/warning "unknown command: %n, args: %n" cmd args)
-      false)))
+      false)
+
+    (:call-filter-hook hook-man :filter-command cmd args)
+    (let [ret (try
+                (do
+                  (found ;args)
+                  true)
+                ((err fib)
+                 (log/error "command %n failed: %n\n%s" cmd err (get-stack-trace fib))
+                 false))]
+      (when ret
+        (:call-hook hook-man :command-executed cmd args))
+      ret)
+
+    false))
 
 
 (defn command-manager-dispatch-command [self cmd-and-args]
