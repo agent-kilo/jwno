@@ -197,7 +197,13 @@
     (k "win + r" :retile)
 
     (k "win + enter  t" [:exec true "wt.exe" "powershell.exe"])
-    (k "win + enter  e" [:exec true "runemacs.exe"])
+    # Some programs (such as Emacs here) would keep the input/output
+    # pipes open, blocking Jwno when it exits. Use powershell or cmd
+    # to launch the program indirectly in this case.
+    (k "win + enter  e" [:exec true
+                         "powershell.exe"
+                         "-Command"
+                         "Start-Process runemacs.exe"])
     (k "win + enter  d" [:exec true
                          "wt.exe"
                          "powershell.exe"
