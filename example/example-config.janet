@@ -196,7 +196,7 @@
     (k "win + shift + q" :quit)
     (k "win + r" :retile)
 
-    (k "win + enter  t" [:exec true "wt.exe" "powershell.exe"])
+    (k "win + enter  t" [:exec true "wt.exe"])
     # Some programs (such as Emacs here) would keep the input/output
     # pipes open, blocking Jwno when it exits. Use powershell or cmd
     # to launch the program indirectly in this case.
@@ -209,7 +209,7 @@
                          "powershell.exe"
                          "-NoExit"
                          "-Command"
-                         "& $Env:SCRIPTS_DIR\\jw32_dev_shell.ps1"])
+                         "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"])
 
     (k "win + shift + c" :close-window-or-frame)
     (k "win + shift + f" :close-frame)
