@@ -1339,7 +1339,7 @@
       (def move-to-fr (:get-current-frame main-fr))
       (each w orphan-windows
         (:add-child move-to-fr w))
-      (put self :children alive-frames)
+      (put self :children @[;alive-frames])
       (when (find |(= $ (in self :current-child)) dead-frames)
         (put self :current-child main-fr)))
 
