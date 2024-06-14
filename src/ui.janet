@@ -33,6 +33,7 @@
 
 (def TIMER-ID-CURRENT-FRAME-TOOLTIP (int/u64 1))
 (def TIMER-ID-GENERIC-TOOLTIP (int/u64 2))
+(def TIMER-ID-DISPLAY-CHANGE (int/u64 3))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -341,7 +342,7 @@
     (show-notify-icon-menu hwnd anchor-x anchor-y)))
 
 
-(defn- msg-wnd-handle-wm-command [hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-wm-command [hwnd wparam _lparam hook-handler state]
   (case wparam
     ID_MENU_EXIT
     (do
@@ -361,11 +362,10 @@
     (PostMessage hwnd SET-HOOKS-MSG 0 0)
 
     ID_MENU_UPDATE_MONITOR_LAYOUT
-    # XXX: Actual WM_DISPLAYCHANGE messages make use of wparam and lparam
-    (PostMessage hwnd WM_DISPLAYCHANGE 0 0)))
+    (ev/give (in hook-handler :chan) :ui/display-changed)))
 
 
-(defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam _hook-handler _state]
+(defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam hook-handler _state]
   (case wparam
     TIMER-ID-CURRENT-FRAME-TOOLTIP
     (do
@@ -377,11 +377,27 @@
       (KillTimer hwnd TIMER-ID-GENERIC-TOOLTIP)
       (PostMessage hwnd HIDE-TOOLTIP-MSG 0 0))
 
+    TIMER-ID-DISPLAY-CHANGE
+    (do
+      (KillTimer hwnd TIMER-ID-DISPLAY-CHANGE)
+      (ev/give (in hook-handler :chan) :ui/display-changed))
+
     (log/warning "Unknown timer: %n" wparam)))
 
 
 (defn- msg-wnd-handle-wm-displaychange [hwnd wparam lparam hook-handler state]
-  (ev/give (in hook-handler :chan) :ui/display-changed))
+  # GetMonitorInfo() may get called before the task bar is properly set up,
+  # and return an inaccurate work area in that case. This timer is here so that
+  # we can wait for things to settle down before actually updating the monitor
+  # layout.
+  (when (= (int/u64 0)
+           (SetTimer hwnd TIMER-ID-DISPLAY-CHANGE
+                     const/DISPLAY-CHANGE-DELAY-TIME
+                     nil))
+    (log/debug "SetTimer failed for TIMER-ID-DISPLAY-CHANGE: %n" (GetLastError))
+    # :ui/display-changed should be sent when the timer fires, but
+    # since SetTimer failed, we fall back to send it here directly.
+    (ev/give (in hook-handler :chan) :ui/display-changed)))
 
 
 (defn- msg-wnd-handle-show-error-and-exit [hwnd wparam _lparam _hook-handler _state]
