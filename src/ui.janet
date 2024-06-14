@@ -375,6 +375,10 @@
     (log/warning "Unknown timer: %n" wparam)))
 
 
+(defn- msg-wnd-handle-wm-displaychange [hwnd wparam lparam hook-handler state]
+  (ev/give (in hook-handler :chan) :ui/display-changed))
+
+
 (defn- msg-wnd-handle-show-error-and-exit [hwnd wparam _lparam _hook-handler _state]
   (let [msg (unmarshal-and-free wparam)]
     (MessageBox hwnd msg "Error" (bor MB_ICONEXCLAMATION MB_OK))
@@ -405,6 +409,7 @@
 
    WM_COMMAND msg-wnd-handle-wm-command
    WM_TIMER msg-wnd-handle-wm-timer
+   WM_DISPLAYCHANGE msg-wnd-handle-wm-displaychange
 
    SHOW-ERROR-AND-EXIT-MSG msg-wnd-handle-show-error-and-exit
 
@@ -448,7 +453,7 @@
                     0                      # y
                     100                    # nWidtn
                     100                    # nHeight
-                    HWND_MESSAGE           # hWndParent
+                    nil                    # hWndParent
                     nil                    # hMenu
                     hInstance              # hInstance
                     nil                    # lpParam
