@@ -64,6 +64,7 @@
 
 (defn- create-notify-icon-menu []
   (def hMenu (CreatePopupMenu))
+  (AppendMenu hMenu MF_STRING ID_MENU_UPDATE_MONITOR_LAYOUT "Update &Monitor Layout")
   (AppendMenu hMenu MF_STRING ID_MENU_RESET_KBD_HOOKS "&Reset Keyboard Hooks")
   (AppendMenu hMenu MF_SEPARATOR 0 0)
   (AppendMenu hMenu MF_STRING ID_MENU_EXIT "E&xit")
@@ -357,7 +358,11 @@
       (DestroyWindow hwnd))
 
     ID_MENU_RESET_KBD_HOOKS
-    (PostMessage hwnd SET-HOOKS-MSG 0 0)))
+    (PostMessage hwnd SET-HOOKS-MSG 0 0)
+
+    ID_MENU_UPDATE_MONITOR_LAYOUT
+    # XXX: Actual WM_DISPLAYCHANGE messages make use of wparam and lparam
+    (PostMessage hwnd WM_DISPLAYCHANGE 0 0)))
 
 
 (defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam _hook-handler _state]
