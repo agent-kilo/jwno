@@ -33,6 +33,7 @@
 
 (def TIMER-ID-CURRENT-FRAME-TOOLTIP (int/u64 1))
 (def TIMER-ID-GENERIC-TOOLTIP (int/u64 2))
+(def TIMER-ID-DISPLAY-CHANGE (int/u64 3))
 
 
 (defn- msg-loop [chan gc-timer-id hook-handler]
@@ -64,6 +65,7 @@
 
 (defn- create-notify-icon-menu []
   (def hMenu (CreatePopupMenu))
+  (AppendMenu hMenu MF_STRING ID_MENU_UPDATE_MONITOR_LAYOUT "Update &Monitor Layout")
   (AppendMenu hMenu MF_STRING ID_MENU_RESET_KBD_HOOKS "&Reset Keyboard Hooks")
   (AppendMenu hMenu MF_SEPARATOR 0 0)
   (AppendMenu hMenu MF_STRING ID_MENU_EXIT "E&xit")
@@ -279,7 +281,10 @@
       (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
       (when (> timeout 0)
-        (SetTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP timeout nil)))))
+        (when (= (int/u64 0)
+                 (SetTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP timeout nil))
+          (log/debug "SetTimer failed for TIMER-ID-CURRENT-FRAME-TOOLTIP: %n"
+                     (GetLastError)))))))
 
 
 (defn- msg-wnd-handle-hide-current-frame-tooltip [_hwnd _wparam _lparam _hook-handler state]
@@ -313,7 +318,10 @@
       (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
       (when (> timeout 0)
-        (SetTimer hwnd TIMER-ID-GENERIC-TOOLTIP timeout nil)))))
+        (when (= (int/u64 0)
+                 (SetTimer hwnd TIMER-ID-GENERIC-TOOLTIP timeout nil))
+          (log/debug "SetTimer failed for TIMER-ID-GENERIC-TOOLTIP: %n"
+                     (GetLastError)))))))
 
 
 (defn- msg-wnd-handle-hide-tooltip [_hwnd _wparam _lparam _hook-handler state]
@@ -340,7 +348,7 @@
     (show-notify-icon-menu hwnd anchor-x anchor-y)))
 
 
-(defn- msg-wnd-handle-wm-command [hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-wm-command [hwnd wparam _lparam hook-handler state]
   (case wparam
     ID_MENU_EXIT
     (do
@@ -357,10 +365,13 @@
       (DestroyWindow hwnd))
 
     ID_MENU_RESET_KBD_HOOKS
-    (PostMessage hwnd SET-HOOKS-MSG 0 0)))
+    (PostMessage hwnd SET-HOOKS-MSG 0 0)
+
+    ID_MENU_UPDATE_MONITOR_LAYOUT
+    (ev/give (in hook-handler :chan) :ui/display-changed)))
 
 
-(defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam _hook-handler _state]
+(defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam hook-handler _state]
   (case wparam
     TIMER-ID-CURRENT-FRAME-TOOLTIP
     (do
@@ -372,7 +383,27 @@
       (KillTimer hwnd TIMER-ID-GENERIC-TOOLTIP)
       (PostMessage hwnd HIDE-TOOLTIP-MSG 0 0))
 
+    TIMER-ID-DISPLAY-CHANGE
+    (do
+      (KillTimer hwnd TIMER-ID-DISPLAY-CHANGE)
+      (ev/give (in hook-handler :chan) :ui/display-changed))
+
     (log/warning "Unknown timer: %n" wparam)))
+
+
+(defn- msg-wnd-handle-wm-displaychange [hwnd wparam lparam hook-handler state]
+  # GetMonitorInfo() may get called before the task bar is properly set up,
+  # and return an inaccurate work area in that case. This timer is here so that
+  # we can wait for things to settle down before actually updating the monitor
+  # layout.
+  (when (= (int/u64 0)
+           (SetTimer hwnd TIMER-ID-DISPLAY-CHANGE
+                     const/DISPLAY-CHANGE-DELAY-TIME
+                     nil))
+    (log/debug "SetTimer failed for TIMER-ID-DISPLAY-CHANGE: %n" (GetLastError))
+    # :ui/display-changed should be sent when the timer fires, but
+    # since SetTimer failed, we fall back to send it here directly.
+    (ev/give (in hook-handler :chan) :ui/display-changed)))
 
 
 (defn- msg-wnd-handle-show-error-and-exit [hwnd wparam _lparam _hook-handler _state]
@@ -405,6 +436,7 @@
 
    WM_COMMAND msg-wnd-handle-wm-command
    WM_TIMER msg-wnd-handle-wm-timer
+   WM_DISPLAYCHANGE msg-wnd-handle-wm-displaychange
 
    SHOW-ERROR-AND-EXIT-MSG msg-wnd-handle-show-error-and-exit
 
@@ -448,7 +480,7 @@
                     0                      # y
                     100                    # nWidtn
                     100                    # nHeight
-                    HWND_MESSAGE           # hWndParent
+                    nil                    # hWndParent
                     nil                    # hMenu
                     hInstance              # hInstance
                     nil                    # lpParam
@@ -460,9 +492,9 @@
 
 (defn- init-timer []
   (def timer-id (SetTimer nil 0 GC-TIMER-INTERVAL nil))
-  (log/debug "timer-id = %n" timer-id)
   (when (= timer-id (int/u64 0))
-    (log/warning "Failed to create GC timer"))
+    (log/warning "Failed to create GC timer: %n" (GetLastError)))
+  (log/debug "timer-id = %n" timer-id)
   timer-id)
 
 

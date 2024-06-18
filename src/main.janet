@@ -47,6 +47,29 @@
               nil)))
          (log/debug "config-env = %n" config-env))
 
+       :ui/display-changed
+       (let [wm (in context :window-manager)
+             root (in wm :root)
+             layouts (in root :children)
+             mon-info (try
+                        (:enumerate-monitors wm)
+                        ((err fib)
+                         (log/debug ":enumerate-monitors failed: %s\n%s"
+                                    err
+                                    (get-stack-trace fib))
+                         # The enumeration may fail if all the monitors are turned
+                         # off. We just ignore this case and wait for the next
+                         # :ui/display-changed event triggered by turning on the
+                         # monitors again.
+                         nil))]
+         (when mon-info
+           (def [work-areas _main-idx] mon-info)
+           (with-activation-hooks wm
+             (each lo (in root :children)
+               (:update-work-areas lo work-areas))
+             (:retile wm)
+             (:activate wm (:get-current-frame root)))))
+
        :ui/exit
        (break)
 

@@ -1305,9 +1305,60 @@
    frame-proto))
 
 
+(defn layout-update-work-areas [self work-areas]
+  (def top-frames (in self :children))
+  (def fr-count (length top-frames))
+  (def wa-count (length work-areas))
+
+  (cond
+    (= fr-count wa-count)
+    # Only the resolutions or monitor configurations are changed
+    (map (fn [fr wa]
+           (:transform fr wa))
+         top-frames
+         work-areas)
+
+    (> fr-count wa-count)
+    # Some of the monitors got unplugged
+    (let [alive-frames (slice top-frames 0 wa-count)
+          dead-frames (slice top-frames wa-count)
+          orphan-windows @[]]
+      (var main-fr (first alive-frames))
+      (map (fn [fr wa]
+             (:transform fr wa)
+             # Find the frame closest to the origin
+             (when (< (+ (math/abs (in wa :top))
+                         (math/abs (in wa :left)))
+                      (+ (math/abs (get-in main-fr [:rect :top]))
+                         (math/abs (get-in main-fr [:rect :left]))))
+               (set main-fr fr)))
+           alive-frames
+           work-areas)
+      (each fr dead-frames
+        (array/push orphan-windows ;(:get-all-windows fr)))
+      (def move-to-fr (:get-current-frame main-fr))
+      (each w orphan-windows
+        (:add-child move-to-fr w))
+      (put self :children @[;alive-frames])
+      (when (find |(= $ (in self :current-child)) dead-frames)
+        (put self :current-child main-fr)))
+
+    (< fr-count wa-count)
+    # New monitors got plugged in
+    (let [old-was (slice work-areas 0 fr-count)
+          new-was (slice work-areas fr-count)
+          new-frames (map |(frame $) new-was)]
+      (map (fn [fr wa]
+             (:transform fr wa))
+           top-frames
+           old-was)
+      (each fr new-frames
+        (:add-child self fr)))))
+
+
 (def- layout-proto
   (table/setproto
-   @{}
+   @{:update-work-areas layout-update-work-areas}
    tree-node-proto))
 
 
