@@ -224,6 +224,39 @@
     [hwnd? uia-win?]))
 
 
+(defn- try-to-get-window-desktop-id [vdm-com hwnd]
+  (try
+    (:GetWindowDesktopId vdm-com hwnd)
+    ((err fib)
+     (log/debug "GetWindowDesktopId failed for %n: %n\n%s"
+                hwnd
+                err
+                (get-stack-trace fib))
+     nil)))
+
+
+(defn- get-hwnd-virtual-desktop-id [hwnd vdm-com]
+  (def desktop-id? (try-to-get-window-desktop-id vdm-com hwnd))
+
+  (if (or (nil? desktop-id?) # GetWindowDesktopId failed
+          (= desktop-id? "{00000000-0000-0000-0000-000000000000}")) # Not a top-level window
+    # Try the ancestor instead
+    (let [ancestor (GetAncestor hwnd GA_ROOTOWNER)]
+      (cond
+        (null? ancestor)
+        nil
+
+        # Some windows (e.g. the Start Menu) may return itself as
+        # the ancestor. No need to try again with the same HWND.
+        (= ancestor hwnd)
+        nil
+
+        true
+        (try-to-get-window-desktop-id vdm-com ancestor)))
+
+    desktop-id?))
+
+
 (defn- get-hwnd-virtual-desktop [hwnd? uia-man vdm-com &opt uia-win?]
   (def [hwnd uia-win]
     (normalize-hwnd-and-uia-element hwnd?
@@ -244,16 +277,7 @@
 
     true
     (do
-      (def desktop-id
-        (let [top-level (GetAncestor hwnd GA_ROOTOWNER)]
-          (log/debug "top-level = %n" top-level)
-          (try
-            (:GetWindowDesktopId vdm-com top-level)
-            ((err fib)
-             (log/debug "GetWindowDesktopId failed: %n\n%s"
-                        err
-                        (get-stack-trace fib))
-             nil))))
+      (def desktop-id (get-hwnd-virtual-desktop-id hwnd vdm-com))
 
       (def desktop-name
         (with-uia [root-elem (:get-root uia-man uia-win)]
@@ -325,14 +349,7 @@
 (defn- window-purge-pred [win wm layout]
   (def hwnd (in win :hwnd))
   (def layout-vd-id (in layout :id))
-  (def win-vd-id
-    (try
-      (:GetWindowDesktopId (in wm :vdm-com) hwnd)
-      ((err fib)
-       (log/debug "GetWindowDesktopId failed: %n\n%s"
-                  err
-                  (get-stack-trace fib))
-       nil)))
+  (def win-vd-id (get-hwnd-virtual-desktop-id hwnd (in wm :vdm-com)))
   (or (not= win-vd-id layout-vd-id)
       (not (:alive? win))))
 
