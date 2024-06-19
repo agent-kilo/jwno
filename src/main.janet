@@ -205,7 +205,10 @@
   (put context :event-sources [(in uia-man :chan) (in ui-man :chan)])
   (put context :key-manager key-man)
   (put context :window-manager window-man)
-  (put context :repl repl-server)
+  (when repl-server
+    (put context :repl
+       {:server repl-server
+        :address (in cli-args "repl")}))
 
   (add-default-commands command-man context)
 
