@@ -361,21 +361,13 @@
 
   (cond
     (not found)
-    (do
-      (log/warning "unknown command: %n, args: %n" cmd args)
-      false)
+    (errorf "unknown command: %n, args: %n" cmd args)
 
     (:call-filter-hook hook-man :filter-command cmd args)
-    (let [ret (try
-                (do
-                  (found ;args)
-                  true)
-                ((err fib)
-                 (log/error "command %n failed: %n\n%s" cmd err (get-stack-trace fib))
-                 false))]
-      (when ret
-        (:call-hook hook-man :command-executed cmd args))
-      ret)
+    (do
+      (found ;args)
+      (:call-hook hook-man :command-executed cmd args)
+      true)
 
     false))
 
@@ -385,7 +377,10 @@
     (if (indexed? cmd-and-args)
       cmd-and-args
       [cmd-and-args]))
-  (command-manager-call-command self ;call-with))
+  (try
+    (command-manager-call-command self ;call-with)
+    ((err fib)
+     (log/error "Command %n failed: %n\n%s" call-with err (get-stack-trace fib)))))
 
 
 (defn command-manager-add-command [self name cmd-fn]
