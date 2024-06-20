@@ -179,6 +179,13 @@
   })
 
 
+(def key-code-to-name
+  (let [table-map @{}]
+    (eachp [name code] key-name-to-code
+      (put table-map code name))
+    table-map))
+
+
 # Only matches lower case key names. Do string/ascii-lower before
 # matching against this PEG.
 (def key-spec-peg
@@ -253,11 +260,28 @@
     self))
 
 
+(defn- format-key-struct [key]
+  (def trigger (in key :key))
+  (def mods (in key :modifiers))
+  (if-let [trigger-name (in key-code-to-name trigger)]
+    (string/join [;mods (string/ascii-upper trigger-name)] " + ")
+    (errorf "unknown key code: %n" trigger)))
+
+
+(defn keymap-format [self]
+  (def cmd-desc @[])
+  (eachp [k c] self
+    (when (and (struct? k) (has-key? k :key))
+      (array/push cmd-desc (string/format "%s\t%n" (format-key-struct k) c))))
+  (string/join cmd-desc "\n"))
+
+
 (def- keymap-proto
   @{:define-key keymap-define-key
     :parse-key keymap-parse-key
     :get-key-binding keymap-get-key-binding
-    :get-root keymap-get-root})
+    :get-root keymap-get-root
+    :format keymap-format})
 
 
 (varfn define-keymap []
@@ -285,10 +309,33 @@
     :get-key-code key-manager-get-key-code})
 
 
-(defn key-manager [ui-man]
-  (table/setproto
-   @{:ui-manager ui-man}
-   key-manager-proto))
+(defn key-manager [ui-man hook-man]
+  (def key-man-obj
+    (table/setproto
+     @{:ui-manager ui-man
+       :hook-manager hook-man}
+     key-manager-proto))
+
+  (:add-hook hook-man :keymap-switched
+     (fn [keymap]
+       # TODO: Show on focused monitor
+       (:show-tooltip ui-man (:format keymap) 0 0 0)))
+  (:add-hook hook-man :keymap-reset
+     (fn [_keymap]
+       (:hide-tooltip ui-man)))
+
+  (:add-hook hook-man :keymap-pushed
+     (fn [keymap]
+       # TODO: Show on focused monitor
+       (:show-tooltip ui-man (:format keymap) 0 0 0)))
+  (:add-hook hook-man :keymap-popped
+     (fn [keymap]
+       (if (in keymap :bottom-of-stack)
+         (:hide-tooltip ui-man)
+         # TODO: Show on focused monitor
+         (:show-tooltip ui-man (:format keymap) 0 0 0))))
+
+  key-man-obj)
 
 
 (defn keyboard-hook-handler-set-keymap [self keymap]

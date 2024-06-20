@@ -82,6 +82,18 @@
        [:key/command cmd]
        (:dispatch-command (in context :command-manager) cmd)
 
+       [:key/switch-keymap cur-keymap]
+       (:call-hook (in context :hook-manager) :keymap-switched cur-keymap)
+
+       [:key/reset-keymap cur-keymap]
+       (:call-hook (in context :hook-manager) :keymap-reset cur-keymap)
+
+       [:key/push-keymap cur-keymap]
+       (:call-hook (in context :hook-manager) :keymap-pushed cur-keymap)
+
+       [:key/pop-keymap cur-keymap]
+       (:call-hook (in context :hook-manager) :keymap-popped cur-keymap)
+
        _
        (log/warning "Unknown message: %n" msg))
      _
@@ -183,7 +195,7 @@
       ((err fib)
        (show-error-and-exit err 1 (get-stack-trace fib)))))
 
-  (def key-man (key-manager ui-man))
+  (def key-man (key-manager ui-man hook-man))
 
   (def window-man
     (try
