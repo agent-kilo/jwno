@@ -280,11 +280,12 @@
       (def [tt-hwnd tt-info] tooltip-info)
       (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
-      (when (> timeout 0)
+      (if (> timeout 0)
         (when (= (int/u64 0)
                  (SetTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP timeout nil))
           (log/debug "SetTimer failed for TIMER-ID-CURRENT-FRAME-TOOLTIP: %n"
-                     (GetLastError)))))))
+                     (GetLastError)))
+        (KillTimer hwnd TIMER-ID-CURRENT-FRAME-TOOLTIP)))))
 
 
 (defn- msg-wnd-handle-hide-current-frame-tooltip [_hwnd _wparam _lparam _hook-handler state]
@@ -317,11 +318,12 @@
       (def [tt-hwnd tt-info] tooltip-info)
       (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in tt-info :address))
-      (when (> timeout 0)
+      (if (> timeout 0)
         (when (= (int/u64 0)
                  (SetTimer hwnd TIMER-ID-GENERIC-TOOLTIP timeout nil))
           (log/debug "SetTimer failed for TIMER-ID-GENERIC-TOOLTIP: %n"
-                     (GetLastError)))))))
+                     (GetLastError)))
+        (KillTimer hwnd TIMER-ID-GENERIC-TOOLTIP)))))
 
 
 (defn- msg-wnd-handle-hide-tooltip [_hwnd _wparam _lparam _hook-handler state]
