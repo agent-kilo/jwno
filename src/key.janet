@@ -269,6 +269,7 @@
 
 
 (defn key-manager-set-keymap [self keymap]
+  (put keymap :bottom-of-stack true)
   (:set-keymap (in self :ui-manager) keymap))
 
 
