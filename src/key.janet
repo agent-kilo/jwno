@@ -268,11 +268,22 @@
     (errorf "unknown key code: %n" trigger)))
 
 
+(defn- format-key-command [cmd]
+  (if (table? cmd)
+    # A sub-keymap
+    "..."
+    # An actual command
+    (string/format "%n" cmd)))
+
+
 (defn keymap-format [self]
   (def cmd-desc @[])
   (eachp [k c] self
     (when (and (struct? k) (has-key? k :key))
-      (array/push cmd-desc (string/format "%s\t%n" (format-key-struct k) c))))
+      (array/push cmd-desc
+                  (string/format "%s\t%s"
+                                 (format-key-struct k)
+                                 (format-key-command c)))))
   (string/join cmd-desc "\n"))
 
 
