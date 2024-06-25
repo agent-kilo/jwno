@@ -25,6 +25,7 @@
 (def SHOW-TOOLTIP-MSG (+ WM_APP 6))
 (def HIDE-TOOLTIP-MSG (+ WM_APP 7))
 (def SET-TOOLTIP-TIMEOUTS-MSG (+ WM_APP 8))
+(def UPDATE-WORK-AREA-MSG (+ WM_APP 9))
 
 (def TIMER-ID-DISPLAY-CHANGE (int/u64 1))
 # The tooltip timers are generated from tooltip numeric IDs.
@@ -270,12 +271,14 @@
     (put hook-handler :hook-id nil)))
 
 
-(defn- get-current-work-area []
+(defn- get-current-work-area [ui-state]
   (def fwin (GetForegroundWindow))
   (def h-mon
     (if (null? fwin)
-      # XXX: No focused window, fallback to the primary monitor
-      (MonitorFromPoint [0 0] MONITOR_DEFAULTTOPRIMARY)
+      # No focused window, try to fallback to the cached work area
+      (if-let [last-wa (in ui-state :last-active-work-area)]
+        (MonitorFromRect last-wa MONITOR_DEFAULTTOPRIMARY)
+        (MonitorFromPoint [0 0] MONITOR_DEFAULTTOPRIMARY))
       (MonitorFromWindow fwin MONITOR_DEFAULTTOPRIMARY)))
   (def mon-info (MONITORINFOEX))
   (def ret (GetMonitorInfo h-mon mon-info))
@@ -305,7 +308,7 @@
     (def [x y]
       (if (or (nil? opt-x) (nil? opt-y))
         # Default to the current monitor
-        (if-let [wa (get-current-work-area)]
+        (if-let [wa (get-current-work-area state)]
           [(in wa :left) (in wa :top)]
           # Something went wrong, try our best to return a coordinate....
           [0 0])
@@ -371,6 +374,12 @@
       (put tooltip :timeout tt-timeout)
       (put tooltips tt-id tooltip))
     (log/debug "New tooltips: %n" tooltips)))
+
+
+(defn- msg-wnd-handle-update-work-area [_hwnd wparam _lparam _hook-handler state]
+  (def work-area (unmarshal-and-free wparam))
+  (log/debug "Updated work area: %n" work-area)
+  (put state :last-active-work-area work-area))
 
 
 (defn- msg-wnd-handle-notify-icon-callback [hwnd wparam lparam _hook-handler _state]
@@ -464,6 +473,8 @@
    SHOW-TOOLTIP-MSG msg-wnd-handle-show-tooltip
    HIDE-TOOLTIP-MSG msg-wnd-handle-hide-tooltip
    SET-TOOLTIP-TIMEOUTS-MSG msg-wnd-handle-set-tooltip-timeouts
+
+   UPDATE-WORK-AREA-MSG msg-wnd-handle-update-work-area
 
    NOTIFY-ICON-CALLBACK-MSG msg-wnd-handle-notify-icon-callback
 
@@ -617,6 +628,13 @@
                            0))
 
 
+(defn ui-manager-update-work-area [self rect]
+  (ui-manager-post-message self
+                           UPDATE-WORK-AREA-MSG
+                           (alloc-and-marshal rect)
+                           0))
+
+
 (defn ui-manager-show-error-and-exit [self msg]
   (def buf-ptr (alloc-and-marshal msg))
   (ui-manager-post-message self SHOW-ERROR-AND-EXIT-MSG buf-ptr 0))
@@ -635,6 +653,7 @@
     :show-tooltip ui-manager-show-tooltip
     :hide-tooltip ui-manager-hide-tooltip
     :set-tooltip-timeout ui-manager-set-tooltip-timeout
+    :update-work-area ui-manager-update-work-area
     :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
 

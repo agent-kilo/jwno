@@ -1784,6 +1784,7 @@
        (def rect (in fr :rect))
        (def center-x (brshift (+ (in rect :left) (in rect :right)) 1))
        (def center-y (brshift (+ (in rect :top) (in rect :bottom)) 1))
-       (:show-tooltip ui-man :current-frame "Current Frame" center-x center-y nil true)))
+       (:show-tooltip ui-man :current-frame "Current Frame" center-x center-y nil true)
+       (:update-work-area ui-man (in (:get-top-frame fr) :rect))))
 
   wm-obj)
