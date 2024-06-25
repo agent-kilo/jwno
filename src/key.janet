@@ -330,21 +330,21 @@
   (:add-hook hook-man :keymap-switched
      (fn [keymap]
        # TODO: Show on focused monitor
-       (:show-tooltip ui-man (:format keymap) 0 0 0)))
+       (:show-tooltip ui-man :keymap (:format keymap) 0 0)))
   (:add-hook hook-man :keymap-reset
      (fn [_keymap]
-       (:hide-tooltip ui-man)))
+       (:hide-tooltip ui-man :keymap)))
 
   (:add-hook hook-man :keymap-pushed
      (fn [keymap]
        # TODO: Show on focused monitor
-       (:show-tooltip ui-man (:format keymap) 0 0 0)))
+       (:show-tooltip ui-man :keymap (:format keymap) 0 0)))
   (:add-hook hook-man :keymap-popped
      (fn [keymap]
        (if (in keymap :bottom-of-stack)
-         (:hide-tooltip ui-man)
+         (:hide-tooltip ui-man :keymap)
          # TODO: Show on focused monitor
-         (:show-tooltip ui-man (:format keymap) 0 0 0))))
+         (:show-tooltip ui-man :keymap (:format keymap) 0 0))))
 
   key-man-obj)
 

@@ -64,14 +64,12 @@
 
 #
 # Jwno uses different types of tooltip windows to show info or
-# get your attention. The :generic tooltip is used to display
-# general info, and the :current-frame tooltip is used to show
+# get your attention. The :current-frame tooltip is used to show
 # which frame is activated. The duration they stay on the screen
 # can be set separately. A timeout value of zero means that the
 # tooltip should not automatically disappear.
 #
 (:set-tooltip-timeout ui-man :current-frame 1500) # In milliseconds
-(:set-tooltip-timeout ui-man :generic 5000)
 
 
 (defn cascade-windows [&opt cur-win]
