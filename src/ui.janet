@@ -27,6 +27,9 @@
 (def SET-TOOLTIP-TIMEOUTS-MSG (+ WM_APP 8))
 
 (def TIMER-ID-DISPLAY-CHANGE (int/u64 1))
+# The tooltip timers are generated from tooltip numeric IDs.
+# The tooltip numeric IDs are from 0x0001 to 0xffff, and the
+# timers are from 0x10001 to 0x1ffff.
 (def TOOLTIP-TIMER-BASE (int/u64 0x10000))
 (def TOOLTIP-TIMER-BASE-MASK (int/u64 0xffff0000))
 
@@ -185,7 +188,7 @@
   (var last-id start)
   (fiber/new
    (fn []
-     (while (< last-id 65535)
+     (while (< last-id 0xffff)
        (++ last-id)
        (yield last-id))
      (error "tooltip uid overflow"))))
