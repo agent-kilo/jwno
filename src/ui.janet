@@ -270,8 +270,24 @@
     (put hook-handler :hook-id nil)))
 
 
+(defn- get-current-work-area []
+  (def fwin (GetForegroundWindow))
+  (def h-mon
+    (if (null? fwin)
+      # XXX: No focused window, fallback to the primary monitor
+      (MonitorFromPoint [0 0] MONITOR_DEFAULTTOPRIMARY)
+      (MonitorFromWindow fwin MONITOR_DEFAULTTOPRIMARY)))
+  (def mon-info (MONITORINFOEX))
+  (def ret (GetMonitorInfo h-mon mon-info))
+  (if (= FALSE ret)
+    (do
+      (log/error "GetMonitorInfo failed for monitor %n" h-mon)
+      nil)
+    (in mon-info :rcWork)))
+
+
 (defn- msg-wnd-handle-show-tooltip [hwnd wparam _lparam _hook-handler state]
-  (let [[tt-id text x y opt-timeout opt-center?] (unmarshal-and-free wparam)]
+  (let [[tt-id text opt-x opt-y opt-timeout opt-center?] (unmarshal-and-free wparam)]
     (def tooltip (get-in state [:tooltips tt-id]))
 
     (def timeout
@@ -285,6 +301,15 @@
       (if (nil? opt-center?)
         false
         opt-center?))
+
+    (def [x y]
+      (if (or (nil? opt-x) (nil? opt-y))
+        # Default to the current monitor
+        (if-let [wa (get-current-work-area)]
+          [(in wa :left) (in wa :top)]
+          # Something went wrong, try our best to return a coordinate....
+          [0 0])
+        [opt-x opt-y]))
 
     (def tt-hwnd? (get-in tooltip [:hwnd]))
     (def [tt-hwnd tt-info]
@@ -574,7 +599,7 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
-(defn ui-manager-show-tooltip [self tt-id text x y &opt timeout center?]
+(defn ui-manager-show-tooltip [self tt-id text &opt x y timeout center?]
   (ui-manager-post-message self
                            SHOW-TOOLTIP-MSG
                            (alloc-and-marshal [tt-id text x y timeout center?])
