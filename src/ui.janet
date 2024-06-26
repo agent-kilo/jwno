@@ -271,22 +271,70 @@
     (put hook-handler :hook-id nil)))
 
 
+(defn- get-desktop-rect [ui-state]
+  (if-let [rect (in ui-state :desktop-rect)]
+    rect
+    (let [desktop-rect @{:top 0 :left 0 :bottom 0 :right 0}]
+      (def mon-info (MONITORINFOEX))
+      (def enum-ret
+        (EnumDisplayMonitors
+         nil nil
+         (fn [hmon _hmdc rect]
+           (each [cmp edge] [[< :top] [< :left] [> :bottom] [> :right]]
+             (when (cmp (in rect edge) (in desktop-rect edge))
+               (put desktop-rect edge (in rect edge))))
+           TRUE)))
+      (if (= FALSE enum-ret)
+        (do
+          (log/error "EnumDisplayMonitors failed")
+          nil)
+        (let [ret-rect (table/to-struct desktop-rect)]
+          (log/debug "New desktop rect: %n" ret-rect)
+          (put ui-state :desktop-rect ret-rect)
+          ret-rect)))))
+
+
 (defn- get-current-work-area [ui-state]
   (def fwin (GetForegroundWindow))
+  (def [ret rect] (GetWindowRect fwin))
+  (def desktop-rect (get-desktop-rect ui-state))
+
   (def h-mon
-    (if (null? fwin)
+    (cond
+      (null? fwin)
       # No focused window, try to fallback to the cached work area
       (if-let [last-wa (in ui-state :last-active-work-area)]
         (MonitorFromRect last-wa MONITOR_DEFAULTTOPRIMARY)
         (MonitorFromPoint [0 0] MONITOR_DEFAULTTOPRIMARY))
+
+      (= FALSE ret)
+      # No rect for the window, default to primary monitor
+      (MonitorFromPoint [0 0] MONITOR_DEFAULTTOPRIMARY)
+
+      (nil? desktop-rect)
+      # Failed to get the bounding rect for the whole desktop
+      (MonitorFromPoint [0 0] MONITOR_DEFAULTTOPRIMARY)
+
+      (= rect desktop-rect)
+      # The foreground window occupies the whole desktop, assume it's the desktop window.
+      # And since MonitorFromWindow(desktop_hwnd, ...) always returns the primary monitor,
+      # use the cached work area instead.
+      (if-let [last-wa (in ui-state :last-active-work-area)]
+        (MonitorFromRect last-wa MONITOR_DEFAULTTOPRIMARY)
+        (MonitorFromPoint [0 0] MONITOR_DEFAULTTOPRIMARY))
+
+      true
       (MonitorFromWindow fwin MONITOR_DEFAULTTOPRIMARY)))
+
   (def mon-info (MONITORINFOEX))
   (def ret (GetMonitorInfo h-mon mon-info))
   (if (= FALSE ret)
     (do
       (log/error "GetMonitorInfo failed for monitor %n" h-mon)
       nil)
-    (in mon-info :rcWork)))
+    (let [cur-wa (in mon-info :rcWork)]
+      (put ui-state :last-active-work-area cur-wa)
+      cur-wa)))
 
 
 (defn- msg-wnd-handle-show-tooltip [hwnd wparam _lparam _hook-handler state]
@@ -436,6 +484,9 @@
 
 
 (defn- msg-wnd-handle-wm-displaychange [hwnd wparam lparam hook-handler state]
+  # Clear cached desktop rect, see get-desktop-rect and get-current-work-area
+  (put state :desktop-rect nil)
+
   # GetMonitorInfo() may get called before the task bar is properly set up,
   # and return an inaccurate work area in that case. This timer is here so that
   # we can wait for things to settle down before actually updating the monitor
