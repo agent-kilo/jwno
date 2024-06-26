@@ -389,6 +389,49 @@
                  0 (bor (band adjusted-x 0xffff) (blshift (band adjusted-y 0xffff) 16)))))
 
 
+(defn- get-tooltip-default-position [work-area anchor]
+  (def wa-width (- (in work-area :right) (in work-area :left)))
+  (def wa-height (- (in work-area :bottom) (in work-area :top)))
+
+  (cond
+    (or (= :top-left anchor)
+        (= :left-top anchor))
+    [(in work-area :left) (in work-area :top)]
+
+    (or (= :top-right anchor)
+        (= :right-top anchor))
+    [(in work-area :right) (in work-area :top)]
+
+    (or (= :bottom-left anchor)
+        (= :left-bottom anchor))
+    [(in work-area :left) (in work-area :bottom)]
+
+    (or (= :bottom-right anchor)
+        (= :right-bottom anchor))
+    [(in work-area :right) (in work-area :bottom)]
+
+    (= :top anchor)
+    [(+ (in work-area :left) (brshift wa-width 1)) (in work-area :top)]
+
+    (= :bottom anchor)
+    [(+ (in work-area :left) (brshift wa-width 1)) (in work-area :bottom)]
+
+    (= :left anchor)
+    [(in work-area :left) (+ (in work-area :top) (brshift wa-height 1))]
+
+    (= :right anchor)
+    [(in work-area :right) (+ (in work-area :top) (brshift wa-height 1))]
+
+    (= :center anchor)
+    [(+ (in work-area :left) (brshift wa-width 1))
+     (+ (in work-area :top) (brshift wa-height 1))]
+
+    true
+    (do
+      (log/warning "Unknown anchor value: %n, default to :top-left" anchor)
+      [(in work-area :left) (in work-area :top)])))
+
+
 (defn- msg-wnd-handle-show-tooltip [hwnd wparam _lparam _hook-handler state]
   (let [[tt-id text opt-x opt-y opt-timeout opt-anchor] (unmarshal-and-free wparam)]
     (def tooltip (get-in state [:tooltips tt-id]))
@@ -409,7 +452,7 @@
       (if (or (nil? opt-x) (nil? opt-y))
         # Default to the current monitor
         (if-let [wa (get-current-work-area state)]
-          [(in wa :left) (in wa :top)]
+          (get-tooltip-default-position wa anchor)
           # Something went wrong, try our best to return a coordinate....
           [0 0])
         [opt-x opt-y]))
