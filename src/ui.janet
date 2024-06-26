@@ -337,8 +337,60 @@
       cur-wa)))
 
 
+(defn- adjust-tooltip-position [tt-hwnd anchor x y]
+  (def [ret rect] (GetWindowRect tt-hwnd))
+  (when (= FALSE ret)
+    (log/error "GetWindowRect failed for tooltip window %n" tt-hwnd)
+    (break))
+
+  (def tt-width (- (in rect :right) (in rect :left)))
+  (def tt-height (- (in rect :bottom) (in rect :top)))
+  (def [adjusted-x adjusted-y]
+    (cond
+      (or (= :top-left anchor)
+          (= :left-top anchor))
+      [x y]
+
+      (or (= :top-right anchor)
+          (= :right-top anchor))
+      [(- x tt-width) y]
+
+      (or (= :bottom-left anchor)
+          (= :left-bottom anchor))
+      [x (- y tt-height)]
+
+      (or (= :bottom-right anchor)
+          (= :right-bottom anchor))
+      [(- x tt-width) (- y tt-height)]
+
+      (= :top anchor)
+      [(- x (brshift tt-width 1)) y]
+
+      (= :bottom anchor)
+      [(- x (brshift tt-width 1)) (- y tt-height)]
+
+      (= :left anchor)
+      [x (- y (brshift tt-height 1))]
+
+      (= :right anchor)
+      [(- x tt-width) (- y (brshift tt-height 1))]
+
+      (= :center anchor)
+      [(- x (brshift tt-width 1)) (- y (brshift tt-height 1))]
+
+      true
+      (do
+        (log/warning "Unknown anchor value: %n, default to :top-left" anchor)
+        [x y])))
+
+  (when (or (not= x adjusted-x)
+            (not= y adjusted-y))
+    (SendMessage tt-hwnd TTM_TRACKPOSITION
+                 0 (bor (band adjusted-x 0xffff) (blshift (band adjusted-y 0xffff) 16)))))
+
+
 (defn- msg-wnd-handle-show-tooltip [hwnd wparam _lparam _hook-handler state]
-  (let [[tt-id text opt-x opt-y opt-timeout opt-center?] (unmarshal-and-free wparam)]
+  (let [[tt-id text opt-x opt-y opt-timeout opt-anchor] (unmarshal-and-free wparam)]
     (def tooltip (get-in state [:tooltips tt-id]))
 
     (def timeout
@@ -348,10 +400,10 @@
           to
           const/DEFAULT-TOOLTIP-TIMEOUT)))
 
-    (def center?
-      (if (nil? opt-center?)
-        false
-        opt-center?))
+    (def anchor
+      (if (nil? opt-anchor)
+        :top-left
+        opt-anchor))
 
     (def [x y]
       (if (or (nil? opt-x) (nil? opt-y))
@@ -367,7 +419,7 @@
       (if tt-hwnd?
         [tt-hwnd? (in tooltip :info)]
         (let [uid (resume (in state :tooltip-uid-generator))
-              created (create-tooltip-window hwnd uid center? text)]
+              created (create-tooltip-window hwnd uid false text)]
           (if (nil? created)
             [nil nil]
             created))))
@@ -391,6 +443,10 @@
       (SendMessage tt-hwnd TTM_UPDATETIPTEXT 0 (in updated-info :address))
       (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
       (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in updated-info :address))
+
+      # This must be called after TTM_TRACKACTIVATE, or the tooltip window
+      # geometry it gets will be wrong.
+      (adjust-tooltip-position tt-hwnd anchor x y)
 
       (def timer-id (tooltip-uid-to-timer-id (in tt-info :uId)))
       (if (> timeout 0)
@@ -661,10 +717,10 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
-(defn ui-manager-show-tooltip [self tt-id text &opt x y timeout center?]
+(defn ui-manager-show-tooltip [self tt-id text &opt x y timeout anchor]
   (ui-manager-post-message self
                            SHOW-TOOLTIP-MSG
-                           (alloc-and-marshal [tt-id text x y timeout center?])
+                           (alloc-and-marshal [tt-id text x y timeout anchor])
                            0))
 
 
