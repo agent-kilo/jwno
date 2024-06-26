@@ -25,7 +25,8 @@
 (def SHOW-TOOLTIP-MSG (+ WM_APP 6))
 (def HIDE-TOOLTIP-MSG (+ WM_APP 7))
 (def SET-TOOLTIP-TIMEOUTS-MSG (+ WM_APP 8))
-(def UPDATE-WORK-AREA-MSG (+ WM_APP 9))
+(def SET-TOOLTIP-ANCHORS-MSG (+ WM_APP 9))
+(def UPDATE-WORK-AREA-MSG (+ WM_APP 10))
 
 (def TIMER-ID-DISPLAY-CHANGE (int/u64 1))
 # The tooltip timers are generated from tooltip numeric IDs.
@@ -444,9 +445,11 @@
           const/DEFAULT-TOOLTIP-TIMEOUT)))
 
     (def anchor
-      (if (nil? opt-anchor)
-        :top-left
-        opt-anchor))
+      (if opt-anchor
+        opt-anchor
+        (if-let [ac (get-in tooltip [:anchor])]
+          ac
+          const/DEFAULT-TOOLTIP-ANCHOR)))
 
     (def [x y]
       (if (or (nil? opt-x) (nil? opt-y))
@@ -510,16 +513,28 @@
         (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))))))
 
 
+(defn- set-tooltip-property [tooltips tt-id prop value]
+  (def tooltip
+    (if-let [tt (in tooltips tt-id)]
+      tt
+      @{}))
+  (put tooltip prop value)
+  (put tooltips tt-id tooltip))
+
+
 (defn- msg-wnd-handle-set-tooltip-timeouts [_hwnd wparam _lparam _hook-handler state]
   (let [timeouts (unmarshal-and-free wparam)
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-timeout] timeouts
-      (def tooltip
-        (if-let [tt (in tooltips tt-id)]
-          tt
-          @{}))
-      (put tooltip :timeout tt-timeout)
-      (put tooltips tt-id tooltip))
+      (set-tooltip-property tooltips tt-id :timeout tt-timeout))
+    (log/debug "New tooltips: %n" tooltips)))
+
+
+(defn- msg-wnd-handle-set-tooltip-anchors [_hwnd wparam _lparam _hook-handler state]
+  (let [anchors (unmarshal-and-free wparam)
+        tooltips (in state :tooltips)]
+    (eachp [tt-id tt-anchor] anchors
+      (set-tooltip-property tooltips tt-id :anchor tt-anchor))
     (log/debug "New tooltips: %n" tooltips)))
 
 
@@ -623,6 +638,7 @@
    SHOW-TOOLTIP-MSG msg-wnd-handle-show-tooltip
    HIDE-TOOLTIP-MSG msg-wnd-handle-hide-tooltip
    SET-TOOLTIP-TIMEOUTS-MSG msg-wnd-handle-set-tooltip-timeouts
+   SET-TOOLTIP-ANCHORS-MSG msg-wnd-handle-set-tooltip-anchors
 
    UPDATE-WORK-AREA-MSG msg-wnd-handle-update-work-area
 
@@ -655,7 +671,8 @@
 (defn- create-msg-window [hInstance hook-handler]
   (def class-name "JwnoMsgWinClass")
   (def msg-wndproc-state
-    @{:tooltips @{:current-frame @{:timeout const/DEFAULT-CURRENT-FRAME-TOOLTIP-TIMEOUT}
+    @{:tooltips @{:current-frame @{:timeout const/DEFAULT-CURRENT-FRAME-TOOLTIP-TIMEOUT
+                                   :anchor const/DEFAULT-CURRENT-FRAME-TOOLTIP-ANCHOR}
                   :keymap @{:timeout const/DEFAULT-KEYMAP-TOOLTIP-TIMEOUT}}
       :tooltip-uid-generator (tooltip-uid-generator 0)})
   (def wc
@@ -778,6 +795,13 @@
                            0))
 
 
+(defn ui-manager-set-tooltip-anchor [self tt-id anchor]
+  (ui-manager-post-message self
+                           SET-TOOLTIP-ANCHORS-MSG
+                           (alloc-and-marshal {tt-id anchor})
+                           0))
+
+
 (defn ui-manager-update-work-area [self rect]
   (ui-manager-post-message self
                            UPDATE-WORK-AREA-MSG
@@ -803,6 +827,7 @@
     :show-tooltip ui-manager-show-tooltip
     :hide-tooltip ui-manager-hide-tooltip
     :set-tooltip-timeout ui-manager-set-tooltip-timeout
+    :set-tooltip-anchor ui-manager-set-tooltip-anchor
     :update-work-area ui-manager-update-work-area
     :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
