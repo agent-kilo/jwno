@@ -224,7 +224,7 @@
 (defn cmd-describe-window [wm ui-man]
   (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
     (if (nil? uia-win)
-      (:show-tooltip ui-man "No focused window." 0 0)
+      (:show-tooltip ui-man :describe-window "No focused window.")
       (do
         (def hwnd (:get_CachedNativeWindowHandle uia-win))
         (if-let [win-info (:get-hwnd-info wm hwnd uia-win)]
@@ -234,6 +234,7 @@
               win-info)
             (def rect (:get_CachedBoundingRectangle uia-win))
             (:show-tooltip ui-man
+                           :describe-window
                            (string/format (string/join
                                            ["HWND: %n"
                                             "EXE: %s"
@@ -251,21 +252,15 @@
                            (in rect :left)
                            (in rect :top)))
           (:show-tooltip ui-man
-                         (string/format "Failed to get window info for %n." hwnd)
-                         0 0))))))
+                         :describe-window
+                         (string/format "Failed to get window info for %n." hwnd)))))))
 
 
 (defn cmd-exec [wm ui-man verbose? cli]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (def mon-frame (:get-top-frame cur-frame))
-  (def mon-rect (in mon-frame :rect))
-  (def tt-x (in mon-rect :left))
-  (def tt-y (in mon-rect :top))
-
   (when verbose?
     (:show-tooltip ui-man
-                   (string/format "Running command: %n" cli)
-                   tt-x tt-y))
+                   :exec
+                   (string/format "Running command: %n" cli)))
 
   # ev/spawn So that waiting for the command won't block the main loop
   (ev/spawn
@@ -276,11 +271,11 @@
                      (os/spawn cli :ep env)
                      ((err fib)
                       (:show-tooltip ui-man
+                                     :exec
                                      (string/format "Failed to start command: %n\n%s\n%s"
                                                     cli
                                                     err
-                                                    (get-stack-trace fib))
-                                     tt-x tt-y)
+                                                    (get-stack-trace fib)))
                       nil))]
      # XXX: No limit on the output text
      (def out (:read (in proc :out) :all))
@@ -292,11 +287,11 @@
 
      (when (not= 0 ret)
        (:show-tooltip ui-man
+                      :exec
                       (string/format "Command: %n\nExit code %d:\n%s"
                                      cli
                                      ret
-                                     (string out "\n" err))
-                      tt-x tt-y)))))
+                                     (string out "\n" err)))))))
 
 
 (defn add-default-commands [command-man context]
