@@ -201,7 +201,7 @@
     (try
       (window-manager uia-man ui-man hook-man)
       ((err fib)
-       (show-error-and-exit err 1 (get-stack-trace fib)))))
+       (show-error-and-exit (string err) 1 (get-stack-trace fib)))))
 
   (def repl-server
     (if-let [repl-addr (in cli-args "repl")]
