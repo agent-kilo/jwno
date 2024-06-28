@@ -189,12 +189,12 @@
     # pipes open, blocking Jwno when it exits. Use powershell or cmd
     # to launch the program indirectly in this case.
     (k "win + enter  e" [:exec true
-                         "powershell.exe"
+                         "pwsh.exe"
                          "-Command"
                          "Start-Process runemacs.exe"])
     (k "win + enter  d" [:exec true
                          "wt.exe"
-                         "powershell.exe"
+                         "pwsh.exe"
                          "-NoExit"
                          "-Command"
                          "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"])
@@ -290,7 +290,10 @@
    (fn [win uia-win _exe-path _desktop-info]
      (def class-name (:get_CachedClassName uia-win))
      (cond
-       (= "Emacs" class-name)
+       (find |(= $ class-name)
+             ["Emacs"
+              "ConsoleWindowClass"
+              "CASCADIA_HOSTING_WINDOW_CLASS"])
        (:set-alpha win (math/floor (* 256 0.9)))
 
        (= "#32770" class-name) # Dialog window class
