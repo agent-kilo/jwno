@@ -11,6 +11,7 @@
 (use ./hook)
 (use ./ui)
 (use ./uia)
+(use ./mod)
 (use ./config)
 (use ./util)
 
@@ -203,6 +204,8 @@
       ((err fib)
        (show-error-and-exit (string err) 1 (get-stack-trace fib)))))
 
+  (def module-man (module-manager))
+
   (def repl-server
     (if-let [repl-addr (in cli-args "repl")]
       # context will only get referenced after the main-loop is running
@@ -217,6 +220,7 @@
   (put context :event-sources [(in uia-man :chan) (in ui-man :chan)])
   (put context :key-manager key-man)
   (put context :window-manager window-man)
+  (put context :module-manager module-man)
   (when repl-server
     (put context :repl
        {:server repl-server
