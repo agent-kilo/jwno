@@ -9,6 +9,8 @@
 (use ./resource)
 (use ./util)
 
+(import ./repl)
+(import ./const)
 (import ./log)
 
 
@@ -296,10 +298,26 @@
                                      (string out "\n" err)))))))
 
 
-(defn cmd-repl [repl ui-man]
-  (when (nil? repl)
-    (:show-tooltip ui-man :repl "REPL is not running.")
-    (break))
+(defn cmd-repl [context &opt start? host port]
+  (default start? false)
+  (default host const/DEFAULT-REPL-HOST)
+  (default port const/DEFAULT-REPL-PORT)
+
+  (def existing-repl (in context :repl))
+  (def ui-man (in context :ui-manager))
+
+  (when (nil? existing-repl)
+    (if start?
+      (do
+        (:show-tooltip ui-man :repl "REPL is not running. Trying to start it...")
+        (put context :repl
+           {:server (repl/start-server context host port)
+            :address @[host port]}))
+      (do
+        (:show-tooltip ui-man :repl "REPL is not running.")
+        (break))))
+
+  (def repl (in context :repl))
 
   (def argv (dyn :args))
   (def argv0 (first argv))
@@ -338,7 +356,8 @@
      (fn [verbose? & cli]
        (cmd-exec wm ui-man verbose? cli)))
   (:add-command command-man :repl
-     (fn [] (cmd-repl repl ui-man)))
+     (fn [&opt start? host port]
+       (cmd-repl context start? host port)))
 
   (:add-command command-man :split-frame
      (fn [dir &opt nfr ratios after-split-fn]

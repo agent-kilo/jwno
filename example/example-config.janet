@@ -198,7 +198,7 @@
                          "-NoExit"
                          "-Command"
                          "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"])
-    (k "win + enter  r" :repl)
+    (k "win + enter  r" [:repl true "127.0.0.1" 9999])
 
     (k "win + shift + c" :close-window-or-frame)
     (k "win + shift + f" :close-frame)

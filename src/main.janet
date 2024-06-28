@@ -226,8 +226,9 @@
 
   (main-loop cli-args context)
 
-  (when repl-server
-    (repl/stop-server repl-server))
+  # May be started by commands
+  (when (in context :repl)
+    (repl/stop-server (get-in context [:repl :server])))
   (:destroy window-man)
   (:destroy uia-man)
   (CoUninitialize)
