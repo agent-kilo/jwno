@@ -3,9 +3,6 @@
 (import ./log)
 
 (def- repl-env (make-env))
-(merge-module repl-env (require "jw32/_winuser"))
-(merge-module repl-env (require "jw32/_combaseapi"))
-(merge-module repl-env (require "jw32/_uiautomation"))
 (merge-module repl-env (require "./log") "log/")
 
 
