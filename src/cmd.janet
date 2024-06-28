@@ -1,4 +1,6 @@
+(use jw32/_winbase)
 (use jw32/_winuser)
+(use jw32/_processthreadsapi)
 (use jw32/_errhandlingapi)
 
 (use ./win)
@@ -294,11 +296,37 @@
                                      (string out "\n" err)))))))
 
 
+(defn cmd-repl [repl ui-man]
+  (when (nil? repl)
+    (:show-tooltip ui-man :repl "REPL is not running.")
+    (break))
+
+  (def argv (dyn :args))
+  (def argv0 (first argv))
+  (def env (os/environ))
+
+  (def exe-path (string (QueryFullProcessImageName (GetCurrentProcess) 0)))
+  (def [repl-host repl-port] (in repl :address))
+  (def cmd-path (string (in env "SystemRoot") "\\system32\\cmd.exe"))
+
+  (def repl-cli
+    # Are we running from the source tree?
+    (if (or (string/has-suffix? "/main.janet" argv0)
+            (string/has-suffix? "\\main.janet" argv0))
+      # Call cmd.exe to give the REPL client a new console
+      [cmd-path "/c" "start" exe-path argv0 "-C" "--repl" (string/format "%s:%d" repl-host repl-port)]
+      [cmd-path "/c" "start" exe-path "-C" "--repl" (string/format "%s:%d" repl-host repl-port)]))
+
+  (log/debug "repl-cli = %n" repl-cli)
+  (os/execute repl-cli))
+
+
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
         :uia-manager uia-man
         :key-manager key-man
-        :window-manager wm}
+        :window-manager wm
+        :repl repl}
     context)
 
   (:add-command command-man :quit
@@ -309,6 +337,8 @@
   (:add-command command-man :exec
      (fn [verbose? & cli]
        (cmd-exec wm ui-man verbose? cli)))
+  (:add-command command-man :repl
+     (fn [] (cmd-repl repl ui-man)))
 
   (:add-command command-man :split-frame
      (fn [dir &opt nfr ratios after-split-fn]
