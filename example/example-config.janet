@@ -1,4 +1,13 @@
 #
+# Jwno has a bunch of built-in modules:
+#   jwno/* modules are high-level APIs provided by Jwno, and
+#   jw32/* modules are low-level APIs from the Jw32 package.
+#
+# See the source code in `mod.janet` for a complete list.
+#
+(import jwno/log)
+
+#
 # One may call (log/<level> "format string" arg0 arg1 ...) to generate logs.
 # To see the logs in a console, run Jwno with the `--log-level <level>` flag.
 # Supported levels are: debug, info, warning, error, quiet.
