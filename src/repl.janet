@@ -3,7 +3,6 @@
 (import ./log)
 
 (def- repl-env (make-env))
-(merge-module repl-env (require "./log") "log/")
 
 
 (defn make-repl-env [name stream context]

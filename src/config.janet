@@ -7,7 +7,6 @@
 
 
 (def- config-env (make-env))
-(merge-module config-env (require "./log") "log/")
 
 
 (def repl-addr-peg

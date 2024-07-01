@@ -205,6 +205,7 @@
        (show-error-and-exit (string err) 1 (get-stack-trace fib)))))
 
   (def module-man (module-manager))
+  (:register-loader module-man) # XXX: Too early?
 
   (def repl-server
     (if-let [repl-addr (in cli-args "repl")]
@@ -233,6 +234,7 @@
   # May be started by commands
   (when (in context :repl)
     (repl/stop-server (get-in context [:repl :server])))
+  (:unregister-loader module-man)
   (:destroy window-man)
   (:destroy uia-man)
   (CoUninitialize)
