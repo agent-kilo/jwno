@@ -96,18 +96,12 @@
 
     (with-dyns [:jwno-no-hooks true]
       (while (not= cur-win next-win)
-        (:transform next-win
-                    cur-rect
-                    (merge (in next-win :tags)
-                           {:anchor :top-left}))
+        (:transform next-win cur-rect {:anchor :top-left})
         (:activate window-man next-win)
         (put cur-rect :left (+ (in cur-rect :left) dx))
         (put cur-rect :top (+ (in cur-rect :top) dy))
         (set next-win (:get-next-child cur-frame next-win)))
-      (:transform cur-win
-                  cur-rect
-                  (merge (in cur-win :tags)
-                         {:anchor :top-left}))
+      (:transform cur-win cur-rect {:anchor :top-left})
       (:activate window-man cur-win))))
 
 

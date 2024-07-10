@@ -884,9 +884,12 @@
 
 
 (defn window-transform [self rect &opt tags]
-  (default tags (in self :tags))
+  (default tags @{})
   (def wm (:get-window-manager self))
-  (:transform-hwnd wm (in self :hwnd) rect tags))
+  (:transform-hwnd wm
+                   (in self :hwnd)
+                   rect
+                   (merge (in self :tags) tags)))
 
 
 (defn window-set-alpha [self alpha]
