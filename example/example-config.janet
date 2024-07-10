@@ -96,12 +96,18 @@
 
     (with-dyns [:jwno-no-hooks true]
       (while (not= cur-win next-win)
-        (:transform next-win cur-rect)
+        (:transform next-win
+                    cur-rect
+                    (merge (in next-win :tags)
+                           {:anchor :top-left}))
         (:activate window-man next-win)
         (put cur-rect :left (+ (in cur-rect :left) dx))
         (put cur-rect :top (+ (in cur-rect :top) dy))
         (set next-win (:get-next-child cur-frame next-win)))
-      (:transform cur-win cur-rect)
+      (:transform cur-win
+                  cur-rect
+                  (merge (in cur-win :tags)
+                         {:anchor :top-left}))
       (:activate window-man cur-win))))
 
 
@@ -307,7 +313,9 @@
        (:set-alpha win (math/floor (* 256 0.9)))
 
        (= "#32770" class-name) # Dialog window class
-       (put (in win :tags) :no-expand true))))
+       (do
+         (put (in win :tags) :no-expand true)
+         (put (in win :tags) :anchor :center)))))
 
 (:add-hook hook-man :window-removed
    (fn [dead-win]

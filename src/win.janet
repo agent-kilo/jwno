@@ -44,28 +44,77 @@
   ~(:with-activation-hooks ,wm (fn [] ,;body)))
 
 
-(defn- calc-centered-coords [win-rect fr-rect fit]
+(defn- calc-win-coords-in-frame [win-rect fr-rect fit anchor]
   (def [fr-width fr-height] (rect-size fr-rect))
   (def [win-width win-height] (rect-size win-rect))
 
-  (def x
-    (math/floor
-     (+ (in fr-rect :left)
-        (/ fr-width 2)
-        (/ win-width -2))))
-  (def y
-    (math/floor
-     (+ (in fr-rect :top)
-        (/ fr-height 2)
-        (/ win-height -2))))
+  (def [x y]
+    (cond
+      (= :center anchor)
+      [(math/floor
+        (+ (in fr-rect :left)
+           (/ fr-width 2)
+           (/ win-width -2)))
+       (math/floor
+        (+ (in fr-rect :top)
+           (/ fr-height 2)
+           (/ win-height -2)))]
+
+      (= :left anchor)
+      [(in fr-rect :left)
+       (math/floor
+        (+ (in fr-rect :top)
+           (/ fr-height 2)
+           (/ win-height -2)))]
+
+      (= :right anchor)
+      [(- (in fr-rect :right) win-width)
+       (math/floor
+        (+ (in fr-rect :top)
+           (/ fr-height 2)
+           (/ win-height -2)))]
+
+      (= :top anchor)
+      [(math/floor
+        (+ (in fr-rect :left)
+           (/ fr-width 2)
+           (/ win-width -2)))
+       (in fr-rect :top)]
+
+      (= :bottom anchor)
+      [(math/floor
+        (+ (in fr-rect :left)
+           (/ fr-width 2)
+           (/ win-width -2)))
+       (- (in fr-rect :bottom) win-height)]
+
+      (or (= :top-left anchor)
+          (= :left-top anchor))
+      [(in fr-rect :left)
+       (in fr-rect :top)]
+
+      (or (= :top-right anchor)
+          (= :right-top anchor))
+      [(- (in fr-rect :right) win-width)
+       (in fr-rect :top)]
+
+      (or (= :bottom-left anchor)
+          (= :left-bottom anchor))
+      [(in fr-rect :left)
+       (- (in fr-rect :bottom) win-height)]
+
+      (or (= :bottom-right anchor)
+          (= :right-bottom anchor))
+      [(- (in fr-rect :right) win-width)
+       (- (in fr-rect :bottom) win-height)]
+
+      (errorf "unknown anchor: %n" anchor)))
 
   (if fit
-    (let [[fitted-x fitted-width] (if (< x (in fr-rect :left))
-                                    [(in fr-rect :left) fr-width]
-                                    [x win-width])
-          [fitted-y fitted-height] (if (< y (in fr-rect :top))
-                                     [(in fr-rect :top) fr-height]
-                                     [y win-height])]
+    (let [fitted-x (max x (in fr-rect :left))
+          fitted-width (min win-width fr-width)
+          fitted-y (max y (in fr-rect :top))
+          fitted-height (min win-height fr-height)]
       [fitted-x fitted-y fitted-width fitted-height])
     [x y win-width win-height]))
 
@@ -89,27 +138,20 @@
                    (not= 0 (:get_CachedCanMove pat)))
           (def no-resize (in tags :no-resize))
           (def no-expand (in tags :no-expand))
+          (def anchor (in tags :anchor :top-left))
 
           (cond
-            (= 0 (:get_CachedCanResize pat))
+            (or (= 0 (:get_CachedCanResize pat))
+                no-resize)
             (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-              # Move the window to the frame's center
               (def [x y _w _h]
-                (calc-centered-coords win-rect rect false))
-              (:Move pat x y))
-
-            no-resize
-            (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-              # Move the window to the frame's center
-              (def [x y _w _h]
-                (calc-centered-coords win-rect rect false))
+                (calc-win-coords-in-frame win-rect rect false anchor))
               (:Move pat x y))
 
             no-expand
             (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-              # Move the window to the frame's center
               (def [x y w h]
-                (calc-centered-coords win-rect rect true))
+                (calc-win-coords-in-frame win-rect rect true anchor))
               (:Move pat x y)
               (:Resize pat w h))
 
@@ -841,9 +883,10 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
-(defn window-transform [self rect]
+(defn window-transform [self rect &opt tags]
+  (default tags (in self :tags))
   (def wm (:get-window-manager self))
-  (:transform-hwnd wm (in self :hwnd) rect (in self :tags)))
+  (:transform-hwnd wm (in self :hwnd) rect tags))
 
 
 (defn window-set-alpha [self alpha]
