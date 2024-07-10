@@ -81,28 +81,21 @@
 (:set-tooltip-timeout ui-man :current-frame 1500) # In milliseconds
 
 
-(defn cascade-windows [&opt cur-win]
-  (default cur-win (:get-current-window (in window-man :root)))
+(defn cascade-windows [&opt frame]
+  (default frame (:get-current-frame (in window-man :root)))
 
-  (unless (nil? cur-win)
-    (def cur-frame (in cur-win :parent))
-    (def cur-rect (struct/to-table (in cur-frame :rect)))
-    (def all-wins (in cur-frame :children))
+  (def dx 32)
+  (def dy 32)
+  (def win-stack (:get-window-stack frame))
+  (def cur-rect (struct/to-table (in frame :rect)))
 
-    (def dx 32)
-    (def dy 32)
-
-    (var next-win (:get-next-child cur-frame cur-win))
-
-    (with-dyns [:jwno-no-hooks true]
-      (while (not= cur-win next-win)
-        (:transform next-win cur-rect {:anchor :top-left})
-        (:activate window-man next-win)
-        (put cur-rect :left (+ (in cur-rect :left) dx))
-        (put cur-rect :top (+ (in cur-rect :top) dy))
-        (set next-win (:get-next-child cur-frame next-win)))
-      (:transform cur-win cur-rect {:anchor :top-left})
-      (:activate window-man cur-win))))
+  (reverse! win-stack)
+  (each win win-stack
+    (:transform win cur-rect {:anchor :top-left})
+    (+= (cur-rect :left) dx)
+    (+= (cur-rect :top) dy))
+  # Update frame's window list so that it matches the z-order
+  (put frame :children win-stack))
 
 
 #
