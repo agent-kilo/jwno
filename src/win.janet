@@ -515,6 +515,20 @@
   top-win)
 
 
+(defn tree-node-get-window-stack [self]
+  (def win-set @{})
+  (each w (:get-all-windows self)
+    (put win-set (in w :hwnd) w))
+  (def win-stack @[])
+  (EnumChildWindows nil
+                    (fn [hwnd]
+                      (when-let [w (in win-set hwnd)]
+                        (array/push win-stack w))
+                      1 # !!! IMPORTANT
+                      ))
+  win-stack)
+
+
 (defn tree-node-get-current-window [self]
   (cond
     (= :window (in self :type))
@@ -842,6 +856,7 @@
     :remove-child tree-node-remove-child
     :get-all-windows tree-node-get-all-windows
     :get-top-window tree-node-get-top-window
+    :get-window-stack tree-node-get-window-stack
     :get-current-window tree-node-get-current-window
     :get-current-frame tree-node-get-current-frame
     :get-first-frame tree-node-get-first-frame
