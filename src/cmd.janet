@@ -2,6 +2,7 @@
 (use jw32/_winuser)
 (use jw32/_processthreadsapi)
 (use jw32/_errhandlingapi)
+(use jw32/_util)
 
 (use ./win)
 (use ./uia)
@@ -109,12 +110,18 @@
       (:activate wm adj-fr))))
 
 
-(defn cmd-enum-window-in-frame [wm dir]
+(defn cmd-enum-window-in-frame [wm dir &opt skip-minimized]
+  (default skip-minimized true)
   (def cur-frame (:get-current-frame (in wm :root)))
   (when-let [cur-win (:get-current-window cur-frame)]
-    (def sibling (:enumerate-node cur-frame cur-win dir))
-    (with-activation-hooks wm
-      (:activate wm sibling))))
+    (var sibling (:enumerate-node cur-frame cur-win dir))
+    (when skip-minimized
+      (while (and (not= sibling cur-win)
+                  (not= FALSE (IsIconic (in sibling :hwnd))))
+        (set sibling (:enumerate-node cur-frame sibling dir))))
+    (unless (= sibling cur-win)
+      (with-activation-hooks wm
+        (:activate wm sibling)))))
 
 
 (defn cmd-move-window [wm dir]

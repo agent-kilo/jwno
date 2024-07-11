@@ -119,62 +119,72 @@
     [x y win-width win-height]))
 
 
+(defn- reset-hwnd-visual-state [hwnd uia-com]
+  (with-uia [cr (:CreateCacheRequest uia-com)]
+    (:AddPattern cr UIA_WindowPatternId)
+    (:AddProperty cr UIA_WindowWindowVisualStatePropertyId)
+
+    (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
+      (with-uia [win-pat
+                 (try
+                   (:GetCachedPatternAs uia-win UIA_WindowPatternId IUIAutomationWindowPattern)
+                   ((err fib)
+                    (log/warning "failed to get window pattern for %n: %n%s"
+                                 hwnd
+                                 err
+                                 (get-stack-trace fib))
+                    nil))]
+        (if win-pat
+          (let [old-state (:get_CachedWindowVisualState win-pat)]
+            (when (= WindowVisualState_Maximized old-state)
+              (:SetWindowVisualState win-pat WindowVisualState_Normal))
+            old-state)
+          # XXX: Default to Normal state when failed to get the window pattern
+          WindowVisualState_Normal)))))
+
+
 (defn- transform-hwnd [hwnd rect uia-man &opt tags]
   (default tags @{})
 
   (log/debug "transforming window: %n, rect = %n" hwnd rect)
 
-  (def {:com uia-com
-        :transform-cr cr}
-    uia-man)
-
+  # Code below will restore maximized windows, but ignore minimized windows
+  # before transforming. This feels more natural in practice, since minimized
+  # windows are more like "hidden", but maximized windows are still visible.
   (try
-    (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
-      (with-uia [tran-pat (:GetCachedPatternAs uia-win
-                                               UIA_TransformPatternId
-                                               IUIAutomationTransformPattern)]
-        (with-uia [win-pat (try
-                             # Wrap it again with try here, so that a failed GetCachedPatternAs
-                             # call won't stop the transformation.
-                             (:GetCachedPatternAs uia-win
-                                                  UIA_WindowPatternId
-                                                  IUIAutomationWindowPattern)
-                             ((err fib)
-                              (log/warning "failed to get window pattern for %n: %n%s"
-                                           hwnd
-                                           err
-                                           (get-stack-trace fib))
-                              nil))]
-          (when (and win-pat
-                     (not= WindowVisualState_Normal
-                           (:get_CachedWindowVisualState win-pat)))
-            (:SetWindowVisualState win-pat WindowVisualState_Normal)))
+    (let [{:com uia-com :transform-cr cr} uia-man
+          old-v-state (reset-hwnd-visual-state hwnd uia-com)]
+      (unless (= WindowVisualState_Minimized old-v-state)
+        (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
+          (with-uia [tran-pat (:GetCachedPatternAs uia-win
+                                                   UIA_TransformPatternId
+                                                   IUIAutomationTransformPattern)]
+            (when (and tran-pat
+                       (not= 0 (:get_CachedCanMove tran-pat)))
+              (def no-resize (in tags :no-resize))
+              (def no-expand (in tags :no-expand))
+              (def anchor (in tags :anchor :top-left))
 
-        (when (and tran-pat
-                   (not= 0 (:get_CachedCanMove tran-pat)))
-          (def no-resize (in tags :no-resize))
-          (def no-expand (in tags :no-expand))
-          (def anchor (in tags :anchor :top-left))
+              (cond
+                (or (= 0 (:get_CachedCanResize tran-pat))
+                    no-resize)
+                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+                  (def [x y _w _h]
+                    (calc-win-coords-in-frame win-rect rect false anchor))
+                  (:Move tran-pat x y))
 
-          (cond
-            (or (= 0 (:get_CachedCanResize tran-pat))
-                no-resize)
-            (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-              (def [x y _w _h]
-                (calc-win-coords-in-frame win-rect rect false anchor))
-              (:Move tran-pat x y))
+                no-expand
+                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
+                  (def [x y w h]
+                    (calc-win-coords-in-frame win-rect rect true anchor))
+                  (:Move tran-pat x y)
+                  (:Resize tran-pat w h))
 
-            no-expand
-            (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-              (def [x y w h]
-                (calc-win-coords-in-frame win-rect rect true anchor))
-              (:Move tran-pat x y)
-              (:Resize tran-pat w h))
+                true
+                (do
+                  (:Move tran-pat (in rect :left) (in rect :top))
+                  (:Resize tran-pat ;(rect-size rect)))))))))
 
-            true
-            (do
-              (:Move tran-pat (in rect :left) (in rect :top))
-              (:Resize tran-pat ;(rect-size rect)))))))
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
      (log/error "window transformation failed for %n: %n\n%s"
@@ -406,10 +416,9 @@
 
 (defn- window-purge-pred [win wm layout]
   (def hwnd (in win :hwnd))
-  (def layout-vd-id (in layout :id))
-  (def win-vd-id (get-hwnd-virtual-desktop-id hwnd (in wm :vdm-com)))
-  (or (not= win-vd-id layout-vd-id)
-      (not (:alive? win))))
+  (or (not (:alive? win))
+      (not= (in layout :id)
+            (get-hwnd-virtual-desktop-id hwnd (in wm :vdm-com)))))
 
 
 ######### Generic tree node #########
