@@ -33,7 +33,6 @@
 
 (defmacro is-valid-uia-window? [uia-win]
   ~(and (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsTransformPatternAvailablePropertyId))
-        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_TransformCanMovePropertyId))
         (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsWindowPatternAvailablePropertyId))))
 
 
@@ -319,6 +318,7 @@
       (:AddPattern cr UIA_WindowPatternId)
       (:AddProperty cr UIA_TransformCanMovePropertyId)
       (:AddProperty cr UIA_TransformCanResizePropertyId)
+      (:AddProperty cr UIA_WindowWindowVisualStatePropertyId)
       (:AddProperty cr UIA_BoundingRectanglePropertyId)
       cr))
 

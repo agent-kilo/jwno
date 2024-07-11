@@ -130,35 +130,51 @@
 
   (try
     (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
-      (with-uia [pat (:GetCachedPatternAs uia-win
-                                          UIA_TransformPatternId
-                                          IUIAutomationTransformPattern)]
-        # TODO: restore maximized windows first
-        (when (and pat
-                   (not= 0 (:get_CachedCanMove pat)))
+      (with-uia [tran-pat (:GetCachedPatternAs uia-win
+                                               UIA_TransformPatternId
+                                               IUIAutomationTransformPattern)]
+        (with-uia [win-pat (try
+                             # Wrap it again with try here, so that a failed GetCachedPatternAs
+                             # call won't stop the transformation.
+                             (:GetCachedPatternAs uia-win
+                                                  UIA_WindowPatternId
+                                                  IUIAutomationWindowPattern)
+                             ((err fib)
+                              (log/warning "failed to get window pattern for %n: %n%s"
+                                           hwnd
+                                           err
+                                           (get-stack-trace fib))
+                              nil))]
+          (when (and win-pat
+                     (not= WindowVisualState_Normal
+                           (:get_CachedWindowVisualState win-pat)))
+            (:SetWindowVisualState win-pat WindowVisualState_Normal)))
+
+        (when (and tran-pat
+                   (not= 0 (:get_CachedCanMove tran-pat)))
           (def no-resize (in tags :no-resize))
           (def no-expand (in tags :no-expand))
           (def anchor (in tags :anchor :top-left))
 
           (cond
-            (or (= 0 (:get_CachedCanResize pat))
+            (or (= 0 (:get_CachedCanResize tran-pat))
                 no-resize)
             (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
               (def [x y _w _h]
                 (calc-win-coords-in-frame win-rect rect false anchor))
-              (:Move pat x y))
+              (:Move tran-pat x y))
 
             no-expand
             (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
               (def [x y w h]
                 (calc-win-coords-in-frame win-rect rect true anchor))
-              (:Move pat x y)
-              (:Resize pat w h))
+              (:Move tran-pat x y)
+              (:Resize tran-pat w h))
 
             true
             (do
-              (:Move pat (in rect :left) (in rect :top))
-              (:Resize pat ;(rect-size rect)))))))
+              (:Move tran-pat (in rect :left) (in rect :top))
+              (:Resize tran-pat ;(rect-size rect)))))))
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
      (log/error "window transformation failed for %n: %n\n%s"
