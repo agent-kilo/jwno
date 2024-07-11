@@ -302,7 +302,10 @@
        (= "#32770" class-name) # Dialog window class
        (do
          (put (in win :tags) :no-expand true)
-         (put (in win :tags) :anchor :center)))))
+         (put (in win :tags) :anchor :center))
+
+       true
+       (put (in win :tags) :anchor :center))))
 
 (:add-hook hook-man :window-removed
    (fn [dead-win]
