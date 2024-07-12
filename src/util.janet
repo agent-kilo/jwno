@@ -1,6 +1,8 @@
 (use jw32/_winuser)
 
 
+################## Misc. Tools ##################
+
 (defn show-error-and-exit [msg exit-code &opt stack-trace]
   (MessageBox nil
               (if stack-trace
@@ -43,3 +45,46 @@
               :err-color false]
     (debug/stacktrace fib))
   err-buf)
+
+
+################## Calculations ##################
+
+(defmacro rect-width [rect]
+  ~(- (in ,rect :right) (in ,rect :left)))
+
+(defmacro rect-height [rect]
+  ~(- (in ,rect :bottom) (in ,rect :top)))
+
+(defmacro rect-size [rect]
+  ~[(- (in ,rect :right) (in ,rect :left))
+    (- (in ,rect :bottom) (in ,rect :top))])
+
+
+################## Hook Helpers ##################
+
+(defmacro with-activation-hooks [wm & body]
+  ~(:with-activation-hooks ,wm (fn [] ,;body)))
+
+
+################## UIAutomation Helpers ##################
+
+(def- DEBUG-REF-COUNT false)
+(var- with-uia-dtor-fn nil)
+(if DEBUG-REF-COUNT
+  (set with-uia-dtor-fn
+       ~(fn [x]
+          (unless (nil? x)
+            (def refc (:Release x))
+            (log/debug "++++ After releasing %n, ref count = %n, stack:\n%s"
+                       x
+                       refc
+                       (get-stack-trace (fiber/current))))))
+  (set with-uia-dtor-fn
+       ~(fn [x]
+          (unless (nil? x)
+            (:Release x)))))
+
+(defmacro with-uia [[binding ctor dtor] & body]
+  ~(do
+     (def ,binding ,ctor)
+     ,(apply defer [(or dtor with-uia-dtor-fn) binding] body)))

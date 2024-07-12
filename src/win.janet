@@ -26,24 +26,6 @@
 
 ######### Helpers #########
 
-(defmacro rect-width [rect]
-  ~(- (in ,rect :right) (in ,rect :left)))
-
-
-(defmacro rect-height [rect]
-  ~(- (in ,rect :bottom) (in ,rect :top)))
-
-
-(defmacro rect-size [rect]
-  ~[(- (in ,rect :right) (in ,rect :left))
-    (- (in ,rect :bottom) (in ,rect :top))])
-
-
-# XXX: Not available in the REPL or config env
-(defmacro with-activation-hooks [wm & body]
-  ~(:with-activation-hooks ,wm (fn [] ,;body)))
-
-
 (defn- calc-win-coords-in-frame [win-rect fr-rect fit anchor]
   (def [fr-width fr-height] (rect-size fr-rect))
   (def [win-width win-height] (rect-size win-rect))

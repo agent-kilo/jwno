@@ -344,8 +344,8 @@
     (log/error "GetWindowRect failed for tooltip window %n" tt-hwnd)
     (break))
 
-  (def tt-width (- (in rect :right) (in rect :left)))
-  (def tt-height (- (in rect :bottom) (in rect :top)))
+  (def [tt-width tt-height] (rect-size rect))
+
   (def [adjusted-x adjusted-y]
     (cond
       (or (= :top-left anchor)
@@ -391,8 +391,7 @@
 
 
 (defn- get-tooltip-default-position [work-area anchor]
-  (def wa-width (- (in work-area :right) (in work-area :left)))
-  (def wa-height (- (in work-area :bottom) (in work-area :top)))
+  (def [wa-width wa-height] (rect-size work-area))
 
   (cond
     (or (= :top-left anchor)
