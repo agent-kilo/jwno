@@ -2,6 +2,8 @@
 (use jw32/_winuser)
 (use jw32/_processthreadsapi)
 (use jw32/_errhandlingapi)
+(use jw32/_combaseapi)
+(use jw32/_uiautomation)
 (use jw32/_util)
 
 (use ./win)
@@ -196,24 +198,37 @@
   (:retile wm))
 
 
-(defn cmd-close-window [wm]
-  (def cur-win (:get-current-window (in wm :root)))
-  (when (nil? cur-win)
-    (break))
-  (with-activation-hooks wm
-    (:close cur-win)))
+(defn cmd-close-window [wm ui-man]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+    (if uia-win
+      (with-uia [win-pat (:GetCurrentPatternAs uia-win
+                                               UIA_WindowPatternId
+                                               IUIAutomationWindowPattern)]
+        (with-activation-hooks wm
+          (:Close win-pat)))
+      # else
+      (:show-tooltip ui-man :close-window "No focused window."))))
 
 
-(defn cmd-close-window-or-frame [wm]
-  (def root (in wm :root))
-  (def cur-frame (:get-current-frame root))
-  (with-activation-hooks wm
-    (if-let [cur-win (:get-current-window cur-frame)]
-      (:close cur-win)
-      (do
-        (:close cur-frame)
-        (:retile wm)
-        (:activate wm (:get-current-window root))))))
+(defn cmd-close-window-or-frame [wm ui-man]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+    (if uia-win
+      (with-uia [win-pat (:GetCurrentPatternAs uia-win
+                                               UIA_WindowPatternId
+                                               IUIAutomationWindowPattern)]
+        (with-activation-hooks wm
+          (:Close win-pat)))
+      # else
+      (let [root (in wm :root)
+            cur-frame (:get-current-frame root)]
+        (if-let [cur-win (:get-current-window cur-frame)]
+          # The current window lost focus, do nothing
+          (:show-tooltip ui-man :close-window "No focused window.")
+          # The frame is empty, assume that we want to close it
+          (with-activation-hooks wm
+            (:close cur-frame)
+            (:retile wm)
+            (:activate wm (:get-current-window root))))))))
 
 
 (defn cmd-change-window-alpha [wm delta]
@@ -394,12 +409,12 @@
   (:add-command command-man :move-window
      (fn [dir] (cmd-move-window wm dir)))
   (:add-command command-man :close-window
-     (fn [] (cmd-close-window wm)))
+     (fn [] (cmd-close-window wm ui-man)))
   (:add-command command-man :change-window-alpha
      (fn [delta] (cmd-change-window-alpha wm delta)))
 
   (:add-command command-man :close-window-or-frame
-     (fn [] (cmd-close-window-or-frame wm)))
+     (fn [] (cmd-close-window-or-frame wm ui-man)))
 
   (:add-command command-man :describe-window
      (fn [] (cmd-describe-window wm ui-man))))
