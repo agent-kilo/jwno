@@ -5,6 +5,7 @@
 #
 # See the source code in `mod.janet` for a complete list.
 #
+(import jwno/util)
 (import jwno/log)
 
 #
@@ -311,9 +312,8 @@
    (fn [dead-win]
      (def parent (in dead-win :parent))
      (when (empty? (in parent :children))
-       (:with-activation-hooks
-          window-man
-          (fn [] (:close parent)))
+       (util/with-activation-hooks window-man
+         (:close parent))
        (:retile window-man))))
 
 
