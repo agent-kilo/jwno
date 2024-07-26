@@ -207,7 +207,16 @@
         (with-activation-hooks wm
           (:Close win-pat)))
       # else
-      (:show-tooltip ui-man :close-window "No focused window."))))
+      (if-let [root (in wm :root)
+               cur-win (:get-current-window root)]
+        (let [fg-hwnd (GetForegroundWindow)]
+          (if (= fg-hwnd (in cur-win :hwnd))
+            # The current window is minimized or invisible, but somehow it
+            # got the focus. Try to close it anyway.
+            (:close cur-win)
+            # The current window lost focus, do nothing
+            (:show-tooltip ui-man :close-window "No focused window.")))
+        (:show-tooltip ui-man :close-window "No focused window.")))))
 
 
 (defn cmd-close-window-or-frame [wm ui-man]
@@ -222,8 +231,13 @@
       (let [root (in wm :root)
             cur-frame (:get-current-frame root)]
         (if-let [cur-win (:get-current-window cur-frame)]
-          # The current window lost focus, do nothing
-          (:show-tooltip ui-man :close-window "No focused window.")
+          (let [fg-hwnd (GetForegroundWindow)]
+            (if (= fg-hwnd (in cur-win :hwnd))
+              # The current window is minimized or invisible, but somehow it
+              # got the focus. Try to close it anyway.
+              (:close cur-win)
+              # The current window lost focus, do nothing
+              (:show-tooltip ui-man :close-window "No focused window.")))
           # The frame is empty, assume that we want to close it
           (with-activation-hooks wm
             (:close cur-frame)
