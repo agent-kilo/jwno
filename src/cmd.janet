@@ -152,16 +152,27 @@
 
 (defn cmd-zoom-in [wm ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (def cur-top (:get-top-frame cur-frame))
-  (unless (= cur-frame cur-top)
-    (def top-rect (:get-padded-rect cur-top))
-    (def top-width (- (in top-rect :right) (in top-rect :left)))
-    (def top-height (- (in top-rect :bottom) (in top-rect :top)))
+  (def parent-frame
+    (if-let [parent (in cur-frame :parent)]
+      (if (= :frame (in parent :type))
+        parent)))
+  (def gp-frame
+    (if parent-frame
+      (if-let [gp (in parent-frame :parent)]
+        (if (= :frame (in gp :type))
+          gp))))
+  (def ref-frame
+    (if gp-frame
+      gp-frame
+      parent-frame))
+  (when ref-frame
+    (def ref-rect (:get-padded-rect ref-frame))
+    (def [ref-width ref-height] (rect-size ref-rect))
     (:resize cur-frame
              {:left 0
               :top 0
-              :right (math/floor (* ratio top-width))
-              :bottom (math/floor (* ratio top-height))})
+              :right (math/floor (* ratio ref-width))
+              :bottom (math/floor (* ratio ref-height))})
     (:retile wm)))
 
 

@@ -122,6 +122,7 @@
     (k (in dir-keys :right) [:resize-frame 100 0])
     (k "=" :balance-frames)
     (k ";" [:zoom-in 0.7])
+    (k "shift + ;" [:zoom-in 0.3])
     #
     # In a transient key map, make sure a :pop-keymap binding is defined,
     # or there will be no way to deactivate this key map.
@@ -211,6 +212,7 @@
     (k "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split])
     (k "win + =" :balance-frames)
     (k "win + ;" [:zoom-in 0.7])
+    (k "win + shift + ;" [:zoom-in 0.3])
     (k "win + f" :fill-monitor)
 
     (k "win + p" :peek-frame)
