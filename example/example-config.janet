@@ -88,7 +88,7 @@
   (def dx 32)
   (def dy 32)
   (def win-stack (:get-window-stack frame))
-  (def cur-rect (struct/to-table (in frame :rect)))
+  (def cur-rect (struct/to-table (:get-padded-rect frame)))
 
   (reverse! win-stack)
   (each win win-stack
@@ -292,6 +292,9 @@
 
 (:add-hook hook-man :window-created
    (fn [win uia-win _exe-path _desktop-info]
+     (put (in win :tags) :margins
+        {:top 10 :left 3 :bottom 3 :right 3})
+
      (def class-name (:get_CachedClassName uia-win))
      (cond
        (find |(= $ class-name)
@@ -316,6 +319,11 @@
          (:close parent))
        (:retile window-man))))
 
+(:add-hook hook-man :layout-created
+   (fn [layout]
+     (each fr (in layout :children)
+       (put (in fr :tags):padding 10))))
+
 
 #
 # You can easily define your own command. When defining key maps,
@@ -332,5 +340,5 @@
      (when cur-win
        (def cur-frame (in cur-win :parent))
        (def mon-frame (:get-top-frame cur-frame))
-       (def rect (in mon-frame :rect))
+       (def rect (:get-padded-rect mon-frame))
        (:transform cur-win rect))))

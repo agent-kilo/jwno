@@ -153,14 +153,16 @@
 (defn cmd-zoom-in [wm ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-top (:get-top-frame cur-frame))
-  (def mon-width (- (get-in cur-top [:rect :right]) (get-in cur-top [:rect :left])))
-  (def mon-height (- (get-in cur-top [:rect :bottom]) (get-in cur-top [:rect :top])))
-  (:resize cur-frame
-           {:left 0
-            :top 0
-            :right (math/floor (* ratio mon-width))
-            :bottom (math/floor (* ratio mon-height))})
-  (:retile wm))
+  (unless (= cur-frame cur-top)
+    (def top-rect (:get-padded-rect cur-top))
+    (def top-width (- (in top-rect :right) (in top-rect :left)))
+    (def top-height (- (in top-rect :bottom) (in top-rect :top)))
+    (:resize cur-frame
+             {:left 0
+              :top 0
+              :right (math/floor (* ratio top-width))
+              :bottom (math/floor (* ratio top-height))})
+    (:retile wm)))
 
 
 (defn cmd-balance-frames [wm]
@@ -194,7 +196,10 @@
   (when (nil? win-rect)
     (break))
 
-  (:resize cur-frame win-rect)
+  (:resize cur-frame
+           (-> win-rect
+               (expand-rect (:get-margins cur-win))
+               (expand-rect (:get-paddings cur-frame))))
   (:retile wm))
 
 
@@ -281,14 +286,16 @@
                                             "Name: %s"
                                             "Class Name: %s"
                                             "Virtual Desktop Name: %s"
-                                            "Virtual Desktop ID: %s"]
+                                            "Virtual Desktop ID: %s"
+                                            "Rect: %n"]
                                            "\n")
                                           hwnd
                                           exe-path
                                           (:get_CachedName uia-win)
                                           (:get_CachedClassName uia-win)
                                           (in desktop-info :name)
-                                          (in desktop-info :id))
+                                          (in desktop-info :id)
+                                          rect)
                            (in rect :left)
                            (in rect :top)))
           (:show-tooltip ui-man

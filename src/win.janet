@@ -125,6 +125,16 @@
           WindowVisualState_Normal)))))
 
 
+(defn- get-margins-or-paddings-from-tags [tags key dkey]
+  (if-let [v (in tags dkey)]
+    v
+    (let [v (in tags key 0)]
+      {:top v
+       :left v
+       :bottom v
+       :right v})))
+
+
 (defn- transform-hwnd [hwnd orig-rect uia-man &opt tags]
   (default tags @{})
 
@@ -146,13 +156,7 @@
               (def no-resize (in tags :no-resize))
               (def no-expand (in tags :no-expand))
               (def anchor (in tags :anchor :top-left))
-              (def margins
-                (if-let [m (in tags :margin)]
-                  {:top m
-                   :left m
-                   :bottom m
-                   :right m}
-                  (in tags :margins {})))
+              (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
               (def rect (shrink-rect orig-rect margins))
 
               (cond
@@ -953,6 +957,10 @@
   (:get-hwnd-info wm (in self :hwnd)))
 
 
+(defn window-get-margins [self]
+  (get-margins-or-paddings-from-tags (in self :tags) :margin :margins))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
@@ -964,7 +972,8 @@
      :get-exe-path window-get-exe-path
      :get-uia-element window-get-uia-element
      :get-virtual-desktop window-get-virtual-desktop
-     :get-info window-get-info}
+     :get-info window-get-info
+     :get-margins window-get-margins}
    tree-node-proto))
 
 
@@ -992,7 +1001,7 @@
       (slice ratios 0 (- n 1))
       ratios))
 
-  (let [[width height] (rect-size (in self :rect))]
+  (let [[width height] (rect-size (:get-padded-rect self))]
     (def new-rects
       (case direction
         :horizontal
@@ -1039,7 +1048,7 @@
 
     true
     (let [child-count (length all-children)
-          [width height] (rect-size (in self :rect))
+          [width height] (rect-size (:get-padded-rect self))
           balanced-len (math/floor (/ (cond
                                         (= vertical-frame-proto (table/getproto self)) height
                                         (= horizontal-frame-proto (table/getproto self)) width)
@@ -1081,6 +1090,7 @@
 
 (defn frame-transform [self new-rect]
   (def old-rect (in self :rect))
+  (def old-padded-rect (:get-padded-rect self))
   (put self :rect new-rect)
 
   (def all-children (in self :children))
@@ -1101,7 +1111,7 @@
           dh (+ (- dy)
                 (- (in new-rect :bottom)
                    (in old-rect :bottom)))
-          [old-width old-height] (rect-size old-rect)]
+          [old-width old-height] (rect-size old-padded-rect)]
       (def calc-fn
         (cond
           (= horizontal-frame-proto (table/getproto self))
@@ -1133,9 +1143,10 @@
 
   (let [all-siblings (in parent :children)
         parent-rect (in parent :rect)
+        parent-padded-rect (:get-padded-rect parent)
         [old-width old-height] (rect-size (in self :rect))
         [new-width new-height] (rect-size new-rect)
-        [parent-width parent-height] (rect-size parent-rect)
+        [parent-width parent-height] (rect-size parent-padded-rect)
         dw (- new-width old-width)
         dh (- new-height old-height)
         avail-h (- parent-height old-height)
@@ -1198,7 +1209,7 @@
         (= :window (in (first children) :type)))
     (let [all-siblings (in parent :children)
           [width height] (rect-size (in self :rect))
-          [parent-width parent-height] (rect-size (in parent :rect))]
+          [parent-width parent-height] (rect-size (:get-padded-rect parent))]
       (if (> (length all-siblings) 2)
         (do
           (:remove-child parent self)
@@ -1301,6 +1312,14 @@
       (:sync-current-window c))))
 
 
+(defn frame-get-paddings [self]
+  (get-margins-or-paddings-from-tags (in self :tags) :padding :paddings))
+
+
+(defn frame-get-padded-rect [self]
+  (shrink-rect (in self :rect) (:get-paddings self)))
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
@@ -1309,7 +1328,9 @@
         :transform frame-transform
         :resize frame-resize
         :close frame-close
-        :sync-current-window frame-sync-current-window}
+        :sync-current-window frame-sync-current-window
+        :get-paddings frame-get-paddings
+        :get-padded-rect frame-get-padded-rect}
       tree-node-proto))
 
 
@@ -1322,7 +1343,7 @@
 
 
 (defn vertical-frame-calculate-sub-rects [self h-fn &opt count]
-  (def rect (in self :rect))
+  (def rect (:get-padded-rect self))
   (var cur-y (in rect :top))
   (var bottom (in rect :bottom))
   (def left (in rect :left))
@@ -1361,7 +1382,7 @@
 
 
 (defn horizontal-frame-calculate-sub-rects [self w-fn &opt count]
-  (def rect (in self :rect))
+  (def rect (:get-padded-rect self))
   (var cur-x (in rect :left))
   (var right (in rect :right))
   (def top (in rect :top))
@@ -1591,7 +1612,7 @@
   (:add-child frame-found new-win)
   (:transform-hwnd self
                    (in new-win :hwnd)
-                   (in frame-found :rect)
+                   (:get-padded-rect frame-found)
                    (in new-win :tags))
   new-win)
 
@@ -1693,7 +1714,7 @@
       (each w (in fr :children)
         (:transform-hwnd self
                          (in w :hwnd)
-                         (in fr :rect)
+                         (:get-padded-rect fr)
                          (in w :tags)))
 
       (or (= :frame (get-in fr [:children 0 :type]))
