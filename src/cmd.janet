@@ -126,6 +126,23 @@
         (:activate wm sibling)))))
 
 
+(defn cmd-cascade-windows-in-frame [wm &opt dx dy]
+  (default dx 32)
+  (default dy dx)
+
+  (def frame (:get-current-frame (in wm :root)))
+  (def win-stack (:get-window-stack frame))
+  (def cur-rect (struct/to-table (:get-padded-rect frame)))
+
+  (reverse! win-stack)
+  (each win win-stack
+    (:transform win cur-rect {:anchor :top-left})
+    (+= (cur-rect :left) dx)
+    (+= (cur-rect :top) dy))
+  # Update frame's window list so that it matches the z-order
+  (put frame :children win-stack))
+
+
 (defn cmd-move-window [wm dir]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
@@ -437,6 +454,8 @@
 
   (:add-command command-man :enum-window-in-frame
      (fn [dir] (cmd-enum-window-in-frame wm dir)))
+  (:add-command command-man :cascade-windows-in-frame
+     (fn [&opt dx dy] (cmd-cascade-windows-in-frame wm dx dy)))
 
   (:add-command command-man :move-window
      (fn [dir] (cmd-move-window wm dir)))

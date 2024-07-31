@@ -82,23 +82,6 @@
 (:set-tooltip-timeout ui-man :current-frame 1500) # In milliseconds
 
 
-(defn cascade-windows [&opt frame]
-  (default frame (:get-current-frame (in window-man :root)))
-
-  (def dx 32)
-  (def dy 32)
-  (def win-stack (:get-window-stack frame))
-  (def cur-rect (struct/to-table (:get-padded-rect frame)))
-
-  (reverse! win-stack)
-  (each win win-stack
-    (:transform win cur-rect {:anchor :top-left})
-    (+= (cur-rect :left) dx)
-    (+= (cur-rect :top) dy))
-  # Update frame's window list so that it matches the z-order
-  (put frame :children win-stack))
-
-
 #
 # A macro to simplify key map definitions. Of course you can call
 # :define-key method from the keymap object directly instead.
@@ -215,7 +198,7 @@
     (k "win + shift + ;" [:zoom-in 0.3])
     (k "win + f" :fill-monitor)
 
-    (k "win + p" :peek-frame)
+    (k "win + p" :cascade-windows-in-frame)
 
     (k (string "win + " (in dir-keys :down)) [:enum-frame :next])
     (k (string "win + " (in dir-keys :up)) [:enum-frame :prev])
@@ -333,9 +316,6 @@
 # require arguments, or simply `:command-name` for commands without
 # any argument.
 #
-(:add-command command-man :peek-frame
-   (fn [] (cascade-windows)))
-
 (:add-command command-man :fill-monitor
    (fn []
      (def cur-win (:get-current-window (in window-man :root)))
