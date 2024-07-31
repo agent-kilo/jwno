@@ -176,7 +176,39 @@
     (:split dummy-frame :vertical 2 [0.5])
     ((err fib)
      (assert (= err "cannot create zero-height frames"))))
-  (assert (= (length (in dummy-frame :children)) 0)))
+  (assert (= (length (in dummy-frame :children)) 0))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put (in dummy-frame :tags) :padding 9)
+  (:split dummy-frame :horizontal)
+  (assert (= 2 (length (in dummy-frame :children))))
+  (let [rect0 (get-in dummy-frame [:children 0 :rect])
+        rect1 (get-in dummy-frame [:children 1 :rect])]
+    (assert (= 19 (in rect0 :top)))
+    (assert (= 19 (in rect0 :left)))
+    (assert (= 101 (in rect0 :bottom)))
+    (assert (= 60 (in rect0 :right)))
+
+    (assert (= 19 (in rect1 :top)))
+    (assert (= 60 (in rect1 :left)))
+    (assert (= 101 (in rect1 :bottom)))
+    (assert (= 101 (in rect1 :right))))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put (in dummy-frame :tags) :paddings {:top 9 :left 8 :bottom 7 :right 6})
+  (:split dummy-frame :vertical)
+  (assert (= 2 (length (in dummy-frame :children))))
+  (let [rect0 (get-in dummy-frame [:children 0 :rect])
+        rect1 (get-in dummy-frame [:children 1 :rect])]
+    (assert (= 19 (in rect0 :top)))
+    (assert (= 18 (in rect0 :left)))
+    (assert (= 61 (in rect0 :bottom)))
+    (assert (= 104 (in rect0 :right)))
+
+    (assert (= 61 (in rect1 :top)))
+    (assert (= 18 (in rect1 :left)))
+    (assert (= 103 (in rect1 :bottom)))
+    (assert (= 104 (in rect1 :right)))))
 
 
 (defn test-tree-node-activate []
@@ -297,7 +329,47 @@
   (assert (= 10 (get-in dummy-sub-frame2 [:rect :top])))
   (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
   (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
-  (assert (= 100 (get-in dummy-sub-frame2 [:rect :right]))))
+  (assert (= 100 (get-in dummy-sub-frame2 [:rect :right])))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put (in dummy-frame :tags) :padding 9)
+  (table/setproto dummy-frame horizontal-frame-proto)
+  (set dummy-sub-frame1 (frame {:top 19 :left 19 :bottom 101 :right 60}))
+  (set dummy-sub-frame2 (frame {:top 19 :left 60 :bottom 101 :right 101}))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+
+  (:transform dummy-frame {:top 13 :left 20 :bottom 107 :right 100})
+
+  (assert (= 22 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 29 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 98 (get-in dummy-sub-frame1 [:rect :bottom])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:rect :right])))
+
+  (assert (= 22 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 98 (get-in dummy-sub-frame2 [:rect :bottom])))
+  (assert (= 91 (get-in dummy-sub-frame2 [:rect :right])))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put (in dummy-frame :tags) :paddings {:top 9 :left 8 :bottom 7 :right 6})
+  (table/setproto dummy-frame vertical-frame-proto)
+  (set dummy-sub-frame1 (frame {:top 19 :left 18 :bottom 61 :right 104}))
+  (set dummy-sub-frame2 (frame {:top 61 :left 18 :bottom 103 :right 104}))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+
+  (:transform dummy-frame {:top 13 :left 20 :bottom 107 :right 100})
+
+  (assert (= 22 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 28 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 61 (get-in dummy-sub-frame1 [:rect :bottom])))
+  (assert (= 94 (get-in dummy-sub-frame1 [:rect :right])))
+
+  (assert (= 61 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 28 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 100 (get-in dummy-sub-frame2 [:rect :bottom])))
+  (assert (= 94 (get-in dummy-sub-frame2 [:rect :right]))))
 
 
 (defn test-layout-get-adjacent-frame []
