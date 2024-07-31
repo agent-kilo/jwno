@@ -1316,7 +1316,8 @@
 (varfn frame [rect &opt parent children]
   (default children @[])
   (let [node (tree-node :frame parent children
-                        :rect rect)]
+                        :rect rect
+                        :tags @{})]
     (table/setproto node frame-proto)))
 
 
@@ -1478,6 +1479,7 @@
   (if layout-found
     (:get-current-frame layout-found)
     (let [new-layout (:new-layout self desktop-info)]
+      (:call-hook (in self :hook-manager) :layout-created new-layout)
       (:add-child self new-layout)
       (:get-current-frame new-layout))))
 
@@ -1499,10 +1501,11 @@
    tree-node-proto))
 
 
-(defn virtual-desktop-container [wm &opt children]
+(defn virtual-desktop-container [wm hook-man &opt children]
   (default children @[])
   (def vdc-obj (tree-node :virtual-desktop-container nil children
-                          :window-manager wm))
+                          :window-manager wm
+                          :hook-manager hook-man))
   (table/setproto vdc-obj virtual-desktop-container-proto))
 
 
@@ -1837,7 +1840,7 @@
        :ui-man ui-man
        :hook-manager hook-man}
      window-manager-proto))
-  (put wm-obj :root (virtual-desktop-container wm-obj))
+  (put wm-obj :root (virtual-desktop-container wm-obj hook-man))
 
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path desktop-info]
