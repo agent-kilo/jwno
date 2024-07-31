@@ -136,9 +136,13 @@
 
   (reverse! win-stack)
   (each win win-stack
-    (:transform win cur-rect {:anchor :top-left})
-    (+= (cur-rect :left) dx)
-    (+= (cur-rect :top) dy))
+    (def hwnd (in win :hwnd))
+    (unless (or (= FALSE (IsWindow hwnd))
+                (= FALSE (IsWindowVisible hwnd))
+                (not= FALSE (IsIconic hwnd)))
+      (:transform win cur-rect {:anchor :top-left})
+      (+= (cur-rect :left) dx)
+      (+= (cur-rect :top) dy)))
   # Update frame's window list so that it matches the z-order
   (put frame :children win-stack))
 
