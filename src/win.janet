@@ -125,10 +125,10 @@
           WindowVisualState_Normal)))))
 
 
-(defn- transform-hwnd [hwnd rect uia-man &opt tags]
+(defn- transform-hwnd [hwnd orig-rect uia-man &opt tags]
   (default tags @{})
 
-  (log/debug "transforming window: %n, rect = %n" hwnd rect)
+  (log/debug "transforming window: %n, orig-rect = %n" hwnd orig-rect)
 
   # Code below will restore maximized windows, but ignore minimized windows
   # before transforming. This feels more natural in practice, since minimized
@@ -146,6 +146,14 @@
               (def no-resize (in tags :no-resize))
               (def no-expand (in tags :no-expand))
               (def anchor (in tags :anchor :top-left))
+              (def margins
+                (if-let [m (in tags :margin)]
+                  {:top m
+                   :left m
+                   :bottom m
+                   :right m}
+                  (in tags :margins {})))
+              (def rect (shrink-rect orig-rect margins))
 
               (cond
                 (or (= 0 (:get_CachedCanResize tran-pat))

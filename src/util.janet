@@ -59,6 +59,26 @@
   ~[(- (in ,rect :right) (in ,rect :left))
     (- (in ,rect :bottom) (in ,rect :top))])
 
+(defn shrink-rect [rect amounts]
+  (def top (+ (in rect :top) (in amounts :top 0)))
+  (def bottom (- (in rect :bottom) (in amounts :bottom 0)))
+  (def left (+ (in rect :left) (in amounts :left 0)))
+  (def right (- (in rect :right) (in amounts :right 0)))
+  {:top top
+   :left left
+   :bottom (if (< bottom top) top bottom)
+   :right (if (< right left) left right)})
+
+(defn expand-rect [rect amounts]
+  (def top (- (in rect :top) (in amounts :top 0)))
+  (def bottom (+ (in rect :bottom) (in amounts :bottom 0)))
+  (def left (- (in rect :left) (in amounts :left 0)))
+  (def right (+ (in rect :right) (in amounts :right 0)))
+  {:top top
+   :left left
+   :bottom (if (< bottom top) top bottom)
+   :right (if (< right left) left right)})
+
 
 ################## Hook Helpers ##################
 
