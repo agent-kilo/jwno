@@ -1,4 +1,5 @@
 (use ../src/uia)
+(use ../src/util)
 
 
 (defn test-with-uia []
