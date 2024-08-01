@@ -961,6 +961,24 @@
   (get-margins-or-paddings-from-tags (in self :tags) :margin :margins))
 
 
+(defn window-get-dwm-border-margins [self &opt uia-win]
+  (def hwnd (in self :hwnd))
+
+  (def outer-rect
+    (if uia-win
+      (:get_CachedBoundingRectangle uia-win)
+      (let [[ret rect] (GetWindowRect hwnd)]
+        (when (= FALSE ret)
+          (errorf "failed to get bounding rectangle for %n" hwnd))
+        rect)))
+  (def inner-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+
+  {:top (- (in outer-rect :top) (in inner-rect :top))
+   :left (- (in outer-rect :left) (in inner-rect :left))
+   :bottom (- (in inner-rect :bottom) (in outer-rect :bottom))
+   :right (- (in inner-rect :right) (in outer-rect :right))})
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
@@ -973,7 +991,8 @@
      :get-uia-element window-get-uia-element
      :get-virtual-desktop window-get-virtual-desktop
      :get-info window-get-info
-     :get-margins window-get-margins}
+     :get-margins window-get-margins
+     :get-dwm-border-margins window-get-dwm-border-margins}
    tree-node-proto))
 
 

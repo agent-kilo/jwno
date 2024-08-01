@@ -277,8 +277,8 @@
 
 (:add-hook hook-man :window-created
    (fn [win uia-win _exe-path _desktop-info]
-     (put (in win :tags) :margins
-        {:top 10 :left 3 :bottom 3 :right 3})
+     (def margins (:get-dwm-border-margins win uia-win))
+     (put (in win :tags) :margins margins)
 
      (def class-name (:get_CachedClassName uia-win))
      (cond
