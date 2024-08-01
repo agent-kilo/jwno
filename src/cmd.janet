@@ -177,23 +177,62 @@
     (if-let [parent (in cur-frame :parent)]
       (if (= :frame (in parent :type))
         parent)))
-  (def gp-frame
-    (if parent-frame
-      (if-let [gp (in parent-frame :parent)]
-        (if (= :frame (in gp :type))
-          gp))))
-  (def ref-frame
-    (if gp-frame
-      gp-frame
-      parent-frame))
-  (when ref-frame
-    (def ref-rect (:get-padded-rect ref-frame))
-    (def [ref-width ref-height] (rect-size ref-rect))
+  (var next-frame
+       (if parent-frame
+         (in parent-frame :parent)))
+  (var ortho-frame nil)
+  (while (and next-frame
+              (= :frame (in next-frame :type)))
+    (unless (= (table/getproto parent-frame)
+               (table/getproto next-frame))
+      (set ortho-frame next-frame))
+    (set next-frame (in next-frame :parent)))
+
+  (def parent-rect
+    (when parent-frame
+      (:get-padded-rect parent-frame)))
+  (def ortho-rect
+    (when ortho-frame
+      (:get-padded-rect ortho-frame)))
+
+  (def [cur-width cur-height]
+    (rect-size (in cur-frame :rect)))
+
+  (def [new-width new-height]
+    (cond
+      (and ortho-rect parent-rect)
+      (let [[parent-width parent-height] (rect-size parent-rect)
+            [ortho-width ortho-height] (rect-size ortho-rect)]
+        (cond
+          (> parent-width cur-width) # parent is horizontal
+          [(math/floor (* ratio parent-width))
+           (math/floor (* ratio ortho-height))]
+
+          (> parent-height cur-height) # parent is vertical
+          [(math/floor (* ratio ortho-width))
+           (math/floor (* ratio parent-height))]))
+
+      parent-rect # ortho-frame not found
+      (let [[parent-width parent-height] (rect-size parent-rect)]
+        (cond
+          (> parent-width cur-width)
+          [(math/floor (* ratio parent-width))
+           parent-height]
+
+          (> parent-height cur-height)
+          [parent-width
+           (math/floor (* ratio parent-height))]))
+
+      true
+      [cur-width cur-height]))
+
+  (unless (and (= new-width cur-width)
+               (= new-height cur-height))
     (:resize cur-frame
              {:left 0
               :top 0
-              :right (math/floor (* ratio ref-width))
-              :bottom (math/floor (* ratio ref-height))})
+              :right new-width
+              :bottom new-height})
     (:retile wm)))
 
 
