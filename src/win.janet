@@ -125,6 +125,22 @@
           WindowVisualState_Normal)))))
 
 
+(defn get-hwnd-dwm-border-margins [hwnd &opt uia-win]
+  (def outer-rect
+    (if uia-win
+      (:get_CachedBoundingRectangle uia-win)
+      (let [[ret rect] (GetWindowRect hwnd)]
+        (when (= FALSE ret)
+          (errorf "failed to get bounding rectangle for %n" hwnd))
+        rect)))
+  (def inner-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+
+  {:top (- (in outer-rect :top) (in inner-rect :top))
+   :left (- (in outer-rect :left) (in inner-rect :left))
+   :bottom (- (in inner-rect :bottom) (in outer-rect :bottom))
+   :right (- (in inner-rect :right) (in outer-rect :right))})
+
+
 (defn- get-margins-or-paddings-from-tags [tags key dkey]
   (if-let [v (in tags dkey)]
     v
@@ -156,8 +172,13 @@
               (def no-resize (in tags :no-resize))
               (def no-expand (in tags :no-expand))
               (def anchor (in tags :anchor :top-left))
+              # These margin values are in "physical pixels." They're already scaled
+              # according to the monitor's DPI.
+              (def dwm-margins (get-hwnd-dwm-border-margins hwnd uia-win))
               (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
-              (def rect (shrink-rect orig-rect margins))
+              (def rect (-> orig-rect
+                            (shrink-rect dwm-margins)
+                            (shrink-rect margins)))
 
               (cond
                 (or (= 0 (:get_CachedCanResize tran-pat))
@@ -963,20 +984,7 @@
 
 (defn window-get-dwm-border-margins [self &opt uia-win]
   (def hwnd (in self :hwnd))
-
-  (def outer-rect
-    (if uia-win
-      (:get_CachedBoundingRectangle uia-win)
-      (let [[ret rect] (GetWindowRect hwnd)]
-        (when (= FALSE ret)
-          (errorf "failed to get bounding rectangle for %n" hwnd))
-        rect)))
-  (def inner-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
-
-  {:top (- (in outer-rect :top) (in inner-rect :top))
-   :left (- (in outer-rect :left) (in inner-rect :left))
-   :bottom (- (in inner-rect :bottom) (in outer-rect :bottom))
-   :right (- (in inner-rect :right) (in outer-rect :right))})
+  (get-hwnd-dwm-border-margins hwnd uia-win))
 
 
 (def- window-proto
