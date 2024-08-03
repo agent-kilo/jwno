@@ -303,10 +303,9 @@
          (:close parent))
        (:retile window-man))))
 
-(:add-hook hook-man :layout-created
-   (fn [layout]
-     (each fr (in layout :children)
-       (put (in fr :tags) :padding 10))))
+(:add-hook hook-man :monitor-updated
+   (fn [frame]
+     (put (in frame :tags) :padding 10)))
 
 
 #

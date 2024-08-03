@@ -1452,11 +1452,15 @@
   (def fr-count (length top-frames))
   (def wa-count (length work-areas))
 
+  (def hook-man (in (:get-window-manager self) :hook-manager))
+
   (cond
     (= fr-count wa-count)
     # Only the resolutions or monitor configurations are changed
     (map (fn [fr wa]
-           (:transform fr wa))
+           (unless (= wa (in fr :rect))
+             (:transform fr wa)
+             (:call-hook hook-man :monitor-updated fr)))
          top-frames
          work-areas)
 
@@ -1467,7 +1471,9 @@
           orphan-windows @[]]
       (var main-fr (first alive-frames))
       (map (fn [fr wa]
-             (:transform fr wa)
+             (unless (= wa (in fr :rect))
+               (:transform fr wa)
+               (:call-hook hook-man :monitor-updated fr))
              # Find the frame closest to the origin
              (when (< (+ (math/abs (in wa :top))
                          (math/abs (in wa :left)))
@@ -1491,11 +1497,14 @@
           new-was (slice work-areas fr-count)
           new-frames (map |(frame $) new-was)]
       (map (fn [fr wa]
-             (:transform fr wa))
+             (unless (= wa (in fr :rect))
+               (:transform fr wa)
+               (:call-hook hook-man :monitor-updated fr)))
            top-frames
            old-was)
       (each fr new-frames
-        (:add-child self fr)))))
+        (:add-child self fr)
+        (:call-hook hook-man :monitor-updated fr)))))
 
 
 (def- layout-proto
@@ -1527,7 +1536,6 @@
   (if layout-found
     (:get-current-frame layout-found)
     (let [new-layout (:new-layout self desktop-info)]
-      (:call-hook (in self :hook-manager) :layout-created new-layout)
       (:add-child self new-layout)
       (:get-current-frame new-layout))))
 
@@ -1539,6 +1547,9 @@
   (def new-layout (layout id name nil (map |(frame $) work-areas)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
+  (each fr (in new-layout :children)
+    (:call-hook (in self :hook-manager) :monitor-updated fr))
+  (:call-hook (in self :hook-manager) :layout-created new-layout)
   new-layout)
 
 
