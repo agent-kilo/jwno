@@ -29,7 +29,7 @@
      (match msg
        [:ui/initialized thread-id msg-hwnd]
        (let [default-config-file-path (string (get-exe-dir) const/DEFAULT-CONFIG-FILE-NAME)
-             paths (in cli-args "config")
+             paths (or (in cli-args "config") (in cli-args :default))
              config-file-paths (if (or (nil? paths) (empty? paths))
                                  [default-config-file-path]
                                  paths)

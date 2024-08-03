@@ -39,6 +39,10 @@
   (argparse
    "Jwno: A Tiling Window Manager for Windows"
 
+   :default
+   {:help (string "\nThe config file to run. Default: " default-config-file-path "\n")
+    :kind :accumulate}
+
    "config"
    {:short "c"
     :help (string "\nThe config file to run. Default: " default-config-file-path "\n")
@@ -67,7 +71,6 @@
    "log-file"
    {:help "\nSpecifies a log file to write to. No log file will be generated if this option is omitted.\n"
     :kind :option}
-
    ))
 
 
