@@ -172,9 +172,13 @@
               (def no-resize (in tags :no-resize))
               (def no-expand (in tags :no-expand))
               (def anchor (in tags :anchor :top-left))
-              # These margin values are in "physical pixels." They're already scaled
+              # These DWM margin values are in "physical pixels." They're already scaled
               # according to the monitor's DPI.
               (def dwm-margins (get-hwnd-dwm-border-margins hwnd uia-win))
+              # TODO: Scale custom margins/paddings according to monitor DPI? Currently
+              # margins and paddings are in "physical pixels," so the window gaps will
+              # always have the same physical pixel size on any DPI. This may make the
+              # gaps seem out of proportion under high DPI settings.
               (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
               (def rect (-> orig-rect
                             (shrink-rect dwm-margins)
