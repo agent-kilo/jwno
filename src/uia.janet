@@ -199,34 +199,7 @@
       (:SetFocus uia-win))))
 
 
-(defn uia-manager-destroy [self]
-  (def {:com uia-com
-        :root root
-        :deinit-fns deinit-fns
-        :focus-cr focus-cr
-        :transform-cr transform-cr
-        :control-view-walker control-view-walker}
-    self)
-  (each df deinit-fns
-    (df))
-  (:Release control-view-walker)
-  (:Release focus-cr)
-  (:Release transform-cr)
-  (:Release root)
-  (:Release uia-com))
-
-
-(def- uia-manager-proto
-  @{:get-root uia-manager-get-root
-    :get-parent-window uia-manager-get-parent-window
-    :get-focused-window uia-manager-get-focused-window
-    :get-window-info uia-manager-get-window-info
-    :get-window-bounding-rect uia-manager-get-window-bounding-rect
-    :set-focus-to-window uia-manager-set-focus-to-window
-    :destroy uia-manager-destroy})
-
-
-(defn uia-init-event-handlers [uia-com element chan]
+(defn- init-event-handlers [uia-com element chan]
   (def window-opened-handler
     # Can't use `with` here, or there will be a "can't marshal alive fiber" error
     (let [cr (:CreateCacheRequest uia-com)]
@@ -264,6 +237,48 @@
         focus-changed-handler))])
 
 
+(defn uia-manager-init-event-handlers [self]
+  (when (in self :deinit-fns)
+    (error "uiautomation event handlers already initialized"))
+
+  (def {:com uia-com
+        :root root
+        :chan chan}
+    self)
+  (def deinit-fns
+    (init-event-handlers uia-com root chan))
+  (put self :deinit-fns deinit-fns))
+
+
+(defn uia-manager-destroy [self]
+  (def {:com uia-com
+        :root root
+        :deinit-fns deinit-fns
+        :focus-cr focus-cr
+        :transform-cr transform-cr
+        :control-view-walker control-view-walker}
+    self)
+  (when deinit-fns
+    (each df deinit-fns
+      (df)))
+  (:Release control-view-walker)
+  (:Release focus-cr)
+  (:Release transform-cr)
+  (:Release root)
+  (:Release uia-com))
+
+
+(def- uia-manager-proto
+  @{:get-root uia-manager-get-root
+    :get-parent-window uia-manager-get-parent-window
+    :get-focused-window uia-manager-get-focused-window
+    :get-window-info uia-manager-get-window-info
+    :get-window-bounding-rect uia-manager-get-window-bounding-rect
+    :set-focus-to-window uia-manager-set-focus-to-window
+    :init-event-handlers uia-manager-init-event-handlers
+    :destroy uia-manager-destroy})
+
+
 (defn uia-manager []
   (def chan (ev/thread-chan const/DEFAULT-CHAN-LIMIT))
 
@@ -275,9 +290,6 @@
     (with-uia [cr (:CreateCacheRequest uia-com)]
       (:AddProperty cr UIA_NativeWindowHandlePropertyId)
       (:GetRootElementBuildCache uia-com cr)))
-
-  (def deinit-fns
-    (uia-init-event-handlers uia-com root chan))
 
   (def focus-cr
     (let [cr (:CreateCacheRequest uia-com)]
@@ -305,7 +317,7 @@
   (table/setproto
    @{:com uia-com
      :root root
-     :deinit-fns deinit-fns
+     :deinit-fns nil # Initialized in uia-manager-init-event-handlers
      :focus-cr focus-cr
      :transform-cr transform-cr
      :control-view-walker control-view-walker

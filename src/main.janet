@@ -46,7 +46,10 @@
                                 err
                                 (get-stack-trace fib)))
               nil)))
-         (log/debug "config-env = %n" config-env))
+         (log/debug "config-env = %n" config-env)
+         # Only proceed after the config file is successfully loaded
+         (when config-env
+           (:init-event-handlers (in context :uia-manager))))
 
        :ui/display-changed
        (let [wm (in context :window-manager)
