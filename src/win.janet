@@ -151,6 +151,23 @@
        :right v})))
 
 
+(def USER_DEFAULT_SCREEN_DPI 96)
+
+
+(defn- calc-pixel-scale [rect]
+  (def hmon (MonitorFromRect rect MONITOR_DEFAULTTONULL))
+  (def [dpi-x dpi-y]
+    (if (null? hmon)
+      (errorf "failed to get monitor info for rect: %n" rect)
+      # GetDpiForWindow will always return 96 for windows that are not
+      # DPI-aware, which is incorrect for DWM border size calculation.
+      # Have to use GetDpiForMonitor here instead.
+      (GetDpiForMonitor hmon MDT_DEFAULT)))
+  # int/u64 doesn't support floating point arithmetic, thus int/to-number
+  [(/ (int/to-number dpi-x) USER_DEFAULT_SCREEN_DPI)
+   (/ (int/to-number dpi-y) USER_DEFAULT_SCREEN_DPI)])
+
+
 (defn- transform-hwnd [hwnd orig-rect uia-man &opt tags]
   (default tags @{})
 
@@ -172,17 +189,49 @@
               (def no-resize (in tags :no-resize))
               (def no-expand (in tags :no-expand))
               (def anchor (in tags :anchor :top-left))
-              # These DWM margin values are in "physical pixels." They're already scaled
-              # according to the monitor's DPI.
-              (def dwm-margins (get-hwnd-dwm-border-margins hwnd uia-win))
-              # TODO: Scale custom margins/paddings according to monitor DPI? Currently
-              # margins and paddings are in "physical pixels," so the window gaps will
-              # always have the same physical pixel size on any DPI. This may make the
-              # gaps seem out of proportion under high DPI settings.
+
+              (def [scale-x scale-y] (calc-pixel-scale orig-rect))
+              (log/debug "scale-x = %n, scale-y = %n" scale-x scale-y)
               (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
-              (def rect (-> orig-rect
-                            (shrink-rect dwm-margins)
-                            (shrink-rect margins)))
+              (log/debug "margins = %n" margins)
+              (def scaled-margins
+                (if (and (= 1 scale-x) (= 1 scale-y))
+                  margins
+                  {:top (* scale-y (in margins :top))
+                   :left (* scale-x (in margins :left))
+                   :bottom (* scale-y (in margins :bottom))
+                   :right (* scale-x (in margins :right))}))
+              (log/debug "scaled-margins = %n" scaled-margins)
+
+              (def [cur-scale-x cur-scale-y] (calc-pixel-scale (:get_CachedBoundingRectangle uia-win)))
+              (log/debug "cur-scale-x = %n, cur-scale-y = %n" cur-scale-x cur-scale-y)
+              # These DWM margin values are in "physical pixels." They're already scaled
+              # according to the current monitor's DPI, but we need to re-scale them in
+              # case the window is moving to another monitor with different DPI.
+              (def dwm-margins (get-hwnd-dwm-border-margins hwnd uia-win))
+              (log/debug "dwm-margins = %n" dwm-margins)
+              (def scaled-dwm-margins
+                (if (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
+                  dwm-margins
+                  {:top (* scale-y (/ (in dwm-margins :top) cur-scale-y))
+                   :left (* scale-x (/ (in dwm-margins :left) cur-scale-x))
+                   :bottom (* scale-y (/ (in dwm-margins :bottom) cur-scale-y))
+                   :right (* scale-x (/ (in dwm-margins :right) cur-scale-x))}))
+              (log/debug "scaled-dwm-margins = %n" scaled-dwm-margins)
+
+              (def combined-margins
+                {:top (math/trunc (+ (in scaled-dwm-margins :top)
+                                     (in scaled-margins :top)))
+                 :left (math/trunc (+ (in scaled-dwm-margins :left)
+                                      (in scaled-margins :left)))
+                 :bottom (math/trunc (+ (in scaled-dwm-margins :bottom)
+                                        (in scaled-margins :bottom)))
+                 :right (math/trunc (+ (in scaled-dwm-margins :right)
+                                       (in scaled-margins :right)))})
+              (log/debug "combined-margins = %n" combined-margins)
+
+              (def rect (shrink-rect orig-rect combined-margins))
+              (log/debug "final rect = %n" rect)
 
               (cond
                 (or (= 0 (:get_CachedCanResize tran-pat))
@@ -200,9 +249,18 @@
                   (:Resize tran-pat w h))
 
                 true
-                (do
-                  (:Move tran-pat (in rect :left) (in rect :top))
-                  (:Resize tran-pat ;(rect-size rect)))))))))
+                (let [x (in rect :left)
+                      y (in rect :top)
+                      [w h] (rect-size rect)]
+                  (:Move tran-pat x y)
+                  (:Resize tran-pat w h)
+                  # XXX: UIAutomation (or something else inside Windows UI code)
+                  # does weird scaling stuff when moving windows across monitors
+                  # with different DPIs, regardless of our DPI-awareness setting. 
+                  # Re-positioning the window SEEMS to solve the problem.
+                  (unless (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
+                    (:Move tran-pat x y)
+                    (:Resize tran-pat w h)))))))))
 
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
@@ -1348,7 +1406,15 @@
 
 
 (defn frame-get-padded-rect [self]
-  (shrink-rect (in self :rect) (:get-paddings self)))
+  (def rect (in self :rect))
+  (def [scale-x scale-y] (calc-pixel-scale rect))
+  (def paddings (:get-paddings self))
+  (def scaled-paddings
+    {:top (math/trunc (* scale-y (in paddings :top)))
+     :left (math/trunc (* scale-x (in paddings :left)))
+     :bottom (math/trunc (* scale-y (in paddings :bottom)))
+     :right (math/trunc (* scale-x (in paddings :right)))})
+  (shrink-rect rect scaled-paddings))
 
 
 (set frame-proto
@@ -1462,9 +1528,11 @@
     (= fr-count wa-count)
     # Only the resolutions or monitor configurations are changed
     (map (fn [fr wa]
-           (unless (= wa (in fr :rect))
-             (:transform fr wa)
-             (:call-hook hook-man :monitor-updated fr)))
+           # When the work area remained the same, the DPI value for
+           # this monitor may have changed, so we always transform this
+           # frame to update paddings etc.
+           (:transform fr wa)
+           (:call-hook hook-man :monitor-updated fr))
          top-frames
          work-areas)
 
@@ -1475,9 +1543,8 @@
           orphan-windows @[]]
       (var main-fr (first alive-frames))
       (map (fn [fr wa]
-             (unless (= wa (in fr :rect))
-               (:transform fr wa)
-               (:call-hook hook-man :monitor-updated fr))
+             (:transform fr wa)
+             (:call-hook hook-man :monitor-updated fr)
              # Find the frame closest to the origin
              (when (< (+ (math/abs (in wa :top))
                          (math/abs (in wa :left)))
@@ -1501,9 +1568,8 @@
           new-was (slice work-areas fr-count)
           new-frames (map |(frame $) new-was)]
       (map (fn [fr wa]
-             (unless (= wa (in fr :rect))
-               (:transform fr wa)
-               (:call-hook hook-man :monitor-updated fr)))
+             (:transform fr wa)
+             (:call-hook hook-man :monitor-updated fr))
            top-frames
            old-was)
       (each fr new-frames
