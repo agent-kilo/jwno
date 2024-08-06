@@ -203,7 +203,8 @@
                    :right (* scale-x (in margins :right))}))
               (log/debug "scaled-margins = %n" scaled-margins)
 
-              (def [cur-scale-x cur-scale-y] (calc-pixel-scale (:get_CachedBoundingRectangle uia-win)))
+              (def [cur-scale-x cur-scale-y]
+                (calc-pixel-scale (:get_CachedBoundingRectangle uia-win)))
               (log/debug "cur-scale-x = %n, cur-scale-y = %n" cur-scale-x cur-scale-y)
               # These DWM margin values are in "physical pixels." They're already scaled
               # according to the current monitor's DPI, but we need to re-scale them in
@@ -220,17 +221,11 @@
               (log/debug "scaled-dwm-margins = %n" scaled-dwm-margins)
 
               (def combined-margins
-                {:top (math/trunc (+ (in scaled-dwm-margins :top)
-                                     (in scaled-margins :top)))
-                 :left (math/trunc (+ (in scaled-dwm-margins :left)
-                                      (in scaled-margins :left)))
-                 :bottom (math/trunc (+ (in scaled-dwm-margins :bottom)
-                                        (in scaled-margins :bottom)))
-                 :right (math/trunc (+ (in scaled-dwm-margins :right)
-                                       (in scaled-margins :right)))})
+                (combine-rect-border-space scaled-dwm-margins
+                                           scaled-margins))
               (log/debug "combined-margins = %n" combined-margins)
 
-              (def rect (shrink-rect orig-rect combined-margins))
+              (def rect (shrink-rect orig-rect combined-margins math/trunc))
               (log/debug "final rect = %n" rect)
 
               (cond
@@ -1040,8 +1035,23 @@
   (:get-hwnd-info wm (in self :hwnd)))
 
 
-(defn window-get-margins [self]
-  (get-margins-or-paddings-from-tags (in self :tags) :margin :margins))
+(defn window-get-margins [self &opt scaled filter-fn]
+  (default scaled true)
+  (default filter-fn identity)
+
+  (def margins
+    (get-margins-or-paddings-from-tags (in self :tags) :margin :margins))
+  (if scaled
+    (let [hwnd (in self :hwnd)
+          [ret win-rect] (GetWindowRect hwnd)
+          [scale-x scale-y] (calc-pixel-scale win-rect)]
+      (when (= ret FALSE)
+        (errorf "failed to get bounding rect for window %n" hwnd))
+      {:top (filter-fn (* scale-y (in margins :top)))
+       :left (filter-fn (* scale-x (in margins :left)))
+       :bottom (filter-fn (* scale-y (in margins :bottom)))
+       :right (filter-fn (* scale-x (in margins :right)))})
+    margins))
 
 
 (defn window-get-dwm-border-margins [self &opt uia-win]
@@ -1401,20 +1411,27 @@
       (:sync-current-window c))))
 
 
-(defn frame-get-paddings [self]
-  (get-margins-or-paddings-from-tags (in self :tags) :padding :paddings))
+(defn frame-get-paddings [self &opt scaled filter-fn]
+  (default scaled true)
+  (default filter-fn identity)
+
+  (def paddings
+    (get-margins-or-paddings-from-tags (in self :tags) :padding :paddings))
+  (if scaled
+    (let [rect (in self :rect)
+          [scale-x scale-y] (calc-pixel-scale rect)]
+      {:top (filter-fn (* scale-y (in paddings :top)))
+       :left (filter-fn (* scale-x (in paddings :left)))
+       :bottom (filter-fn (* scale-y (in paddings :bottom)))
+       :right (filter-fn (* scale-x (in paddings :right)))})
+    paddings))
 
 
-(defn frame-get-padded-rect [self]
-  (def rect (in self :rect))
-  (def [scale-x scale-y] (calc-pixel-scale rect))
-  (def paddings (:get-paddings self))
-  (def scaled-paddings
-    {:top (math/trunc (* scale-y (in paddings :top)))
-     :left (math/trunc (* scale-x (in paddings :left)))
-     :bottom (math/trunc (* scale-y (in paddings :bottom)))
-     :right (math/trunc (* scale-x (in paddings :right)))})
-  (shrink-rect rect scaled-paddings))
+(defn frame-get-padded-rect [self &opt scaled]
+  (default scaled true)
+
+  (def paddings (:get-paddings self scaled))
+  (shrink-rect (in self :rect) paddings math/trunc))
 
 
 (set frame-proto

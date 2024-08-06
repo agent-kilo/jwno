@@ -4,6 +4,7 @@
 (use jw32/_errhandlingapi)
 (use jw32/_combaseapi)
 (use jw32/_uiautomation)
+(use jw32/_dwmapi)
 (use jw32/_util)
 
 (use ./win)
@@ -256,21 +257,21 @@
       (:activate wm (:get-current-window root)))))
 
 
-(defn cmd-frame-to-window-size [wm uia-man]
+(defn cmd-frame-to-window-size [wm]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (when (nil? cur-win)
     (break))
 
   (def win-rect
-    (:get-window-bounding-rect uia-man (in cur-win :hwnd)))
-  (when (nil? win-rect)
-    (break))
+    (DwmGetWindowAttribute (in cur-win :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS))
+
+  (def border-space
+    (combine-rect-border-space (:get-margins cur-win)
+                               (:get-paddings cur-frame)))
 
   (:resize cur-frame
-           (-> win-rect
-               (expand-rect (:get-margins cur-win))
-               (expand-rect (:get-paddings cur-frame))))
+           (expand-rect win-rect border-space math/trunc))
   (:retile wm))
 
 
@@ -484,7 +485,7 @@
   (:add-command command-man :close-frame
      (fn [] (cmd-close-frame wm)))
   (:add-command command-man :frame-to-window-size
-     (fn [] (cmd-frame-to-window-size wm uia-man)))
+     (fn [] (cmd-frame-to-window-size wm)))
   (:add-command command-man :balance-frames
      (fn [] (cmd-balance-frames wm)))
   (:add-command command-man :zoom-in
