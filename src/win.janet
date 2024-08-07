@@ -234,28 +234,25 @@
                 (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
                   (def [x y _w _h]
                     (calc-win-coords-in-frame win-rect rect false anchor))
-                  (:Move tran-pat x y))
+                  (SetWindowPos hwnd nil x y 0 0 (bor SWP_NOSIZE SWP_NOZORDER SWP_NOACTIVATE)))
 
                 no-expand
                 (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
                   (def [x y w h]
                     (calc-win-coords-in-frame win-rect rect true anchor))
-                  (:Move tran-pat x y)
-                  (:Resize tran-pat w h))
+                  (SetWindowPos hwnd nil x y w h (bor SWP_NOZORDER SWP_NOACTIVATE)))
 
                 true
                 (let [x (in rect :left)
                       y (in rect :top)
                       [w h] (rect-size rect)]
-                  (:Move tran-pat x y)
-                  (:Resize tran-pat w h)
-                  # XXX: UIAutomation (or something else inside Windows UI code)
-                  # does weird scaling stuff when moving windows across monitors
-                  # with different DPIs, regardless of our DPI-awareness setting. 
-                  # Re-positioning the window SEEMS to solve the problem.
-                  (unless (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
-                    (:Move tran-pat x y)
-                    (:Resize tran-pat w h)))))))))
+                  # This was achieved by separate calls to :Move and :Resize methods
+                  # from the tran-pat object. But, when moving windows between monitors
+                  # with different DPIs, the first :Move call may generate a WM_DPICHANGED
+                  # message for the target window, then the following :Resize call will
+                  # scale w and h incorrectly. It seems SetWindowPos doesn't have that
+                  # problem because it moves and resizes the target window at the same time.
+                  (SetWindowPos hwnd nil x y w h (bor SWP_NOZORDER SWP_NOACTIVATE)))))))))
 
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
