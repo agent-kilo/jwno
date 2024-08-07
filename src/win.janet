@@ -252,6 +252,18 @@
                   # message for the target window, then the following :Resize call will
                   # scale w and h incorrectly. It seems SetWindowPos doesn't have that
                   # problem because it moves and resizes the target window at the same time.
+                  #
+                  # There's another issue though. (Tested on Windows 10 build 19045.4651)
+                  # DPI-unaware (and system DPI-aware?) windows would NOT respect the geometries
+                  # passed to SetWindowPos, if any part of the target rect (i.e. the transformed
+                  # window) would appear on another monitor with different DPI. For example,
+                  # there are two monitors, Monitor A is of 96 DPI, and monitor B 144. If
+                  # SetWindowPos would transform a DPI-unaware window such that the window will
+                  # mainly be displayed on monitor A, but has its right-most column of pixels
+                  # (even the pixels from the invisible border added by the shell) shown on
+                  # monitor B, it will re-calculate (?) its own geometries and use those.
+                  # To remedy this issue, margins or paddings should be added around DPI-unaware
+                  # windows, to keep their invisible borders clear from the edges of monitors.
                   (SetWindowPos hwnd nil x y w h (bor SWP_NOZORDER SWP_NOACTIVATE)))))))))
 
     ((err fib)
