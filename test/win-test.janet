@@ -387,7 +387,16 @@
              (get-in dummy-frame [:children 1])))
   (assert (nil? (:get-adjacent-frame (get-in dummy-frame [:children 2]) :right)))
   (assert (nil? (:get-adjacent-frame (get-in dummy-frame [:children 0]) :up)))
-  (assert (nil? (:get-adjacent-frame (get-in dummy-frame [:children 0]) :down))))
+  (assert (nil? (:get-adjacent-frame (get-in dummy-frame [:children 0]) :down)))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-frame2 (frame {:top 10 :left -90 :bottom 110 :right 10}))
+  (set dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame dummy-frame2]))
+
+  (assert (= (:get-adjacent-frame dummy-frame :left)
+             dummy-frame2))
+  (assert (= (:get-adjacent-frame dummy-frame2 :right)
+             dummy-frame)))
 
 
 (defn main [&]

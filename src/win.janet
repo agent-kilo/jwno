@@ -819,31 +819,53 @@
                  idx
                  (error "inconsistent states for frame tree"))]
     (var adj-fr nil)
-    (case dir
-      :left
-      (loop [i :down-to [(- fr-idx 1) 0]]
-        (def sibling (in all-siblings i))
-        (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)
-          (break)))
-      :right
-      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
-        (def sibling (in all-siblings i))
-        (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
-          (set adj-fr sibling)
-          (break)))
-      :up
-      (loop [i :down-to [(- fr-idx 1) 0]]
-        (def sibling (in all-siblings i))
-        (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling)
-          (break)))
-      :down
-      (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
-        (def sibling (in all-siblings i))
-        (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
-          (set adj-fr sibling)
-          (break))))
+
+    (if (not= :layout (in parent :type))
+      (case dir
+        :left
+         (loop [i :down-to [(- fr-idx 1) 0]]
+           (def sibling (in all-siblings i))
+           (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+             (set adj-fr sibling)
+             (break)))
+         :right
+         (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+           (def sibling (in all-siblings i))
+           (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+             (set adj-fr sibling)
+             (break)))
+         :up
+         (loop [i :down-to [(- fr-idx 1) 0]]
+           (def sibling (in all-siblings i))
+           (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+             (set adj-fr sibling)
+             (break)))
+         :down
+         (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
+           (def sibling (in all-siblings i))
+           (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+             (set adj-fr sibling)
+             (break))))
+
+      # Children of layout objects are not sorted
+      (do
+        (def [node-dist-prop sib-dist-prop cmp-op]
+          (case dir
+            :left [:left :right >=]
+            :right [:right :left <=]
+            :up [:top :bottom >=]
+            :down [:bottom :top <=]))
+        (var min-dist math/int-max)
+        (each sibling all-siblings
+          (def sib-prop-val (get-in sibling [:rect sib-dist-prop]))
+          (def node-prop-val (get-in node [:rect node-dist-prop]))
+          (when (and (not= sibling node)
+                     (cmp-op node-prop-val sib-prop-val ))
+            (def cur-dist (math/abs (- node-prop-val sib-prop-val)))
+            (when (< cur-dist min-dist)
+              (set min-dist cur-dist)
+              (set adj-fr sibling)
+              (break))))))
 
     (if adj-fr
       (get-adjacent-frame-impl-descent orig-node adj-fr dir)
