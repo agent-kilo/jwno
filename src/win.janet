@@ -168,6 +168,22 @@
    (/ (int/to-number dpi-y) USER_DEFAULT_SCREEN_DPI)])
 
 
+(defn- set-window-pos [hwnd x y w h &opt scaled]
+  (default scaled false)
+
+  (def flags
+    (if (or (<= w 0) (<= h 0))
+      (bor SWP_NOZORDER SWP_NOACTIVATE SWP_NOSIZE)
+      (bor SWP_NOZORDER SWP_NOACTIVATE)))
+  (SetWindowPos hwnd nil x y w h flags)
+  # XXX: I couldn't work out why SetWindowPos sometimes wouldn't respect
+  # the x, y, w and h values when moving windows between monitors with
+  # different DPIs (besides the DPI-unaware window's case described in
+  # transform-hwnd), but calling it again SEEMED to fix it.
+  (when scaled
+    (SetWindowPos hwnd nil x y w h flags)))
+
+
 (defn- transform-hwnd [hwnd orig-rect uia-man &opt tags]
   (default tags @{})
 
@@ -228,19 +244,23 @@
               (def rect (shrink-rect orig-rect combined-margins math/trunc))
               (log/debug "final rect = %n" rect)
 
+              (def scaled
+                (or (not= scale-x cur-scale-x)
+                    (not= scale-y cur-scale-y)))
+
               (cond
                 (or (= 0 (:get_CachedCanResize tran-pat))
                     no-resize)
                 (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
                   (def [x y _w _h]
                     (calc-win-coords-in-frame win-rect rect false anchor))
-                  (SetWindowPos hwnd nil x y 0 0 (bor SWP_NOSIZE SWP_NOZORDER SWP_NOACTIVATE)))
+                  (set-window-pos hwnd x y 0 0 scaled))
 
                 no-expand
                 (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
                   (def [x y w h]
                     (calc-win-coords-in-frame win-rect rect true anchor))
-                  (SetWindowPos hwnd nil x y w h (bor SWP_NOZORDER SWP_NOACTIVATE)))
+                  (set-window-pos hwnd x y w h scaled))
 
                 true
                 (let [x (in rect :left)
@@ -260,11 +280,11 @@
                   # there are two monitors, Monitor A is of 96 DPI, and monitor B 144. If
                   # SetWindowPos would transform a DPI-unaware window such that the window will
                   # mainly be displayed on monitor A, but has its right-most column of pixels
-                  # (even the pixels from the invisible border added by the shell) shown on
+                  # (the pixels from the invisible border added by the shell) shown on
                   # monitor B, it will re-calculate (?) its own geometries and use those.
                   # To remedy this issue, margins or paddings should be added around DPI-unaware
                   # windows, to keep their invisible borders clear from the edges of monitors.
-                  (SetWindowPos hwnd nil x y w h (bor SWP_NOZORDER SWP_NOACTIVATE)))))))))
+                  (set-window-pos hwnd x y w h scaled))))))))
 
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
