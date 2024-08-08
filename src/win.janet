@@ -1469,8 +1469,11 @@
   (def paddings
     (get-margins-or-paddings-from-tags (in self :tags) :padding :paddings))
   (if scaled
-    (let [rect (in self :rect)
-          [scale-x scale-y] (calc-pixel-scale rect)]
+    (let [top-fr (:get-top-frame self)
+          mon (in top-fr :monitor)
+          [dpi-x dpi-y] (in mon :dpi)
+          [scale-x scale-y] [(/ dpi-x USER_DEFAULT_SCREEN_DPI)
+                             (/ dpi-y USER_DEFAULT_SCREEN_DPI)]]
       {:top (filter-fn (* scale-y (in paddings :top)))
        :left (filter-fn (* scale-x (in paddings :left)))
        :bottom (filter-fn (* scale-y (in paddings :bottom)))
@@ -1585,42 +1588,45 @@
    frame-proto))
 
 
-(defn layout-update-work-areas [self work-areas]
+(defn layout-update-work-areas [self monitors]
   (def top-frames (in self :children))
   (def fr-count (length top-frames))
-  (def wa-count (length work-areas))
+  (def mon-count (length monitors))
 
   (def hook-man (in (:get-window-manager self) :hook-manager))
 
   (cond
-    (= fr-count wa-count)
+    (= fr-count mon-count)
     # Only the resolutions or monitor configurations are changed
-    (map (fn [fr wa]
+    (map (fn [fr mon]
            # When the work area remained the same, the DPI value for
            # this monitor may have changed, so we always transform this
            # frame to update paddings etc.
-           (:transform fr wa)
+           (:transform fr (in mon :work-area))
+           (put fr :monitor mon)
            (:call-hook hook-man :monitor-updated fr))
          top-frames
-         work-areas)
+         monitors)
 
-    (> fr-count wa-count)
+    (> fr-count mon-count)
     # Some of the monitors got unplugged
-    (let [alive-frames (slice top-frames 0 wa-count)
-          dead-frames (slice top-frames wa-count)
+    (let [alive-frames (slice top-frames 0 mon-count)
+          dead-frames (slice top-frames mon-count)
           orphan-windows @[]]
       (var main-fr (first alive-frames))
-      (map (fn [fr wa]
-             (:transform fr wa)
+      (map (fn [fr mon]
+             (:transform fr (in mon :work-area))
+             (put fr :monitor mon)
              (:call-hook hook-man :monitor-updated fr)
              # Find the frame closest to the origin
+             (def wa (in mon :work-area))
              (when (< (+ (math/abs (in wa :top))
                          (math/abs (in wa :left)))
                       (+ (math/abs (get-in main-fr [:rect :top]))
                          (math/abs (get-in main-fr [:rect :left]))))
                (set main-fr fr)))
            alive-frames
-           work-areas)
+           monitors)
       (each fr dead-frames
         (array/push orphan-windows ;(:get-all-windows fr)))
       (def move-to-fr (:get-current-frame main-fr))
@@ -1630,16 +1636,21 @@
       (when (find |(= $ (in self :current-child)) dead-frames)
         (put self :current-child main-fr)))
 
-    (< fr-count wa-count)
+    (< fr-count mon-count)
     # New monitors got plugged in
-    (let [old-was (slice work-areas 0 fr-count)
-          new-was (slice work-areas fr-count)
-          new-frames (map |(frame $) new-was)]
-      (map (fn [fr wa]
-             (:transform fr wa)
+    (let [old-mons (slice monitors 0 fr-count)
+          new-mons (slice monitors fr-count)
+          new-frames (map (fn [mon]
+                            (def new-fr (frame (in mon :work-area)))
+                            (put new-fr :monitor mon)
+                            new-fr)
+                          new-mons)]
+      (map (fn [fr mon]
+             (:transform fr (in mon :work-area))
+             (put fr :monitor mon)
              (:call-hook hook-man :monitor-updated fr))
            top-frames
-           old-was)
+           old-mons)
       (each fr new-frames
         (:add-child self fr)
         (:call-hook hook-man :monitor-updated fr)))))
@@ -1680,9 +1691,15 @@
 
 (defn vdc-new-layout [self desktop-info]
   (def wm (in self :window-manager))
-  (def [work-areas main-idx] (:enumerate-monitors wm))
+  (def [monitors main-idx] (:enumerate-monitors wm))
   (def {:id id :name name} desktop-info)
-  (def new-layout (layout id name nil (map |(frame $) work-areas)))
+  (def new-layout
+    (layout id name nil
+            (map (fn [mon]
+                   (def new-fr (frame (in mon :work-area)))
+                   (put new-fr :monitor mon)
+                   new-fr)
+                 monitors)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
   (each fr (in new-layout :children)
@@ -1900,7 +1917,7 @@
 
 
 (defn wm-enumerate-monitors [self]
-  (def work-areas @[])
+  (def monitors @[])
   (def monitor-info (MONITORINFOEX))
   (var main-idx nil)
   (var idx 0)
@@ -1911,18 +1928,24 @@
        (def ret (GetMonitorInfo hmon monitor-info))
        (if (= FALSE ret)
          (error (string/format "GetMonitorInfo failed for monitor %n" hmon)))
-       (array/push work-areas (in monitor-info :rcWork))
+       (def [dpi-x dpi-y] (GetDpiForMonitor hmon MDT_DEFAULT))
+       (array/push monitors
+                   {:rect (in monitor-info :rcMonitor)
+                    :work-area (in monitor-info :rcWork)
+                    :flags (in monitor-info :dwFlags)
+                    :device (in monitor-info :szDevice)
+                    :dpi [(int/to-number dpi-x) (int/to-number dpi-y)]})
        (if (> (band (in monitor-info :dwFlags) MONITORINFOF_PRIMARY) (int/u64 0))
          (set main-idx idx))
        (+= idx 1)
        TRUE)))
   (if (= FALSE enum-ret)
     (error "EnumDisplayMonitors failed"))
-  (log/debug "work-areas = %n" work-areas)
+  (log/debug "monitors = %n" monitors)
   (log/debug "main-idx = %n" main-idx)
-  (when (empty? work-areas)
+  (when (empty? monitors)
     (error "no monitor found"))
-  [work-areas main-idx])
+  [monitors main-idx])
 
 
 (defn wm-close-hwnd [self hwnd]

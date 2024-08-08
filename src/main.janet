@@ -67,10 +67,10 @@
                          # monitors again.
                          nil))]
          (when mon-info
-           (def [work-areas _main-idx] mon-info)
+           (def [monitors _main-idx] mon-info)
            (with-activation-hooks wm
              (each lo (in root :children)
-               (:update-work-areas lo work-areas))
+               (:update-work-areas lo monitors))
              (:retile wm)
              (:activate wm (:get-current-frame root)))))
 
