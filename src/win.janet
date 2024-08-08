@@ -1238,9 +1238,26 @@
   (table/setproto self frame-proto))
 
 
-(defn frame-transform [self new-rect]
+(defn frame-transform [self new-rect &opt to-dpi]
   (def old-rect (in self :rect))
   (def old-padded-rect (:get-padded-rect self))
+
+  (def new-padded-rect
+    (if to-dpi
+      (let [[new-dpi-x new-dpi-y] (if (number? to-dpi)
+                                    [to-dpi to-dpi]
+                                    to-dpi)
+            new-scale-x (/ new-dpi-x USER_DEFAULT_SCREEN_DPI)
+            new-scale-y (/ new-dpi-y USER_DEFAULT_SCREEN_DPI)
+            phy-paddings (:get-paddings self false)
+            new-paddings {:top (* new-scale-y (in phy-paddings :top))
+                          :left (* new-scale-x (in phy-paddings :left))
+                          :bottom (* new-scale-y (in phy-paddings :bottom))
+                          :right (* new-scale-x (in phy-paddings :right))}]
+        (shrink-rect new-rect new-paddings math/trunc))
+      (let [new-paddings (:get-paddings self)]
+        (shrink-rect new-rect new-paddings math/trunc))))
+
   (put self :rect new-rect)
 
   (def all-children (in self :children))
@@ -1253,33 +1270,33 @@
     (break)
 
     (= :frame (get-in all-children [0 :type]))
-    (let [dx (- (in new-rect :left) (in old-rect :left))
-          dy (- (in new-rect :top) (in old-rect :top))
+    (let [dx (- (in new-padded-rect :left) (in old-padded-rect :left))
+          dy (- (in new-padded-rect :top) (in old-padded-rect :top))
           dw (+ (- dx)
-                (- (in new-rect :right)
-                   (in old-rect :right)))
+                (- (in new-padded-rect :right)
+                   (in old-padded-rect :right)))
           dh (+ (- dy)
-                (- (in new-rect :bottom)
-                   (in old-rect :bottom)))
-          [old-width old-height] (rect-size old-padded-rect)]
+                (- (in new-padded-rect :bottom)
+                   (in old-padded-rect :bottom)))
+          [old-padded-width old-padded-height] (rect-size old-padded-rect)]
       (def calc-fn
         (cond
           (= horizontal-frame-proto (table/getproto self))
           (fn [sub-fr _i]
             (let [w (rect-width (in sub-fr :rect))
-                  wr (/ w old-width)
+                  wr (/ w old-padded-width)
                   sub-dw (math/floor (* wr dw))]
               (+ w sub-dw)))
 
           (= vertical-frame-proto (table/getproto self))
           (fn [sub-fr _i]
             (let [h (rect-height (in sub-fr :rect))
-                  hr (/ h old-height)
+                  hr (/ h old-padded-height)
                   sub-dh (math/floor (* hr dh))]
               (+ h sub-dh)))))
-      (def new-rects (:calculate-sub-rects self calc-fn))
+      (def new-rects (:calculate-sub-rects self calc-fn nil new-padded-rect))
       (map (fn [sub-fr rect]
-             (:transform sub-fr rect))
+             (:transform sub-fr rect to-dpi))
            all-children
            new-rects))))
 
@@ -1510,8 +1527,9 @@
     (table/setproto node frame-proto)))
 
 
-(defn vertical-frame-calculate-sub-rects [self h-fn &opt count]
-  (def rect (:get-padded-rect self))
+(defn vertical-frame-calculate-sub-rects [self h-fn &opt count rect]
+  (default rect (:get-padded-rect self))
+
   (var cur-y (in rect :top))
   (var bottom (in rect :bottom))
   (def left (in rect :left))
@@ -1549,8 +1567,9 @@
    frame-proto))
 
 
-(defn horizontal-frame-calculate-sub-rects [self w-fn &opt count]
-  (def rect (:get-padded-rect self))
+(defn horizontal-frame-calculate-sub-rects [self w-fn &opt count rect]
+  (default rect (:get-padded-rect self))
+
   (var cur-x (in rect :left))
   (var right (in rect :right))
   (def top (in rect :top))
@@ -1602,7 +1621,7 @@
            # When the work area remained the same, the DPI value for
            # this monitor may have changed, so we always transform this
            # frame to update paddings etc.
-           (:transform fr (in mon :work-area))
+           (:transform fr (in mon :work-area) (in mon :dpi))
            (put fr :monitor mon)
            (:call-hook hook-man :monitor-updated fr))
          top-frames
@@ -1615,7 +1634,7 @@
           orphan-windows @[]]
       (var main-fr (first alive-frames))
       (map (fn [fr mon]
-             (:transform fr (in mon :work-area))
+             (:transform fr (in mon :work-area) (in mon :dpi))
              (put fr :monitor mon)
              (:call-hook hook-man :monitor-updated fr)
              # Find the frame closest to the origin
@@ -1646,7 +1665,7 @@
                             new-fr)
                           new-mons)]
       (map (fn [fr mon]
-             (:transform fr (in mon :work-area))
+             (:transform fr (in mon :work-area) (in mon :dpi))
              (put fr :monitor mon)
              (:call-hook hook-man :monitor-updated fr))
            top-frames
