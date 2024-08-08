@@ -132,6 +132,16 @@
   (default dy dx)
 
   (def frame (:get-current-frame (in wm :root)))
+
+  (def top-frame (:get-top-frame frame))
+  (def [dpi-x dpi-y] (get-in top-frame [:monitor :dpi]))
+  (def [scale-x scale-y]
+    [(/ dpi-x const/USER-DEFAULT-SCREEN-DPI)
+     (/ dpi-y const/USER-DEFAULT-SCREEN-DPI)])
+  (def [scaled-dx scaled-dy]
+    [(* dx scale-x)
+     (* dy scale-y)])
+
   (def win-stack (:get-window-stack frame))
   (def cur-rect (struct/to-table (:get-padded-rect frame)))
 
@@ -142,8 +152,8 @@
                 (= FALSE (IsWindowVisible hwnd))
                 (not= FALSE (IsIconic hwnd)))
       (:transform win cur-rect {:anchor :top-left})
-      (+= (cur-rect :left) dx)
-      (+= (cur-rect :top) dy)))
+      (+= (cur-rect :left) scaled-dx)
+      (+= (cur-rect :top) scaled-dy)))
   # Update frame's window list so that it matches the z-order
   (put frame :children win-stack))
 

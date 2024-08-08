@@ -14,6 +14,7 @@
 (use ./uia)
 (use ./util)
 
+(import ./const)
 (import ./log)
 
 
@@ -151,9 +152,6 @@
        :right v})))
 
 
-(def USER_DEFAULT_SCREEN_DPI 96)
-
-
 (defn- calc-pixel-scale [rect]
   (def hmon (MonitorFromRect rect MONITOR_DEFAULTTONULL))
   (def [dpi-x dpi-y]
@@ -164,8 +162,8 @@
       # Have to use GetDpiForMonitor here instead.
       (GetDpiForMonitor hmon MDT_DEFAULT)))
   # int/u64 doesn't support floating point arithmetic, thus int/to-number
-  [(/ (int/to-number dpi-x) USER_DEFAULT_SCREEN_DPI)
-   (/ (int/to-number dpi-y) USER_DEFAULT_SCREEN_DPI)])
+  [(/ (int/to-number dpi-x) const/USER-DEFAULT-SCREEN-DPI)
+   (/ (int/to-number dpi-y) const/USER-DEFAULT-SCREEN-DPI)])
 
 
 (defn- set-window-pos [hwnd x y w h &opt scaled]
@@ -1247,8 +1245,8 @@
       (let [[new-dpi-x new-dpi-y] (if (number? to-dpi)
                                     [to-dpi to-dpi]
                                     to-dpi)
-            new-scale-x (/ new-dpi-x USER_DEFAULT_SCREEN_DPI)
-            new-scale-y (/ new-dpi-y USER_DEFAULT_SCREEN_DPI)
+            new-scale-x (/ new-dpi-x const/USER-DEFAULT-SCREEN-DPI)
+            new-scale-y (/ new-dpi-y const/USER-DEFAULT-SCREEN-DPI)
             phy-paddings (:get-paddings self false)
             new-paddings {:top (* new-scale-y (in phy-paddings :top))
                           :left (* new-scale-x (in phy-paddings :left))
@@ -1489,8 +1487,8 @@
     (let [top-fr (:get-top-frame self)
           mon (in top-fr :monitor)
           [dpi-x dpi-y] (in mon :dpi)
-          [scale-x scale-y] [(/ dpi-x USER_DEFAULT_SCREEN_DPI)
-                             (/ dpi-y USER_DEFAULT_SCREEN_DPI)]]
+          [scale-x scale-y] [(/ dpi-x const/USER-DEFAULT-SCREEN-DPI)
+                             (/ dpi-y const/USER-DEFAULT-SCREEN-DPI)]]
       {:top (filter-fn (* scale-y (in paddings :top)))
        :left (filter-fn (* scale-x (in paddings :left)))
        :bottom (filter-fn (* scale-y (in paddings :bottom)))
