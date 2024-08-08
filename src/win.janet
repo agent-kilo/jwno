@@ -173,13 +173,15 @@
     (if (or (<= w 0) (<= h 0))
       (bor SWP_NOZORDER SWP_NOACTIVATE SWP_NOSIZE)
       (bor SWP_NOZORDER SWP_NOACTIVATE)))
-  (SetWindowPos hwnd nil x y w h flags)
+  (when (= FALSE (SetWindowPos hwnd nil x y w h flags))
+    (errorf "SetWindowPos failed for window %n: %n" hwnd (GetLastError)))
   # XXX: I couldn't work out why SetWindowPos sometimes wouldn't respect
   # the x, y, w and h values when moving windows between monitors with
   # different DPIs (besides the DPI-unaware window's case described in
   # transform-hwnd), but calling it again SEEMED to fix it.
   (when scaled
-    (SetWindowPos hwnd nil x y w h flags)))
+    (when (= FALSE (SetWindowPos hwnd nil x y w h flags))
+      (errorf "SetWindowPos failed for window %n: %n" hwnd (GetLastError)))))
 
 
 (defn- transform-hwnd [hwnd orig-rect uia-man &opt tags]
