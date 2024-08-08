@@ -277,6 +277,7 @@
 
 (:add-hook hook-man :window-created
    (fn [win uia-win _exe-path _desktop-info]
+     (put (in win :tags) :anchor :center)
      (put (in win :tags) :margin 10)
 
      (def class-name (:get_CachedClassName uia-win))
@@ -288,12 +289,7 @@
        (:set-alpha win (math/floor (* 256 0.9)))
 
        (= "#32770" class-name) # Dialog window class
-       (do
-         (put (in win :tags) :no-expand true)
-         (put (in win :tags) :anchor :center))
-
-       true
-       (put (in win :tags) :anchor :center))))
+       (put (in win :tags) :no-expand true))))
 
 (:add-hook hook-man :window-removed
    (fn [dead-win]
