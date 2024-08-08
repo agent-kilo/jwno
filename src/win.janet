@@ -1618,12 +1618,10 @@
     (= fr-count mon-count)
     # Only the resolutions or monitor configurations are changed
     (map (fn [fr mon]
-           # When the work area remained the same, the DPI value for
-           # this monitor may have changed, so we always transform this
-           # frame to update paddings etc.
-           (:transform fr (in mon :work-area) (in mon :dpi))
-           (put fr :monitor mon)
-           (:call-hook hook-man :monitor-updated fr))
+           (unless (= mon (in fr :monitor))
+             (:transform fr (in mon :work-area) (in mon :dpi))
+             (put fr :monitor mon)
+             (:call-hook hook-man :monitor-updated fr)))
          top-frames
          monitors)
 
@@ -1634,9 +1632,10 @@
           orphan-windows @[]]
       (var main-fr (first alive-frames))
       (map (fn [fr mon]
-             (:transform fr (in mon :work-area) (in mon :dpi))
-             (put fr :monitor mon)
-             (:call-hook hook-man :monitor-updated fr)
+             (unless (= mon (in fr :monitor))
+               (:transform fr (in mon :work-area) (in mon :dpi))
+               (put fr :monitor mon)
+               (:call-hook hook-man :monitor-updated fr))
              # Find the frame closest to the origin
              (def wa (in mon :work-area))
              (when (< (+ (math/abs (in wa :top))
@@ -1665,9 +1664,10 @@
                             new-fr)
                           new-mons)]
       (map (fn [fr mon]
-             (:transform fr (in mon :work-area) (in mon :dpi))
-             (put fr :monitor mon)
-             (:call-hook hook-man :monitor-updated fr))
+             (unless (= mon (in fr :monitor))
+               (:transform fr (in mon :work-area) (in mon :dpi))
+               (put fr :monitor mon)
+               (:call-hook hook-man :monitor-updated fr)))
            top-frames
            old-mons)
       (each fr new-frames
