@@ -1,5 +1,7 @@
 (use ../src/win)
 
+(import ../src/const)
+
 
 (defn test-frame-constructor []
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -58,7 +60,10 @@
 
 
 (defn test-frame-split []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
 
   (try
     (:split dummy-frame :horizontal 1)
@@ -86,6 +91,7 @@
      (assert (= err "frame is already split"))))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (:split dummy-frame :vertical)
   (assert (= (length (in dummy-frame :children)) 2))
 
@@ -102,6 +108,7 @@
   (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (try
     (:split dummy-frame :horizontal 3)
     ((err fib)
@@ -130,6 +137,7 @@
   (assert (= (get-in dummy-frame [:children 2 :rect :bottom]) 110))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (:split dummy-frame :horizontal 2 [0.555 0.445])
   (assert (= (length (in dummy-frame :children)) 2))
 
@@ -146,6 +154,7 @@
   (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (def dummy-window1 (window :dummy-hwnd1))
   (def dummy-window2 (window :dummy-hwnd2))
   (def dummy-window3 (window :dummy-hwnd3))
@@ -167,6 +176,7 @@
   (assert (= (length (get-in dummy-frame [:children 1 :children])) 0))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 11 :right 11}))
+  (put dummy-frame :monitor dummy-monitor)
   (try
     (:split dummy-frame :horizontal 2 [0.5])
     ((err fib)
@@ -179,6 +189,7 @@
   (assert (= (length (in dummy-frame :children)) 0))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (put (in dummy-frame :tags) :padding 9)
   (:split dummy-frame :horizontal)
   (assert (= 2 (length (in dummy-frame :children))))
@@ -195,6 +206,7 @@
     (assert (= 101 (in rect1 :right))))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (put (in dummy-frame :tags) :paddings {:top 9 :left 8 :bottom 7 :right 6})
   (:split dummy-frame :vertical)
   (assert (= 2 (length (in dummy-frame :children))))
@@ -297,12 +309,14 @@
 
 
 (defn test-frame-transform []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   #
   # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
   #              |
   #              +- dummy-sub-frame2 -- dummy-window2
   #
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   # XXX: wrap this up?
   (table/setproto dummy-frame horizontal-frame-proto)
   (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
@@ -332,6 +346,7 @@
   (assert (= 100 (get-in dummy-sub-frame2 [:rect :right])))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (put (in dummy-frame :tags) :padding 9)
   (table/setproto dummy-frame horizontal-frame-proto)
   (set dummy-sub-frame1 (frame {:top 19 :left 19 :bottom 101 :right 60}))
@@ -352,6 +367,7 @@
   (assert (= 91 (get-in dummy-sub-frame2 [:rect :right])))
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (put (in dummy-frame :tags) :paddings {:top 9 :left 8 :bottom 7 :right 6})
   (table/setproto dummy-frame vertical-frame-proto)
   (set dummy-sub-frame1 (frame {:top 19 :left 18 :bottom 61 :right 104}))
@@ -373,7 +389,9 @@
 
 
 (defn test-layout-get-adjacent-frame []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (var dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
   (:split dummy-frame :horizontal 3 [0.3 0.4 0.3])
 
