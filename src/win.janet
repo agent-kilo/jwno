@@ -126,15 +126,17 @@
           WindowVisualState_Normal)))))
 
 
-(defn get-hwnd-dwm-border-margins [hwnd &opt uia-win]
-  (def outer-rect
-    (if uia-win
-      (:get_CachedBoundingRectangle uia-win)
-      (let [[ret rect] (GetWindowRect hwnd)]
-        (when (= FALSE ret)
-          (errorf "failed to get bounding rectangle for %n" hwnd))
-        rect)))
+(defn get-hwnd-dwm-border-margins [hwnd &opt outer-rect]
+  (default outer-rect
+    (let [[gwr-ret rect] (GetWindowRect hwnd)]
+      (when (= FALSE gwr-ret)
+        (errorf "failed to get bounding rectangle for window %n" hwnd))
+      rect))
+
   (def inner-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+
+  (log/debug "outer-rect = %n" outer-rect)
+  (log/debug "inner-rect = %n" inner-rect)
 
   {:top (- (in outer-rect :top) (in inner-rect :top))
    :left (- (in outer-rect :left) (in inner-rect :left))
@@ -206,6 +208,13 @@
               (def no-expand (in tags :no-expand))
               (def anchor (in tags :anchor :top-left))
 
+              # XXX: When dealing with QT windows, the bounding rectangle returned by
+              # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
+              # returns the right values though, so that's what we use here.
+              (def [gwr-ret win-rect] (GetWindowRect hwnd))
+              (when (= FALSE gwr-ret)
+                (errorf "failed to get bounding rectangle for window %n" hwnd))
+
               (def [scale-x scale-y] (calc-pixel-scale orig-rect))
               (log/debug "scale-x = %n, scale-y = %n" scale-x scale-y)
               (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
@@ -219,13 +228,12 @@
                    :right (* scale-x (in margins :right))}))
               (log/debug "scaled-margins = %n" scaled-margins)
 
-              (def [cur-scale-x cur-scale-y]
-                (calc-pixel-scale (:get_CachedBoundingRectangle uia-win)))
+              (def [cur-scale-x cur-scale-y] (calc-pixel-scale win-rect))
               (log/debug "cur-scale-x = %n, cur-scale-y = %n" cur-scale-x cur-scale-y)
               # These DWM margin values are in "physical pixels." They're already scaled
               # according to the current monitor's DPI, but we need to re-scale them in
               # case the window is moving to another monitor with different DPI.
-              (def dwm-margins (get-hwnd-dwm-border-margins hwnd uia-win))
+              (def dwm-margins (get-hwnd-dwm-border-margins hwnd win-rect))
               (log/debug "dwm-margins = %n" dwm-margins)
               (def scaled-dwm-margins
                 (if (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
@@ -251,15 +259,11 @@
               (cond
                 (or (= 0 (:get_CachedCanResize tran-pat))
                     no-resize)
-                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-                  (def [x y _w _h]
-                    (calc-win-coords-in-frame win-rect rect false anchor))
+                (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor)]
                   (set-window-pos hwnd x y 0 0 scaled))
 
                 no-expand
-                (when-let [win-rect (:get_CachedBoundingRectangle uia-win)]
-                  (def [x y w h]
-                    (calc-win-coords-in-frame win-rect rect true anchor))
+                (let [[x y w h] (calc-win-coords-in-frame win-rect rect true anchor)]
                   (set-window-pos hwnd x y w h scaled))
 
                 true
@@ -1097,7 +1101,7 @@
           [ret win-rect] (GetWindowRect hwnd)
           [scale-x scale-y] (calc-pixel-scale win-rect)]
       (when (= ret FALSE)
-        (errorf "failed to get bounding rect for window %n" hwnd))
+        (errorf "failed to get bounding rectangle for window %n" hwnd))
       {:top (filter-fn (* scale-y (in margins :top)))
        :left (filter-fn (* scale-x (in margins :left)))
        :bottom (filter-fn (* scale-y (in margins :bottom)))
@@ -1105,9 +1109,9 @@
     margins))
 
 
-(defn window-get-dwm-border-margins [self &opt uia-win]
+(defn window-get-dwm-border-margins [self &opt bounding-rect]
   (def hwnd (in self :hwnd))
-  (get-hwnd-dwm-border-margins hwnd uia-win))
+  (get-hwnd-dwm-border-margins hwnd bounding-rect))
 
 
 (def- window-proto
