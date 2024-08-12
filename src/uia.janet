@@ -103,7 +103,13 @@
   (var parent (get-parent cur-elem))
 
   (while true
-    (def hwnd (:get_CachedNativeWindowHandle cur-elem))
+    (def hwnd (try
+                (:get_CachedNativeWindowHandle cur-elem)
+                ((err fib)
+                 (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
+                            err
+                            (get-stack-trace fib))
+                 nil)))
     (cond
       (and
         # Has a handle
@@ -120,10 +126,18 @@
         (release cur-elem)
         (break))
 
-      (= root-hwnd (:get_CachedNativeWindowHandle parent))
-      (do
-        (release cur-elem)
-        (break)))
+      true
+      (let [parent-hwnd (try
+                          (:get_CachedNativeWindowHandle parent)
+                          ((err fib)
+                           (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
+                                      err
+                                      (get-stack-trace fib))
+                           nil))]
+        (when (or (nil? parent-hwnd)
+                  (= root-hwnd parent-hwnd))
+          (release cur-elem)
+          (break))))
 
     (release cur-elem)
     (set cur-elem parent)
