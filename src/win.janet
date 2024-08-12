@@ -249,7 +249,7 @@
                                            scaled-margins))
               (log/debug "combined-margins = %n" combined-margins)
 
-              (def rect (shrink-rect orig-rect combined-margins math/trunc))
+              (def rect (shrink-rect orig-rect combined-margins))
               (log/debug "final rect = %n" rect)
 
               (def scaled
@@ -1253,14 +1253,14 @@
                                     to-dpi)
             new-scale-x (/ new-dpi-x const/USER-DEFAULT-SCREEN-DPI)
             new-scale-y (/ new-dpi-y const/USER-DEFAULT-SCREEN-DPI)
-            phy-paddings (:get-paddings self false)
-            new-paddings {:top (* new-scale-y (in phy-paddings :top))
-                          :left (* new-scale-x (in phy-paddings :left))
-                          :bottom (* new-scale-y (in phy-paddings :bottom))
-                          :right (* new-scale-x (in phy-paddings :right))}]
-        (shrink-rect new-rect new-paddings math/trunc))
+            virt-paddings (:get-paddings self false)
+            new-paddings {:top (* new-scale-y (in virt-paddings :top))
+                          :left (* new-scale-x (in virt-paddings :left))
+                          :bottom (* new-scale-y (in virt-paddings :bottom))
+                          :right (* new-scale-x (in virt-paddings :right))}]
+        (shrink-rect new-rect new-paddings))
       (let [new-paddings (:get-paddings self)]
-        (shrink-rect new-rect new-paddings math/trunc))))
+        (shrink-rect new-rect new-paddings))))
 
   (put self :rect new-rect)
 
@@ -1506,7 +1506,7 @@
   (default scaled true)
 
   (def paddings (:get-paddings self scaled))
-  (shrink-rect (in self :rect) paddings math/trunc))
+  (shrink-rect (in self :rect) paddings))
 
 
 (set frame-proto

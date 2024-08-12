@@ -59,29 +59,33 @@
   ~[(- (in ,rect :right) (in ,rect :left))
     (- (in ,rect :bottom) (in ,rect :top))])
 
-(defn shrink-rect [rect amounts &opt filter-fn]
-  (default filter-fn identity)
+(defn shrink-rect [rect amounts]
+  (def top (math/ceil (+ (in rect :top)
+                         (in amounts :top 0))))
+  (def bottom (math/floor (- (in rect :bottom)
+                             (in amounts :bottom 0))))
+  (def left (math/ceil (+ (in rect :left)
+                          (in amounts :left 0))))
+  (def right (math/floor (- (in rect :right)
+                            (in amounts :right 0))))
+  {:top top
+   :left left
+   :bottom (if (< bottom top) top bottom)
+   :right (if (< right left) left right)})
 
-  (def top (+ (in rect :top) (in amounts :top 0)))
-  (def bottom (- (in rect :bottom) (in amounts :bottom 0)))
-  (def left (+ (in rect :left) (in amounts :left 0)))
-  (def right (- (in rect :right) (in amounts :right 0)))
-  {:top (filter-fn top)
-   :left (filter-fn left)
-   :bottom (filter-fn (if (< bottom top) top bottom))
-   :right (filter-fn (if (< right left) left right))})
-
-(defn expand-rect [rect amounts &opt filter-fn]
-  (default filter-fn identity)
-
-  (def top (- (in rect :top) (in amounts :top 0)))
-  (def bottom (+ (in rect :bottom) (in amounts :bottom 0)))
-  (def left (- (in rect :left) (in amounts :left 0)))
-  (def right (+ (in rect :right) (in amounts :right 0)))
-  {:top (filter-fn top)
-   :left (filter-fn left)
-   :bottom (filter-fn (if (< bottom top) top bottom))
-   :right (filter-fn (if (< right left) left right))})
+(defn expand-rect [rect amounts]
+  (def top (math/floor (- (in rect :top)
+                          (in amounts :top 0))))
+  (def bottom (math/ceil (+ (in rect :bottom)
+                            (in amounts :bottom 0))))
+  (def left (math/floor (- (in rect :left)
+                           (in amounts :left 0))))
+  (def right (math/ceil (+ (in rect :right)
+                           (in amounts :right 0))))
+  {:top top
+   :left left
+   :bottom (if (< bottom top) top bottom)
+   :right (if (< right left) left right)})
 
 (defn combine-rect-border-space [& args]
   (def last-arg (last args))

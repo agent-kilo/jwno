@@ -280,8 +280,7 @@
     (combine-rect-border-space (:get-margins cur-win)
                                (:get-paddings cur-frame)))
 
-  (:resize cur-frame
-           (expand-rect win-rect border-space math/trunc))
+  (:resize cur-frame (expand-rect win-rect border-space))
   (:retile wm))
 
 
