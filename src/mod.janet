@@ -50,23 +50,65 @@
     name))
 
 
+(defn- check-module-not-relative [name]
+  # See check-is-dep function in boot.janet
+  (unless (or (string/has-prefix? "/" name)
+              (string/has-prefix? "@" name)
+              (string/has-prefix? "." name))
+    name))
+
+
 (defn- load-built-in-module [name args]
   (log/debug "Loading built-in module: %n, args = %n" name args)
   (in BUILT-IN-MODULE-CACHE name))
 
 
-(defn module-manager-register-loader [self]
+(defn module-manager-register-loader [self & paths]
   # To ensure we have no more than one entry in module/paths
   (:unregister-loader self)
+
   (put module/loaders :jwno-built-in-module load-built-in-module)
-  (array/insert module/paths 0 [check-module-in-cache :jwno-built-in-module]))
+
+  (array/insert module/paths 0 [check-module-in-cache :jwno-built-in-module])
+
+  (def to-insert
+    (if-let [idx (find-index |(= :preload (in $ 1)) module/paths)]
+      # Put our paths AFTER the default module cache
+      (+ 1 idx)
+      # There's no default cache, go after our own cache
+      1))
+  (each p paths
+    (array/insert module/paths
+                  to-insert
+                  [(string p "/:all::native:")
+                   :native
+                   check-module-not-relative])
+    (array/insert module/paths
+                  to-insert
+                  [(string p "/:all:/init.janet")
+                   :source
+                   check-module-not-relative])
+    (array/insert module/paths
+                  to-insert
+                  [(string p "/:all:.janet")
+                   :source
+                   check-module-not-relative])
+    (array/insert module/paths
+                  to-insert
+                  [(string p "/:all:.jimage")
+                   :image
+                   check-module-not-relative])))
 
 
 (defn module-manager-unregister-loader [self]
   (var i 0)
   (while (< i (length module/paths))
-    (if (= (in module/paths i)
-           [check-module-in-cache :jwno-built-in-module])
+    (def entry (in module/paths i))
+    # See module-manager-register-loader for the entry structures
+    (if (or (= entry
+               [check-module-in-cache :jwno-built-in-module])
+            (and (= 3 (length entry))
+                 (= check-module-not-relative (in entry 2))))
       (array/remove module/paths i)
       (++ i)))
   (put module/loaders :jwno-built-in-module nil))
