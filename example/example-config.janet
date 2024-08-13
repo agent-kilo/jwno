@@ -9,7 +9,7 @@
 (import jwno/util)
 (import jwno/log)
 
-(import ./wallpaper-manager)
+(import wallpaper-manager)
 
 
 #
