@@ -91,12 +91,7 @@
   found)
 
 
-(defn load-config-file [paths-to-try context]
-  (def config-path (look-for-config-file paths-to-try))
-  (when (nil? config-path)
-    (errorf "No config file found in these locations:\n%s\n"
-            (string/join paths-to-try "\n")))
-
+(defn load-config-file [config-path context]
   (def new-env (make-env config-env))
   (put new-env 'jwno-context @{:value context
                                :doc "The Jwno main loop context object.\n"})

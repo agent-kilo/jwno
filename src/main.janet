@@ -1,4 +1,5 @@
 (import spork/netrepl)
+(import spork/path)
 
 (use jw32/_winuser)
 (use jw32/_libloaderapi)
@@ -20,6 +21,59 @@
 (import ./log)
 
 
+(defn get-config-file-paths [cli-args]
+  (def default-config-file-path
+    (string (get-exe-dir) const/DEFAULT-CONFIG-FILE-NAME))
+  (def paths
+    (or (in cli-args "config")
+        (in cli-args :default)))
+  (if (or (nil? paths)
+          (empty? paths))
+    [default-config-file-path]
+    paths))
+
+
+(defn get-mod-paths [cli-args config-file-path]
+  (def ret
+    (if-let [paths (in cli-args "mod-path")]
+      paths
+      @[]))
+  (array/push ret (path/dirname config-file-path))
+  ret)
+
+
+(defn late-init [cli-args context]
+  (def config-file-paths (get-config-file-paths cli-args))
+  (def config-found (look-for-config-file config-file-paths))
+
+  (if config-found
+    (do
+      (:register-loader (in context :module-manager)
+                        ;(get-mod-paths cli-args config-found))
+
+      (def config-env
+        (try
+          (load-config-file config-found context)
+          ((err fib)
+           (:show-error-and-exit
+              (in context :ui-manager)
+              (string/format "Failed to load config file: %s\n\n%s\n%s"
+                             config-found
+                             err
+                             (get-stack-trace fib)))
+           nil)))
+      (log/debug "config-env = %n" config-env)
+      (when config-env
+        # Only proceed after the config file is successfully loaded
+        (:init-event-handlers (in context :uia-manager))))
+
+    # config file not found
+    (:show-error-and-exit
+       (in context :ui-manager)
+       (string/format "No config file found in these locations:\n%s\n"
+                      (string/join config-file-paths "\n")))))
+
+
 (defn main-loop [cli-args context]
   (forever
    (def event (ev/select ;(in context :event-sources)))
@@ -28,28 +82,9 @@
      [:take chan msg]
      (match msg
        [:ui/initialized thread-id msg-hwnd]
-       (let [default-config-file-path (string (get-exe-dir) const/DEFAULT-CONFIG-FILE-NAME)
-             paths (or (in cli-args "config") (in cli-args :default))
-             config-file-paths (if (or (nil? paths) (empty? paths))
-                                 [default-config-file-path]
-                                 paths)
-             ui-man (in context :ui-manager)]
-         (:initialized ui-man thread-id msg-hwnd)
-         (def config-env
-           (try
-             (load-config-file config-file-paths context)
-             ((err fib)
-              (:show-error-and-exit
-                 ui-man
-                 (string/format "Failed to load config file: %n\n\n%s\n%s"
-                                config-file-paths
-                                err
-                                (get-stack-trace fib)))
-              nil)))
-         (log/debug "config-env = %n" config-env)
-         # Only proceed after the config file is successfully loaded
-         (when config-env
-           (:init-event-handlers (in context :uia-manager))))
+       (do
+         (:initialized (in context :ui-manager) thread-id msg-hwnd)
+         (late-init cli-args context))
 
        :ui/display-changed
        (let [wm (in context :window-manager)
