@@ -43,9 +43,29 @@
    {:help (string "\nThe config file to run. Default: " default-config-file-path "\n")
     :kind :accumulate}
 
+   "client"
+   {:short "C"
+    :help "\nStarts in REPL client mode. Connects to the REPL address specified by the repl option.\n"
+    :kind :flag}
+
    "config"
    {:short "c"
     :help (string "\nThe config file to run. Default: " default-config-file-path "\n")
+    :kind :accumulate}
+
+   "log-file"
+   {:help "\nSpecifies a log file to write to. No log file will be generated if this option is omitted.\n"
+    :kind :option}
+
+   "log-level"
+   {:help "\nThe log level. Can be quiet, error, warning, info or debug. Default: quiet\n"
+    :default "quiet"
+    :kind :option
+    :map keyword}
+
+   "mod-path"
+   {:short "m"
+    :help "\nA custom path to load modules from.\n"
     :kind :accumulate}
 
    "repl"
@@ -56,21 +76,6 @@
            (if-let [repl-addr (peg/match repl-addr-peg addr-str)]
              repl-addr
              (errorf "Malformed REPL address: %n" addr-str)))}
-
-   "client"
-   {:short "C"
-    :help "\nStarts in REPL client mode. Connects to the REPL address specified by the repl option.\n"
-    :kind :flag}
-
-   "log-level"
-   {:help "\nThe log level. Can be quiet, error, warning, info or debug. Default: quiet\n"
-    :default "quiet"
-    :kind :option
-    :map keyword}
-
-   "log-file"
-   {:help "\nSpecifies a log file to write to. No log file will be generated if this option is omitted.\n"
-    :kind :option}
    ))
 
 

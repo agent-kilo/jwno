@@ -208,7 +208,11 @@
        (show-error-and-exit (string err) 1 (get-stack-trace fib)))))
 
   (def module-man (module-manager))
-  (:register-loader module-man) # XXX: Too early?
+  # XXX: Too early?
+  (:register-loader module-man
+                    ;(if-let [paths (in cli-args "mod-path")]
+                       paths
+                       []))
 
   (def repl-server
     (if-let [repl-addr (in cli-args "repl")]
