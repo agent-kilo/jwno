@@ -5,8 +5,12 @@
 #
 # See the source code in `mod.janet` for a complete list.
 #
+(import jwno/repl)
 (import jwno/util)
 (import jwno/log)
+
+(import ./wallpaper-manager)
+
 
 #
 # One may call (log/<level> "format string" arg0 arg1 ...) to generate logs.
@@ -70,6 +74,13 @@
       :ui-manager ui-man
       :hook-manager hook-man}
   jwno-context)
+
+
+(def wallpaper-man (wallpaper-manager/wallpaper-manager jwno-context))
+#
+# When you want something available in the REPL, export it like this:
+#
+(repl/export wallpaper-man)
 
 
 #

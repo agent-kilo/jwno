@@ -2,10 +2,23 @@
 
 (import ./log)
 
+
 (def- repl-env (make-env))
 
+(defn export* [sym meta]
+  (put repl-env sym meta))
 
-(defn make-repl-env [name stream context]
+(defmacro export [sym]
+  ~(,export* (quote ,sym) (in (curenv) (quote ,sym))))
+
+(defn unset* [sym]
+  (put repl-env sym nil))
+
+(defmacro unset [sym]
+  ~(,unset* (quote ,sym)))
+
+
+(defn- make-repl-env [name stream context]
   (def context-def
     @{:value context
       :doc "The Jwno main loop context object.\n"})

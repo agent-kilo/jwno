@@ -38,7 +38,8 @@
     # Jwno modules
     (build-module-cache
      cache
-     [["./util" "jwno/util"]
+     [["./repl" "jwno/repl"]
+      ["./util" "jwno/util"]
       ["./log" "jwno/log"]])
 
     cache))
