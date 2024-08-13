@@ -74,6 +74,33 @@
                       (string/join config-file-paths "\n")))))
 
 
+(defn handle-display-changed [context]
+  (def wm (in context :window-manager))
+  (def root (in wm :root))
+  (def layouts (in root :children))
+
+  (def mon-info
+    (try
+      (:enumerate-monitors wm)
+      ((err fib)
+       (log/debug ":enumerate-monitors failed: %s\n%s"
+                  err
+                  (get-stack-trace fib))
+       # The enumeration may fail if all the monitors are turned
+       # off. We just ignore this case and wait for the next
+       # :ui/display-changed event triggered by turning on the
+       # monitors again.
+       nil)))
+
+  (when mon-info
+    (def [monitors _main-idx] mon-info)
+    (with-activation-hooks wm
+      (each lo layouts
+        (:update-work-areas lo monitors))
+      (:retile wm)
+      (:activate wm (:get-current-frame root)))))
+
+
 (defn main-loop [cli-args context]
   (forever
    (def event (ev/select ;(in context :event-sources)))
@@ -87,27 +114,7 @@
          (late-init cli-args context))
 
        :ui/display-changed
-       (let [wm (in context :window-manager)
-             root (in wm :root)
-             layouts (in root :children)
-             mon-info (try
-                        (:enumerate-monitors wm)
-                        ((err fib)
-                         (log/debug ":enumerate-monitors failed: %s\n%s"
-                                    err
-                                    (get-stack-trace fib))
-                         # The enumeration may fail if all the monitors are turned
-                         # off. We just ignore this case and wait for the next
-                         # :ui/display-changed event triggered by turning on the
-                         # monitors again.
-                         nil))]
-         (when mon-info
-           (def [monitors _main-idx] mon-info)
-           (with-activation-hooks wm
-             (each lo (in root :children)
-               (:update-work-areas lo monitors))
-             (:retile wm)
-             (:activate wm (:get-current-frame root)))))
+       (handle-display-changed context)
 
        :ui/exit
        (break)
