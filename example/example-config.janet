@@ -5,7 +5,6 @@
 #
 # See the source code in `mod.janet` for a complete list.
 #
-(import jwno/repl)
 (import jwno/util)
 (import jwno/log)
 
@@ -72,15 +71,19 @@
       :command-manager command-man
       :window-manager window-man
       :ui-manager ui-man
-      :hook-manager hook-man}
+      :hook-manager hook-man
+      :repl-manager repl-man}
   jwno-context)
 
 
 (def wallpaper-man (wallpaper-manager/wallpaper-manager jwno-context))
 #
-# When you want something available in the REPL, export it like this:
+# When you want something available in an REPL, export it like this:
 #
-(repl/export wallpaper-man)
+(def repl-server
+  (or (:get-default-server repl-man)
+      (:start-server repl-man)))
+(util/export-to-repl repl-server wallpaper-man)
 
 
 #
