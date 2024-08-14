@@ -8,6 +8,10 @@
 (import jwno/util)
 (import jwno/log)
 
+#
+# Separate modules placed alongside the config file can be
+# imported directly. See `wallpaper-manager.janet`.
+#
 (import wallpaper-manager)
 
 
@@ -80,9 +84,11 @@
 #
 # When you want something available in an REPL, export it like this:
 #
+# 1. Retrieve the REPL server you want to modify.
 (def repl-server
   (or (:get-default-server repl-man)
       (:start-server repl-man)))
+# 2. Do the export for that server.
 (util/export-to-repl repl-server wallpaper-man)
 
 
