@@ -6,6 +6,7 @@
 (use jw32/_combaseapi)
 (use jw32/_util)
 
+(use ./repl)
 (use ./key)
 (use ./cmd)
 (use ./win)
@@ -16,7 +17,6 @@
 (use ./config)
 (use ./util)
 
-(import ./repl)
 (import ./const)
 (import ./log)
 
@@ -251,12 +251,9 @@
 
   (def module-man (module-manager))
 
-  (def repl-server
-    (if-let [repl-addr (in cli-args "repl")]
-      # context will only get referenced after the main-loop is running
-      # and when the first REPL client connects.
-      (repl/start-server context ;repl-addr)
-      nil))
+  (def repl-man (repl-manager context))
+  (if-let [repl-addr (in cli-args "repl")]
+    (:start-server repl-man ;repl-addr))
 
   (put context :hook-manager hook-man)
   (put context :command-manager command-man)
@@ -266,18 +263,13 @@
   (put context :key-manager key-man)
   (put context :window-manager window-man)
   (put context :module-manager module-man)
-  (when repl-server
-    (put context :repl
-       {:server repl-server
-        :address (in cli-args "repl")}))
+  (put context :repl-manager repl-man)
 
   (add-default-commands command-man context)
 
   (main-loop cli-args context)
 
-  # May be started by commands
-  (when (in context :repl)
-    (repl/stop-server (get-in context [:repl :server])))
+  (:stop-all-servers repl-man)
   (:unregister-loader module-man)
   (:destroy window-man)
   (:destroy uia-man)

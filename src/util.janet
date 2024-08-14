@@ -137,3 +137,12 @@
   ~(do
      (def ,binding ,ctor)
      ,(apply defer [(or dtor with-uia-dtor-fn) binding] body)))
+
+
+################## REPL Helpers ##################
+
+(defmacro export-to-repl [repl-server sym]
+  ~(:export ,repl-server (quote ,sym) (in (curenv) (quote ,sym))))
+
+(defmacro unset-from-repl [repl-server sym]
+  ~(:unset ,repl-server (quote ,sym)))
