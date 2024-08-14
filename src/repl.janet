@@ -10,12 +10,19 @@
   (:close (in self :stream)))
 
 
-(defn repl-server-export [self sym meta]
-  (put (in self :env) sym meta))
+(defn repl-server-export [self & syms-meta]
+  (def count (length syms-meta))
+  (unless (even? count)
+    (errorf "expected even number of symbol and meta values, got %n" count))
+  (loop [i :range [0 count 2]]
+    (put (in self :env)
+         (in syms-meta i)
+         (in syms-meta (+ 1 i)))))
 
 
-(defn repl-server-unset [self sym]
-  (put (in self :env) sym nil))
+(defn repl-server-unset [self & syms]
+  (each s syms
+    (put (in self :env) s nil)))
 
 
 (defn repl-server-make-env [self client-name client-stream]

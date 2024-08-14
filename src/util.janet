@@ -141,8 +141,15 @@
 
 ################## REPL Helpers ##################
 
-(defmacro export-to-repl [repl-server sym]
-  ~(:export ,repl-server (quote ,sym) (in (curenv) (quote ,sym))))
+(defmacro export-to-repl [repl-server & syms]
+  (def quoted-syms-meta @[])
+  (loop [i :range [0 (length syms)]]
+    (def sym (in syms i))
+    (array/push quoted-syms-meta ~(quote ,sym))
+    (array/push quoted-syms-meta ~(in (curenv) (quote ,sym))))
+  ~(:export ,repl-server ,;quoted-syms-meta))
 
-(defmacro unset-from-repl [repl-server sym]
-  ~(:unset ,repl-server (quote ,sym)))
+(defmacro unset-from-repl [repl-server & syms]
+  (def quoted-syms
+    (map (fn [s] ~(quote ,s)) syms))
+  ~(:unset ,repl-server ,;quoted-syms))
