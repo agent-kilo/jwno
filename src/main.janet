@@ -1,10 +1,12 @@
 (import spork/netrepl)
+(import spork/path)
 
 (use jw32/_winuser)
 (use jw32/_libloaderapi)
 (use jw32/_combaseapi)
 (use jw32/_util)
 
+(use ./repl)
 (use ./key)
 (use ./cmd)
 (use ./win)
@@ -15,9 +17,88 @@
 (use ./config)
 (use ./util)
 
-(import ./repl)
 (import ./const)
 (import ./log)
+
+
+(defn get-config-file-paths [cli-args]
+  (def default-config-file-path
+    (string (get-exe-dir) const/DEFAULT-CONFIG-FILE-NAME))
+  (def paths
+    (or (in cli-args "config")
+        (in cli-args :default)))
+  (if (or (nil? paths)
+          (empty? paths))
+    [default-config-file-path]
+    paths))
+
+
+(defn get-mod-paths [cli-args config-file-path]
+  (def ret
+    (if-let [paths (in cli-args "mod-path")]
+      paths
+      @[]))
+  (array/push ret (path/dirname config-file-path))
+  ret)
+
+
+(defn late-init [cli-args context]
+  (def config-file-paths (get-config-file-paths cli-args))
+  (def config-found (look-for-config-file config-file-paths))
+
+  (if config-found
+    (do
+      (:register-loader (in context :module-manager)
+                        ;(get-mod-paths cli-args config-found))
+
+      (def config-env
+        (try
+          (load-config-file config-found context)
+          ((err fib)
+           (:show-error-and-exit
+              (in context :ui-manager)
+              (string/format "Failed to load config file: %s\n\n%s\n%s"
+                             config-found
+                             err
+                             (get-stack-trace fib)))
+           nil)))
+      (log/debug "config-env = %n" config-env)
+      (when config-env
+        # Only proceed after the config file is successfully loaded
+        (:init-event-handlers (in context :uia-manager))))
+
+    # config file not found
+    (:show-error-and-exit
+       (in context :ui-manager)
+       (string/format "No config file found in these locations:\n%s\n"
+                      (string/join config-file-paths "\n")))))
+
+
+(defn handle-display-changed [context]
+  (def wm (in context :window-manager))
+  (def root (in wm :root))
+  (def layouts (in root :children))
+
+  (def mon-info
+    (try
+      (:enumerate-monitors wm)
+      ((err fib)
+       (log/debug ":enumerate-monitors failed: %s\n%s"
+                  err
+                  (get-stack-trace fib))
+       # The enumeration may fail if all the monitors are turned
+       # off. We just ignore this case and wait for the next
+       # :ui/display-changed event triggered by turning on the
+       # monitors again.
+       nil)))
+
+  (when mon-info
+    (def [monitors _main-idx] mon-info)
+    (with-activation-hooks wm
+      (each lo layouts
+        (:update-work-areas lo monitors))
+      (:retile wm)
+      (:activate wm (:get-current-frame root)))))
 
 
 (defn main-loop [cli-args context]
@@ -28,51 +109,12 @@
      [:take chan msg]
      (match msg
        [:ui/initialized thread-id msg-hwnd]
-       (let [default-config-file-path (string (get-exe-dir) const/DEFAULT-CONFIG-FILE-NAME)
-             paths (or (in cli-args "config") (in cli-args :default))
-             config-file-paths (if (or (nil? paths) (empty? paths))
-                                 [default-config-file-path]
-                                 paths)
-             ui-man (in context :ui-manager)]
-         (:initialized ui-man thread-id msg-hwnd)
-         (def config-env
-           (try
-             (load-config-file config-file-paths context)
-             ((err fib)
-              (:show-error-and-exit
-                 ui-man
-                 (string/format "Failed to load config file: %n\n\n%s\n%s"
-                                config-file-paths
-                                err
-                                (get-stack-trace fib)))
-              nil)))
-         (log/debug "config-env = %n" config-env)
-         # Only proceed after the config file is successfully loaded
-         (when config-env
-           (:init-event-handlers (in context :uia-manager))))
+       (do
+         (:initialized (in context :ui-manager) thread-id msg-hwnd)
+         (late-init cli-args context))
 
        :ui/display-changed
-       (let [wm (in context :window-manager)
-             root (in wm :root)
-             layouts (in root :children)
-             mon-info (try
-                        (:enumerate-monitors wm)
-                        ((err fib)
-                         (log/debug ":enumerate-monitors failed: %s\n%s"
-                                    err
-                                    (get-stack-trace fib))
-                         # The enumeration may fail if all the monitors are turned
-                         # off. We just ignore this case and wait for the next
-                         # :ui/display-changed event triggered by turning on the
-                         # monitors again.
-                         nil))]
-         (when mon-info
-           (def [monitors _main-idx] mon-info)
-           (with-activation-hooks wm
-             (each lo (in root :children)
-               (:update-work-areas lo monitors))
-             (:retile wm)
-             (:activate wm (:get-current-frame root)))))
+       (handle-display-changed context)
 
        :ui/exit
        (break)
@@ -208,14 +250,10 @@
        (show-error-and-exit (string err) 1 (get-stack-trace fib)))))
 
   (def module-man (module-manager))
-  (:register-loader module-man) # XXX: Too early?
 
-  (def repl-server
-    (if-let [repl-addr (in cli-args "repl")]
-      # context will only get referenced after the main-loop is running
-      # and when the first REPL client connects.
-      (repl/start-server context ;repl-addr)
-      nil))
+  (def repl-man (repl-manager context))
+  (if-let [repl-addr (in cli-args "repl")]
+    (:start-server repl-man ;repl-addr))
 
   (put context :hook-manager hook-man)
   (put context :command-manager command-man)
@@ -225,18 +263,13 @@
   (put context :key-manager key-man)
   (put context :window-manager window-man)
   (put context :module-manager module-man)
-  (when repl-server
-    (put context :repl
-       {:server repl-server
-        :address (in cli-args "repl")}))
+  (put context :repl-manager repl-man)
 
   (add-default-commands command-man context)
 
   (main-loop cli-args context)
 
-  # May be started by commands
-  (when (in context :repl)
-    (repl/stop-server (get-in context [:repl :server])))
+  (:stop-all-servers repl-man)
   (:unregister-loader module-man)
   (:destroy window-man)
   (:destroy uia-man)

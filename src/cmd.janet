@@ -7,13 +7,13 @@
 (use jw32/_dwmapi)
 (use jw32/_util)
 
+(use ./repl)
 (use ./win)
 (use ./uia)
 (use ./input)
 (use ./resource)
 (use ./util)
 
-(import ./repl)
 (import ./const)
 (import ./log)
 
@@ -427,21 +427,20 @@
   (default host const/DEFAULT-REPL-HOST)
   (default port const/DEFAULT-REPL-PORT)
 
-  (def existing-repl (in context :repl))
   (def ui-man (in context :ui-manager))
+  (def repl-man (in context :repl-manager))
+  (def existing-repl (:get-default-server repl-man))
 
   (when (nil? existing-repl)
     (if start?
       (do
         (:show-tooltip ui-man :repl "REPL is not running. Trying to start it...")
-        (put context :repl
-           {:server (repl/start-server context host port)
-            :address @[host port]}))
+        (:start-server repl-man host port))
       (do
         (:show-tooltip ui-man :repl "REPL is not running.")
         (break))))
 
-  (def repl (in context :repl))
+  (def repl (:get-default-server repl-man))
 
   (def argv (dyn :args))
   (def argv0 (first argv))

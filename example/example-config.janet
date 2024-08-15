@@ -9,6 +9,13 @@
 (import jwno/log)
 
 #
+# Separate modules placed alongside the config file can be
+# imported directly. See `wallpaper-manager.janet`.
+#
+(import wallpaper-manager)
+
+
+#
 # One may call (log/<level> "format string" arg0 arg1 ...) to generate logs.
 # To see the logs in a console, run Jwno with the `--log-level <level>` flag.
 # Supported levels are: debug, info, warning, error, quiet.
@@ -68,8 +75,21 @@
       :command-manager command-man
       :window-manager window-man
       :ui-manager ui-man
-      :hook-manager hook-man}
+      :hook-manager hook-man
+      :repl-manager repl-man}
   jwno-context)
+
+
+(def wallpaper-man (wallpaper-manager/wallpaper-manager jwno-context))
+#
+# When you want something available in an REPL, export it like this:
+#
+# 1. Retrieve the REPL server you want to modify.
+(def repl-server
+  (or (:get-default-server repl-man)
+      (:start-server repl-man)))
+# 2. Do the export for that server.
+(util/export-to-repl repl-server wallpaper-man)
 
 
 #
