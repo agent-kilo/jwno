@@ -998,6 +998,94 @@
     (:get-top-frame parent)))
 
 
+(defn- unwrap-rect [rect]
+  [(in rect :left)
+   (in rect :top)
+   (in rect :right)
+   (in rect :bottom)])
+
+
+(defn tree-node-dump-subtree [self &opt level indent-width indent-char]
+  (default level 0)
+  (default indent-width const/DEFAULT-FRAME-TREE-DUMP-INDENT-WIDTH)
+  (default indent-char const/DEFAULT-FRAME-TREE-DUMP-INDENT-CHAR)
+
+  (def indent
+    (buffer/new-filled (* level indent-width) indent-char))
+
+  (case (in self :type)
+    :virtual-desktop-container
+    (printf "%sRoot Container" indent)
+
+    :layout
+    (printf "%sVirtual Desktop (name=\"%s\", id=%s)"
+            indent
+            (in self :name)
+            (in self :id))
+
+    :frame
+    (let [rect (in self :rect)]
+      (if-let [mon (in self :monitor)]
+        (printf "%sMonitor (primary=%n,dir=%s,work-area={l:%d,t:%d,r:%d,b:%d},dpi=%n,device=%n)"
+                indent
+                # primary
+                (> (band (in mon :flags) MONITORINFOF_PRIMARY) (int/u64 0))
+                # dir
+                (if-let [dir (:get-direction self)]
+                  (string dir)
+                  "none")
+                # work-area
+                ;(unwrap-rect rect)
+                # dpi
+                (in mon :dpi)
+                # device
+                (in mon :device))
+        (printf "%sFrame (dir=%s,rect={l:%d,t:%d,r:%d,b:%d})"
+                indent
+                # dir
+                (if-let [dir (:get-direction self)]
+                  (string dir)
+                  "none")
+                # rect
+                ;(unwrap-rect rect))))
+
+    :window
+    (if-let [win-info (:get-info self)]
+      (do
+        (def more-indent
+          (string indent (buffer/new-filled indent-width indent-char)))
+        (printf "%sWindow (hwnd=%n)"
+                indent
+                (in self :hwnd))
+        (printf "%sName: %s"
+                more-indent
+                (:get_CachedName (in win-info :uia-element)))
+        (printf "%sClass: %s"
+                more-indent
+                (:get_CachedClassName (in win-info :uia-element)))
+        (printf "%sExe: %s"
+                more-indent
+                (in win-info :exe-path))
+        (printf "%sRect: {l:%d,t:%d,r:%d,b:%d}"
+                more-indent
+                ;(unwrap-rect (:get_CachedBoundingRectangle (in win-info :uia-element))))
+        (printf "%sExtended Frame Bounds: {l:%d,t:%d,r:%d,b:%d}"
+                more-indent
+                ;(unwrap-rect (DwmGetWindowAttribute (in self :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS)))
+        (printf "%sVirtual Desktop: %s"
+                more-indent
+                (get-in win-info [:virtual-desktop :name]))
+        (:Release (in win-info :uia-element)))
+
+      (printf "%sWindow (hwnd=%n,failed to get info)" indent))
+
+    (printf "%sUnknown (%n)" indent self))
+
+  (when-let [children (in self :children)]
+    (each child children
+      (:dump-subtree child (+ 1 level) indent-width indent-char))))
+
+
 (def- tree-node-proto
   @{:activate tree-node-activate
     :get-next-child tree-node-get-next-child
@@ -1020,7 +1108,8 @@
     :get-layout tree-node-get-layout
     :get-root tree-node-get-root
     :get-window-manager tree-node-get-window-manager
-    :get-top-frame tree-node-get-top-frame})
+    :get-top-frame tree-node-get-top-frame
+    :dump-subtree tree-node-dump-subtree})
 
 
 (defn tree-node [node-type &opt parent children &keys extra-fields]
@@ -1509,6 +1598,14 @@
   (shrink-rect (in self :rect) paddings))
 
 
+(defn frame-get-direction [self]
+  (cond
+    (= vertical-frame-proto (table/getproto self)) :vertical
+    (= horizontal-frame-proto (table/getproto self)) :horizontal
+    # The frame is not split
+    true nil))
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
@@ -1519,7 +1616,8 @@
         :close frame-close
         :sync-current-window frame-sync-current-window
         :get-paddings frame-get-paddings
-        :get-padded-rect frame-get-padded-rect}
+        :get-padded-rect frame-get-padded-rect
+        :get-direction frame-get-direction}
       tree-node-proto))
 
 
