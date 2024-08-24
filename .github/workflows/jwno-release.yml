@@ -127,6 +127,8 @@ jobs:
           path: |
             ${{ env.JWNO_DIR }}\build\*.exe
             ${{ env.JWNO_DIR }}\build\*.exe.sha256
+            ${{ env.JWNO_DIR }}\build\*.lib
+            ${{ env.JWNO_DIR }}\build\*.exp
           if-no-files-found: error
           retention-days: 7
           overwrite: true
@@ -140,4 +142,6 @@ jobs:
           files: |
             ./jwno/build/jwno.exe
             ./jwno/build/jwno.exe.sha256
+            ./jwno/build/jwno.lib
+            ./jwno/build/jwno.exp
           token: ${{ secrets.RELEASE_PAT }}
