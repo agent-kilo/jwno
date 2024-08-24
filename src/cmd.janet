@@ -359,6 +359,7 @@
                   :virtual-desktop desktop-info}
               win-info)
             (def rect (:get_CachedBoundingRectangle uia-win))
+            (def efb-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
             (:show-tooltip ui-man
                            :describe-window
                            (string/format (string/join
@@ -368,17 +369,21 @@
                                             "Class Name: %s"
                                             "Virtual Desktop Name: %s"
                                             "Virtual Desktop ID: %s"
-                                            "Rect: %n"]
+                                            "Rect: %n"
+                                            "EFB Rect: %n"]
                                            "\n")
                                           hwnd
                                           exe-path
                                           (:get_CachedName uia-win)
                                           (:get_CachedClassName uia-win)
                                           (in desktop-info :name)
-                                          (in desktop-info :id)
-                                          rect)
-                           (in rect :left)
-                           (in rect :top)))
+                                          (if-let [desktop-id (in desktop-info :id)]
+                                            desktop-id
+                                            "n/a")
+                                          rect
+                                          efb-rect)
+                           (in efb-rect :left)
+                           (in efb-rect :top)))
           (:show-tooltip ui-man
                          :describe-window
                          (string/format "Failed to get window info for %n." hwnd)))))))
