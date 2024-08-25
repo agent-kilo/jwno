@@ -176,6 +176,12 @@
   (:activate move-to-frame))
 
 
+(defn match-exe-name [exe-name]
+  (fn [win]
+    (def win-exe (:get-exe-path win))
+    (string/has-suffix? (string "\\" exe-name) win-exe)))
+
+
 #
 # We build our main key map below. Make sure to call the :set-keymap
 # method from the key-manager object with the new key map, or Jwno
@@ -191,11 +197,16 @@
     (k "win + shift + q" :quit)
     (k "win + r" :retile)
 
-    (k "win + enter  t" [:exec true "wt.exe"])
+    (k "win + enter  t" [:summon
+                         (match-exe-name "WindowsTerminal.exe")
+                         true
+                         "wt.exe"])
     # Some programs (such as Emacs here) would keep the input/output
     # pipes open, blocking Jwno when it exits. Use powershell or cmd
     # to launch the program indirectly in this case.
-    (k "win + enter  e" [:exec true
+    (k "win + enter  e" [:summon
+                         (match-exe-name "emacs.exe")
+                         true
                          "pwsh.exe"
                          "-Command"
                          "Start-Process runemacs.exe"])
