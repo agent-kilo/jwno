@@ -1,5 +1,7 @@
 (import spork/netrepl)
 
+(use ./util)
+
 (import ./const)
 (import ./log)
 
@@ -26,24 +28,24 @@
 
 
 (defn repl-server-make-env [self client-name client-stream]
-  (def context-def
-    @{:value (in self :context)
-      :doc "The Jwno main loop context object.\n"})
-  (def repl-server-def
-    @{:value self
-      :doc "The current REPL server.\n"})
-  (def client-name-def
-    @{:value client-name
-      :doc "The name for the current REPL client.\n"})
-  (def client-stream-def
-    @{:value client-stream
-      :doc "The socket stream for the current REPL client.\n"})
-
   (def new-env (make-env (in self :env)))
-  (put new-env 'jwno-context context-def)
-  (put new-env 'jwno-repl-server repl-server-def)
-  (put new-env 'jwno-client-name client-name-def)
-  (put new-env 'jwno-client-stream client-stream-def)
+
+  (put new-env
+       (global-ns 'context)
+       @{:value (in self :context)
+         :doc "The Jwno main loop context object.\n"})
+  (put new-env
+       (global-ns 'repl-server)
+       @{:value self
+         :doc "The current REPL server.\n"})
+  (put new-env
+       (global-ns 'client-name)
+       @{:value client-name
+         :doc "The name for the current REPL client.\n"})
+  (put new-env
+       (global-ns 'client-stream)
+       @{:value client-stream
+         :doc "The socket stream for the current REPL client.\n"})
 
   (make-env new-env))
 

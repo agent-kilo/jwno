@@ -93,8 +93,10 @@
 
 (defn load-config-file [config-path context]
   (def new-env (make-env config-env))
-  (put new-env 'jwno-context @{:value context
-                               :doc "The Jwno main loop context object.\n"})
+  (put new-env
+       (global-ns 'context)
+       @{:value context
+         :doc "The Jwno main loop context object.\n"})
   (dofile config-path
           :source config-path
           :env (make-env new-env)))

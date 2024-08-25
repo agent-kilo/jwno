@@ -1,5 +1,7 @@
 (use jw32/_winuser)
 
+(import ./const)
+
 
 ################## Misc. Tools ##################
 
@@ -45,6 +47,10 @@
               :err-color false]
     (debug/stacktrace fib))
   err-buf)
+
+
+(defn global-ns [sym]
+  (symbol (string const/GLOBAL-NAMESPACE-PREFIX sym)))
 
 
 ################## Calculations ##################
