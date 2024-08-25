@@ -22,7 +22,7 @@
 # Jwno will start with the log level set to "quiet" by default.
 #
 (log/info "++++++++ HELLO THERE ++++++++")
-(log/info "++++++++ Keys in jwno-context: %n ++++++++" (keys jwno-context))
+(log/info "++++++++ Keys in jwno/context: %n ++++++++" (keys jwno/context))
 
 
 #
@@ -69,7 +69,7 @@
 #
 # Most of Jwno's APIs are exported as methods in these "manager" objects.
 # You can inspect them in the Jwno REPL by looking into their prototypes.
-# For example: `(table/getproto (in jwno-context :window-manager))`
+# For example: `(table/getproto (in jwno/context :window-manager))`
 #
 (def {:key-manager key-man
       :command-manager command-man
@@ -77,10 +77,10 @@
       :ui-manager ui-man
       :hook-manager hook-man
       :repl-manager repl-man}
-  jwno-context)
+  jwno/context)
 
 
-(def wallpaper-man (wallpaper-manager/wallpaper-manager jwno-context))
+(def wallpaper-man (wallpaper-manager/wallpaper-manager jwno/context))
 #
 # When you want something available in an REPL, export it like this:
 #
