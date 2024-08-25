@@ -427,6 +427,37 @@
                                      (string out "\n" err)))))))
 
 
+(defn cmd-summon [wm ui-man match-fn pull? cli]
+  (def all-windows (:get-all-windows (in wm :root)))
+  (var win-found nil)
+  (each w all-windows
+    (when (try
+            (match-fn w)
+            ((err fib)
+             (log/debug "match-fn failed: %n\n%s"
+                        err
+                        (get-stack-trace fib))
+             false))
+      (set win-found w)
+      (break)))
+
+  (if win-found
+    (do
+      (when pull?
+        (def cur-frame (:get-current-frame (in wm :root)))
+        (def cur-vd (in (:get-layout cur-frame) :id))
+        (def win-vd (in (:get-virtual-desktop win-found) :id))
+        # Only pull the window when it's in the same virtual desktop,
+        # since the Windows API doesn't support moving windows across
+        # virtual desktops.
+        (when (= cur-vd win-vd)
+          (:add-child cur-frame win-found)
+          (:retile wm cur-frame)))
+      (with-activation-hooks wm
+        (:activate wm win-found)))
+    (cmd-exec wm ui-man true cli)))
+
+
 (defn cmd-repl [context &opt start? host port]
   (default start? false)
   (default host const/DEFAULT-REPL-HOST)
@@ -483,6 +514,9 @@
   (:add-command command-man :exec
      (fn [verbose? & cli]
        (cmd-exec wm ui-man verbose? cli)))
+  (:add-command command-man :summon
+     (fn [match-fn pull? & cli]
+       (cmd-summon wm ui-man match-fn pull? cli)))
   (:add-command command-man :repl
      (fn [&opt start? host port]
        (cmd-repl context start? host port)))
