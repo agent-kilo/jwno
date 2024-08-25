@@ -102,7 +102,7 @@
     [x y win-width win-height]))
 
 
-(defn- reset-hwnd-visual-state [hwnd uia-com]
+(defn- reset-hwnd-visual-state [hwnd uia-com restore-minimized restore-maximized]
   (with-uia [cr (:CreateCacheRequest uia-com)]
     (:AddPattern cr UIA_WindowPatternId)
     (:AddProperty cr UIA_WindowWindowVisualStatePropertyId)
@@ -119,7 +119,11 @@
                     nil))]
         (if win-pat
           (let [old-state (:get_CachedWindowVisualState win-pat)]
-            (when (= WindowVisualState_Maximized old-state)
+            (when (and restore-minimized
+                       (= WindowVisualState_Minimized old-state))
+              (:SetWindowVisualState win-pat WindowVisualState_Normal))
+            (when (and restore-maximized
+                       (= WindowVisualState_Maximized old-state))
               (:SetWindowVisualState win-pat WindowVisualState_Normal))
             old-state)
           # XXX: Default to Normal state when failed to get the window pattern
@@ -196,7 +200,7 @@
   # windows are more like "hidden", but maximized windows are still visible.
   (try
     (let [{:com uia-com :transform-cr cr} uia-man
-          old-v-state (reset-hwnd-visual-state hwnd uia-com)]
+          old-v-state (reset-hwnd-visual-state hwnd uia-com false true)]
       (unless (= WindowVisualState_Minimized old-v-state)
         (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
           (with-uia [tran-pat (:GetCachedPatternAs uia-win
@@ -1148,6 +1152,14 @@
                    (merge (in self :tags) tags)))
 
 
+(defn window-reset-visual-state [self &opt restore-minimized restore-maximized]
+  (def wm (:get-window-manager self))
+  (:reset-hwnd-visual-state wm
+                            (in self :hwnd)
+                            restore-minimized
+                            restore-maximized))
+
+
 (defn window-set-alpha [self alpha]
   (set-hwnd-alpha (in self :hwnd) alpha))
 
@@ -1208,6 +1220,7 @@
    @{:close window-close
      :alive? window-alive?
      :transform window-transform
+     :reset-visual-state window-reset-visual-state
      :get-alpha window-get-alpha
      :set-alpha window-set-alpha
      :elevated? window-elevated?
@@ -1850,6 +1863,15 @@
   (transform-hwnd hwnd rect (in self :uia-manager) tags))
 
 
+(defn wm-reset-hwnd-visual-state [self hwnd &opt restore-minimized restore-maximized]
+  (default restore-minimized true)
+  (default restore-maximized true)
+  (reset-hwnd-visual-state hwnd
+                           (get-in self [:uia-manager :com])
+                           restore-minimized
+                           restore-maximized))
+
+
 (defn wm-hwnd-process-elevated? [self hwnd]
   (hwnd-process-elevated? hwnd))
 
@@ -2108,6 +2130,7 @@
     :window-opened wm-window-opened
 
     :transform-hwnd wm-transform-hwnd
+    :reset-hwnd-visual-state wm-reset-hwnd-visual-state
     :retile wm-retile
     :activate wm-activate
 

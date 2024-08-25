@@ -443,6 +443,7 @@
 
   (if win-found
     (do
+      (:reset-visual-state win-found true false)
       (when pull?
         (def cur-frame (:get-current-frame (in wm :root)))
         (def cur-vd (in (:get-layout cur-frame) :id))
