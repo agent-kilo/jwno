@@ -77,7 +77,8 @@
  :deps [;(->> (os/dir "src")
               (filter |(string/has-suffix? ".janet" $))
               (map |(string "src/" $)))
-        (generated "resource.obj")]
+        (generated "resource.obj")
+        (generated "winmain_stub.o")]
 
  # Cannot embed the manifest directly when linking, or there'll be this warning
  #   warning LNK4078: multiple '.rsrc' sections found with different attributes
@@ -88,8 +89,4 @@
  #         "/manifest:embed"
  #         "/manifestinput:manifest/jwno.manifest"]
 
- :ldflags [(generated "winmain_stub.o") (generated "resource.obj") "/subsystem:windows"]
- )
-
-(add-dep (generated "jwno.exe")
-         (generated "winmain_stub.o"))
+ :ldflags [(generated "winmain_stub.o") (generated "resource.obj") "/subsystem:windows"])
