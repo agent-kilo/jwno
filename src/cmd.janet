@@ -513,59 +513,201 @@
     context)
 
   (:add-command command-man :quit
-     (fn [] (cmd-quit ui-man)))
+     (fn [] (cmd-quit ui-man))
+     ```
+     (:quit)
+
+     Tells Jwno to stop running.
+     ```)
   (:add-command command-man :retile
-     (fn [] (cmd-retile wm)))
+     (fn [] (cmd-retile wm))
+     ```
+     (:retile)
+
+     Fits all managed windows to their frames.
+     ```)
 
   (:add-command command-man :exec
      (fn [verbose? & cli]
-       (cmd-exec wm ui-man verbose? cli)))
+       (cmd-exec wm ui-man verbose? cli))
+     ```
+     (:exec & cli)
+
+     Executes a command line specified by cli.
+     ```)
   (:add-command command-man :summon
      (fn [match-fn &opt pull? & cli]
-       (cmd-summon wm ui-man match-fn pull? cli)))
+       (cmd-summon wm ui-man match-fn pull? cli))
+     ```
+     (:summon match-fn &opt pull? & cli)
+
+     Summons a managed window for which match-fn returns a truthy value.
+     Match-fn should accept a window object as its sole argument. When
+     pull? is truthy, and the matching window is on the currently active
+     virtual desktop, that window will be pulled into the current frame.
+     Otherwise, simply bring focus to the matching window. If no matching
+     window is found, will try to execute cli unless its empty.
+     ```)
   (:add-command command-man :repl
      (fn [&opt start? host port]
-       (cmd-repl context start? host port)))
+       (cmd-repl context start? host port))
+     ```
+     (:repl &opt start? host port)
+
+     Opens an REPL window for the current Jwno process. If start? is
+     truthy, and no REPL server is available, a new server will be
+     started. Host and port specify the address to connect, and they
+     default to "127.0.0.1" and 9999.
+     ```)
 
   (:add-command command-man :split-frame
      (fn [dir &opt nfr ratios after-split-fn]
-       (cmd-split-frame wm dir nfr ratios after-split-fn)))
+       (cmd-split-frame wm dir nfr ratios after-split-fn))
+     ```
+     (:split-frame dir &opt nfr ratios after-split-fn)
+
+     Divides a frame into multiple sub-frames. Dir can be :vertical or
+     :horizontal. Nfr specifies the number of sub-frames which defaults
+     to 2. Ratios, if provided, should be a tuple or array, containing
+     ratios for sub-frame sizes. After-split-fn is a function accepting
+     the frame object being divided as its sole argument, and it will
+     be called after the split.
+
+     For example, calling the command (:split-frame :vertical 3 [0.1 0.3 0.6])
+     splits the current frame into 3 vertical sub-frames, whose heights
+     are 0.1, 0.3 and 0.6 of the original frame height, respectively.
+     ```)
   (:add-command command-man :flatten-parent
-     (fn [] (cmd-flatten-parent wm)))
+     (fn [] (cmd-flatten-parent wm))
+     ```
+     (:flatten-parent)
+
+     Flattens the parent frame, by closing the current frame and all
+     its siblings.
+     ```)
 
   (:add-command command-man :resize-frame
-     (fn [dw dh] (cmd-resize-frame wm dw dh)))
+     (fn [dw dh] (cmd-resize-frame wm dw dh))
+     ```
+     (:resize-frame dw dh)
+
+     Resizes the current frame. Dw and dh are the deltas of width and
+     height, respectively. Both of them are in physical pixels.
+     ```)
   (:add-command command-man :close-frame
-     (fn [] (cmd-close-frame wm)))
+     (fn [] (cmd-close-frame wm))
+     ```
+     (:close-frame)
+
+     Closes the current frame.
+     ```)
   (:add-command command-man :frame-to-window-size
-     (fn [] (cmd-frame-to-window-size wm)))
+     (fn [] (cmd-frame-to-window-size wm))
+     ```
+     (:frame-to-window-size)
+
+     Resizes the current frame, so that it's the same size as its
+     current active window. Constraints from the parent frame apply.
+     ```)
   (:add-command command-man :balance-frames
-     (fn [] (cmd-balance-frames wm)))
+     (fn [] (cmd-balance-frames wm))
+     ```
+     (:balance-frames)
+
+     Resizes all frames, so that all siblings belonging to the same
+     parent have the same size.
+     ```)
   (:add-command command-man :zoom-in
-     (fn [ratio] (cmd-zoom-in wm ratio)))
+     (fn [ratio] (cmd-zoom-in wm ratio))
+     ```
+     (:zoom-in ratio)
+
+     Resizes the current frame, so that its size is proportional to
+     its ancestors', according to ratio.
+
+     For example, (:zoom-in 0.7) makes a frame to have 0.7 of both
+     its ancestors' width and height.
+     ```)
 
   (:add-command command-man :enum-frame
-     (fn [dir] (cmd-enum-frame wm dir)))
+     (fn [dir] (cmd-enum-frame wm dir))
+     ```
+     (:enum-frame dir)
+
+     Brings focus to another frame in the specified direction. Dir
+     can be :next or :prev.
+     ```)
   (:add-command command-man :adjacent-frame
-     (fn [dir] (cmd-adjacent-frame wm dir)))
+     (fn [dir] (cmd-adjacent-frame wm dir))
+     ```
+     (:adjacent-frame dir)
+
+     Brings focus to the adjacent frame in the specified direction.
+     Dir can be :left, :right, :up or :down.
+     ```)
 
   (:add-command command-man :enum-window-in-frame
-     (fn [dir] (cmd-enum-window-in-frame wm dir)))
+     (fn [dir] (cmd-enum-window-in-frame wm dir))
+     ```
+     (:enum-window-in-frame dir)
+
+     Brings focus to another window in the current frame, in the
+     specified direction. Dir can be :next or :prev.
+     ```)
   (:add-command command-man :cascade-windows-in-frame
-     (fn [&opt dx dy] (cmd-cascade-windows-in-frame wm dx dy)))
+     (fn [&opt dx dy] (cmd-cascade-windows-in-frame wm dx dy))
+     ```
+     (:cascade-windows-in-frame &opt dx dy)
+
+     Cascades windows in the current frame. Dx and dy are the X and
+     Y offsets for each window, respectively. Dx and dy are both in
+     virtual pixels, and default to 32.
+     ```)
 
   (:add-command command-man :move-window
-     (fn [dir] (cmd-move-window wm dir)))
+     (fn [dir] (cmd-move-window wm dir))
+     ```
+     (:move-window dir)
+
+     Moves a window in the specified direction. Dir can be :left,
+     :right, :up or :down.
+     ```)
   (:add-command command-man :close-window
-     (fn [] (cmd-close-window wm ui-man)))
+     (fn [] (cmd-close-window wm ui-man))
+     ```
+     (:close-window)
+
+     Tries to close the focused window. This command works by
+     sending a message to the target window, instead of forcibly
+     killing the window's process.
+     ```)
   (:add-command command-man :change-window-alpha
-     (fn [delta] (cmd-change-window-alpha wm delta)))
+     (fn [delta] (cmd-change-window-alpha wm delta))
+     ```
+     (:change-window-alpha delta)
+
+     Changes the focused window's alpha value, making it partially
+     transparent. Delta, which can be negative, is the increment to
+     apply to the alpha value. A window's alpha value is in the
+     range [0, 255]. Some window's alpha cannot be changed.
+     ```)
 
   (:add-command command-man :close-window-or-frame
-     (fn [] (cmd-close-window-or-frame wm ui-man)))
+     (fn [] (cmd-close-window-or-frame wm ui-man))
+     ```
+     (:close-window-or-frame)
+
+     If the current frame is not empty, closes its active window.
+     Otherwise, closes the current frame.
+     ```)
 
   (:add-command command-man :describe-window
-     (fn [] (cmd-describe-window wm ui-man))))
+     (fn [] (cmd-describe-window wm ui-man))
+     ```
+     (:describe-window)
+
+     Shows basic info about a window.
+     ```))
 
 
 (defn command-manager-call-command [self cmd & args]
@@ -612,12 +754,20 @@
   (put (in self :commands) name nil))
 
 
+(defn command-manager-print-doc [self name]
+  (if-let [cmd (:get-command self name)
+           cmd-doc (in cmd :doc)]
+    (print (doc-format cmd-doc))
+    (print (doc-format "No doc available."))))
+
+
 (def- command-manager-proto
   @{:call-command command-manager-call-command
     :dispatch-command command-manager-dispatch-command
     :add-command command-manager-add-command
     :get-command command-manager-get-command
-    :remove-command command-manager-remove-command})
+    :remove-command command-manager-remove-command
+    :print-doc command-manager-print-doc})
 
 
 (defn command-manager [hook-man]

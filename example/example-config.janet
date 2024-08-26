@@ -343,6 +343,12 @@
 # require arguments, or simply `:command-name` for commands without
 # any argument.
 #
+# Command documentation can be found by evaluating
+#
+#   (:print-doc command-manager :command-name)
+#
+# in the REPL.
+#
 (:add-command command-man :fill-monitor
    (fn []
      (def cur-win (:get-current-window (in window-man :root)))
@@ -350,4 +356,10 @@
        (def cur-frame (in cur-win :parent))
        (def mon-frame (:get-top-frame cur-frame))
        (def rect (:get-padded-rect mon-frame))
-       (:transform cur-win rect))))
+       (:transform cur-win rect)))
+   ```
+   (:fill-monitor)
+
+   Resizes the focused window, so that it fills the whole work
+   area of the current monitor.
+   ```)
