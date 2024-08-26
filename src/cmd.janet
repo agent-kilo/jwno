@@ -427,7 +427,10 @@
                                      (string out "\n" err)))))))
 
 
-(defn cmd-summon [wm ui-man match-fn pull? cli]
+(defn cmd-summon [wm ui-man match-fn &opt pull? cli]
+  (default pull? false)
+  (default cli [])
+
   (def all-windows (:get-all-windows (in wm :root)))
   (var win-found nil)
   (each w all-windows
@@ -456,7 +459,9 @@
           (:retile wm cur-frame)))
       (with-activation-hooks wm
         (:activate wm win-found)))
-    (cmd-exec wm ui-man true cli)))
+    (if (empty? cli)
+      (:show-tooltip ui-man :summon "Summoning failed. Window not found.")
+      (cmd-exec wm ui-man true cli))))
 
 
 (defn cmd-repl [context &opt start? host port]
@@ -516,7 +521,7 @@
      (fn [verbose? & cli]
        (cmd-exec wm ui-man verbose? cli)))
   (:add-command command-man :summon
-     (fn [match-fn pull? & cli]
+     (fn [match-fn &opt pull? & cli]
        (cmd-summon wm ui-man match-fn pull? cli)))
   (:add-command command-man :repl
      (fn [&opt start? host port]

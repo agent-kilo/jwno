@@ -210,7 +210,9 @@
                          "pwsh.exe"
                          "-Command"
                          "Start-Process runemacs.exe"])
-    (k "win + enter  d" [:exec true
+    (k "win + enter  f" [:summon (match-exe-name "firefox.exe")])
+    (k "win + enter  d" [:exec
+                         true
                          "wt.exe"
                          "pwsh.exe"
                          "-NoExit"
