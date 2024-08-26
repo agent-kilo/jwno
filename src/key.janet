@@ -6,6 +6,11 @@
 (import ./log)
 
 
+# Forward declaration
+(var define-keymap nil)
+(var keymap? nil)
+
+
 (defn ascii [ascii-str]
   (in ascii-str 0))
 
@@ -47,15 +52,12 @@
 
 
 (defn- set-key-def [keymap key-struct command-or-keymap]
-  (if (table? command-or-keymap)
+  (if (keymap? command-or-keymap)
     (let [sub-keymap command-or-keymap]
       (put sub-keymap :parent keymap)
       (put keymap key-struct sub-keymap))
     (let [command command-or-keymap]
       (put keymap key-struct command))))
-
-
-(var define-keymap nil) # Forward declaration
 
 
 (def key-name-to-code
@@ -238,7 +240,7 @@
 
   (if (<= (length rest-keys) 0)
     (set-key-def self cur-key command-or-keymap)
-    (let [sub-keymap (if (table? cur-def)
+    (let [sub-keymap (if (keymap? cur-def)
                        cur-def
                        (define-keymap))]
       (set-key-def self
@@ -269,7 +271,7 @@
 
 
 (defn- format-key-command [cmd]
-  (if (table? cmd)
+  (if (keymap? cmd)
     # A sub-keymap
     "..."
     # An actual command
@@ -297,6 +299,11 @@
 
 (varfn define-keymap []
   (table/setproto (table/new 0) keymap-proto))
+
+
+(varfn keymap? [x]
+  (and (table? x)
+       (not (has-key? x :cmd))))
 
 
 (defn key-manager-new-keymap [self]
@@ -447,7 +454,7 @@
 (defn keyboard-hook-handler-handle-binding [self hook-struct binding]
   (def key-up (hook-struct :flags.up))
 
-  (when (table? binding)
+  (when (keymap? binding)
     # It's a sub-keymap, activate it only on key-up
     (if key-up
       (do
