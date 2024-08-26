@@ -579,7 +579,7 @@
 
     (:call-filter-hook hook-man :filter-command cmd args)
     (do
-      (found ;args)
+      ((in found :fn) ;args)
       (:call-hook hook-man :command-executed cmd args)
       true)
 
@@ -597,8 +597,15 @@
      (log/error "Command %n failed: %n\n%s" call-with err (get-stack-trace fib)))))
 
 
-(defn command-manager-add-command [self name cmd-fn]
-  (put (in self :commands) name cmd-fn))
+(defn command-manager-add-command [self name cmd-fn &opt doc]
+  (put (in self :commands)
+       name
+       @{:fn cmd-fn
+         :doc doc}))
+
+
+(defn command-manager-get-command [self name]
+  (get-in self [:commands name]))
 
 
 (defn command-manager-remove-command [self name]
@@ -609,6 +616,7 @@
   @{:call-command command-manager-call-command
     :dispatch-command command-manager-dispatch-command
     :add-command command-manager-add-command
+    :get-command command-manager-get-command
     :remove-command command-manager-remove-command})
 
 
