@@ -3,6 +3,7 @@
 (use ./cmd)
 (use ./input)
 
+(import ./const)
 (import ./log)
 
 
@@ -272,6 +273,15 @@
     str))
 
 
+(defn- clip-string-right [str clip-to]
+  (def str-len (length str))
+  (if (> str-len clip-to)
+    (let [clip-sign "..."
+          clip-sign-len (length clip-sign)]
+      (string (string/slice str 0 (- clip-to clip-sign-len)) clip-sign))
+    str))
+
+
 (defn- format-key-struct [key &opt pad-to]
   (default pad-to 0) # No padding by default
 
@@ -283,16 +293,20 @@
     (errorf "unknown key code: %n" trigger)))
 
 
-(defn- format-key-command [cmd-info]
-  (if (keymap? cmd-info)
-    # A sub-keymap
-    (if-let [km-doc (in cmd-info :doc)]
-      km-doc
-      "...")
-    # An actual command
-    (if-let [key-doc (in cmd-info :doc)]
-      key-doc
-      (string/format "%n" (in cmd-info :cmd)))))
+(defn- format-key-command [cmd-info &opt clip-to]
+  (default clip-to const/KEYMAP-COMMAND-DESC-MAX-LENGTH)
+
+  (def cmd-desc
+    (if (keymap? cmd-info)
+      # A sub-keymap
+      (if-let [km-doc (in cmd-info :doc)]
+        km-doc
+        "...")
+      # An actual command
+      (if-let [key-doc (in cmd-info :doc)]
+        key-doc
+        (string/format "%n" (in cmd-info :cmd)))))
+  (clip-string-right cmd-desc clip-to))
 
 
 (defn keymap-format [self]
