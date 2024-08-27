@@ -106,8 +106,8 @@
 # A macro to simplify key map definitions. Of course you can call
 # :define-key method from the keymap object directly instead.
 #
-(defmacro k [key-seq cmd]
-  ~(:define-key keymap ,key-seq ,cmd))
+(defmacro k [key-seq cmd &opt doc]
+  ~(:define-key keymap ,key-seq ,cmd ,doc))
 
 
 #
@@ -194,13 +194,15 @@
 (defn build-keymap [key-man]
   (let [keymap (:new-keymap key-man)]
 
+    (k "win + shift + /" :show-root-keymap)
     (k "win + shift + q" :quit)
     (k "win + r" :retile)
 
     (k "win + enter  t" [:summon
                          (match-exe-name "WindowsTerminal.exe")
                          true
-                         "wt.exe"])
+                         "wt.exe"]
+       "Summon Terminal")
     # Some programs (such as Emacs here) would keep the input/output
     # pipes open, blocking Jwno when it exits. Use powershell or cmd
     # to launch the program indirectly in this case.
@@ -209,23 +211,29 @@
                          true
                          "pwsh.exe"
                          "-Command"
-                         "Start-Process runemacs.exe"])
-    (k "win + enter  f" [:summon (match-exe-name "firefox.exe")])
+                         "Start-Process runemacs.exe"]
+       "Summon Emacs")
+    (k "win + enter  f" [:summon (match-exe-name "firefox.exe")]
+       "Summon Firefox")
     (k "win + enter  d" [:exec
                          true
                          "wt.exe"
                          "pwsh.exe"
                          "-NoExit"
                          "-Command"
-                         "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"])
-    (k "win + enter  r" [:repl true "127.0.0.1" 9999])
+                         "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"]
+       "Launch VS Dev Shell")
+    (k "win + enter  r" [:repl true "127.0.0.1" 9999]
+       "Launch Jwno REPL")
 
     (k "win + shift + c" :close-window-or-frame)
     (k "win + shift + f" :close-frame)
     (k "win + ctrl + f" :flatten-parent)
 
-    (k "win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split])
-    (k "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split])
+    (k "win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split]
+       "Split current frame horizontally")
+    (k "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split]
+       "Split current frame vertically")
     (k "win + =" :balance-frames)
     (k "win + ;" [:zoom-in 0.7])
     (k "win + shift + ;" [:zoom-in 0.3])
@@ -242,12 +250,15 @@
       (k (string "win + ctrl + " (in dir-keys dir)) [:adjacent-frame dir])
       (k (string "win + shift + " (in dir-keys dir)) [:move-window dir]))
 
-    (k "win + s" [:push-keymap resize-mode-keymap])
-    (k "win + k" [:push-keymap yank-mode-keymap])
+    (k "win + s" [:push-keymap resize-mode-keymap]
+       "Resize mode")
+    (k "win + k" [:push-keymap yank-mode-keymap]
+       "Yank mode")
 
     (k "win + shift + s" :frame-to-window-size)
 
-    (k "win + a" [:push-keymap alpha-mode-keymap])
+    (k "win + a" [:push-keymap alpha-mode-keymap]
+       "Alpha mode")
 
     (k "win + b" :describe-window)
 
@@ -260,7 +271,8 @@
     keymap))
 
 
-(:set-keymap key-man (build-keymap key-man))
+(def root-keymap (build-keymap key-man))
+(:set-keymap key-man root-keymap)
 
 
 (:add-hook hook-man :filter-window
@@ -362,4 +374,20 @@
 
    Resizes the focused window, so that it fills the whole work
    area of the current monitor.
+   ```)
+
+(:add-command command-man :show-root-keymap
+   (fn []
+     (:show-tooltip
+        ui-man
+        :show-root-keymap
+        (:format root-keymap)
+        nil
+        nil
+        10000
+        :center))
+   ```
+   (:show-root-keymap)
+
+   Shows the root keymap defined in the config file.
    ```)

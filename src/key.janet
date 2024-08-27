@@ -51,13 +51,14 @@
    VK_RWIN :rwin})
 
 
-(defn- set-key-def [keymap key-struct command-or-keymap]
+(defn- set-key-def [keymap key-struct command-or-keymap &opt doc]
   (if (keymap? command-or-keymap)
     (let [sub-keymap command-or-keymap]
       (put sub-keymap :parent keymap)
+      (put sub-keymap :doc doc)
       (put keymap key-struct sub-keymap))
     (let [command command-or-keymap]
-      (put keymap key-struct command))))
+      (put keymap key-struct @{:cmd command :doc doc}))))
 
 
 (def key-name-to-code
@@ -227,19 +228,19 @@
     (error (string/format "unknown key spec: %n" key-spec))))
 
 
-(defn keymap-define-key [self key-seq command-or-keymap]
+(defn keymap-define-key [self key-seq command-or-keymap &opt doc]
   (if-not (indexed? key-seq)
     (if (string? key-seq)
-      (break (keymap-define-key self (keymap-parse-key self key-seq) command-or-keymap))
+      (break (keymap-define-key self (keymap-parse-key self key-seq) command-or-keymap doc))
       # A single key spec
-      (break (keymap-define-key self [key-seq] command-or-keymap))))
+      (break (keymap-define-key self [key-seq] command-or-keymap doc))))
 
   (def cur-key (in key-seq 0))
   (def rest-keys (slice key-seq 1))
   (def cur-def (get self cur-key))
 
   (if (<= (length rest-keys) 0)
-    (set-key-def self cur-key command-or-keymap)
+    (set-key-def self cur-key command-or-keymap doc)
     (let [sub-keymap (if (keymap? cur-def)
                        cur-def
                        (define-keymap))]
@@ -248,7 +249,8 @@
                    (keymap-define-key
                      sub-keymap
                      rest-keys
-                     command-or-keymap))
+                     command-or-keymap
+                     doc))
       self)))
 
 
@@ -262,29 +264,48 @@
     self))
 
 
-(defn- format-key-struct [key]
+(defn- format-key-struct [key &opt pad-to]
+  (default pad-to 8)
+
   (def trigger (in key :key))
   (def mods (in key :modifiers))
   (if-let [trigger-name (in key-code-to-name trigger)]
-    (string/join [;mods (string/ascii-upper trigger-name)] " + ")
+    (let [key-str (string/join [;mods (string/ascii-upper trigger-name)] " + ")
+          key-str-len (length key-str)]
+      (if (< key-str-len pad-to)
+        (string key-str (buffer/new-filled (- pad-to key-str-len) (in " " 0)))
+        key-str))
     (errorf "unknown key code: %n" trigger)))
 
 
-(defn- format-key-command [cmd]
-  (if (keymap? cmd)
+(defn- format-key-command [cmd-info]
+  (if (keymap? cmd-info)
     # A sub-keymap
-    "..."
+    (if-let [km-doc (in cmd-info :doc)]
+      km-doc
+      "...")
     # An actual command
-    (string/format "%n" cmd)))
+    (if-let [key-doc (in cmd-info :doc)]
+      key-doc
+      (string/format "%n" (in cmd-info :cmd)))))
 
 
 (defn keymap-format [self]
   (def cmd-desc @[])
+
+  (var max-key-str-len 0)
+  (eachk k self
+    (when (and (struct? k) (has-key? k :key))
+      (def key-str (format-key-struct k 0))
+      (def key-str-len (length key-str))
+      (if (> key-str-len max-key-str-len)
+        (set max-key-str-len key-str-len))))
+
   (eachp [k c] self
     (when (and (struct? k) (has-key? k :key))
       (array/push cmd-desc
-                  (string/format "%s\t%s"
-                                 (format-key-struct k)
+                  (string/format "%s\t\t%s"
+                                 (format-key-struct k max-key-str-len)
                                  (format-key-command c)))))
   (string/join cmd-desc "\n"))
 
@@ -390,12 +411,13 @@
     # Already remapped
     (break nil))
 
-  (if-let [binding (:get-key-binding (in self :current-keymap)
-                                     (key (hook-struct :vkCode)))]
-    (match binding
+  (when-let [binding (:get-key-binding (in self :current-keymap)
+                                       (key (hook-struct :vkCode)))]
+    (def {:cmd cmd} binding)
+    (match cmd
       [:map-to new-key]
       new-key
-
+      
       _
       nil)))
 
@@ -462,7 +484,9 @@
         (break [:key/switch-keymap binding]))
       (break nil)))
 
-  (match binding
+  (def {:cmd cmd} binding)
+
+  (match cmd
     [:push-keymap keymap]
     (when key-up
       (keyboard-hook-handler-push-keymap self keymap)
