@@ -264,17 +264,22 @@
     self))
 
 
+(defn- pad-string-right [str pad-to]
+  (def str-len (length str))
+  (def pad-char (in " " 0))
+  (if (< str-len pad-to)
+    (string str (buffer/new-filled (- pad-to str-len) pad-char))
+    str))
+
+
 (defn- format-key-struct [key &opt pad-to]
-  (default pad-to 8)
+  (default pad-to 0) # No padding by default
 
   (def trigger (in key :key))
   (def mods (in key :modifiers))
   (if-let [trigger-name (in key-code-to-name trigger)]
-    (let [key-str (string/join [;mods (string/ascii-upper trigger-name)] " + ")
-          key-str-len (length key-str)]
-      (if (< key-str-len pad-to)
-        (string key-str (buffer/new-filled (- pad-to key-str-len) (in " " 0)))
-        key-str))
+    (let [key-str (string/join [;mods (string/ascii-upper trigger-name)] " + ")]
+      (pad-string-right key-str pad-to))
     (errorf "unknown key code: %n" trigger)))
 
 
@@ -291,22 +296,24 @@
 
 
 (defn keymap-format [self]
-  (def cmd-desc @[])
-
   (var max-key-str-len 0)
-  (eachk k self
+  (def km-arr @[])
+  (eachk k (table/proto-flatten self)
     (when (and (struct? k) (has-key? k :key))
       (def key-str (format-key-struct k 0))
       (def key-str-len (length key-str))
       (if (> key-str-len max-key-str-len)
-        (set max-key-str-len key-str-len))))
+        (set max-key-str-len key-str-len))
+      (array/push km-arr [key-str (in self k)])))
 
-  (eachp [k c] self
-    (when (and (struct? k) (has-key? k :key))
-      (array/push cmd-desc
-                  (string/format "%s\t\t%s"
-                                 (format-key-struct k max-key-str-len)
-                                 (format-key-command c)))))
+  (sort km-arr |(< (first $0) (first $1)))
+
+  (def cmd-desc @[])
+  (each [ks c] km-arr
+    (array/push cmd-desc
+                (string/format "%s\t\t%s"
+                               (pad-string-right ks max-key-str-len)
+                               (format-key-command c))))
   (string/join cmd-desc "\n"))
 
 
