@@ -33,6 +33,12 @@
 
 (defn- handle-focus-changed-event [sender chan]
   (log/debug "#################### handle-focus-changed-event ####################")
+
+  # When sweeping through menu items with the mouse, each item would trigger
+  # a focus-changed event. We don't want these excessive events.
+  (when (= UIA_MenuItemControlTypeId (:get_CachedControlType sender))
+    (break S_OK))
+
   (ev/give chan :uia/focus-changed)
   S_OK)
 
@@ -223,11 +229,16 @@
       handler))
 
   (def focus-changed-handler
-    (:AddFocusChangedEventHandler
-       uia-com
-       nil
-       (fn [sender]
-         (handle-focus-changed-event sender chan))))
+    (let [cr (:CreateCacheRequest uia-com)]
+      (:AddProperty cr UIA_ControlTypePropertyId)
+      (def handler
+        (:AddFocusChangedEventHandler
+           uia-com
+           cr
+           (fn [sender]
+             (handle-focus-changed-event sender chan))))
+      (:Release cr)
+      handler))
 
   [(fn []
      (:RemoveAutomationEventHandler
