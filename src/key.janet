@@ -3,7 +3,13 @@
 (use ./cmd)
 (use ./input)
 
+(import ./const)
 (import ./log)
+
+
+# Forward declaration
+(var define-keymap nil)
+(var keymap? nil)
 
 
 (defn ascii [ascii-str]
@@ -46,16 +52,14 @@
    VK_RWIN :rwin})
 
 
-(defn- set-key-def [keymap key-struct command-or-keymap]
-  (if (table? command-or-keymap)
+(defn- set-key-def [keymap key-struct command-or-keymap &opt doc]
+  (if (keymap? command-or-keymap)
     (let [sub-keymap command-or-keymap]
       (put sub-keymap :parent keymap)
+      (put sub-keymap :doc doc)
       (put keymap key-struct sub-keymap))
     (let [command command-or-keymap]
-      (put keymap key-struct command))))
-
-
-(var define-keymap nil) # Forward declaration
+      (put keymap key-struct @{:cmd command :doc doc}))))
 
 
 (def key-name-to-code
@@ -225,20 +229,20 @@
     (error (string/format "unknown key spec: %n" key-spec))))
 
 
-(defn keymap-define-key [self key-seq command-or-keymap]
+(defn keymap-define-key [self key-seq command-or-keymap &opt doc]
   (if-not (indexed? key-seq)
     (if (string? key-seq)
-      (break (keymap-define-key self (keymap-parse-key self key-seq) command-or-keymap))
+      (break (keymap-define-key self (keymap-parse-key self key-seq) command-or-keymap doc))
       # A single key spec
-      (break (keymap-define-key self [key-seq] command-or-keymap))))
+      (break (keymap-define-key self [key-seq] command-or-keymap doc))))
 
   (def cur-key (in key-seq 0))
   (def rest-keys (slice key-seq 1))
   (def cur-def (get self cur-key))
 
   (if (<= (length rest-keys) 0)
-    (set-key-def self cur-key command-or-keymap)
-    (let [sub-keymap (if (table? cur-def)
+    (set-key-def self cur-key command-or-keymap doc)
+    (let [sub-keymap (if (keymap? cur-def)
                        cur-def
                        (define-keymap))]
       (set-key-def self
@@ -246,7 +250,8 @@
                    (keymap-define-key
                      sub-keymap
                      rest-keys
-                     command-or-keymap))
+                     command-or-keymap
+                     doc))
       self)))
 
 
@@ -260,30 +265,69 @@
     self))
 
 
-(defn- format-key-struct [key]
+(defn- pad-string-right [str pad-to]
+  (def str-len (length str))
+  (def pad-char (in " " 0))
+  (if (< str-len pad-to)
+    (string str (buffer/new-filled (- pad-to str-len) pad-char))
+    str))
+
+
+(defn- clip-string-right [str clip-to]
+  (def str-len (length str))
+  (if (> str-len clip-to)
+    (let [clip-sign "..."
+          clip-sign-len (length clip-sign)]
+      (string (string/slice str 0 (- clip-to clip-sign-len)) clip-sign))
+    str))
+
+
+(defn- format-key-struct [key &opt pad-to]
+  (default pad-to 0) # No padding by default
+
   (def trigger (in key :key))
   (def mods (in key :modifiers))
   (if-let [trigger-name (in key-code-to-name trigger)]
-    (string/join [;mods (string/ascii-upper trigger-name)] " + ")
+    (let [key-str (string/join [;mods (string/ascii-upper trigger-name)] " + ")]
+      (pad-string-right key-str pad-to))
     (errorf "unknown key code: %n" trigger)))
 
 
-(defn- format-key-command [cmd]
-  (if (table? cmd)
-    # A sub-keymap
-    "..."
-    # An actual command
-    (string/format "%n" cmd)))
+(defn- format-key-command [cmd-info &opt clip-to]
+  (default clip-to const/KEYMAP-COMMAND-DESC-MAX-LENGTH)
+
+  (def cmd-desc
+    (if (keymap? cmd-info)
+      # A sub-keymap
+      (if-let [km-doc (in cmd-info :doc)]
+        km-doc
+        "...")
+      # An actual command
+      (if-let [key-doc (in cmd-info :doc)]
+        key-doc
+        (string/format "%n" (in cmd-info :cmd)))))
+  (clip-string-right cmd-desc clip-to))
 
 
 (defn keymap-format [self]
-  (def cmd-desc @[])
-  (eachp [k c] self
+  (var max-key-str-len 0)
+  (def km-arr @[])
+  (eachk k (table/proto-flatten self)
     (when (and (struct? k) (has-key? k :key))
-      (array/push cmd-desc
-                  (string/format "%s\t%s"
-                                 (format-key-struct k)
-                                 (format-key-command c)))))
+      (def key-str (format-key-struct k 0))
+      (def key-str-len (length key-str))
+      (if (> key-str-len max-key-str-len)
+        (set max-key-str-len key-str-len))
+      (array/push km-arr [key-str (in self k)])))
+
+  (sort km-arr |(< (first $0) (first $1)))
+
+  (def cmd-desc @[])
+  (each [ks c] km-arr
+    (array/push cmd-desc
+                (string/format "%s\t\t%s"
+                               (pad-string-right ks max-key-str-len)
+                               (format-key-command c))))
   (string/join cmd-desc "\n"))
 
 
@@ -297,6 +341,11 @@
 
 (varfn define-keymap []
   (table/setproto (table/new 0) keymap-proto))
+
+
+(varfn keymap? [x]
+  (and (table? x)
+       (not (has-key? x :cmd))))
 
 
 (defn key-manager-new-keymap [self]
@@ -383,12 +432,13 @@
     # Already remapped
     (break nil))
 
-  (if-let [binding (:get-key-binding (in self :current-keymap)
-                                     (key (hook-struct :vkCode)))]
-    (match binding
+  (when-let [binding (:get-key-binding (in self :current-keymap)
+                                       (key (hook-struct :vkCode)))]
+    (def {:cmd cmd} binding)
+    (match cmd
       [:map-to new-key]
       new-key
-
+      
       _
       nil)))
 
@@ -447,7 +497,7 @@
 (defn keyboard-hook-handler-handle-binding [self hook-struct binding]
   (def key-up (hook-struct :flags.up))
 
-  (when (table? binding)
+  (when (keymap? binding)
     # It's a sub-keymap, activate it only on key-up
     (if key-up
       (do
@@ -455,7 +505,9 @@
         (break [:key/switch-keymap binding]))
       (break nil)))
 
-  (match binding
+  (def {:cmd cmd} binding)
+
+  (match cmd
     [:push-keymap keymap]
     (when key-up
       (keyboard-hook-handler-push-keymap self keymap)

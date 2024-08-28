@@ -36,31 +36,36 @@
   (def handler (keyboard-hook-handler keymap))
 
   (def dummy-hook-struct-a {:vkCode (ascii "A")})
-  (assert (= :dummy-command-a (:find-binding handler dummy-hook-struct-a @{:lctrl true})))
+  (assert (= :dummy-command-a (in (:find-binding handler dummy-hook-struct-a @{:lctrl true}) :cmd)))
   (assert (nil? (:find-binding handler dummy-hook-struct-a @{:rctrl true})))
   (assert (nil? (:find-binding handler dummy-hook-struct-a @{})))
 
   (def dummy-hook-struct-b {:vkCode (ascii "B")})
-  (assert (= :dummy-command-b (:find-binding handler dummy-hook-struct-b @{:lctrl true})))
-  (assert (= :dummy-command-b (:find-binding handler dummy-hook-struct-b @{:rctrl true})))
+  (assert (= :dummy-command-b (in (:find-binding handler dummy-hook-struct-b @{:lctrl true}) :cmd)))
+  (assert (= :dummy-command-b (in (:find-binding handler dummy-hook-struct-b @{:rctrl true}) :cmd)))
   (assert (nil? (:find-binding handler dummy-hook-struct-b @{})))
 
   (def dummy-hook-struct-c {:vkCode (ascii "C")})
-  (assert (= :dummy-command-c (:find-binding handler dummy-hook-struct-c @{})))
+  (assert (= :dummy-command-c (in (:find-binding handler dummy-hook-struct-c @{}) :cmd)))
   (assert (nil? (:find-binding handler dummy-hook-struct-c @{:lctrl true})))
 
   (def dummy-hook-struct-d {:vkCode (ascii "D")})
   (assert (= sub-keymap (:find-binding handler dummy-hook-struct-d @{})))
 
   (def dummy-hook-struct-f {:vkCode (ascii "F")})
-  (assert (= :dummy-command-f (:find-binding handler dummy-hook-struct-f @{:lctrl true :lalt true})))
+  (assert (= :dummy-command-f
+             (in (:find-binding handler dummy-hook-struct-f @{:lctrl true :lalt true}) :cmd)))
   (assert (nil? (:find-binding handler dummy-hook-struct-f @{:lctrl true :ralt true})))
 
   (def dummy-hook-struct-g {:vkCode (ascii "G")})
-  (assert (= :dummy-command-g (:find-binding handler dummy-hook-struct-g @{:lctrl true :lalt true})))
-  (assert (= :dummy-command-g (:find-binding handler dummy-hook-struct-g @{:rctrl true :lalt true})))
-  (assert (= :dummy-command-g (:find-binding handler dummy-hook-struct-g @{:lctrl true :ralt true})))
-  (assert (= :dummy-command-g (:find-binding handler dummy-hook-struct-g @{:rctrl true :ralt true}))))
+  (assert (= :dummy-command-g
+             (in (:find-binding handler dummy-hook-struct-g @{:lctrl true :lalt true}) :cmd)))
+  (assert (= :dummy-command-g
+             (in (:find-binding handler dummy-hook-struct-g @{:rctrl true :lalt true}) :cmd)))
+  (assert (= :dummy-command-g
+             (in (:find-binding handler dummy-hook-struct-g @{:lctrl true :ralt true}) :cmd)))
+  (assert (= :dummy-command-g
+             (in (:find-binding handler dummy-hook-struct-g @{:rctrl true :ralt true}) :cmd))))
 
 
 (defn test-keymap-parse-key []

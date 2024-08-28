@@ -125,8 +125,9 @@
        :uia/focus-changed
        (:focus-changed (in context :window-manager))
 
-       [:key/command cmd]
-       (:dispatch-command (in context :command-manager) cmd)
+       [:key/command cmd-info]
+       (let [{:cmd cmd} cmd-info]
+         (:dispatch-command (in context :command-manager) cmd))
 
        [:key/switch-keymap cur-keymap]
        (:call-hook (in context :hook-manager) :keymap-switched cur-keymap)
