@@ -79,10 +79,7 @@
     self)
   (def root-hwnd (:get_CachedNativeWindowHandle root))
 
-  (def release
-    (fn [elem]
-      (unless (= elem uia-elem)
-        (:Release elem))))
+  (:AddRef uia-elem)
 
   (def get-parent
     (fn [elem]
@@ -120,7 +117,7 @@
 
       (nil? parent)
       (do
-        (release cur-elem)
+        (:Release cur-elem)
         (break))
 
       true
@@ -133,10 +130,10 @@
                            nil))]
         (when (or (nil? parent-hwnd)
                   (= root-hwnd parent-hwnd))
-          (release cur-elem)
+          (:Release cur-elem)
           (break))))
 
-    (release cur-elem)
+    (:Release cur-elem)
     (set cur-elem parent)
     (set parent (get-parent cur-elem)))
 
@@ -157,11 +154,7 @@
                                    (get-stack-trace fib))
                         nil))]
     (if focused
-      (let [ret (uia-manager-get-parent-window self focused)]
-        (when (= ret focused)
-          # So that it won't be freed when returned
-          (:AddRef focused))
-        ret)
+      (uia-manager-get-parent-window self focused)
       nil)))
 
 
