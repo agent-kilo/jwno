@@ -434,6 +434,20 @@
     desktop-id?))
 
 
+(defn- get-current-virtual-desktop-name [uia-win uia-man]
+  # XXX: The returned root element will always have the name of
+  # the current virtual desktop, but this is not documented at
+  # all.
+  (with-uia [root-elem (:get-root uia-man uia-win)]
+    (if root-elem
+      (do
+        (when (= root-elem uia-win)
+          # So that it won't be freed when leaving with-uia
+          (:AddRef uia-win))
+        (:get_CachedName root-elem))
+      nil)))
+
+
 (defn- get-hwnd-virtual-desktop [hwnd? uia-man vdm-com &opt uia-win?]
   (def [hwnd uia-win]
     (normalize-hwnd-and-uia-element hwnd?
@@ -454,17 +468,16 @@
 
     true
     (do
-      (def desktop-id (get-hwnd-virtual-desktop-id hwnd vdm-com))
+      (def desktop-id
+        (get-hwnd-virtual-desktop-id hwnd vdm-com))
 
+      # XXX: The name of the HWND's virtual desktop can only be
+      # retrieved when that virtual desktop is active. Find a way
+      # around this?
       (def desktop-name
-        (with-uia [root-elem (:get-root uia-man uia-win)]
-          (if root-elem
-            (do
-              (when (= root-elem uia-win)
-                # So that it won't be freed when leaving with-uia
-                (:AddRef uia-win))
-              (:get_CachedName root-elem))
-            nil)))
+        (if (= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+          nil
+          (get-current-virtual-desktop-name uia-win uia-man)))
 
       (when (nil? uia-win?)
         # uia-win is constructed locally in this case, release it.
@@ -1055,7 +1068,7 @@
 
     :window
     (if-let [win-info (:get-info self)]
-      (do
+      (with-uia [_uia-win (in win-info :uia-element)]
         (def more-indent
           (string indent (buffer/new-filled indent-width indent-char)))
         (printf "%sWindow (hwnd=%n)"
@@ -1076,10 +1089,9 @@
         (printf "%sExtended Frame Bounds: {l:%d,t:%d,r:%d,b:%d}"
                 more-indent
                 ;(unwrap-rect (DwmGetWindowAttribute (in self :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS)))
-        (printf "%sVirtual Desktop: %s"
+        (printf "%sVirtual Desktop ID: %s"
                 more-indent
-                (get-in win-info [:virtual-desktop :name]))
-        (:Release (in win-info :uia-element)))
+                (get-in win-info [:virtual-desktop :id])))
 
       (printf "%sWindow (hwnd=%n,failed to get info)" indent))
 
@@ -1969,6 +1981,8 @@
       (:activate win)
       (break))
 
+    # :uia-element in hwnd-info is uia-win, which is managed
+    # by with-uia above, no need to :Release again.
     (def hwnd-info
       (get-hwnd-info hwnd
                      (in self :uia-manager)
