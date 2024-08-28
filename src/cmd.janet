@@ -353,10 +353,8 @@
       (:show-tooltip ui-man :describe-window "No focused window.")
       (do
         (def hwnd (:get_CachedNativeWindowHandle uia-win))
-        # :uia-element in win-info is uia-win, which is managed by
-        # with-uia above, no need to :Release again.
         (if-let [win-info (:get-hwnd-info wm hwnd uia-win)]
-          (do
+          (with-uia [_uia-win (in win-info :uia-element)]
             (def {:exe-path exe-path
                   :virtual-desktop desktop-info}
               win-info)

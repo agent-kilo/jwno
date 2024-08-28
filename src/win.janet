@@ -388,17 +388,21 @@
       [hwnd? (get-hwnd-uia-element hwnd? uia-com cr)])
 
     (or (nil? hwnd?) (null? hwnd?))
-    [(try
-       (:get_CachedNativeWindowHandle uia-win?)
-       ((err fib)
-        (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
-                   err
-                   (get-stack-trace fib))
-        nil))
-     uia-win?]
+    (do
+      (:AddRef uia-win?)
+      [(try
+         (:get_CachedNativeWindowHandle uia-win?)
+         ((err fib)
+          (log/debug "get_CachedNativeWindowHandle failed: %n\n%s"
+                     err
+                     (get-stack-trace fib))
+          nil))
+       uia-win?])
 
     true
-    [hwnd? uia-win?]))
+    (do
+      (:AddRef uia-win?)
+      [hwnd? uia-win?])))
 
 
 (defn- try-to-get-window-desktop-id [vdm-com hwnd]
@@ -440,11 +444,7 @@
   # all.
   (with-uia [root-elem (:get-root uia-man uia-win)]
     (if root-elem
-      (do
-        (when (= root-elem uia-win)
-          # So that it won't be freed when leaving with-uia
-          (:AddRef uia-win))
-        (:get_CachedName root-elem))
+      (:get_CachedName root-elem)
       nil)))
 
 
@@ -455,40 +455,26 @@
                                     (in uia-man :com)
                                     (in uia-man :focus-cr)))
 
-  (cond
-    (nil? uia-win)
-    nil
+  (with-uia [_uia-win uia-win]
+    (cond
+      (nil? uia-win)
+      nil
 
-    (nil? hwnd)
-    (do
-      (when (nil? uia-win?)
-        # uia-win is constructed locally, release it
-        (:Release uia-win))
-      nil)
+      (nil? hwnd)
+      nil
 
-    true
-    (do
-      (def desktop-id
-        (get-hwnd-virtual-desktop-id hwnd vdm-com))
-
-      # XXX: The name of the HWND's virtual desktop can only be
-      # retrieved when that virtual desktop is active. Find a way
-      # around this?
-      (def desktop-name
-        (if (= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+      true
+      (let [desktop-id (get-hwnd-virtual-desktop-id hwnd vdm-com)
+            # XXX: The name of the HWND's virtual desktop can only be
+            # retrieved when that virtual desktop is active. Find a way
+            # around this?
+            desktop-name (if (= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+                           nil
+                           (get-current-virtual-desktop-name uia-win uia-man))]
+        (if (and (nil? desktop-id)
+                 (nil? desktop-name))
           nil
-          (get-current-virtual-desktop-name uia-win uia-man)))
-
-      (when (nil? uia-win?)
-        # uia-win is constructed locally in this case, release it.
-        (:Release uia-win))
-
-      (if (and (nil? desktop-id)
-               (nil? desktop-name))
-        nil
-        (let [ret {:id desktop-id :name desktop-name}]
-          (log/debug "desktop info = %n" ret)
-          ret)))))
+          {:id desktop-id :name desktop-name})))))
 
 
 (defn- get-hwnd-info [hwnd? uia-man vdm-com &opt uia-win?]
@@ -497,14 +483,15 @@
                                     uia-win?
                                     (in uia-man :com)
                                     (in uia-man :focus-cr)))
-  (def exe-path
-    (unless (nil? hwnd)
-      (get-hwnd-path hwnd)))
-  (def desktop-info
-    (unless (nil? hwnd)
-      (get-hwnd-virtual-desktop hwnd uia-man vdm-com uia-win)))
 
-  (def ret
+  (with-uia [_uia-win uia-win]
+    (def exe-path
+      (unless (nil? hwnd)
+        (get-hwnd-path hwnd)))
+    (def desktop-info
+      (unless (nil? hwnd)
+        (get-hwnd-virtual-desktop hwnd uia-man vdm-com uia-win)))
+
     (cond
       (nil? uia-win)
       # normalize-hwnd-and-uia-element failed
@@ -523,17 +510,15 @@
       nil
 
       true
-      {:hwnd hwnd
-       :uia-element uia-win
-       :exe-path exe-path
-       :virtual-desktop desktop-info}))
-
-  (when (and (nil? ret)
-             (not (nil? uia-win))
-             (not= uia-win uia-win?))
-    (:Release uia-win))
-
-  ret)
+      (do
+        # Always :AddRef when returning a UIA element. Its the
+        # callers' responsibility to :Release all the UIA elements
+        # they get.
+        (:AddRef uia-win)
+        {:hwnd hwnd
+         :uia-element uia-win
+         :exe-path exe-path
+         :virtual-desktop desktop-info}))))
 
 
 (defn- window-purge-pred [win wm layout]
@@ -1981,8 +1966,6 @@
       (:activate win)
       (break))
 
-    # :uia-element in hwnd-info is uia-win, which is managed
-    # by with-uia above, no need to :Release again.
     (def hwnd-info
       (get-hwnd-info hwnd
                      (in self :uia-manager)
@@ -1992,12 +1975,13 @@
       (log/debug "Window %n vanished?" hwnd)
       (break))
 
-    (unless (:should-manage-hwnd? self hwnd-info)
-      (log/debug "Ignoring window: %n" hwnd)
-      (break))
+    (with-uia [_uia-win (in hwnd-info :uia-element)]
+      (unless (:should-manage-hwnd? self hwnd-info)
+        (log/debug "Ignoring window: %n" hwnd)
+        (break))
 
-    (if-let [new-win (:add-hwnd self hwnd-info)]
-      (:activate new-win))))
+      (if-let [new-win (:add-hwnd self hwnd-info)]
+        (:activate new-win)))))
 
 
 (defn wm-window-opened [self hwnd]

@@ -44,10 +44,7 @@
     self)
   (def root-hwnd (:get_CachedNativeWindowHandle root))
 
-  (def release
-    (fn [elem]
-      (unless (= elem uia-elem)
-        (:Release elem))))
+  (:AddRef uia-elem)
 
   (def get-parent
     (fn [elem]
@@ -64,14 +61,14 @@
 
   (while (and (not= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
               (not (nil? parent)))
-    (release cur-elem)
+    (:Release cur-elem)
     (set cur-elem parent)
     (set parent (get-parent cur-elem)))
 
   (if (= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
     cur-elem
     (do
-      (release cur-elem)
+      (:Release cur-elem)
       nil)))
 
 
