@@ -10,7 +10,8 @@
 
 
 (defmacro is-valid-uia-window? [uia-win]
-  ~(and (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsTransformPatternAvailablePropertyId))
+  ~(and (= 0 (:GetCachedPropertyValue ,uia-win UIA_IsOffscreenPropertyId))
+        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsTransformPatternAvailablePropertyId))
         (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsWindowPatternAvailablePropertyId))))
 
 
@@ -315,6 +316,7 @@
       (:AddProperty cr UIA_IsTransformPatternAvailablePropertyId)
       (:AddProperty cr UIA_TransformCanMovePropertyId)
       (:AddProperty cr UIA_IsWindowPatternAvailablePropertyId)
+      (:AddProperty cr UIA_IsOffscreenPropertyId)
       cr))
 
   (def transform-cr

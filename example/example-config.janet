@@ -287,32 +287,6 @@
        # A "floating" virtual desktop
        false
 
-       # The invisible pseudo window from the Terminal app.
-       (= "PseudoConsoleWindow" class-name)
-       false
-
-       # The hidden window created when the Bluetooth icon
-       # was right-clicked
-       (= "BluetoothNotificationAreaIconWindowClass" class-name)
-       false
-
-       # The hidden window created when the PowerToys icon
-       # was right-clicked
-       (= "PToyTrayIconWindow" class-name)
-       false
-
-       #  Hidden window from AMD Software notify icon
-       (= "AMD:CCC-AEMCapturingWindow" name)
-       false
-
-       (= "Mozilla_firefox_default_RemoteWindow" class-name)
-       false
-
-       # The hidden "Edit" window from Acrobat
-       (and (string/has-suffix? "Acrobat.exe" exe-path)
-            (= "Edit" class-name))
-       false
-
        # Steam notify icon menu
        (and (string/has-suffix? "steamwebhelper.exe" exe-path)
             (= "Menu" name))
