@@ -417,25 +417,23 @@
 
 
 (defn- get-hwnd-virtual-desktop-id [hwnd vdm-com]
-  (def desktop-id? (try-to-get-window-desktop-id vdm-com hwnd))
+  # Only top-level windows can be managed by virtual desktops
+  (var cur-hwnd (GetAncestor hwnd GA_ROOT))
+  (var desktop-id? (try-to-get-window-desktop-id vdm-com cur-hwnd))
 
-  (if (or (nil? desktop-id?) # GetWindowDesktopId failed
-          (= desktop-id? "{00000000-0000-0000-0000-000000000000}")) # Not a top-level window
-    # Try the ancestor instead
-    (let [ancestor (GetAncestor hwnd GA_ROOTOWNER)]
-      (cond
-        (null? ancestor)
-        nil
+  (while (or # GetWindowDesktopId failed
+             (nil? desktop-id?)
+             # Window not managed by virtual desktops
+             (= desktop-id? "{00000000-0000-0000-0000-000000000000}"))
+    # Try the owner instead
+    (def owner (GetWindow cur-hwnd GW_OWNER))
+    (when (null? owner)
+      (break))
 
-        # Some windows (e.g. the Start Menu) may return itself as
-        # the ancestor. No need to try again with the same HWND.
-        (= ancestor hwnd)
-        nil
+    (set cur-hwnd owner)
+    (set desktop-id? (try-to-get-window-desktop-id vdm-com cur-hwnd)))
 
-        true
-        (try-to-get-window-desktop-id vdm-com ancestor)))
-
-    desktop-id?))
+  desktop-id?)
 
 
 (defn- get-current-virtual-desktop-name [uia-win uia-man]
@@ -1950,6 +1948,73 @@
   new-win)
 
 
+(defn wm-filter-hwnd [self hwnd &opt uia-win? exe-path? desktop-info?]
+  (def uia-win
+    (if uia-win?
+      (do
+        (:AddRef uia-win?)
+        uia-win?)
+      (:get-hwnd-uia-element self hwnd (get-in self [:uia-manager :focus-cr]))))
+  (def exe-path
+    (if exe-path?
+      exe-path?
+      (:get-hwnd-path self hwnd)))
+  (def desktop-info
+    (if desktop-info?
+      desktop-info?
+      (:get-hwnd-virtual-desktop self hwnd uia-win)))
+
+  (def desktop-id
+    (get-in desktop-info [:id]))
+
+  (with-uia [_uia-win uia-win]
+    (cond
+      (or (nil? desktop-id)
+          (= "{00000000-0000-0000-0000-000000000000}" desktop-id))
+      [false [:invalid-virtual-desktop desktop-id]]
+
+      (not (find |(= $ (:GetCachedPropertyValue uia-win UIA_ControlTypePropertyId))
+                 [UIA_WindowControlTypeId
+                  # Strangely, some top level windows declare that they are pane controls.
+                  UIA_PaneControlTypeId]))
+      [false [:invalid-control-type (:GetCachedPropertyValue uia-win UIA_ControlTypePropertyId)]]
+
+      (not= 0 (:GetCachedPropertyValue uia-win UIA_IsOffscreenPropertyId))
+      [false :offscreen-window]
+
+      (= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId))
+      [false :no-window-pattern]
+
+      (= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
+      [false :no-transform-pattern]
+
+      (= 0 (:GetCachedPropertyValue uia-win UIA_TransformCanMovePropertyId))
+      [false :immovable-window]
+
+      (= WS_CHILD (band WS_CHILD (signed-to-unsigned-32 (GetWindowLong hwnd GWL_STYLE))))
+      [false :child-window]
+
+      (not= 0 (try
+                (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
+                ((err fib)
+                 (log/debug "DwmGetWindowAttribute failed: %n\n%s"
+                            err
+                            (get-stack-trace fib))
+                 (if (= err E_HANDLE)
+                   # The hwnd got invalidated before we checked it,
+                   # assume the window is closed. Return an arbitrary
+                   # flag so that the filter returns early.
+                   0xffff
+                   0))))
+      [false :cloaked-window]
+
+      (and (not (:jwno-process-elevated? self))
+           (hwnd-process-elevated? hwnd))
+      [false :elevated-window]
+
+      true)))
+
+
 (defn wm-focus-changed [self]
   (:call-hook (in self :hook-manager) :focus-changed)
 
@@ -2141,6 +2206,7 @@
 
     :should-manage-hwnd? wm-should-manage-hwnd?
     :add-hwnd wm-add-hwnd
+    :filter-hwnd wm-filter-hwnd
 
     :close-hwnd wm-close-hwnd
 
@@ -2151,42 +2217,6 @@
     :with-activation-hooks wm-with-activation-hooks
 
     :destroy wm-destroy})
-
-
-(defn default-window-filter [hwnd uia-win exe-path desktop-info wm]
-  (def desktop-id (in desktop-info :id))
-
-  (cond
-    # Some windows are not managed by Virtual Desktops, we
-    # exclude them too.
-    (or (nil? desktop-id)
-        (= "{00000000-0000-0000-0000-000000000000}" desktop-id))
-    false
-
-    (not (is-valid-uia-window? uia-win))
-    false
-
-    # Exclude cloaked windows
-    (not= 0 (try
-              (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
-              ((err fib)
-               (log/debug "DwmGetWindowAttribute failed: %n\n%s"
-                          err
-                          (get-stack-trace fib))
-               (if (= err E_HANDLE)
-                 # The hwnd got invalidated before we checked it,
-                 # assume the window is closed. Return an arbitrary
-                 # flag so that the filter returns early.
-                 0xffff
-                 0))))
-    false
-
-    # Exclude windows we are not privileged enough to manage
-    (and (not (:jwno-process-elevated? wm))
-         (hwnd-process-elevated? hwnd))
-    false
-
-    true))
 
 
 (defn window-manager [uia-man ui-man hook-man]
@@ -2206,7 +2236,14 @@
 
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path desktop-info]
-       (default-window-filter hwnd uia-win exe-path desktop-info wm-obj)))
+       (match (:filter-hwnd wm-obj hwnd uia-win exe-path desktop-info)
+         [false reason]
+         (do
+           (log/debug "Window %n failed to pass default filter: %n" hwnd reason)
+           false)
+
+         true
+         true)))
   (:add-hook hook-man :focus-changed
      (fn []
        # XXX: If the focus change is caused by a closing window, that

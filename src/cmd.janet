@@ -348,7 +348,7 @@
 
 
 (defn cmd-describe-window [wm ui-man]
-  (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager) false)]
     (if (nil? uia-win)
       (:show-tooltip ui-man :describe-window "No focused window.")
       (do
@@ -359,7 +359,12 @@
                   :virtual-desktop desktop-info}
               win-info)
             (def rect (:get_CachedBoundingRectangle uia-win))
-            (def efb-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+            (def efb-rect
+              (try
+                (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+                ((err fib)
+                 (log/debug "DwmGetWindowAttribute failed for %n: %n" hwnd err)
+                 nil)))
             (:show-tooltip ui-man
                            :describe-window
                            (string/format (string/join
@@ -370,7 +375,7 @@
                                             "Virtual Desktop Name: %s"
                                             "Virtual Desktop ID: %s"
                                             "Rect: %n"
-                                            "EFB Rect: %n"]
+                                            "EFB Rect: %s"]
                                            "\n")
                                           hwnd
                                           exe-path
@@ -381,9 +386,16 @@
                                             desktop-id
                                             "n/a")
                                           rect
-                                          efb-rect)
-                           (in efb-rect :left)
-                           (in efb-rect :top)))
+                                          (if efb-rect
+                                            (string/format "%n" efb-rect)
+                                            "n/a"))
+                           (if efb-rect
+                             (in efb-rect :left)
+                             (in rect :left))
+                           (if efb-rect
+                             (in efb-rect :top)
+                             (in rect :top))))
+
           (:show-tooltip ui-man
                          :describe-window
                          (string/format "Failed to get window info for %n." hwnd)))))))
