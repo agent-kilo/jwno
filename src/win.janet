@@ -1991,9 +1991,6 @@
       (= 0 (:GetCachedPropertyValue uia-win UIA_TransformCanMovePropertyId))
       [false :immovable-window]
 
-      (= WS_CHILD (band WS_CHILD (signed-to-unsigned-32 (GetWindowLong hwnd GWL_STYLE))))
-      [false :child-window]
-
       (not= 0 (try
                 (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
                 ((err fib)
@@ -2012,7 +2009,23 @@
            (hwnd-process-elevated? hwnd))
       [false :elevated-window]
 
-      true)))
+      true
+      (let [styles (signed-to-unsigned-32 (GetWindowLong hwnd GWL_STYLE))
+            ex-styles (signed-to-unsigned-32 (GetWindowLong hwnd GWL_EXSTYLE))]
+        (cond
+          (= WS_CHILD (band WS_CHILD styles))
+          [false :child-window]
+
+          (= WS_EX_TOOLWINDOW (band WS_EX_TOOLWINDOW ex-styles))
+          [false :tool-window]
+
+          (= WS_EX_NOACTIVATE (band WS_EX_NOACTIVATE ex-styles))
+          [false :not-activatable-window]
+
+          (= WS_EX_TOPMOST (band WS_EX_TOPMOST ex-styles))
+          [false :topmost-window]
+
+          true)))))
 
 
 (defn wm-focus-changed [self]
