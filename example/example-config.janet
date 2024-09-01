@@ -287,11 +287,6 @@
        # A "floating" virtual desktop
        false
 
-       # Steam notify icon menu
-       (and (string/has-suffix? "steamwebhelper.exe" exe-path)
-            (= "Menu" name))
-       false
-
        true)))
 
 (:add-hook hook-man :window-created
