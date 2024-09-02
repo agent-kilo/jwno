@@ -260,10 +260,9 @@
     (k "win + a" [:push-keymap alpha-mode-keymap]
        "Alpha mode")
 
-    (k "win + b" :describe-window)
-
-    (k "win + w" :manage-window)
-    (k "win + shift + w" :ignore-window)
+    (k "win + w d" :describe-window)
+    (k "win + w m" :manage-window)
+    (k "win + w i" :ignore-window)
 
     # XXX: If a remapped key is used to trigger keymap switching, and
     # the switched keymap doesn't have the same remap, the translated key
