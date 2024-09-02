@@ -405,6 +405,40 @@
                          (string/format "Failed to get window info for %n." hwnd)))))))
 
 
+(defn cmd-manage-window [wm ui-man]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager) true)]
+    (unless uia-win
+      (:show-tooltip ui-man :manage-window "No focused window.")
+      (break))
+
+    (def hwnd (:get_CachedNativeWindowHandle uia-win))
+    (put (in wm :ignored-hwnds) hwnd nil)
+
+    (if (:find-hwnd (in wm :root) hwnd)
+      (:show-tooltip ui-man :manage-window
+         (string/format "Window \"%s\" is already managed."
+                        (:get_CachedName uia-win)))
+      (when-let [info (:get-hwnd-info wm hwnd uia-win)]
+        (with-uia [_uia-win (in info :uia-element)]
+          (:show-tooltip ui-man :manage-window
+             (string/format "Adding \"%s\" to managed windows." (:get_CachedName uia-win)))
+          (:add-hwnd wm info :forced))))))
+
+
+(defn cmd-ignore-window [wm ui-man]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager) true)]
+    (unless uia-win
+      (:show-tooltip ui-man :manage-window "No focused window.")
+      (break))
+
+    (def hwnd (:get_CachedNativeWindowHandle uia-win))
+
+    (:show-tooltip ui-man :ignore-window
+       (string/format "Ignoring \"%s\"" (:get_CachedName uia-win)))
+    (:ignore-hwnd wm hwnd)
+    (:remove-hwnd wm hwnd)))
+
+
 (defn cmd-exec [wm ui-man verbose? cli]
   (when verbose?
     (:show-tooltip ui-man
@@ -723,6 +757,22 @@
      (:describe-window)
 
      Shows basic info about a window.
+     ```)
+
+  (:add-command command-man :manage-window
+     (fn [] (cmd-manage-window wm ui-man))
+     ```
+     (:manage-window)
+
+     Forcibly adds the current window to the list of managed windows.
+     ```)
+
+  (:add-command command-man :ignore-window
+     (fn [] (cmd-ignore-window wm ui-man))
+     ```
+     (:ignore-window)
+
+     Removes the current window from the list of managed windows.
      ```))
 
 

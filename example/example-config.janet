@@ -262,6 +262,9 @@
 
     (k "win + b" :describe-window)
 
+    (k "win + w" :manage-window)
+    (k "win + shift + w" :ignore-window)
+
     # XXX: If a remapped key is used to trigger keymap switching, and
     # the switched keymap doesn't have the same remap, the translated key
     # will be stuck down.

@@ -1983,6 +1983,14 @@
   new-win)
 
 
+(defn wm-remove-hwnd [self hwnd]
+  (when-let [w (:find-hwnd (in self :root) hwnd)]
+    (def parent-fr (in w :parent))
+    (:remove-child parent-fr w)
+    (:call-hook (in self :hook-manager) :window-removed w)
+    w))
+
+
 (defn wm-filter-hwnd [self hwnd &opt uia-win? exe-path? desktop-info?]
   (def uia-win
     (if uia-win?
@@ -2063,6 +2071,17 @@
           true)))))
 
 
+(defn wm-ignore-hwnd [self hwnd]
+  (put (in self :ignored-hwnds) hwnd true))
+
+
+(defn wm-is-hwnd-ignored [self hwnd]
+  # normalize true/nil to true/false
+  (if (get-in self [:ignored-hwnds hwnd])
+    true
+    false))
+
+
 (defn wm-focus-changed [self]
   (:call-hook (in self :hook-manager) :focus-changed)
 
@@ -2071,8 +2090,12 @@
     (when (nil? uia-win)
       (log/debug "No focused window")
       (break))
-    
+
     (def hwnd (:get_CachedNativeWindowHandle uia-win))
+
+    (when (:is-hwnd-ignored self hwnd)
+      (log/debug "ignored hwnd: %n" hwnd)
+      (break))
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       #Already managed
@@ -2101,6 +2124,10 @@
 
 
 (defn wm-window-opened [self hwnd]
+  (when (:is-hwnd-ignored self hwnd)
+    (log/debug "ignored hwnd: %n" hwnd)
+    (break))
+
   (when-let [win (:find-hwnd (in self :root) hwnd)]
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break))
@@ -2260,7 +2287,10 @@
 
     :should-manage-hwnd? wm-should-manage-hwnd?
     :add-hwnd wm-add-hwnd
+    :remove-hwnd wm-remove-hwnd
     :filter-hwnd wm-filter-hwnd
+    :ignore-hwnd wm-ignore-hwnd
+    :is-hwnd-ignored wm-is-hwnd-ignored
 
     :close-hwnd wm-close-hwnd
 
@@ -2284,7 +2314,8 @@
      @{:vdm-com vdm-com
        :uia-manager uia-man
        :ui-man ui-man
-       :hook-manager hook-man}
+       :hook-manager hook-man
+       :ignored-hwnds @{}}
      window-manager-proto))
   (put wm-obj :root (virtual-desktop-container wm-obj hook-man))
 
@@ -2300,6 +2331,12 @@
          true)))
   (:add-hook hook-man :focus-changed
      (fn []
+       (def ignored (in wm-obj :ignored-hwnds))
+       # Clean up the ignored list
+       (each h (keys ignored)
+         (when (= FALSE (IsWindow h))
+           (put ignored h nil)))
+
        # XXX: If the focus change is caused by a closing window, that
        # window may still be alive, so it won't be purged immediately.
        # Maybe I shoud check the hwnds everytime a window is manipulated?
