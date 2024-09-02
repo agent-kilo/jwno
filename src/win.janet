@@ -2050,7 +2050,8 @@
 
       # Minimized and maximized windows always return FALSE for
       # UIA_TransformCanMovePropertyId, so we only check normal
-      # windows here.
+      # windows here. In other words, minimized/maximized windows
+      # are always treated as movable.
       (and
         (= WindowVisualState_Normal
            (:GetCachedPropertyValue uia-win UIA_WindowWindowVisualStatePropertyId))
