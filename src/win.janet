@@ -190,10 +190,53 @@
       (errorf "SetWindowPos failed for window %n: %n" hwnd (GetLastError)))))
 
 
+(defn calc-window-rect-with-margins [win-rect orig-rect cur-scale scale dwm-margins margins]
+  (log/debug "win-rect = %n" win-rect)
+  (log/debug "orig-rect = %n" orig-rect)
+  (log/debug "cur-scale = %n" cur-scale)
+  (log/debug "scale = %n" scale)
+  (log/debug "dwm-margins = %n" dwm-margins)
+  (log/debug "margins = %n" margins)
+
+  (def [cur-scale-x cur-scale-y] cur-scale)
+  (def [scale-x scale-y] scale)
+
+  # These DWM margin values are in "physical pixels." They're already scaled
+  # according to the current monitor's DPI, but we need to re-scale them in
+  # case the window is moving to another monitor with different DPI.
+  (def scaled-dwm-margins
+    (if (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
+      dwm-margins
+      {:top (* scale-y (/ (in dwm-margins :top) cur-scale-y))
+       :left (* scale-x (/ (in dwm-margins :left) cur-scale-x))
+       :bottom (* scale-y (/ (in dwm-margins :bottom) cur-scale-y))
+       :right (* scale-x (/ (in dwm-margins :right) cur-scale-x))}))
+  (log/debug "scaled-dwm-margins = %n" scaled-dwm-margins)
+
+  (def scaled-margins
+    (if (and (= 1 scale-x) (= 1 scale-y))
+      margins
+      {:top (* scale-y (in margins :top))
+       :left (* scale-x (in margins :left))
+       :bottom (* scale-y (in margins :bottom))
+       :right (* scale-x (in margins :right))}))
+  (log/debug "scaled-margins = %n" scaled-margins)
+
+  (def combined-margins
+    (combine-rect-border-space scaled-dwm-margins
+                               scaled-margins))
+  (log/debug "combined-margins = %n" combined-margins)
+
+  (def rect (shrink-rect orig-rect combined-margins))
+  (log/debug "final rect = %n" rect)
+
+  rect)
+
+
 (defn- transform-hwnd [hwnd orig-rect uia-man &opt tags]
   (default tags @{})
 
-  (log/debug "transforming window: %n, orig-rect = %n" hwnd orig-rect)
+  (log/debug "transforming window: %n" hwnd)
 
   # Code below will restore maximized windows, but ignore minimized windows
   # before transforming. This feels more natural in practice, since minimized
@@ -206,62 +249,39 @@
           (with-uia [tran-pat (:GetCachedPatternAs uia-win
                                                    UIA_TransformPatternId
                                                    IUIAutomationTransformPattern)]
-            (when (and tran-pat
-                       (not= 0 (:get_CachedCanMove tran-pat)))
-              (def no-resize (in tags :no-resize))
-              (def no-expand (in tags :no-expand))
-              (def anchor (in tags :anchor :top-left))
+            (def no-resize (in tags :no-resize))
+            (def no-expand (in tags :no-expand))
+            (def anchor (in tags :anchor :top-left))
+            (def forced (in tags :forced))
 
-              # XXX: When dealing with QT windows, the bounding rectangle returned by
-              # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
-              # returns the right values though, so that's what we use here.
-              (def [gwr-ret win-rect] (GetWindowRect hwnd))
-              (when (= FALSE gwr-ret)
-                (errorf "failed to get bounding rectangle for window %n" hwnd))
+            # XXX: When dealing with QT windows, the bounding rectangle returned by
+            # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
+            # returns the right values though, so that's what we use here.
+            (def [gwr-ret win-rect] (GetWindowRect hwnd))
+            (when (= FALSE gwr-ret)
+              (errorf "failed to get bounding rectangle for window %n" hwnd))
 
-              (def [scale-x scale-y] (calc-pixel-scale orig-rect))
-              (log/debug "scale-x = %n, scale-y = %n" scale-x scale-y)
-              (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
-              (log/debug "margins = %n" margins)
-              (def scaled-margins
-                (if (and (= 1 scale-x) (= 1 scale-y))
-                  margins
-                  {:top (* scale-y (in margins :top))
-                   :left (* scale-x (in margins :left))
-                   :bottom (* scale-y (in margins :bottom))
-                   :right (* scale-x (in margins :right))}))
-              (log/debug "scaled-margins = %n" scaled-margins)
+            (def scale (calc-pixel-scale orig-rect))
+            (def cur-scale (calc-pixel-scale win-rect))
+            (def scaled (not= scale cur-scale))
 
-              (def [cur-scale-x cur-scale-y] (calc-pixel-scale win-rect))
-              (log/debug "cur-scale-x = %n, cur-scale-y = %n" cur-scale-x cur-scale-y)
-              # These DWM margin values are in "physical pixels." They're already scaled
-              # according to the current monitor's DPI, but we need to re-scale them in
-              # case the window is moving to another monitor with different DPI.
-              (def dwm-margins (get-hwnd-dwm-border-margins hwnd win-rect))
-              (log/debug "dwm-margins = %n" dwm-margins)
-              (def scaled-dwm-margins
-                (if (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
-                  dwm-margins
-                  {:top (* scale-y (/ (in dwm-margins :top) cur-scale-y))
-                   :left (* scale-x (/ (in dwm-margins :left) cur-scale-x))
-                   :bottom (* scale-y (/ (in dwm-margins :bottom) cur-scale-y))
-                   :right (* scale-x (/ (in dwm-margins :right) cur-scale-x))}))
-              (log/debug "scaled-dwm-margins = %n" scaled-dwm-margins)
+            (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
+            (def dwm-margins (get-hwnd-dwm-border-margins hwnd win-rect))
 
-              (def combined-margins
-                (combine-rect-border-space scaled-dwm-margins
-                                           scaled-margins))
-              (log/debug "combined-margins = %n" combined-margins)
+            (def rect
+              (calc-window-rect-with-margins win-rect
+                                             orig-rect
+                                             cur-scale
+                                             scale
+                                             dwm-margins
+                                             margins))
 
-              (def rect (shrink-rect orig-rect combined-margins))
-              (log/debug "final rect = %n" rect)
-
-              (def scaled
-                (or (not= scale-x cur-scale-x)
-                    (not= scale-y cur-scale-y)))
-
+            (when (or (and tran-pat
+                           (not= 0 (:get_CachedCanMove tran-pat)))
+                      forced)
               (cond
-                (or (= 0 (:get_CachedCanResize tran-pat))
+                (or (and tran-pat
+                         (= 0 (:get_CachedCanResize tran-pat)))
                     no-resize)
                 (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor)]
                   (set-window-pos hwnd x y 0 0 scaled))
@@ -1912,11 +1932,23 @@
         :exe-path exe-path
         :virtual-desktop desktop-info}
     hwnd-info)
-  (:call-filter-hook (in self :hook-manager) :filter-window
-     hwnd uia-win exe-path desktop-info))
+
+  (cond
+    (:call-filter-hook (in self :hook-manager) :or :filter-forced-window
+       hwnd uia-win exe-path desktop-info)
+    :forced
+
+    (:call-filter-hook (in self :hook-manager) :and :filter-window
+       hwnd uia-win exe-path desktop-info)
+    :normal
+
+    true
+    :ignored))
 
 
-(defn wm-add-hwnd [self hwnd-info]
+(defn wm-add-hwnd [self hwnd-info &opt manage-state]
+  (default manage-state :normal)
+
   (def {:hwnd hwnd
         :uia-element uia-win
         :exe-path exe-path
@@ -1926,6 +1958,9 @@
   (log/debug "new window: %n" hwnd)
 
   (def new-win (window hwnd))
+  (when (= :forced manage-state)
+    (put (in new-win :tags) :forced true))
+
   (:call-hook (in self :hook-manager) :window-created
      new-win uia-win exe-path desktop-info)
 
@@ -2054,11 +2089,14 @@
       (break))
 
     (with-uia [_uia-win (in hwnd-info :uia-element)]
-      (unless (:should-manage-hwnd? self hwnd-info)
+      (def manage-state (:should-manage-hwnd? self hwnd-info))
+      (log/debug "manage-state = %n" manage-state)
+
+      (when (= :ignored manage-state)
         (log/debug "Ignoring window: %n" hwnd)
         (break))
 
-      (if-let [new-win (:add-hwnd self hwnd-info)]
+      (if-let [new-win (:add-hwnd self hwnd-info manage-state)]
         (:activate new-win)))))
 
 
@@ -2076,11 +2114,14 @@
     (break))
 
   (with-uia [_uia-win (in hwnd-info :uia-element)]
-    (unless (:should-manage-hwnd? self hwnd-info)
+    (def manage-state (:should-manage-hwnd? self hwnd-info))
+    (log/debug "manage-state = %n" manage-state)
+
+    (when (= :ignored manage-state)
       (log/debug "Ignoring window: %n" hwnd)
       (break))
 
-    (:add-hwnd self hwnd-info)))
+    (:add-hwnd self hwnd-info manage-state)))
 
 
 (defn wm-activate [self node]

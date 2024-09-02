@@ -372,15 +372,18 @@
                                             "EXE: %s"
                                             "Name: %s"
                                             "Class Name: %s"
+                                            "Control Type: %n"
                                             "Virtual Desktop Name: %s"
                                             "Virtual Desktop ID: %s"
                                             "Rect: %n"
-                                            "EFB Rect: %s"]
+                                            "EFB Rect: %s"
+                                            "Filter Result: %n"]
                                            "\n")
                                           hwnd
                                           exe-path
                                           (:get_CachedName uia-win)
                                           (:get_CachedClassName uia-win)
+                                          (:get_CachedControlType uia-win)
                                           (in desktop-info :name)
                                           (if-let [desktop-id (in desktop-info :id)]
                                             desktop-id
@@ -388,7 +391,8 @@
                                           rect
                                           (if efb-rect
                                             (string/format "%n" efb-rect)
-                                            "n/a"))
+                                            "n/a")
+                                          (:filter-hwnd wm hwnd uia-win exe-path desktop-info))
                            (if efb-rect
                              (in efb-rect :left)
                              (in rect :left))
@@ -731,7 +735,7 @@
     (not found)
     (errorf "unknown command: %n, args: %n" cmd args)
 
-    (:call-filter-hook hook-man :filter-command cmd args)
+    (:call-filter-hook hook-man :and :filter-command cmd args)
     (do
       ((in found :fn) ;args)
       (:call-hook hook-man :command-executed cmd args)

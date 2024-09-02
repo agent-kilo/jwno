@@ -275,19 +275,31 @@
 (:set-keymap key-man root-keymap)
 
 
+#
+# Some windows declare their abilities incorrectly, and Jwno will not
+# manage those windows by default. For example, some windows can be moved,
+# but they declared otherwise. In that case you'll need to use this hook
+# to match those windows and force Jwno to manage them.
+#
+(:add-hook hook-man :filter-forced-window
+   (fn [_hwnd uia-win _exe-path _desktop-info]
+     (or
+       (= "Ubisoft Connect" (:get_CachedName uia-win))
+       # Add your own rules here
+       )))
+#
+# When you don't want certain windows to be managed by Jwno, use this
+# hook to ignore them.
+#
 (:add-hook hook-man :filter-window
    (fn [_hwnd uia-win exe-path desktop-info]
-     (def name (:get_CachedName uia-win))
-     (def class-name (:get_CachedClassName uia-win))
      (def desktop-name (in desktop-info :name))
 
      # Excluded windows
-     (cond
-       (= "Desktop 2" desktop-name)
-       # A "floating" virtual desktop
-       false
-
-       true)))
+     (not (or
+            (= "Desktop 2" desktop-name)
+            # Add your own rules here
+            ))))
 
 (:add-hook hook-man :window-created
    (fn [win uia-win _exe-path _desktop-info]
