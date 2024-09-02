@@ -276,12 +276,18 @@
                                              dwm-margins
                                              margins))
 
-            (when (or (and tran-pat
-                           (not= 0 (:get_CachedCanMove tran-pat)))
-                      forced)
+            (def can-move
+              (or forced
+                  (and tran-pat
+                       (not= 0 (:get_CachedCanMove tran-pat)))))
+            (def can-resize
+              (or forced
+                  (and tran-pat
+                       (not= 0 (:get_CachedCanResize tran-pat)))))
+
+            (when can-move
               (cond
-                (or (and tran-pat
-                         (= 0 (:get_CachedCanResize tran-pat)))
+                (or (not can-resize)
                     no-resize)
                 (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor)]
                   (set-window-pos hwnd x y 0 0 scaled))
