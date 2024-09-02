@@ -2018,6 +2018,9 @@
 
   (with-uia [_uia-win uia-win]
     (cond
+      (get-in self [:ignored-hwnds hwnd])
+      [false :ignored-window]
+
       (or (nil? desktop-id)
           (= "{00000000-0000-0000-0000-000000000000}" desktop-id))
       [false [:invalid-virtual-desktop desktop-id]]
@@ -2081,13 +2084,6 @@
   (put (in self :ignored-hwnds) hwnd true))
 
 
-(defn wm-is-hwnd-ignored [self hwnd]
-  # normalize true/nil to true/false
-  (if (get-in self [:ignored-hwnds hwnd])
-    true
-    false))
-
-
 (defn wm-focus-changed [self]
   (:call-hook (in self :hook-manager) :focus-changed)
 
@@ -2098,10 +2094,6 @@
       (break))
 
     (def hwnd (:get_CachedNativeWindowHandle uia-win))
-
-    (when (:is-hwnd-ignored self hwnd)
-      (log/debug "ignored hwnd: %n" hwnd)
-      (break))
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       #Already managed
@@ -2130,10 +2122,6 @@
 
 
 (defn wm-window-opened [self hwnd]
-  (when (:is-hwnd-ignored self hwnd)
-    (log/debug "ignored hwnd: %n" hwnd)
-    (break))
-
   (when-let [win (:find-hwnd (in self :root) hwnd)]
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break))
@@ -2296,7 +2284,6 @@
     :remove-hwnd wm-remove-hwnd
     :filter-hwnd wm-filter-hwnd
     :ignore-hwnd wm-ignore-hwnd
-    :is-hwnd-ignored wm-is-hwnd-ignored
 
     :close-hwnd wm-close-hwnd
 
