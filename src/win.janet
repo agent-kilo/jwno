@@ -2040,7 +2040,21 @@
       (= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
       [false :no-transform-pattern]
 
-      (= 0 (:GetCachedPropertyValue uia-win UIA_TransformCanMovePropertyId))
+      # We don't check for maximized windows, since we still want
+      # to manage them, and transform-hwnd will restore them when
+      # doing the resizing.
+
+      (= WindowVisualState_Minimized
+         (:GetCachedPropertyValue uia-win UIA_WindowWindowVisualStatePropertyId))
+      [false :minimized-window]
+
+      # Minimized and maximized windows always return FALSE for
+      # UIA_TransformCanMovePropertyId, so we only check normal
+      # windows here.
+      (and
+        (= WindowVisualState_Normal
+           (:GetCachedPropertyValue uia-win UIA_WindowWindowVisualStatePropertyId))
+        (= 0 (:GetCachedPropertyValue uia-win UIA_TransformCanMovePropertyId)))
       [false :immovable-window]
 
       (not= 0 (try

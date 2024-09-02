@@ -326,6 +326,7 @@
       (:AddProperty cr UIA_IsTransformPatternAvailablePropertyId)
       (:AddProperty cr UIA_TransformCanMovePropertyId)
       (:AddProperty cr UIA_IsWindowPatternAvailablePropertyId)
+      (:AddProperty cr UIA_WindowWindowVisualStatePropertyId)
       (:AddProperty cr UIA_IsOffscreenPropertyId)
       (:AddProperty cr UIA_ControlTypePropertyId)
       cr))
