@@ -190,10 +190,53 @@
       (errorf "SetWindowPos failed for window %n: %n" hwnd (GetLastError)))))
 
 
+(defn calc-window-rect-with-margins [win-rect orig-rect cur-scale scale dwm-margins margins]
+  (log/debug "win-rect = %n" win-rect)
+  (log/debug "orig-rect = %n" orig-rect)
+  (log/debug "cur-scale = %n" cur-scale)
+  (log/debug "scale = %n" scale)
+  (log/debug "dwm-margins = %n" dwm-margins)
+  (log/debug "margins = %n" margins)
+
+  (def [cur-scale-x cur-scale-y] cur-scale)
+  (def [scale-x scale-y] scale)
+
+  # These DWM margin values are in "physical pixels." They're already scaled
+  # according to the current monitor's DPI, but we need to re-scale them in
+  # case the window is moving to another monitor with different DPI.
+  (def scaled-dwm-margins
+    (if (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
+      dwm-margins
+      {:top (* scale-y (/ (in dwm-margins :top) cur-scale-y))
+       :left (* scale-x (/ (in dwm-margins :left) cur-scale-x))
+       :bottom (* scale-y (/ (in dwm-margins :bottom) cur-scale-y))
+       :right (* scale-x (/ (in dwm-margins :right) cur-scale-x))}))
+  (log/debug "scaled-dwm-margins = %n" scaled-dwm-margins)
+
+  (def scaled-margins
+    (if (and (= 1 scale-x) (= 1 scale-y))
+      margins
+      {:top (* scale-y (in margins :top))
+       :left (* scale-x (in margins :left))
+       :bottom (* scale-y (in margins :bottom))
+       :right (* scale-x (in margins :right))}))
+  (log/debug "scaled-margins = %n" scaled-margins)
+
+  (def combined-margins
+    (combine-rect-border-space scaled-dwm-margins
+                               scaled-margins))
+  (log/debug "combined-margins = %n" combined-margins)
+
+  (def rect (shrink-rect orig-rect combined-margins))
+  (log/debug "final rect = %n" rect)
+
+  rect)
+
+
 (defn- transform-hwnd [hwnd orig-rect uia-man &opt tags]
   (default tags @{})
 
-  (log/debug "transforming window: %n, orig-rect = %n" hwnd orig-rect)
+  (log/debug "transforming window: %n" hwnd)
 
   # Code below will restore maximized windows, but ignore minimized windows
   # before transforming. This feels more natural in practice, since minimized
@@ -206,62 +249,45 @@
           (with-uia [tran-pat (:GetCachedPatternAs uia-win
                                                    UIA_TransformPatternId
                                                    IUIAutomationTransformPattern)]
-            (when (and tran-pat
-                       (not= 0 (:get_CachedCanMove tran-pat)))
-              (def no-resize (in tags :no-resize))
-              (def no-expand (in tags :no-expand))
-              (def anchor (in tags :anchor :top-left))
+            (def no-resize (in tags :no-resize))
+            (def no-expand (in tags :no-expand))
+            (def anchor (in tags :anchor :top-left))
+            (def forced (in tags :forced))
 
-              # XXX: When dealing with QT windows, the bounding rectangle returned by
-              # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
-              # returns the right values though, so that's what we use here.
-              (def [gwr-ret win-rect] (GetWindowRect hwnd))
-              (when (= FALSE gwr-ret)
-                (errorf "failed to get bounding rectangle for window %n" hwnd))
+            # XXX: When dealing with QT windows, the bounding rectangle returned by
+            # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
+            # returns the right values though, so that's what we use here.
+            (def [gwr-ret win-rect] (GetWindowRect hwnd))
+            (when (= FALSE gwr-ret)
+              (errorf "failed to get bounding rectangle for window %n" hwnd))
 
-              (def [scale-x scale-y] (calc-pixel-scale orig-rect))
-              (log/debug "scale-x = %n, scale-y = %n" scale-x scale-y)
-              (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
-              (log/debug "margins = %n" margins)
-              (def scaled-margins
-                (if (and (= 1 scale-x) (= 1 scale-y))
-                  margins
-                  {:top (* scale-y (in margins :top))
-                   :left (* scale-x (in margins :left))
-                   :bottom (* scale-y (in margins :bottom))
-                   :right (* scale-x (in margins :right))}))
-              (log/debug "scaled-margins = %n" scaled-margins)
+            (def scale (calc-pixel-scale orig-rect))
+            (def cur-scale (calc-pixel-scale win-rect))
+            (def scaled (not= scale cur-scale))
 
-              (def [cur-scale-x cur-scale-y] (calc-pixel-scale win-rect))
-              (log/debug "cur-scale-x = %n, cur-scale-y = %n" cur-scale-x cur-scale-y)
-              # These DWM margin values are in "physical pixels." They're already scaled
-              # according to the current monitor's DPI, but we need to re-scale them in
-              # case the window is moving to another monitor with different DPI.
-              (def dwm-margins (get-hwnd-dwm-border-margins hwnd win-rect))
-              (log/debug "dwm-margins = %n" dwm-margins)
-              (def scaled-dwm-margins
-                (if (and (= scale-x cur-scale-x) (= scale-y cur-scale-y))
-                  dwm-margins
-                  {:top (* scale-y (/ (in dwm-margins :top) cur-scale-y))
-                   :left (* scale-x (/ (in dwm-margins :left) cur-scale-x))
-                   :bottom (* scale-y (/ (in dwm-margins :bottom) cur-scale-y))
-                   :right (* scale-x (/ (in dwm-margins :right) cur-scale-x))}))
-              (log/debug "scaled-dwm-margins = %n" scaled-dwm-margins)
+            (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
+            (def dwm-margins (get-hwnd-dwm-border-margins hwnd win-rect))
 
-              (def combined-margins
-                (combine-rect-border-space scaled-dwm-margins
-                                           scaled-margins))
-              (log/debug "combined-margins = %n" combined-margins)
+            (def rect
+              (calc-window-rect-with-margins win-rect
+                                             orig-rect
+                                             cur-scale
+                                             scale
+                                             dwm-margins
+                                             margins))
 
-              (def rect (shrink-rect orig-rect combined-margins))
-              (log/debug "final rect = %n" rect)
+            (def can-move
+              (or forced
+                  (and tran-pat
+                       (not= 0 (:get_CachedCanMove tran-pat)))))
+            (def can-resize
+              (or forced
+                  (and tran-pat
+                       (not= 0 (:get_CachedCanResize tran-pat)))))
 
-              (def scaled
-                (or (not= scale-x cur-scale-x)
-                    (not= scale-y cur-scale-y)))
-
+            (when can-move
               (cond
-                (or (= 0 (:get_CachedCanResize tran-pat))
+                (or (not can-resize)
                     no-resize)
                 (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor)]
                   (set-window-pos hwnd x y 0 0 scaled))
@@ -417,25 +443,23 @@
 
 
 (defn- get-hwnd-virtual-desktop-id [hwnd vdm-com]
-  (def desktop-id? (try-to-get-window-desktop-id vdm-com hwnd))
+  # Only top-level windows can be managed by virtual desktops
+  (var cur-hwnd (GetAncestor hwnd GA_ROOT))
+  (var desktop-id? (try-to-get-window-desktop-id vdm-com cur-hwnd))
 
-  (if (or (nil? desktop-id?) # GetWindowDesktopId failed
-          (= desktop-id? "{00000000-0000-0000-0000-000000000000}")) # Not a top-level window
-    # Try the ancestor instead
-    (let [ancestor (GetAncestor hwnd GA_ROOTOWNER)]
-      (cond
-        (null? ancestor)
-        nil
+  (while (or # GetWindowDesktopId failed
+             (nil? desktop-id?)
+             # Window not managed by virtual desktops
+             (= desktop-id? "{00000000-0000-0000-0000-000000000000}"))
+    # Try the owner instead
+    (def owner (GetWindow cur-hwnd GW_OWNER))
+    (when (null? owner)
+      (break))
 
-        # Some windows (e.g. the Start Menu) may return itself as
-        # the ancestor. No need to try again with the same HWND.
-        (= ancestor hwnd)
-        nil
+    (set cur-hwnd owner)
+    (set desktop-id? (try-to-get-window-desktop-id vdm-com cur-hwnd)))
 
-        true
-        (try-to-get-window-desktop-id vdm-com ancestor)))
-
-    desktop-id?))
+  desktop-id?)
 
 
 (defn- get-current-virtual-desktop-name [uia-win uia-man]
@@ -1914,11 +1938,23 @@
         :exe-path exe-path
         :virtual-desktop desktop-info}
     hwnd-info)
-  (:call-filter-hook (in self :hook-manager) :filter-window
-     hwnd uia-win exe-path desktop-info))
+
+  (cond
+    (:call-filter-hook (in self :hook-manager) :or :filter-forced-window
+       hwnd uia-win exe-path desktop-info)
+    :forced
+
+    (:call-filter-hook (in self :hook-manager) :and :filter-window
+       hwnd uia-win exe-path desktop-info)
+    :normal
+
+    true
+    :ignored))
 
 
-(defn wm-add-hwnd [self hwnd-info]
+(defn wm-add-hwnd [self hwnd-info &opt manage-state]
+  (default manage-state :normal)
+
   (def {:hwnd hwnd
         :uia-element uia-win
         :exe-path exe-path
@@ -1928,6 +1964,9 @@
   (log/debug "new window: %n" hwnd)
 
   (def new-win (window hwnd))
+  (when (= :forced manage-state)
+    (put (in new-win :tags) :forced true))
+
   (:call-hook (in self :hook-manager) :window-created
      new-win uia-win exe-path desktop-info)
 
@@ -1950,6 +1989,116 @@
   new-win)
 
 
+(defn wm-remove-hwnd [self hwnd]
+  (when-let [w (:find-hwnd (in self :root) hwnd)]
+    (def parent-fr (in w :parent))
+    (:remove-child parent-fr w)
+    (:call-hook (in self :hook-manager) :window-removed w)
+    w))
+
+
+(defn wm-filter-hwnd [self hwnd &opt uia-win? exe-path? desktop-info?]
+  (def uia-win
+    (if uia-win?
+      (do
+        (:AddRef uia-win?)
+        uia-win?)
+      (:get-hwnd-uia-element self hwnd (get-in self [:uia-manager :focus-cr]))))
+  (def exe-path
+    (if exe-path?
+      exe-path?
+      (:get-hwnd-path self hwnd)))
+  (def desktop-info
+    (if desktop-info?
+      desktop-info?
+      (:get-hwnd-virtual-desktop self hwnd uia-win)))
+
+  (def desktop-id
+    (get-in desktop-info [:id]))
+
+  (with-uia [_uia-win uia-win]
+    (cond
+      (get-in self [:ignored-hwnds hwnd])
+      [false :ignored-window]
+
+      (or (nil? desktop-id)
+          (= "{00000000-0000-0000-0000-000000000000}" desktop-id))
+      [false [:invalid-virtual-desktop desktop-id]]
+
+      (not (find |(= $ (:GetCachedPropertyValue uia-win UIA_ControlTypePropertyId))
+                 [UIA_WindowControlTypeId
+                  # Strangely, some top level windows declare that they are pane controls.
+                  UIA_PaneControlTypeId]))
+      [false [:invalid-control-type (:GetCachedPropertyValue uia-win UIA_ControlTypePropertyId)]]
+
+      (not= 0 (:GetCachedPropertyValue uia-win UIA_IsOffscreenPropertyId))
+      [false :offscreen-window]
+
+      (= 0 (:GetCachedPropertyValue uia-win UIA_IsWindowPatternAvailablePropertyId))
+      [false :no-window-pattern]
+
+      (= 0 (:GetCachedPropertyValue uia-win UIA_IsTransformPatternAvailablePropertyId))
+      [false :no-transform-pattern]
+
+      # We don't check for maximized windows, since we still want
+      # to manage them, and transform-hwnd will restore them when
+      # doing the resizing.
+
+      (= WindowVisualState_Minimized
+         (:GetCachedPropertyValue uia-win UIA_WindowWindowVisualStatePropertyId))
+      [false :minimized-window]
+
+      # Minimized and maximized windows always return FALSE for
+      # UIA_TransformCanMovePropertyId, so we only check normal
+      # windows here. In other words, minimized/maximized windows
+      # are always treated as movable.
+      (and
+        (= WindowVisualState_Normal
+           (:GetCachedPropertyValue uia-win UIA_WindowWindowVisualStatePropertyId))
+        (= 0 (:GetCachedPropertyValue uia-win UIA_TransformCanMovePropertyId)))
+      [false :immovable-window]
+
+      (not= 0 (try
+                (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
+                ((err fib)
+                 (log/debug "DwmGetWindowAttribute failed: %n\n%s"
+                            err
+                            (get-stack-trace fib))
+                 (if (= err E_HANDLE)
+                   # The hwnd got invalidated before we checked it,
+                   # assume the window is closed. Return an arbitrary
+                   # flag so that the filter returns early.
+                   0xffff
+                   0))))
+      [false :cloaked-window]
+
+      (and (not (:jwno-process-elevated? self))
+           (hwnd-process-elevated? hwnd))
+      [false :elevated-window]
+
+      true
+      (let [styles (signed-to-unsigned-32 (GetWindowLong hwnd GWL_STYLE))
+            ex-styles (signed-to-unsigned-32 (GetWindowLong hwnd GWL_EXSTYLE))]
+        (cond
+          (= WS_CHILD (band WS_CHILD styles))
+          [false :child-window]
+
+          (= WS_EX_TOOLWINDOW (band WS_EX_TOOLWINDOW ex-styles))
+          [false :tool-window]
+
+          (= WS_EX_NOACTIVATE (band WS_EX_NOACTIVATE ex-styles))
+          [false :not-activatable-window]
+
+          (= WS_EX_TOPMOST (band WS_EX_TOPMOST ex-styles))
+          [false :topmost-window]
+
+          true)))))
+
+
+(defn wm-ignore-hwnd [self hwnd]
+  (put (in self :ignored-hwnds) hwnd true))
+
+
 (defn wm-focus-changed [self]
   (:call-hook (in self :hook-manager) :focus-changed)
 
@@ -1958,7 +2107,7 @@
     (when (nil? uia-win)
       (log/debug "No focused window")
       (break))
-    
+
     (def hwnd (:get_CachedNativeWindowHandle uia-win))
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
@@ -1976,11 +2125,14 @@
       (break))
 
     (with-uia [_uia-win (in hwnd-info :uia-element)]
-      (unless (:should-manage-hwnd? self hwnd-info)
+      (def manage-state (:should-manage-hwnd? self hwnd-info))
+      (log/debug "manage-state = %n" manage-state)
+
+      (when (= :ignored manage-state)
         (log/debug "Ignoring window: %n" hwnd)
         (break))
 
-      (if-let [new-win (:add-hwnd self hwnd-info)]
+      (if-let [new-win (:add-hwnd self hwnd-info manage-state)]
         (:activate new-win)))))
 
 
@@ -1998,11 +2150,14 @@
     (break))
 
   (with-uia [_uia-win (in hwnd-info :uia-element)]
-    (unless (:should-manage-hwnd? self hwnd-info)
+    (def manage-state (:should-manage-hwnd? self hwnd-info))
+    (log/debug "manage-state = %n" manage-state)
+
+    (when (= :ignored manage-state)
       (log/debug "Ignoring window: %n" hwnd)
       (break))
 
-    (:add-hwnd self hwnd-info)))
+    (:add-hwnd self hwnd-info manage-state)))
 
 
 (defn wm-activate [self node]
@@ -2141,6 +2296,9 @@
 
     :should-manage-hwnd? wm-should-manage-hwnd?
     :add-hwnd wm-add-hwnd
+    :remove-hwnd wm-remove-hwnd
+    :filter-hwnd wm-filter-hwnd
+    :ignore-hwnd wm-ignore-hwnd
 
     :close-hwnd wm-close-hwnd
 
@@ -2151,42 +2309,6 @@
     :with-activation-hooks wm-with-activation-hooks
 
     :destroy wm-destroy})
-
-
-(defn default-window-filter [hwnd uia-win exe-path desktop-info wm]
-  (def desktop-id (in desktop-info :id))
-
-  (cond
-    # Some windows are not managed by Virtual Desktops, we
-    # exclude them too.
-    (or (nil? desktop-id)
-        (= "{00000000-0000-0000-0000-000000000000}" desktop-id))
-    false
-
-    (not (is-valid-uia-window? uia-win))
-    false
-
-    # Exclude cloaked windows
-    (not= 0 (try
-              (DwmGetWindowAttribute hwnd DWMWA_CLOAKED)
-              ((err fib)
-               (log/debug "DwmGetWindowAttribute failed: %n\n%s"
-                          err
-                          (get-stack-trace fib))
-               (if (= err E_HANDLE)
-                 # The hwnd got invalidated before we checked it,
-                 # assume the window is closed. Return an arbitrary
-                 # flag so that the filter returns early.
-                 0xffff
-                 0))))
-    false
-
-    # Exclude windows we are not privileged enough to manage
-    (and (not (:jwno-process-elevated? wm))
-         (hwnd-process-elevated? hwnd))
-    false
-
-    true))
 
 
 (defn window-manager [uia-man ui-man hook-man]
@@ -2200,15 +2322,29 @@
      @{:vdm-com vdm-com
        :uia-manager uia-man
        :ui-man ui-man
-       :hook-manager hook-man}
+       :hook-manager hook-man
+       :ignored-hwnds @{}}
      window-manager-proto))
   (put wm-obj :root (virtual-desktop-container wm-obj hook-man))
 
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path desktop-info]
-       (default-window-filter hwnd uia-win exe-path desktop-info wm-obj)))
+       (match (:filter-hwnd wm-obj hwnd uia-win exe-path desktop-info)
+         [false reason]
+         (do
+           (log/debug "Window %n failed to pass default filter: %n" hwnd reason)
+           false)
+
+         true
+         true)))
   (:add-hook hook-man :focus-changed
      (fn []
+       (def ignored (in wm-obj :ignored-hwnds))
+       # Clean up the ignored list
+       (each h (keys ignored)
+         (when (= FALSE (IsWindow h))
+           (put ignored h nil)))
+
        # XXX: If the focus change is caused by a closing window, that
        # window may still be alive, so it won't be purged immediately.
        # Maybe I shoud check the hwnds everytime a window is manipulated?

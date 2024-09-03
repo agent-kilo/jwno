@@ -21,16 +21,25 @@
                   (get-stack-trace fib))))))
 
 
-(defn hook-manager-call-filter-hook [self hook-name & args]
+(defn hook-manager-call-filter-hook [self mode hook-name & args]
+  (when (and (not= :and mode)
+             (not= :or mode))
+    (errorf "unknown filter hook mode: %n" mode))
+
+  (def default-res
+    (case mode
+      :and true
+      :or false))
+
   (when (dyn :jwno-no-hooks)
     (log/debug ":jwno-no-hooks set, skipping hooks: %n" hook-name)
-    (break true)) # XXX: Always pass the checks when no-hooks
+    (break default-res))
 
-  (log/debug "#### calling hook: %n" hook-name)
+  (log/debug "#### calling filter hook in %n mode: %n" mode hook-name)
 
   (def hooks (in self :hooks))
   (def hook-fn-list (in hooks hook-name @[]))
-  (var result true)
+  (var result default-res)
   (each hook-fn hook-fn-list
     (set result
       (try
@@ -39,11 +48,16 @@
          (log/error "Hook function failed: %n\n%s"
                     err
                     (get-stack-trace fib))
-         # XXX: defaults to true
-         true)))
+         default-res)))
     (log/debug "result of %n: %n" hook-fn result)
-    (if-not result
-      (break)))
+    # Short circuit
+    (case mode
+      :and
+      (if-not result
+        (break))
+      :or
+      (if result
+        (break))))
   result)
 
 

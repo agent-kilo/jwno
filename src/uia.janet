@@ -1,3 +1,4 @@
+(use jw32/_winuser)
 (use jw32/_combaseapi)
 (use jw32/_uiautomation)
 (use jw32/_errhandlingapi)
@@ -7,12 +8,6 @@
 
 (import ./const)
 (import ./log)
-
-
-(defmacro is-valid-uia-window? [uia-win]
-  ~(and (= 0 (:GetCachedPropertyValue ,uia-win UIA_IsOffscreenPropertyId))
-        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsTransformPatternAvailablePropertyId))
-        (not= 0 (:GetCachedPropertyValue ,uia-win UIA_IsWindowPatternAvailablePropertyId))))
 
 
 (defn- handle-window-opened-event [sender event-id chan]
@@ -79,7 +74,20 @@
       nil)))
 
 
-(defn uia-manager-get-parent-window [self uia-elem]
+(defn- get-uia-direct-parent [elem walker cr]
+  (try
+    (:GetParentElementBuildCache walker elem cr)
+    ((err fib)
+     # The window or its parent may have vanished
+     (log/debug "GetParentElementBuildCache failed: %n\n%s"
+                err
+                (get-stack-trace fib))
+     nil)))
+
+
+(defn uia-manager-get-parent-window [self uia-elem &opt top-level?]
+  (default top-level? true)
+
   (def {:root root
         :focus-cr focus-cr
         :control-view-walker walker}
@@ -88,20 +96,9 @@
 
   (:AddRef uia-elem)
 
-  (def get-parent
-    (fn [elem]
-      (try
-        (:GetParentElementBuildCache walker elem focus-cr)
-        ((err fib)
-         # The window or its parent may have vanished
-         (log/debug "GetParentElementBuildCache failed: %n\n%s"
-                    err
-                    (get-stack-trace fib))
-         nil))))
-
   (var ret nil)
   (var cur-elem uia-elem)
-  (var parent (get-parent cur-elem))
+  (var parent (get-uia-direct-parent cur-elem walker focus-cr))
 
   (while true
     (def hwnd (try
@@ -116,8 +113,16 @@
         # Has a handle
         (not (nil? hwnd))
         (not (null? hwnd))
-        # Is a valid window?
-        (is-valid-uia-window? cur-elem))
+        # Is a window control?
+        (= UIA_WindowControlTypeId (:GetCachedPropertyValue cur-elem UIA_ControlTypePropertyId))
+        # Is Visible?
+        (= 0 (:GetCachedPropertyValue cur-elem UIA_IsOffscreenPropertyId))
+        # Are we looking for a top-level window?
+        (if top-level?
+          (= (int/u64 0)
+             (band WS_CHILD
+                   (signed-to-unsigned-32 (GetWindowLong hwnd GWL_STYLE))))
+          true))
       (do
         (set ret cur-elem)
         (break))
@@ -137,17 +142,22 @@
                            nil))]
         (when (or (nil? parent-hwnd)
                   (= root-hwnd parent-hwnd))
-          (:Release cur-elem)
+          # cur-elem is a top-level thingy, but not a valid window by our
+          # standards. Return it anyway, to let the caller check it and
+          # decide what to do.
+          (set ret cur-elem)
           (break))))
 
     (:Release cur-elem)
     (set cur-elem parent)
-    (set parent (get-parent cur-elem)))
+    (set parent (get-uia-direct-parent cur-elem walker focus-cr)))
 
   ret)
 
 
-(defn uia-manager-get-focused-window [self]
+(defn uia-manager-get-focused-window [self &opt top-level?]
+  (default top-level? true)
+
   (def {:com uia-com
         :focus-cr focus-cr}
     self)
@@ -161,7 +171,7 @@
                                    (get-stack-trace fib))
                         nil))]
     (if focused
-      (uia-manager-get-parent-window self focused)
+      (:get-parent-window self focused top-level?)
       nil)))
 
 
@@ -316,7 +326,9 @@
       (:AddProperty cr UIA_IsTransformPatternAvailablePropertyId)
       (:AddProperty cr UIA_TransformCanMovePropertyId)
       (:AddProperty cr UIA_IsWindowPatternAvailablePropertyId)
+      (:AddProperty cr UIA_WindowWindowVisualStatePropertyId)
       (:AddProperty cr UIA_IsOffscreenPropertyId)
+      (:AddProperty cr UIA_ControlTypePropertyId)
       cr))
 
   (def transform-cr

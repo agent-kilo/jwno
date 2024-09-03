@@ -348,7 +348,7 @@
 
 
 (defn cmd-describe-window [wm ui-man]
-  (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager) false)]
     (if (nil? uia-win)
       (:show-tooltip ui-man :describe-window "No focused window.")
       (do
@@ -359,7 +359,12 @@
                   :virtual-desktop desktop-info}
               win-info)
             (def rect (:get_CachedBoundingRectangle uia-win))
-            (def efb-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+            (def efb-rect
+              (try
+                (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+                ((err fib)
+                 (log/debug "DwmGetWindowAttribute failed for %n: %n" hwnd err)
+                 nil)))
             (:show-tooltip ui-man
                            :describe-window
                            (string/format (string/join
@@ -367,26 +372,71 @@
                                             "EXE: %s"
                                             "Name: %s"
                                             "Class Name: %s"
+                                            "Control Type: %n"
                                             "Virtual Desktop Name: %s"
                                             "Virtual Desktop ID: %s"
                                             "Rect: %n"
-                                            "EFB Rect: %n"]
+                                            "EFB Rect: %s"
+                                            "Filter Result: %n"]
                                            "\n")
                                           hwnd
                                           exe-path
                                           (:get_CachedName uia-win)
                                           (:get_CachedClassName uia-win)
+                                          (:get_CachedControlType uia-win)
                                           (in desktop-info :name)
                                           (if-let [desktop-id (in desktop-info :id)]
                                             desktop-id
                                             "n/a")
                                           rect
-                                          efb-rect)
-                           (in efb-rect :left)
-                           (in efb-rect :top)))
+                                          (if efb-rect
+                                            (string/format "%n" efb-rect)
+                                            "n/a")
+                                          (:filter-hwnd wm hwnd uia-win exe-path desktop-info))
+                           (if efb-rect
+                             (in efb-rect :left)
+                             (in rect :left))
+                           (if efb-rect
+                             (in efb-rect :top)
+                             (in rect :top))))
+
           (:show-tooltip ui-man
                          :describe-window
                          (string/format "Failed to get window info for %n." hwnd)))))))
+
+
+(defn cmd-manage-window [wm ui-man]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager) true)]
+    (unless uia-win
+      (:show-tooltip ui-man :manage-window "No focused window.")
+      (break))
+
+    (def hwnd (:get_CachedNativeWindowHandle uia-win))
+    (put (in wm :ignored-hwnds) hwnd nil)
+
+    (if (:find-hwnd (in wm :root) hwnd)
+      (:show-tooltip ui-man :manage-window
+         (string/format "Window \"%s\" is already managed."
+                        (:get_CachedName uia-win)))
+      (when-let [info (:get-hwnd-info wm hwnd uia-win)]
+        (with-uia [_uia-win (in info :uia-element)]
+          (:show-tooltip ui-man :manage-window
+             (string/format "Adding \"%s\" to managed windows." (:get_CachedName uia-win)))
+          (:add-hwnd wm info :forced))))))
+
+
+(defn cmd-ignore-window [wm ui-man]
+  (with-uia [uia-win (:get-focused-window (in wm :uia-manager) true)]
+    (unless uia-win
+      (:show-tooltip ui-man :manage-window "No focused window.")
+      (break))
+
+    (def hwnd (:get_CachedNativeWindowHandle uia-win))
+
+    (:show-tooltip ui-man :ignore-window
+       (string/format "Ignoring \"%s\"" (:get_CachedName uia-win)))
+    (:ignore-hwnd wm hwnd)
+    (:remove-hwnd wm hwnd)))
 
 
 (defn cmd-exec [wm ui-man verbose? cli]
@@ -707,6 +757,22 @@
      (:describe-window)
 
      Shows basic info about a window.
+     ```)
+
+  (:add-command command-man :manage-window
+     (fn [] (cmd-manage-window wm ui-man))
+     ```
+     (:manage-window)
+
+     Forcibly adds the current window to the list of managed windows.
+     ```)
+
+  (:add-command command-man :ignore-window
+     (fn [] (cmd-ignore-window wm ui-man))
+     ```
+     (:ignore-window)
+
+     Removes the current window from the list of managed windows.
      ```))
 
 
@@ -719,7 +785,7 @@
     (not found)
     (errorf "unknown command: %n, args: %n" cmd args)
 
-    (:call-filter-hook hook-man :filter-command cmd args)
+    (:call-filter-hook hook-man :and :filter-command cmd args)
     (do
       ((in found :fn) ;args)
       (:call-hook hook-man :command-executed cmd args)
