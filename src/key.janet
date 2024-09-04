@@ -339,8 +339,9 @@
     :format keymap-format})
 
 
-(varfn define-keymap []
-  (table/setproto (table/new 0) keymap-proto))
+(varfn define-keymap [&opt proto]
+  (default proto keymap-proto)
+  (table/setproto (table/new 0) proto))
 
 
 (varfn keymap? [x]
@@ -348,8 +349,8 @@
        (not (has-key? x :cmd))))
 
 
-(defn key-manager-new-keymap [self]
-  (define-keymap))
+(defn key-manager-new-keymap [self &opt proto]
+  (define-keymap proto))
 
 
 (defn key-manager-set-keymap [self keymap]
