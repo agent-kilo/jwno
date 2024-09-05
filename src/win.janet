@@ -2112,7 +2112,8 @@
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       #Already managed
-      (:activate win)
+      (with-activation-hooks self
+        (:activate win))
       (break))
 
     (def hwnd-info
@@ -2133,7 +2134,8 @@
         (break))
 
       (if-let [new-win (:add-hwnd self hwnd-info manage-state)]
-        (:activate new-win)))))
+        (with-activation-hooks self
+          (:activate new-win))))))
 
 
 (defn wm-window-opened [self hwnd]
