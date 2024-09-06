@@ -180,14 +180,11 @@
       ```
       Hello there! Welcome to this little Jwno tutorial!
 
-      Jwno is a keyboard-centric tiling window manager, we'll be using your keyboard
-      a lot, so keep it handy ;)
+      Jwno is a keyboard-centric tiling window manager, we'll be using your keyboard a lot, so keep it handy ;)
 
-      Note that Jwno has no key bindings defined by default, the keys we'll use here
-      are specifically defined for this tutorial.
+      Note that Jwno has no key bindings defined by default, the keys we'll use here are specifically defined for this tutorial.
 
-      Press Win + Q or right click on Jwno's system tray icon at any time to stop this
-      tutorial and exit.
+      Press Win + Q or right click on Jwno's system tray icon at any time to stop this tutorial and exit.
       ```)
      nil nil
      0
@@ -208,8 +205,7 @@
       ```
       We'll be walking through some of Jwno's window management features.
 
-      To do that, I'll first try to minimize all your windows to make us a clean
-      desktop. You can also manually close them before we continue.
+      To do that, I'll first try to minimize all your windows to make us a clean desktop. You can also manually close them before we continue.
       ```)
      nil nil
      0
@@ -301,13 +297,11 @@
      (format-slide-text
       id total
       ```
-      Jwno calls the screen areas it manages "frames." It will allocate a top-level
-      frame that covers the whole desktop area for each monitor by default.
+      Jwno calls the screen areas it manages "frames." It will allocate a top-level frame that covers the whole desktop area for each monitor by default.
 
       The area now occupied by the Notepad window is our top frame for this monitor.
 
-      Note that Jwno will show a gap of 20 virtual pixels around the windows in this
-      tutorial, so that we can easily visualize frame borders.
+      Note that Jwno will show a gap of 20 virtual pixels around the windows in this tutorial, so that we can easily visualize frame borders.
       ```)
      nil nil
      0
@@ -330,12 +324,9 @@
       ```
       Every frame can be split into multiple child frames.
 
-      We just called the :split-frame command and have the top frame split into two
-      child frames. This is called a "horizontal split," since after the split, child frames
-      are lined up horizontally.
+      We just called the :split-frame command and have the top frame split into two child frames. This is called a "horizontal split," since after the split, child frames are lined up horizontally.
 
-      Don't worry about the colon(:) in front of the command name. Just knowing that
-      some names in Jwno start with a colon is sufficient for this tutorial.
+      Don't worry about the colon(:) in front of the command name. Just knowing that some names in Jwno start with a colon is sufficient for this tutorial.
       ```)
      nil nil
      0
@@ -378,9 +369,7 @@
      (format-slide-text
       id total
       ```
-      Jwno has the concept of "active frames." An active frame is a frame that
-      currently has the input focus. New windows will snap into the active frame,
-      and all frame selection commands are relative to the active frame.
+      Jwno has the concept of "active frames." An active frame is a frame that currently has the input focus. New windows will snap into the active frame, and all frame selection commands are relative to the active frame.
 
       A Frame can be activated in one of these ways:
 
@@ -409,12 +398,9 @@
       ```
       The arrow keys on your keyboard are now bound to frame selection commands.
 
-      Use the arrow keys, or click on the Notepad windows, to observe the switching
-      of active frames. There will be a small tooltip appearing in the center of the
-      activated frame.
+      Use the arrow keys, or click on the Notepad windows, to observe the switching of active frames. There will be a small tooltip appearing in the center of the activated frame.
 
-      If you're curious about what command the arrow keys actually called, have a
-      look at the top-left corner of your current monitor.
+      If you're curious about what command the arrow keys actually called, have a look at the top-left corner of your current monitor.
       ```)
      nil nil
      0
@@ -431,17 +417,13 @@
   (def text
     (if (> (length (in layout :children)) 1)
       ```
-      I see that you have multiple monitors. Jwno has excellent multi-monitor support,
-      and knows about your monitor arrangement, so the frame selection commands also
-      work across different monitors, as you may have noticed.
+      I see that you have multiple monitors. Jwno has excellent multi-monitor support, and knows about your monitor arrangement, so the frame selection commands also work across different monitors, as you may have noticed.
 
       In other words, you can generally treat your monitors as normal frames.
       ```
       # else
       ```
-      Jwno has excellent multi-monitor support, and knows about your monitor
-      arrangement. So if you have multiple monitors, the frame selection commands
-      would also work across all of them.
+      Jwno has excellent multi-monitor support, and knows about your monitor arrangement. So if you have multiple monitors, the frame selection commands would also work across all of them.
 
       In other words, you can generally treat your monitors as normal frames.
       ```
@@ -542,16 +524,14 @@
      (format-slide-text
       id total
       ```
-      But Jwno does not enforce window geometries. Instead, it only resizes and
-      relocates windows in these situations:
+      But Jwno does not enforce window geometries. Instead, it only resizes and relocates windows in these situations:
 
       1. A new window is opened;
       2. The input focus is moved to a window that's not already managed;
       3. The frame layout is changed;
       4. You explicitly request resizing/relocation/retiling.
 
-      You can now freely move or resize any managed windows on the screen. I'll
-      retile them for you in the next step.
+      You can now freely move or resize any managed windows on the screen. I'll retile them for you in the next step.
       ```)
      nil nil
      0
@@ -575,12 +555,9 @@
       ```
       There! The windows are back to where they should be.
 
-      We just called the :retile command. When you temporarily altered the layout
-      of your windows, or want to deal with some weird windows that did not snap
-      to the frames cleanly, this command may come in handy.
+      We just called the :retile command. When you temporarily altered the layout of your windows, or want to deal with some weird windows that did not snap to the frames cleanly, this command may come in handy.
 
-      From now on in this tutorial, you can press the R key if you ever messed up the
-      window layout and want to retile.
+      From now on in this tutorial, you can press the R key if you ever messed up the window layout and want to retile.
       ```)
      nil nil
      0
@@ -605,8 +582,7 @@
 
       Select a window, and try the arrow keys while holding down Shift ;)
 
-      The Shift + <arrow key> combinations are now bound to window movement commands.
-      Likewise, the command that is actually called will be shown in the top-left corner.
+      The Shift + <arrow key> combinations are now bound to window movement commands. Likewise, the command that is actually called will be shown in the top-left corner.
 
       These commands also work across monitors, like the frame selection commands.
       ```)
@@ -631,15 +607,11 @@
       ```
       But what happened to the windows in a frame when a new window moved in?
 
-      They're still there, but covered by the new window, as you would have expected.
-      Alt + Tab to them, and you'll see they still occupy the same frame area.
+      They're still there, but covered by the new window, as you would have expected. Alt + Tab to them, and you'll see they still occupy the same frame area.
 
-      There's an :enum-window-in-frame command to flip through these overlapped
-      windows.
+      There's an :enum-window-in-frame command to flip through these overlapped windows.
 
-      Let's try it out - move multiple windows into one frame with Shift + <arrow key>,
-      then imagine that frame is a book. The N key will bring you to the next page,
-      and P key to the previous page.
+      Let's try it out - move multiple windows into one frame with Shift + <arrow key>, then imagine that frame is a book. The N key will bring you to the next page, and P key to the previous page.
       ```)
      nil nil
      0
@@ -659,11 +631,9 @@
      (format-slide-text
       id total
       ```
-      Sometimes it's too slow to flip through a thick book. Luckily we have the
-      :cascade-windows-in-frame command.
+      Sometimes it's too slow to flip through a thick book. Luckily we have the :cascade-windows-in-frame command.
 
-      Activate a frame with multiple windows, then press the C key to see it in
-      action ;)
+      Activate a frame with multiple windows, then press the C key to see it in action ;)
 
       To fit the windows to their frames again, press R to :retile.
       ```)
@@ -692,10 +662,7 @@
 
       Try Ctrl + <arrow key> combinations ;)
 
-      But note that, when you're resizing a window, you're actually resizing the
-      frame it belongs to, and all other windows in the same frame, so that our
-      layout stays clean and tidy. You can see from the top-left corner of your
-      screen when resizing, that the command is actually called :resize-frame.
+      But note that, when you're resizing a window, you're actually resizing the frame it belongs to, and all other windows in the same frame, so that our layout stays clean and tidy. You can see from the top-left corner of your screen when resizing, that the command is actually called :resize-frame.
       ```)
      nil nil
      0
@@ -714,9 +681,7 @@
      (format-slide-text
       id total
       ```
-      You may have noticed, some windows have minimum size requirements, but Jwno's
-      frames don't have that limitation. So sometimes windows will "overflow" from the
-      designated frame area. Unfortunately Jwno has no control over this.
+      You may have noticed, some windows have minimum size requirements, but Jwno's frames don't have that limitation. So sometimes windows will "overflow" from the designated frame area. Unfortunately Jwno has no control over this.
       ```)
      nil nil
      0
@@ -728,6 +693,8 @@
 
 
 # ------------------ #
+
+(:set-tooltip-max-width ui-man :tutorial 450)
 
 (:add-hook hook-man :window-created
    (fn [win _uia-win _exe-path _desktop-info]
