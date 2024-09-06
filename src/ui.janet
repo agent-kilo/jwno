@@ -26,7 +26,8 @@
 (def HIDE-TOOLTIP-MSG (+ WM_APP 7))
 (def SET-TOOLTIP-TIMEOUTS-MSG (+ WM_APP 8))
 (def SET-TOOLTIP-ANCHORS-MSG (+ WM_APP 9))
-(def UPDATE-WORK-AREA-MSG (+ WM_APP 10))
+(def SET-TOOLTIP-MAX-WIDTHS-MSG (+ WM_APP 10))
+(def UPDATE-WORK-AREA-MSG (+ WM_APP 11))
 
 (def TIMER-ID-DISPLAY-CHANGE (int/u64 1))
 # The tooltip timers are generated from tooltip numeric IDs.
@@ -200,9 +201,10 @@
   (+ TOOLTIP-TIMER-BASE uid))
 
 
-(defn- create-tooltip-window [parent-hwnd tt-id &opt center? text]
+(defn- create-tooltip-window [parent-hwnd tt-id &opt center? text max-width]
   (default center? false)
   (default text "")
+  (default max-width const/DEFAULT-TOOLTIP-MAX-WIDTH)
 
   (def tt-hwnd
     (CreateWindowEx WS_EX_TOPMOST
@@ -235,7 +237,7 @@
     (break nil))
 
   # For multi-line tooltip text.
-  (SendMessage tt-hwnd TTM_SETMAXTIPWIDTH 0 const/TOOLTIP-MAX-WIDTH)
+  (SendMessage tt-hwnd TTM_SETMAXTIPWIDTH 0 max-width)
   [tt-hwnd t-info])
 
 
@@ -450,6 +452,11 @@
           ac
           const/DEFAULT-TOOLTIP-ANCHOR)))
 
+    (def max-width
+      (if-let [mw (get-in tooltip [:max-width])]
+        mw
+        const/DEFAULT-TOOLTIP-MAX-WIDTH))
+
     (def [x y]
       (if (or (nil? opt-x) (nil? opt-y))
         # Default to the current monitor
@@ -464,7 +471,7 @@
       (if tt-hwnd?
         [tt-hwnd? (in tooltip :info)]
         (let [uid (resume (in state :tooltip-uid-generator))
-              created (create-tooltip-window hwnd uid false text)]
+              created (create-tooltip-window hwnd uid false text max-width)]
           (if (nil? created)
             [nil nil]
             created))))
@@ -534,6 +541,14 @@
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-anchor] anchors
       (set-tooltip-property tooltips tt-id :anchor tt-anchor))
+    (log/debug "New tooltips: %n" tooltips)))
+
+
+(defn- msg-wnd-handle-set-tooltip-max-widths [_hwnd wparam _lparam _hook-handler state]
+  (let [max-widths (unmarshal-and-free wparam)
+        tooltips (in state :tooltips)]
+    (eachp [tt-id tt-max-width] max-widths
+      (set-tooltip-property tooltips tt-id :max-width tt-max-width))
     (log/debug "New tooltips: %n" tooltips)))
 
 
@@ -638,6 +653,7 @@
    HIDE-TOOLTIP-MSG msg-wnd-handle-hide-tooltip
    SET-TOOLTIP-TIMEOUTS-MSG msg-wnd-handle-set-tooltip-timeouts
    SET-TOOLTIP-ANCHORS-MSG msg-wnd-handle-set-tooltip-anchors
+   SET-TOOLTIP-MAX-WIDTHS-MSG msg-wnd-handle-set-tooltip-max-widths
 
    UPDATE-WORK-AREA-MSG msg-wnd-handle-update-work-area
 
@@ -801,6 +817,13 @@
                            0))
 
 
+(defn ui-manager-set-tooltip-max-width [self tt-id max-width]
+  (ui-manager-post-message self
+                           SET-TOOLTIP-MAX-WIDTHS-MSG
+                           (alloc-and-marshal {tt-id max-width})
+                           0))
+
+
 (defn ui-manager-update-work-area [self rect]
   (ui-manager-post-message self
                            UPDATE-WORK-AREA-MSG
@@ -827,6 +850,7 @@
     :hide-tooltip ui-manager-hide-tooltip
     :set-tooltip-timeout ui-manager-set-tooltip-timeout
     :set-tooltip-anchor ui-manager-set-tooltip-anchor
+    :set-tooltip-max-width ui-manager-set-tooltip-max-width
     :update-work-area ui-manager-update-work-area
     :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
