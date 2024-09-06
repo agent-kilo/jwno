@@ -138,7 +138,8 @@
            :move-window
            :resize-frame
            :split-frame
-           :enum-window-in-frame]))
+           :enum-window-in-frame
+           :cascade-windows-in-frame]))
   (when show?
     (:show-tooltip
        ui-man
@@ -169,9 +170,6 @@
 
   # Pause window management
   (:add-hook hook-man :filter-window negative-window-filter)
-
-  # Show important commands
-  (:add-hook hook-man :filter-command show-command-filter)
 
   (:show-tooltip
      ui-man
@@ -312,6 +310,9 @@
 (defn split-top-frame
   {:slide 6}
   [id total keymap]
+
+  # Start showing important commands
+  (:add-hook hook-man :filter-command show-command-filter)
 
   (:set-keymap key-man keymap)
 
