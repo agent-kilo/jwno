@@ -134,6 +134,7 @@
   (def show?
     (find |(= $ cmd)
           [:adjacent-frame
+           :retile
            :move-window
            :resize-frame
            :split-frame
