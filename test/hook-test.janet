@@ -43,21 +43,43 @@
     (fn [& args]
       (set hook-fn3-called-with args)
       true))
+  (var hook-fn4-called-with nil)
+  (def hook-fn4
+    (fn [& args]
+      (set hook-fn4-called-with args)
+      false))
 
-  (:add-hook hook-man :dummy-hook hook-fn1)
-  (assert (= true (:call-filter-hook hook-man :dummy-hook 'arg1)))
+  (:add-hook hook-man :dummy-and-hook hook-fn1)
+  (assert (= true (:call-filter-hook hook-man :and :dummy-and-hook 'arg1)))
   (assert (= ['arg1] hook-fn1-called-with))
 
-  (:add-hook hook-man :dummy-hook hook-fn2)
-  (assert (= false (:call-filter-hook hook-man :dummy-hook 'other-arg1)))
+  (:add-hook hook-man :dummy-and-hook hook-fn2)
+  (assert (= false (:call-filter-hook hook-man :and :dummy-and-hook 'other-arg1)))
   (assert (= ['other-arg1] hook-fn1-called-with))
   (assert (= ['other-arg1] hook-fn2-called-with))
 
-  (:add-hook hook-man :dummy-hook hook-fn3)
-  (assert (= false (:call-filter-hook hook-man :dummy-hook 'another-arg1)))
+  (:add-hook hook-man :dummy-and-hook hook-fn3)
+  (assert (= false (:call-filter-hook hook-man :and :dummy-and-hook 'another-arg1)))
   (assert (= ['another-arg1] hook-fn1-called-with))
   (assert (= ['another-arg1] hook-fn2-called-with))
-  (assert (nil? hook-fn3-called-with)))
+  (assert (nil? hook-fn3-called-with))
+
+  (set hook-fn2-called-with nil)
+  (:add-hook hook-man :dummy-or-hook hook-fn2)
+  (assert (= false (:call-filter-hook hook-man :or :dummy-or-hook 'arg1)))
+  (assert (= ['arg1] hook-fn2-called-with))
+
+  (set hook-fn3-called-with nil)
+  (:add-hook hook-man :dummy-or-hook hook-fn3)
+  (assert (= true (:call-filter-hook hook-man :or :dummy-or-hook 'other-arg1)))
+  (assert (= ['other-arg1] hook-fn2-called-with))
+  (assert (= ['other-arg1] hook-fn3-called-with))
+
+  (:add-hook hook-man :dummy-or-hook hook-fn4)
+  (assert (= true (:call-filter-hook hook-man :or :dummy-or-hook 'another-arg1)))
+  (assert (= ['another-arg1] hook-fn2-called-with))
+  (assert (= ['another-arg1] hook-fn3-called-with))
+  (assert (nil? hook-fn4-called-with)))
 
 
 (defn main [&]
