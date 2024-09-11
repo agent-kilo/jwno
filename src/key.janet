@@ -38,7 +38,7 @@
 
 
 (defmacro- async-key-state-down? [vkey-code]
-  ~(not= (,GetAsyncKeyState ,vkey-code) 0))
+  ~(< (,GetAsyncKeyState ,vkey-code) 0))
 
 
 (def MODIFIER-KEYS
