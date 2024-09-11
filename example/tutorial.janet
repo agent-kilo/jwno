@@ -90,10 +90,13 @@
                  "Win + Shift + Q"
                  :quit
                  "Stop this tutorial and quit Jwno")
-    (:define-key keymap
-                 "Win + Enter R"
-                 [:repl true "127.0.0.1" 9999]
-                 "Launch Jwno REPL")
+    # XXX: Multi-level keys defined in the keymap prototype will make the
+    # keymap reset to that prototype instead of the correct parent. Maybe
+    # we need another stack for resetting keymaps
+    #(:define-key keymap
+    #             "Win + Enter R"
+    #             [:repl true "127.0.0.1" 9999]
+    #             "Launch Jwno REPL")
     keymap))
 
 
@@ -106,6 +109,11 @@
                  "Win + Shift + /"
                  [:show-keymap keymap]
                  "Show current keymap")
+    # XXX: See comment for *common-keymap*
+    (:define-key keymap
+                 "Win + Enter R"
+                 [:repl true "127.0.0.1" 9999]
+                 "Launch Jwno REPL")
     keymap))
 
 
@@ -180,12 +188,14 @@
     (:show-tooltip
        ui-man
        :show-command
-       (string/format "[%n %s]"
-                      cmd
-                      (string/join (map |(if (function? $)
-                                           "..."
-                                           (string/format "%n" $)) args)
-                                   " "))
+       (if (and args (> (length args) 0))
+         (string/format "[%n %s]"
+                        cmd
+                        (string/join (map |(if (function? $)
+                                             "..."
+                                             (string/format "%n" $)) args)
+                                     " "))
+         (string/format "%n" cmd))
        nil nil
        5000
        :top-left))
@@ -248,19 +258,18 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Hello there! Welcome to this little Jwno tutorial!
 
-      Jwno is a keyboard-centric tiling window manager, we'll be using your keyboard a lot, so keep it handy ;)
+```Hello there! Welcome to this little Jwno tutorial!
 
-      Note that Jwno has no key bindings defined by default. The keys we'll use here are the same keys defined in example-config.janet.
+I'm Agent Kilo, the guy who created Jwno. But you can call me anything you want, I can't hear you anyway.
 
-      This tutorial assumes that you use the US Qwerty keyboard layout.
+Jwno is a keyboard-centric tiling window manager, we'll be using your keyboard a lot, so keep it handy ;) Here I assume that you use the US Qwerty keyboard layout.
 
-      You should be able to use the example config directly, or use it as a starting point for your own config, after going through this tutorial.
+Note that Jwno has no key bindings defined by default. The keys we'll use here are the same keys defined in example-config.janet. After going through this tutorial, you should be able to use that config file directly, or as a starting point for your own config.
 
-      Press Win + Shift + Q or right click on Jwno's system tray icon at any time to stop this tutorial and exit.
-      ```)
+Press Win + Shift + Q or right click on Jwno's system tray icon at any time to stop this tutorial and exit.```
+
+      )
      nil nil
      0
      :center))
@@ -277,11 +286,12 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      We'll be walking through some of Jwno's window management features.
 
-      To do that, I'll first try to minimize all your windows to make us a clean desktop. You can also manually close them before we continue.
-      ```)
+```We'll be walking through some of Jwno's window management features.
+
+But I'll try to minimize all your windows first, to make us a clean desktop. You can also manually close them before we continue.```
+
+      )
      nil nil
      0
      :center))
@@ -318,9 +328,10 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Next, I'll spawn some Notepad windows for us to manage.
-      ```)
+
+```And... let there be Notepad!```
+      
+      )
      nil nil
      0
      :center))
@@ -350,9 +361,10 @@
       :tutorial
       (format-slide-text
        id total
-       ```
-       With our windows in place, let's tile them!
-       ```)
+
+```Notepad is good. It comes with Windows™, it's slim and fast... Oh, right, we were talking about Jwno.```
+
+       )
       (+ 100 (in w-rect :left)) (+ 100 (in w-rect :top))
       0
       :top-left)))
@@ -378,15 +390,15 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Jwno calls the screen areas it manages "frames." It will allocate a top-level frame that covers the whole desktop area for each monitor by default.
 
-      The area now occupied by the Notepad window is our top frame for this monitor.
+```Jwno calls the screen areas it manages "frames." A top-level frame that covers the whole desktop area is allocated for each monitor by default.
 
-      Note that Jwno will show a gap of 20 virtual pixels around the windows in this tutorial, so that we can easily visualize frame borders.
+The area now occupied by the Notepad window is our top frame for this monitor.
 
-      Try Pressing Win + , (the comma key) on your keyboard ;)
-      ```
+To help us visualize frame borders, I configured Jwno to show a gap of 20 pixels around the windows in this tutorial.
+
+Try Pressing Win + , (the comma key) on your keyboard ;)```
+
       false)
      nil nil
      0
@@ -411,15 +423,17 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Every frame can be split into multiple child frames.
 
-      We just called the :split-frame command and have the top frame split into two child frames. This is called a "horizontal split," since after the split, child frames are lined up horizontally.
+```We just called the :split-frame command and have the top frame split into two child frames.
 
-      Don't worry about the colon(:) in front of the command name. Just knowing that some names in Jwno start with a colon is sufficient for this tutorial.
+Every frame can be split into multiple children. And the children can be split again. And again. And again if you like. But please don't tell anyone we're splitting children in half.
 
-      Now try Win + . (the period key).
-      ```
+...Aaaanyway, this is called a "horizontal split," since after the split, the child frames are lined up horizontally.
+
+(Don't worry about the colon(:) in front of the command name. Just knowing that some names in Jwno start with a colon is sufficient for this tutorial.)
+
+Now try Win + . (the period key).```
+
       false)
      nil nil
      0
@@ -441,11 +455,12 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      We just did a vertical split. As you can see, a frame can be empty.
 
-      And if we open a new window... (I'll spawn an Explorer window for you.)
-      ```)
+```We just did a vertical split. Notice that a frame can be empty.
+
+And if we open a new window... (I'll spawn an Explorer window for you.)```
+
+      )
      ;(calc-rect-center (in cur-frame :rect))
      0
      :center))
@@ -468,9 +483,10 @@
       :tutorial
       (format-slide-text
        id total
-       ```
-       The new window will snap into the active frame.
-       ```)
+       
+```The new window will snap into the active frame.```
+       
+       )
       ;(calc-rect-center (in cur-frame :rect))
       0
       :center)))
@@ -487,15 +503,16 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Jwno has the concept of "active frames." An active frame is a frame that currently has the input focus. New windows will snap into the active frame, and all frame selection commands are relative to that frame too.
 
-      A Frame can be activated in one of these ways:
+```Jwno has the concept of "active frames." An active frame is a frame that currently has the input focus. New windows will snap into the active frame, and all frame selection commands are relative to that frame too.
 
-      1. Switch focus to one of the windows it contains;
-      2. Use frame selection commands;
-      3. Programmatically call the activation API. 
-      ```)
+A Frame can be activated in one of these ways:
+
+1. Switch focus to one of the windows it contains;
+2. Use frame selection commands;
+3. Programmatically call the activation API.```
+
+       )
      nil nil
      0
      :center))
@@ -512,11 +529,12 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      There're two main frame selection commands, the first one is :enum-frame.
 
-      Internally, frames are organized in a tree-like structure, and :enum-frame can help you traverse the leaf frames in order. If that doesn't make sense to you, just know that :enum-frame can generally switch to the next frame from top to bottom, and from left to right, or in the opposite direction.
-      ```)
+```There're two main frame selection commands, the first one is :enum-frame.
+
+Internally, frames are organized in a tree-like structure, and :enum-frame can help you traverse the leaf frames in order. If that doesn't make sense to you, just know that :enum-frame can generally switch to the next frame from top to bottom, and from left to right, or in the opposite direction.```
+
+      )
      nil nil
      0
      :center))
@@ -537,13 +555,14 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      You can now use Win + U and Win + I to call the :enum-frame command and activate the next/prev frame.
 
-      Use these keys, or click on the managed windows, to observe the activation of frames. There will be a small tooltip appearing in the center of the activated frame.
+```You can now use Win + U and Win + I to call the :enum-frame command and activate the next/prev frame. The actual commands we bound to these keys will be shown in the top-left corner of your current monitor.
 
-      The actual commands we bound to those keys will be shown in the top-left corner of your current monitor.
-      ```)
+Use those keys, or click on the managed windows, to observe the activation of frames. There will be a small tooltip appearing in the center of the activated frame.
+
+After activating a frame, you can restore your minimized windows, or open new windows, to see how Jwno takes them under management.```
+
+      )
      nil nil
      0
      :center))
@@ -560,11 +579,12 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      The second frame selection command is :adjacent-frame.
 
-      It just does what it says: activating an adjacent frame. You can specify a direction for it to know where to go next.
-      ```)
+```And here comes the second frame selection command, :adjacent-frame.
+
+It just does what it says: activating an adjacent frame. You can specify a direction for it to know where to go next.```
+
+      )
      nil nil
      0
      :center))
@@ -588,13 +608,14 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      The Win + Ctrl + Y/U/I/O keys are now bound to moving the focus left/down/up/right.
 
-      Please try them out, and maybe compare them with the :enum-frame keys.
+```The Win + Ctrl + Y/U/I/O keys are now bound to moving the focus left/down/up/right.
 
-      Now that we have a bunch of keys to remember, you can press Win + Shift + / (the slash key) to see a list of all defined keys. Some of the commands in that list are now disabled to keep you oriented though.
-      ```)
+Please try them out, and maybe compare them with Win + U and Win + I.
+
+Now that we have a bunch of keys to remember, you can press Win + Shift + / (the slash key) to see a list of all defined keys. But some of those commands are now disabled to keep us oriented.```
+
+      )
      nil nil
      0
      :center))
@@ -609,17 +630,17 @@
   (def layout (:get-layout (:get-current-frame (in window-man :root))))
   (def text
     (if (> (length (in layout :children)) 1)
-      ```
-      I see that you have multiple monitors. You may have noticed, the frame selection commands also work across different monitors.
 
-      In other words, you can generally treat your monitors as normal frames.
-      ```
+```I see that you have multiple monitors. You may have noticed, the frame selection commands also work across different monitors.
+
+In other words, you can generally treat your monitors as normal frames.```
+
       # else
-      ```
-      Jwno has excellent multi-monitor support, and knows about your monitor arrangement. So if you have multiple monitors, the frame selection commands would also work across all of them.
 
-      In other words, you can generally treat your monitors as normal frames.
-      ```
+```Jwno has excellent multi-monitor support, and knows about your monitor arrangement. So if you have multiple monitors, the frame selection commands would also work across all of them.
+
+In other words, you can generally treat your monitors as normal frames.```
+
       ))
 
   (:show-tooltip
@@ -644,16 +665,19 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      An important feature of Jwno is that, it does not always enforce window geometries. Instead, it only resizes and relocates windows in these situations:
 
-      1. A new window is opened;
-      2. The input focus is moved to a window that's not already managed;
-      3. The frame layout is changed;
-      4. You explicitly request resizing/relocation/retiling.
+```An important feature of Jwno is that, it does not always enforce window geometries. Instead, it only resizes and relocates windows in these situations:
 
-      You can now freely move or resize any managed windows on the screen. I'll retile them for you in the next step.
-      ```)
+1. A new window is opened;
+2. The input focus is moved to a window that's not already managed;
+3. The frame layout is changed;
+4. You explicitly request resizing/relocation/retiling.
+
+In other words, after you manually moved/resized your windows, they will stay the way they are, until you change the frame layout or tell Jwno to retile them. This will be handy when you want to temporarily resize or rearrange some windows, for example.
+
+You can now freely move or resize any managed windows on the screen. I'll retile them for you in the next step.```
+
+      )
      nil nil
      0
      :center))
@@ -675,13 +699,12 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      There! The windows are back to where they should be.
 
-      We just called the :retile command. When you temporarily altered the layout of your windows, or want to deal with some weird windows that did not snap to the frames cleanly, this command may come in handy.
+```There! The windows are back to where they should be.
 
-      From now on, you can press Win + R if you ever messed up the window layout and want to retile.
-      ```)
+We just called the :retile command. From now on, you can press Win + R if the window layout got messed up and you want to retile.```
+
+      )
      nil nil
      0
      :center))
@@ -704,13 +727,14 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Now it's time to move our windows around.
 
-      Select a window, and try Win + Shift + Y/U/I/O ;)
+```Now it's time to move our windows around.
 
-      These keys are now bound to window movement commands. They also work across monitors, like the frame selection commands.
-      ```)
+Select a window, and try Win + Shift + Y/U/I/O ;)
+
+These keys are now bound to window movement commands. They also work across monitors, like the frame selection commands.```
+
+      )
      nil nil
      0
      :center))
@@ -727,13 +751,12 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      But what happened to the windows in a frame when a new window moved in?
 
-      They're still there, but covered by the new window, as you would have expected. Alt + Tab to them, and you'll see they still occupy the same frame area.
+```But what happened to the windows in a frame when a new window moved in?
 
-      There's an :enum-window-in-frame command to flip through these overlapped windows.
-      ```)
+They're still there, but covered by the new window, as you would have expected. We have the :enum-window-in-frame command to flip through these overlapped windows.```
+
+      )
      nil nil
      0
      :center))
@@ -754,13 +777,14 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Let's try it out - move multiple windows into one frame with the window movement keys, or simply open some new windows, then imagine that frame is a book. Win + O will bring you to the next page, and Win + Y to the previous page.
 
-      Remember, you can still use Win + U or Win + I to switch the "book" you want to read.
+```Let's try it out - move multiple windows into one frame with the window movement keys, or simply open some new windows, then imagine that frame is a book. Win + O will bring you to the next page, and Win + Y to the previous page.
 
-      (This book analogy is the main reason these keys are arranged like this. You don't like it? No worries! Jwno is quite customizable, just define your own keys.)
-      ```)
+Remember, you can still use Win + U or Win + I to switch the "book" you want to read.
+
+(This book analogy is the main reason these keys are arranged like this. You don't like it? No worries! Jwno is quite customizable, just define your own keys.)```
+
+      )
      nil nil
      0
      :center))
@@ -780,13 +804,14 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Sometimes it's too slow to flip through a thick book. Luckily we have the :cascade-windows-in-frame command.
 
-      Activate a frame containing multiple windows, then press Win + P to see it in action ;)
+```Sometimes it's too slow to flip through a thick book. Luckily we have the :cascade-windows-in-frame command.
 
-      To fit the windows to their frames again, press Win + R to :retile.
-      ```)
+Activate a frame containing multiple windows, then press Win + P to see it in action ;)
+
+To fit the windows to their frames again, press Win + R to :retile.```
+
+      )
      nil nil
      0
      :center))
@@ -825,15 +850,15 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      And of course, we have commands to resize windows too. Here we defined our window resizing keys in a Transient Keymap.
 
-      Jwno's keymaps work like a stack. When you want to temporarily switch to another keymap, use the special :push-keymap command. After you're done with the transient keymap, use the :pop-keymap command to bring back the normal keymap.
+```And of course, we have commands to resize windows too. Here we defined our window resizing keys in a Transient Keymap.
 
-      When a transient keymap is in effect, Jwno will automatically show the keys defined in the top-left corner.
+Jwno's keymaps work like a stack. When you want to temporarily switch to another keymap, use the special :push-keymap command. After you're done with the transient keymap, use the :pop-keymap command to bring back the normal keymap.
 
-      Please try this out. First select a window you want to resize, then press Win + S. After that you can resize the window with only the Y/U/I/O keys. Press the Enter key when you're done.
-      ```
+When a transient keymap is in effect, Jwno will automatically show the keys defined in the top-left corner.
+
+Please try this out. First select a window you want to resize, then press Win + S. After that you can resize the window with only the Y/U/I/O keys. Press the Enter key when you're done.```
+
       false)
      nil nil
      0
@@ -844,6 +869,9 @@
   {:slide 22}
   [id total keymap]
 
+  (enable-command :frame-to-window-size)
+
+  (:define-key *acc-keymap* "Win + Shift + S" :frame-to-window-size)
   (:set-keymap key-man keymap)
 
   (:show-tooltip
@@ -851,11 +879,12 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      When you're resizing a window, you're actually resizing the frame it belongs to, and all other windows in the same frame, so that our layout stays clean and tidy. You can see that from the command's name: it's actually called :resize-frame.
 
-      Some windows have minimum size requirements, but Jwno's frames don't have that limitation. So sometimes windows will "overflow" from the designated frame area. Unfortunately Jwno has no control over this.
-      ```)
+```When you're resizing a window, you're actually resizing the frame it belongs to, and all other windows in the same frame. You can see that from the command's name: it's actually called :resize-frame.
+
+Some windows have minimum size requirements, but Jwno's frames don't have that limitation. So sometimes windows will "overflow" from the designated frame area. Unfortunately Jwno has no control over this. In that case, you can switch to the overflowing window, and use Win + Shift + S to make its parent frame large enough to contain it.```
+
+      )
      nil nil
      0
      :center))
@@ -884,15 +913,16 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      To close a window, use the :close-window-or-frame command.
 
-      If there's a focused window, that command will close it. Otherwise, if the active frame is empty, it'll close the frame instead.
+```To close a window, use the :close-window-or-frame command.
 
-      Note that the example config added a hook to automatically close empty frames after closing a window, so we'll include the same behavior here, but it's not Jwno's default behavior.
+If there's a focused window, that command will close it. Otherwise, if the active frame is empty, it'll close the frame instead.
 
-      To try it out, first activate the window or frame you wan to close, then press Win + Shift + C.
-      ```)
+Note that the example config added a hook to automatically close empty frames after closing a window, so we'll include the same behavior here, but it's not Jwno's default behavior.
+
+To try it out, first activate the window or frame you wan to close, then press Win + Shift + C.```
+
+      )
      nil nil
      0
      :center))
@@ -913,13 +943,14 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Alright! We have walked through Jwno's most important commands. Now I have enabled them all, and they're yours to play with ;)
 
-      Or, you can check out example-config.janet and try to launch Jwno with it. There're extra goodies there. 
+```Alright! We have walked through Jwno's most important commands. Now I have enabled them all, and they're yours to play with ;)
 
-      Remember to use Win + Shift + / (the slash key) to see the list of defined keys.
-      ```)
+Or, you can check out example-config.janet and try to launch Jwno with it. There're extra goodies there. 
+
+Remember to use Win + Shift + / (the slash key) to see the list of defined keys.```
+
+      )
      nil nil
      0
      :center))
@@ -936,13 +967,13 @@
      :tutorial
      (format-slide-text
       id total
-      ```
-      Please try out the keys/commands.
 
-      Win + Shift + / to show all keys.
+```Please try out the keys/commands.
 
-      Win + Shift + Q to exit Jwno.
-      ```
+Win + Shift + / to show all keys.
+
+Win + Shift + Q to exit Jwno.```
+
       false)
      nil nil
      0
