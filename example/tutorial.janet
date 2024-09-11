@@ -181,6 +181,7 @@
            :retile
            :move-window
            :resize-frame
+           :frame-to-window-size
            :split-frame
            :enum-window-in-frame
            :cascade-windows-in-frame]))
