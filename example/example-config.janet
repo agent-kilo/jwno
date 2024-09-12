@@ -25,7 +25,7 @@
 # change the keyboard-layout into something you prefer, and off you
 # go. Check dir-keys below for layouts supported by this config.
 #
-(def keyboard-layout :colemak-dh)
+(def keyboard-layout :qwerty)
 
 
 (def dir-keys
