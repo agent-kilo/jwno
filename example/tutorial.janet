@@ -90,13 +90,10 @@
                  "Win + Shift + Q"
                  :quit
                  "Stop this tutorial and quit Jwno")
-    # XXX: Multi-level keys defined in the keymap prototype will make the
-    # keymap reset to that prototype instead of the correct parent. Maybe
-    # we need another stack for resetting keymaps
-    #(:define-key keymap
-    #             "Win + Enter R"
-    #             [:repl true "127.0.0.1" 9999]
-    #             "Launch Jwno REPL")
+    (:define-key keymap
+                 "Win + Enter R"
+                 [:repl true "127.0.0.1" 9999]
+                 "Launch Jwno REPL")
     keymap))
 
 
@@ -109,11 +106,6 @@
                  "Win + Shift + /"
                  [:show-keymap keymap]
                  "Show current keymap")
-    # XXX: See comment for *common-keymap*
-    (:define-key keymap
-                 "Win + Enter R"
-                 [:repl true "127.0.0.1" 9999]
-                 "Launch Jwno REPL")
     keymap))
 
 
@@ -229,6 +221,9 @@
         # Put it in the event queue
         (ev/spawn
          (:call-command command-man next-cmd)))))
+
+  (unless allowed?
+    (:show-tooltip ui-man :command-disabled "Command disabled ;)"))
 
   allowed?)
 
@@ -427,7 +422,7 @@ Try Pressing Win + , (the comma key) on your keyboard ;)```
 
 ```We just called the :split-frame command and have the top frame split into two child frames.
 
-Every frame can be split into multiple children. And the children can be split again. And again. And again if you like. But please don't tell anyone we're splitting children in half.
+Every frame can be split into multiple children. And the children can be split again. And again. And again if you like. Just don't tell anyone we're splitting children in half.
 
 ...Aaaanyway, this is called a "horizontal split," since after the split, the child frames are lined up horizontally.
 
@@ -507,7 +502,7 @@ And if we open a new window... (I'll spawn an Explorer window for you.)```
 
 ```Jwno has the concept of "active frames." An active frame is a frame that currently has the input focus. New windows will snap into the active frame, and all frame selection commands are relative to that frame too.
 
-A Frame can be activated in one of these ways:
+A frame can be activated in one of these ways:
 
 1. Switch focus to one of the windows it contains;
 2. Use frame selection commands;
