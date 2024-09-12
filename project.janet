@@ -2,7 +2,7 @@
  :name "Jwno"
  :description "A window manager built with Janet."
  :dependencies [{:url "https://github.com/janet-lang/spork.git"
-                 :tag "d024557895f327d5527b1ecdd063f71372e9a97e"}])
+                 :tag "253a67e89dca695632283ef60f77851311c404c9"}])
 
 
 (defn dir-exists? [name]
