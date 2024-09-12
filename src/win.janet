@@ -359,41 +359,6 @@
       elevated)))
 
 
-(defn- get-pid-path [pid]
-  (with [proc
-         (OpenProcess (bor PROCESS_QUERY_INFORMATION
-                           PROCESS_VM_READ)
-                      true
-                      pid)
-         CloseHandle]
-    (log/debug "proc = %n" proc)
-    (QueryFullProcessImageName proc 0)))
-
-
-(defn- get-hwnd-path [hwnd]
-  (def [_tid pid] (GetWindowThreadProcessId hwnd))
-  (when (= (int/u64 0) pid)
-    (break nil))
-
-  (def path (get-pid-path pid))
-
-  (var uwp-pid nil)
-  (when (and (not (nil? path))
-             (string/has-suffix? "ApplicationFrameHost.exe" path))
-    # Executables for UWP apps live somewhere else
-    (EnumChildWindows hwnd
-                      (fn [child-hwnd]
-                        (def [_tid child-pid] (GetWindowThreadProcessId child-hwnd))
-                        (when (and (not= (int/u64 0) child-pid)
-                                   (not= pid child-pid))
-                          (set uwp-pid child-pid)
-                          (break FALSE))
-                        TRUE)))
-  (if uwp-pid
-    (get-pid-path uwp-pid)
-    path))
-
-
 (defn- get-hwnd-uia-element [hwnd uia-com &opt cr]
   (try
     (if cr
@@ -2167,13 +2132,13 @@
     (:activate node))
 
   (def uia-man (in self :uia-manager))
-  (def root (in uia-man :root))
-  (def root-hwnd (:get_CachedNativeWindowHandle root))
+  (def defview (in uia-man :def-view))
+  (def defview-hwnd (:get_CachedNativeWindowHandle defview))
 
   (def hwnd
     (cond
       (nil? node)
-      root-hwnd
+      defview-hwnd
 
       (= :window (in node :type))
       (in node :hwnd)
@@ -2182,12 +2147,10 @@
           (= :layout (in node :type)))
       (if-let [cur-win (:get-current-window node)]
         (in cur-win :hwnd)
-        root-hwnd)))
+        defview-hwnd)))
 
   (log/debug "setting focus to window: %n" hwnd)
-  (if (= hwnd root-hwnd)
-    (SetForegroundWindow hwnd) # The UIA SetFocus method doesn't work for the desktop window
-    (:set-focus-to-window uia-man hwnd)))
+  (:set-focus-to-window uia-man hwnd))
 
 
 (defn wm-retile [self &opt fr]

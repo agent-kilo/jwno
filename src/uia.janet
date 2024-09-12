@@ -317,6 +317,21 @@
       (:AddProperty cr UIA_NativeWindowHandlePropertyId)
       (:GetRootElementBuildCache uia-com cr)))
 
+  (def defview
+    (with-uia [con (:CreatePropertyCondition uia-com UIA_ClassNamePropertyId "SHELLDLL_DefView")]
+      (with-uia [walker (:CreateTreeWalker uia-com con)]
+        (with-uia [cr (:CreateCacheRequest uia-com)]
+          (:AddProperty cr UIA_NativeWindowHandlePropertyId)
+          (with-uia [dve (:GetFirstChildElementBuildCache walker root cr)]
+            (let [dv-hwnd (:get_CachedNativeWindowHandle dve)
+                  dv-path (get-hwnd-path dv-hwnd)]
+              # XXX: More strict checks?
+              (if (string/has-suffix? "\\explorer.exe" dv-path)
+                (do
+                  (:AddRef dve)
+                  dve)
+                (error "failed to get SHELLDLL_DefView window"))))))))
+
   (def focus-cr
     (let [cr (:CreateCacheRequest uia-com)]
       (:AddProperty cr UIA_NativeWindowHandlePropertyId)
@@ -346,6 +361,7 @@
   (table/setproto
    @{:com uia-com
      :root root
+     :def-view defview
      :deinit-fns nil # Initialized in uia-manager-init-event-handlers
      :focus-cr focus-cr
      :transform-cr transform-cr

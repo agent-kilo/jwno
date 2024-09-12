@@ -1,4 +1,8 @@
 (use jw32/_winuser)
+(use jw32/_winbase)
+(use jw32/_processthreadsapi)
+(use jw32/_handleapi)
+(use jw32/_util)
 
 (import ./const)
 
@@ -51,6 +55,40 @@
 
 (defn global-ns [sym]
   (symbol (string const/GLOBAL-NAMESPACE-PREFIX sym)))
+
+
+(defn get-pid-path [pid]
+  (with [proc
+         (OpenProcess (bor PROCESS_QUERY_INFORMATION
+                           PROCESS_VM_READ)
+                      true
+                      pid)
+         CloseHandle]
+    (QueryFullProcessImageName proc 0)))
+
+
+(defn get-hwnd-path [hwnd]
+  (def [_tid pid] (GetWindowThreadProcessId hwnd))
+  (when (= (int/u64 0) pid)
+    (break nil))
+
+  (def path (get-pid-path pid))
+
+  (var uwp-pid nil)
+  (when (and (not (nil? path))
+             (string/has-suffix? "ApplicationFrameHost.exe" path))
+    # Executables for UWP apps live somewhere else
+    (EnumChildWindows hwnd
+                      (fn [child-hwnd]
+                        (def [_tid child-pid] (GetWindowThreadProcessId child-hwnd))
+                        (when (and (not= (int/u64 0) child-pid)
+                                   (not= pid child-pid))
+                          (set uwp-pid child-pid)
+                          (break FALSE))
+                        TRUE)))
+  (if uwp-pid
+    (get-pid-path uwp-pid)
+    path))
 
 
 ################## Calculations ##################
