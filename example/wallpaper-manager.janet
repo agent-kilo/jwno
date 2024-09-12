@@ -1,3 +1,17 @@
+#
+# This is an example module for Jwno, in pure Janet.
+#
+# To use it, place this file alongside your config file,
+# and add these code in your config:
+#
+#     (import wallpaper-manager)
+#     (def wp-man (wallpaper-manager/wallpaper-manager))
+#
+# Then you can use wp-man's methods to control your wallpaper.
+# See wallpaper-manager-proto below for the available methods.
+#
+
+
 (use jw32/_combaseapi)
 (use jw32/_shobjidl_core)
 
