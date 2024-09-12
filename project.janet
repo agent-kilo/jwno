@@ -49,8 +49,10 @@
   (generate-resource-header (dofile "src/resource.janet") _target))
 
 
-(gen-rule (generated "resource.res") [(generated "resource.h")]
-  (spawn-and-wait "rc.exe" "/I" (find-build-dir) "/fo" _target "res/jwno.rc"))
+(gen-rule (generated "resource.res") ["res/jwno.rc"
+                                      "res/jwno.ico"
+                                      (generated "resource.h")]
+  (spawn-and-wait "rc.exe" "/I" (find-build-dir) "/fo" _target (_deps 0)))
 
 
 (gen-rule (generated "resource.obj") [(generated "resource.res")]
