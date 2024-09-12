@@ -55,7 +55,8 @@
 (defn- set-key-def [keymap key-struct command-or-keymap &opt doc]
   (if (keymap? command-or-keymap)
     (let [sub-keymap command-or-keymap]
-      (put sub-keymap :parent keymap)
+      # We're now using :current-keymap as a stack to track the real parent
+      #(put sub-keymap :parent keymap)
       (put sub-keymap :doc doc)
       (put keymap key-struct sub-keymap))
     (let [command command-or-keymap]
@@ -259,12 +260,6 @@
   (in self key-struct))
 
 
-(defn keymap-get-root [self]
-  (if-let [parent (in self :parent)]
-    (keymap-get-root parent)
-    self))
-
-
 (defn- pad-string-right [str pad-to]
   (def str-len (length str))
   (def pad-char (in " " 0))
@@ -335,7 +330,6 @@
   @{:define-key keymap-define-key
     :parse-key keymap-parse-key
     :get-key-binding keymap-get-key-binding
-    :get-root keymap-get-root
     :format keymap-format})
 
 
@@ -401,7 +395,7 @@
     (if (nil? keymap)
       (define-keymap)
       keymap))
-  (put self :current-keymap to-set)
+  (put self :current-keymap @[to-set])
   (put self :keymap-stack @[]))
 
 
@@ -413,17 +407,17 @@
   # XXX: Always reset the current keymap at the same time,
   # Or a sub-keymap may still be active when we pop the stack.
   (array/push (in self :keymap-stack)
-              (:get-root (in self :current-keymap)))
-  (put self :current-keymap new-keymap))
+              (first (in self :current-keymap)))
+  (put self :current-keymap @[new-keymap]))
 
 
 (defn keyboard-hook-handler-pop-keymap [self]
-  (def old-keymap (in self :current-keymap))
+  (def old-keymap (first (in self :current-keymap)))
   (def new-keymap
     (if-let [stack-top (array/pop (in self :keymap-stack))]
       stack-top
       (define-keymap)))
-  (put self :current-keymap new-keymap)
+  (put self :current-keymap @[new-keymap])
   old-keymap)
 
 
@@ -433,7 +427,7 @@
     # Already remapped
     (break nil))
 
-  (when-let [binding (:get-key-binding (in self :current-keymap)
+  (when-let [binding (:get-key-binding (last (in self :current-keymap))
                                        (key (hook-struct :vkCode)))]
     (def {:cmd cmd} binding)
     (match cmd
@@ -475,7 +469,7 @@
   (each comb mod-combinations-to-check
     (def key-struct (key (hook-struct :vkCode) (sort (keys comb))))
     (log/debug "Finding binding for key: %n" key-struct)
-    (if-let [found (:get-key-binding (in self :current-keymap) key-struct)]
+    (if-let [found (:get-key-binding (last (in self :current-keymap)) key-struct)]
       (match found
         [:map-to _]
         # handled in translate-key
@@ -489,9 +483,10 @@
 
 
 (defn keyboard-hook-handler-reset-keymap [self]
-  (def cur-keymap (in self :current-keymap))
-  (def root-keymap (:get-root cur-keymap))
-  (put self :current-keymap root-keymap)
+  (log/debug "Resetting keymap")
+  (def cur-keymap (last (in self :current-keymap)))
+  (def root-keymap (first (in self :current-keymap)))
+  (put self :current-keymap @[root-keymap])
   (not= root-keymap cur-keymap))
 
 
@@ -502,7 +497,7 @@
     # It's a sub-keymap, activate it only on key-up
     (if key-up
       (do
-        (put self :current-keymap binding)
+        (array/push (in self :current-keymap) binding)
         (break [:key/switch-keymap binding]))
       (break nil)))
 
@@ -512,19 +507,19 @@
     [:push-keymap keymap]
     (when key-up
       (keyboard-hook-handler-push-keymap self keymap)
-      [:key/push-keymap (in self :current-keymap)])
+      [:key/push-keymap (last (in self :current-keymap))])
 
     :pop-keymap
     (when key-up
       (keyboard-hook-handler-pop-keymap self)
-      [:key/pop-keymap (in self :current-keymap)])
+      [:key/pop-keymap (last (in self :current-keymap))])
 
     _
     # It's a normal command, only fire on key-down, and
     # try to reset to root keymap when key-up
     (if key-up
       (when (keyboard-hook-handler-reset-keymap self)
-        [:key/reset-keymap (in self :current-keymap)])
+        [:key/reset-keymap (last (in self :current-keymap))])
       [:key/command binding])))
 
 
@@ -535,9 +530,8 @@
   # will prevent the next key combo from having different modifiers.
   (when (and key-up
              (not (in MODIFIER-KEYS (in hook-struct :vkCode))))
-    (log/debug "Resetting keymap")
     (when (keyboard-hook-handler-reset-keymap self)
-      [:key/reset-keymap (in self :current-keymap)])))
+      [:key/reset-keymap (last (in self :current-keymap))])))
 
 
 (def- keyboard-hook-handler-proto
@@ -555,5 +549,11 @@
 (defn keyboard-hook-handler [keymap]
   (table/setproto
    @{:keymap-stack @[]
-     :current-keymap keymap}
+     # if a sub-keymap is defined in a prototype, and we simply follow
+     # the child -> parent link in keymaps, the current keymap will be
+     # reset to the prototype instead of the real parent, after we
+     # triggered that sub-keymap. This array is used as another stack
+     # to record how we reached the current keymap, so that we can get
+     # back to its real parent.
+     :current-keymap @[keymap]}
    keyboard-hook-handler-proto))
