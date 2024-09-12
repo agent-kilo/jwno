@@ -1,3 +1,50 @@
+#include "winres.h"
+
 #include "resource.h"
 
+
 IDI_LOGO    ICON    "jwno.ico"
+
+
+#define __STR(s) #s
+#define _STR(s) __STR(s)
+#define _FILE_VERSION     VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_INTERNAL
+#define _FILE_VERSION_STR _STR(VERSION_MAJOR) "." _STR(VERSION_MINOR) "." _STR(VERSION_PATCH) "." _STR(VERSION_INTERNAL)
+#define _PRODUCT_VERSION         _FILE_VERSION
+#define _PRODUCT_VERSION_STR     _FILE_VERSION_STR
+
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION _FILE_VERSION
+ PRODUCTVERSION _PRODUCT_VERSION
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS VS_FF_DEBUG
+#else
+ FILEFLAGS 0
+#endif
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "FileVersion", _FILE_VERSION_STR
+            VALUE "ProductVersion", _PRODUCT_VERSION_STR
+
+            VALUE "InternalName", "jwno.exe"
+            VALUE "OriginalFilename", "jwno.exe"
+            VALUE "ProductName", "Jwno"
+            VALUE "FileDescription", "Jwno Tiling Window Manager"
+
+            VALUE "CompanyName", "Chibidou"
+            VALUE "LegalCopyright", "Copyright 2024 Chibidou"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
