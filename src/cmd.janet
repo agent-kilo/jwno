@@ -285,16 +285,43 @@
 
 
 (defn cmd-close-window [wm ui-man]
-  (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
-    (if uia-win
-      (with-uia [win-pat (:GetCurrentPatternAs uia-win
-                                               UIA_WindowPatternId
-                                               IUIAutomationWindowPattern)]
-        (with-activation-hooks wm
-          (:Close win-pat)))
-      # else
-      (if-let [root (in wm :root)
-               cur-win (:get-current-window root)]
+  (def win-pat
+    (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+      (when uia-win
+        (:GetCurrentPatternAs uia-win UIA_WindowPatternId IUIAutomationWindowPattern))))
+
+  (if win-pat
+    (with-uia [_win-pat win-pat]
+      (with-activation-hooks wm
+        (:Close win-pat)))
+    # else
+    (if-let [root (in wm :root)
+             cur-win (:get-current-window root)]
+      (let [fg-hwnd (GetForegroundWindow)]
+        (if (= fg-hwnd (in cur-win :hwnd))
+          # The current window is minimized or invisible, but somehow it
+          # got the focus. Try to close it anyway.
+          (:close cur-win)
+          # The current window lost focus, do nothing
+          (:show-tooltip ui-man :close-window "No focused window.")))
+      (:show-tooltip ui-man :close-window "No focused window."))))
+
+
+(defn cmd-close-window-or-frame [wm ui-man]
+  # This will be nil when SHELLDLL_DefView (the desktop) is focused
+  (def win-pat
+    (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+      (when uia-win
+        (:GetCurrentPatternAs uia-win UIA_WindowPatternId IUIAutomationWindowPattern))))
+
+  (if win-pat
+    (with-uia [_win-pat win-pat]
+      (with-activation-hooks wm
+        (:Close win-pat)))
+    # else
+    (let [root (in wm :root)
+          cur-frame (:get-current-frame root)]
+      (if-let [cur-win (:get-current-window cur-frame)]
         (let [fg-hwnd (GetForegroundWindow)]
           (if (= fg-hwnd (in cur-win :hwnd))
             # The current window is minimized or invisible, but somehow it
@@ -302,33 +329,11 @@
             (:close cur-win)
             # The current window lost focus, do nothing
             (:show-tooltip ui-man :close-window "No focused window.")))
-        (:show-tooltip ui-man :close-window "No focused window.")))))
-
-
-(defn cmd-close-window-or-frame [wm ui-man]
-  (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
-    (if uia-win
-      (with-uia [win-pat (:GetCurrentPatternAs uia-win
-                                               UIA_WindowPatternId
-                                               IUIAutomationWindowPattern)]
+        # The frame is empty, assume that we want to close it
         (with-activation-hooks wm
-          (:Close win-pat)))
-      # else
-      (let [root (in wm :root)
-            cur-frame (:get-current-frame root)]
-        (if-let [cur-win (:get-current-window cur-frame)]
-          (let [fg-hwnd (GetForegroundWindow)]
-            (if (= fg-hwnd (in cur-win :hwnd))
-              # The current window is minimized or invisible, but somehow it
-              # got the focus. Try to close it anyway.
-              (:close cur-win)
-              # The current window lost focus, do nothing
-              (:show-tooltip ui-man :close-window "No focused window.")))
-          # The frame is empty, assume that we want to close it
-          (with-activation-hooks wm
-            (:close cur-frame)
-            (:retile wm)
-            (:activate wm (:get-current-window root))))))))
+          (:close cur-frame)
+          (:retile wm)
+          (:activate wm (:get-current-window root)))))))
 
 
 (defn cmd-change-window-alpha [wm delta]
