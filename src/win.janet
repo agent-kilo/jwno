@@ -1467,6 +1467,92 @@
                     :bottom (+ dh (in parent-rect :bottom))}))))))
 
 
+(defn frame-insert-sub-frame [self index &opt size-ratio direction]
+  (def all-children (in self :children))
+  (def child-count (length all-children))
+
+  (cond
+    (or (empty? all-children)
+        (= :window (get-in all-children [0 :type])))
+    # A leaf frame, split it
+    (let [ratio (if size-ratio
+                  size-ratio
+                  0.5)
+          dir (if direction
+                direction
+                (error "frame is not split, but no direction is provided"))
+          [move-windows? split-ratio-list] (case index
+                                             -1 [false [(- 1 ratio)]]
+                                             0 [true [ratio]]
+                                             1 [false [(- 1 ratio)]]
+                                             (errorf "expected index in range [-1 1], got %n" index))]
+      (:split self dir 2 split-ratio-list)
+      (when move-windows?
+        (def to-frame (get-in self [:children 1]))
+        (each w all-children
+          (:add-child to-frame w))))
+
+    (and direction
+         (not= direction (:get-direction self)))
+    (error "directions don't match")
+
+    true
+    # children are sub-frames
+    (let [dir (:get-direction self)
+          ratio (if size-ratio
+                  size-ratio
+                  (/ 1 (+ 1 child-count)))
+          idx (if (< index 0)
+                (+ 1 index child-count) # -1 means insert to the end of the array
+                index)
+          ref-frame (if (>= idx child-count)
+                      nil
+                      (in all-children idx))
+          ref-rect (when ref-frame
+                     (in ref-frame :rect))]
+      (def new-rect
+        (case dir
+          :horizontal
+          (if ref-rect
+            {:left (in ref-rect :left)
+             :top (in ref-rect :top)
+             :right (in ref-rect :left)
+             :bottom (in ref-rect :bottom)}
+            (let [last-frame (last all-children)
+                  last-rect (in last-frame :rect)]
+              {:left (in last-rect :right)
+               :top (in last-rect :top)
+               :right (in last-rect :right)
+               :bottom (in last-rect :bottom)}))
+
+          :vertical
+          (if ref-rect
+            {:left (in ref-rect :left)
+             :top (in ref-rect :top)
+             :right (in ref-rect :right)
+             :bottom (in ref-rect :top)}
+            (let [last-frame (last all-children)
+                  last-rect (in last-frame :rect)]
+              {:left (in last-rect :left)
+               :top (in last-rect :bottom)
+               :right (in last-rect :right)
+               :bottom (in last-rect :bottom)}))))
+
+      (def new-frame (frame new-rect self))
+      (array/insert all-children idx new-frame)
+      (def padded-rect (:get-padded-rect self))
+      (def [width height] (rect-size padded-rect))
+      (def resize-rect
+        (case dir
+          :horizontal
+          (let [sub-width (math/floor (* width ratio))]
+            {:left 0 :top 0 :right sub-width :bottom (- (in new-rect :bottom) (in new-rect :top))})
+          :vertical
+          (let [sub-height (math/floor (* height ratio))]
+            {:left 0 :top 0 :right (- (in new-rect :right) (in new-rect :left)) :bottom sub-height})))
+      (:resize new-frame resize-rect))))
+
+
 (defn frame-close [self]
   (def parent (in self :parent))
   (def children (in self :children))
@@ -1625,6 +1711,7 @@
         :flatten frame-flatten
         :transform frame-transform
         :resize frame-resize
+        :insert-sub-frame frame-insert-sub-frame
         :close frame-close
         :sync-current-window frame-sync-current-window
         :get-paddings frame-get-paddings

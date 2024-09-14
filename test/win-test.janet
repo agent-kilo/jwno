@@ -223,6 +223,99 @@
     (assert (= 104 (in rect1 :right)))))
 
 
+(defn test-frame-insert-sub-frame []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
+
+  (:insert-sub-frame dummy-frame 0 nil :horizontal)
+  (assert (= (length (in dummy-frame :children)) 2))
+
+  (:insert-sub-frame dummy-frame 0)
+  (assert (= (length (in dummy-frame :children)) 3))
+
+  (assert (= (get-in dummy-frame [:children 0 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 0 :rect :left]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :right]) 43))
+  (assert (= (get-in dummy-frame [:children 0 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 1 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 1 :rect :left]) 43))
+  (assert (= (get-in dummy-frame [:children 1 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 1 :rect :right]) 76))
+  (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 2 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 2 :rect :left]) 76))
+  (assert (= (get-in dummy-frame [:children 2 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 2 :rect :right]) 110))
+  (assert (= (get-in dummy-frame [:children 2 :rect :bottom]) 110))
+
+  (:insert-sub-frame dummy-frame 1 0.5)
+  (assert (= (length (in dummy-frame :children)) 4))
+
+  (assert (= (get-in dummy-frame [:children 0 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 0 :rect :left]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :right]) 26))
+  (assert (= (get-in dummy-frame [:children 0 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 1 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 1 :rect :left]) 26))
+  (assert (= (get-in dummy-frame [:children 1 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 1 :rect :right]) 76))
+  (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 2 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 2 :rect :left]) 76))
+  (assert (= (get-in dummy-frame [:children 2 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 2 :rect :right]) 92))
+  (assert (= (get-in dummy-frame [:children 2 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 3 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 3 :rect :left]) 92))
+  (assert (= (get-in dummy-frame [:children 3 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 3 :rect :right]) 110))
+  (assert (= (get-in dummy-frame [:children 3 :rect :bottom]) 110))
+
+  (:insert-sub-frame dummy-frame -1)
+  (assert (= (length (in dummy-frame :children)) 5))
+
+  (assert (= (get-in dummy-frame [:children 4 :type]) :frame))
+  # XXX: The last frame's width has accumulated rounding error
+  (assert (= (get-in dummy-frame [:children 4 :rect :left]) 88))
+  (assert (= (get-in dummy-frame [:children 4 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 4 :rect :right]) 110))
+  (assert (= (get-in dummy-frame [:children 4 :rect :bottom]) 110))
+
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
+
+  (def dummy-window1 (window :dummy-hwnd1))
+  (def dummy-window2 (window :dummy-hwnd2))
+
+  (:add-child dummy-frame dummy-window1)
+  (:add-child dummy-frame dummy-window2)
+
+  (:insert-sub-frame dummy-frame 0 nil :vertical)
+  (assert (empty? (get-in dummy-frame [:children 0 :children])))
+  (def win-list (get-in dummy-frame [:children 1 :children]))
+  (assert (= 2 (length win-list)))
+  (assert (= dummy-window1 (in win-list 0)))
+  (assert (= dummy-window2 (in win-list 1)))
+
+  (:insert-sub-frame dummy-frame 2 nil :vertical)
+  (assert (empty? (get-in dummy-frame [:children 0 :children])))
+  (assert (empty? (get-in dummy-frame [:children 2 :children])))
+  (def win-list (get-in dummy-frame [:children 1 :children]))
+  (assert (= 2 (length win-list)))
+  (assert (= dummy-window1 (in win-list 0)))
+  (assert (= dummy-window2 (in win-list 1))))
+
+
 (defn test-tree-node-activate []
   #
   # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
@@ -422,6 +515,7 @@
   (test-frame-constructor)
   (test-frame-add-child)
   (test-frame-split)
+  (test-frame-insert-sub-frame)
   (test-frame-find-hwnd)
   (test-frame-get-current-frame)
   (test-frame-transform)
