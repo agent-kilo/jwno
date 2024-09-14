@@ -989,6 +989,18 @@
     (:get-top-frame parent)))
 
 
+(defn tree-node-get-depth [self &opt cur-depth]
+  # Start from -2 by default so that top-level frames have a depth of 0.
+  # Depths of layout and virtual-desktop-container objects are negative
+  # by default.
+  (default cur-depth -2)
+
+  (def parent (in self :parent))
+  (if (nil? parent)
+    cur-depth
+    (:get-depth parent (+ cur-depth 1))))
+
+
 (defn- unwrap-rect [rect]
   [(in rect :left)
    (in rect :top)
@@ -1099,6 +1111,7 @@
     :get-root tree-node-get-root
     :get-window-manager tree-node-get-window-manager
     :get-top-frame tree-node-get-top-frame
+    :get-depth tree-node-get-depth
     :dump-subtree tree-node-dump-subtree})
 
 
