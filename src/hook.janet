@@ -65,7 +65,8 @@
   (def hooks (in self :hooks))
   (def hook-fn-list (in hooks hook-name @[]))
   (array/push hook-fn-list hook-fn)
-  (put hooks hook-name hook-fn-list))
+  (put hooks hook-name hook-fn-list)
+  hook-fn)
 
 
 (defn hook-manager-remove-hook [self hook-name hook-fn]
