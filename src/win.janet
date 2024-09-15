@@ -1243,7 +1243,8 @@
 
 (defn frame-split [self direction &opt n ratios]
   (default n 2)
-  (default ratios [0.5])
+  (default ratios (array/new-filled (- n 1) (/ 1 n)))
+
   (if (and (not (empty? (in self :children)))
            (= (get-in self [:children 0 :type]) :frame))
     (error "frame is already split"))
