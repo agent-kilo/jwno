@@ -9,6 +9,7 @@
 #
 
 (import jwno/util)
+(use jw32/_uiautomation)
 
 
 # ================== BSP Layout ==================
@@ -25,6 +26,13 @@
 #
 
 (defn bsp-on-window-created [self win uia-win _exe-path desktop-info]
+  # Don't create new frames for these windows
+  (cond
+    (or (= "#32770" (:get_CachedClassName uia-win))
+        (not= 0 (:GetCurrentPropertyValue uia-win UIA_IsDialogPropertyId)))
+    # Dialog windows
+    (break))
+
   (def {:window-manager window-man} self)
   (def cur-frame
     (:get-current-frame-on-desktop (in window-man :root) desktop-info))
