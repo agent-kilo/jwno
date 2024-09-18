@@ -109,12 +109,29 @@
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (put dummy-frame :monitor dummy-monitor)
-  (try
-    (:split dummy-frame :horizontal 3)
-    ((err fib)
-     (assert (= err "not enough ratios provided"))))
-  (assert (= (length (in dummy-frame :children)) 0))
+  (:split dummy-frame :horizontal 3)
+  (assert (= (length (in dummy-frame :children)) 3))
 
+  (assert (= (get-in dummy-frame [:children 0 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 0 :rect :left]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :right]) 43))
+  (assert (= (get-in dummy-frame [:children 0 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 1 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 1 :rect :left]) 43))
+  (assert (= (get-in dummy-frame [:children 1 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 1 :rect :right]) 76))
+  (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 2 :type]) :frame))
+  (assert (= (get-in dummy-frame [:children 2 :rect :left]) 76))
+  (assert (= (get-in dummy-frame [:children 2 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 2 :rect :right]) 110))
+  (assert (= (get-in dummy-frame [:children 2 :rect :bottom]) 110))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
   (:split dummy-frame :horizontal 3 [0.5 0.3])
   (assert (= (length (in dummy-frame :children)) 3))
 
