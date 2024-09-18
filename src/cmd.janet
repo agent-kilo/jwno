@@ -80,7 +80,7 @@
     (:activate wm cur-frame)))
 
 
-(defn cmd-insert-frame [wm location]
+(defn cmd-insert-frame [wm location &opt after-insertion-fn]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when (or (in cur-frame :monitor)
             (nil? (in cur-frame :parent)))
@@ -93,8 +93,15 @@
       :before cur-idx
       :after (+ cur-idx 1)
       (errorf "unknown location to insert: %n" location)))
-  (:insert-sub-frame parent insert-idx)
-  (:retile wm parent))
+
+  (with-activation-hooks wm
+    (:insert-sub-frame parent insert-idx)
+
+    (when after-insertion-fn
+      (after-insertion-fn (get-in parent [:children insert-idx])))
+
+    (:retile wm parent)
+    (:activate wm parent)))
 
 
 (defn cmd-flatten-parent [wm]
@@ -650,14 +657,16 @@
      are 0.1, 0.3 and 0.6 of the original frame height, respectively.
      ```)
   (:add-command command-man :insert-frame
-     (fn [location]
-       (cmd-insert-frame wm location))
+     (fn [location &opt after-insertion-fn]
+       (cmd-insert-frame wm location after-insertion-fn))
      ```
-     (:insert-frame location)
+     (:insert-frame location &opt after-insertion-fn)
 
      Inserts a new frame and adjusts its sibling frames' sizes as needed.
      Location is relative to the current frame, can be :before or :after.
-     If the current frame is a top-level frame, does nothing.
+     After-insertion-fn is a function accepting the new inserted frame
+     object as its sole argument, and it will be called after the insertion.
+     If the current frame is a top-level frame, this command does nothing.
      ```)
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm))
