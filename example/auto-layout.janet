@@ -95,7 +95,7 @@
 
 (defn zoom-in-on-window-activated [self win]
   (ev/spawn
-   (:call-command (in self :command-manager) :zoom-in 0.7)))
+   (:call-command (in self :command-manager) :zoom-in (in self :ratio))))
 
 
 (defn zoom-in-enable [self]
@@ -120,11 +120,14 @@
     :disable zoom-in-disable})
 
 
-(defn zoom-in [context]
+(defn zoom-in [context &opt ratio]
+  (default ratio 0.7)
+
   (def {:command-manager command-man
         :hook-manager hook-man}
     context)
   (table/setproto
    @{:command-manager command-man
-     :hook-manager hook-man}
+     :hook-manager hook-man
+     :ratio ratio}
    zoom-in-proto))
