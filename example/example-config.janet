@@ -160,6 +160,11 @@
 # new empty frame, and activate (move focus to) that frame.
 # See the definitions for Win+, and Win+. key combos below.
 #
+# But please note, due to the limitation of Jwno's threading
+# model and keymap handling logic, these functions cannot make
+# reference to mutable states outside of their body scopes,
+# or those mutable states will not get updated properly.
+#
 (defn move-window-after-split [frame]
   (def all-sub-frames (in frame :children))
   (def all-wins (in (first all-sub-frames) :children))
