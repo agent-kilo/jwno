@@ -198,14 +198,19 @@
 
 
 (defn init-log [cli-args]
-  (let [log-path (in cli-args "log-file")
-        loggers (if (nil? log-path)
-                  [log/print-logger]
-                  [log/print-logger (fn [] (log/file-logger log-path))])]
-    (try
-      (log/init (in cli-args "log-level") ;loggers)
-      ((err fib)
-       (show-error-and-exit err 1 (get-stack-trace fib))))))
+  (def loggers @[])
+
+  (when (not (in cli-args "no-console"))
+    (array/push loggers log/print-logger))
+
+  (def log-path (in cli-args "log-file"))
+  (when log-path
+    (array/push loggers (fn [] (log/file-logger log-path))))
+
+  (try
+    (log/init (in cli-args "log-level") ;loggers)
+    ((err fib)
+     (show-error-and-exit err 1 (get-stack-trace fib)))))
 
 
 (defn init-com []

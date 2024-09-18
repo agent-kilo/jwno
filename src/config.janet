@@ -63,6 +63,11 @@
     :kind :option
     :map keyword}
 
+   "no-console"
+   {:help "\nSupress console output, when log-level is not quiet.\n"
+    :default false
+    :kind :flag}
+
    "mod-path"
    {:short "m"
     :help "\nA custom path to load modules from.\n"

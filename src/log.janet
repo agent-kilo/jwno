@@ -38,15 +38,14 @@
    :close (fn [_self] (file/close log-file))})
 
 
-(defn init [level & factories]
+(defn init [level & logger-factories]
   (when (nil? (in log-levels level))
     (error (string/format "Unknown log level: %s" level)))
 
   (set log-level level)
-  (def logger-factories
-    (if (empty? factories)
-      [print-logger]
-      factories))
+  (when (empty? logger-factories)
+    # There's no logger anyway
+    (set log-level :quiet))
 
   (when (<= (in log-levels level) (in log-levels :quiet))
     # No log at all
