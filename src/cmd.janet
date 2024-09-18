@@ -80,6 +80,23 @@
     (:activate wm cur-frame)))
 
 
+(defn cmd-insert-frame [wm location]
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (when (or (in cur-frame :monitor)
+            (nil? (in cur-frame :parent)))
+    (break))
+
+  (def parent (in cur-frame :parent))
+  (def cur-idx (find-index |(= $ cur-frame) (in parent :children)))
+  (def insert-idx
+    (case location
+      :before cur-idx
+      :after (+ cur-idx 1)
+      (errorf "unknown location to insert: %n" location)))
+  (:insert-sub-frame parent insert-idx)
+  (:retile wm parent))
+
+
 (defn cmd-flatten-parent [wm]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def parent (in cur-frame :parent))
@@ -631,6 +648,16 @@
      For example, calling the command (:split-frame :vertical 3 [0.1 0.3 0.6])
      splits the current frame into 3 vertical sub-frames, whose heights
      are 0.1, 0.3 and 0.6 of the original frame height, respectively.
+     ```)
+  (:add-command command-man :insert-frame
+     (fn [location]
+       (cmd-insert-frame wm location))
+     ```
+     (:insert-frame location)
+
+     Inserts a new frame and adjusts its sibling frames' sizes as needed.
+     Location is relative to the current frame, can be :before or :after.
+     If the current frame is a top-level frame, does nothing.
      ```)
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm))
