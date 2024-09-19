@@ -604,10 +604,10 @@
   (def children (in self :children))
   (cond
     (or (nil? children) (empty? children))
-    []
+    @[]
 
     (= :window (in (first children) :type))
-    (slice (in self :children))
+    (array/slice (in self :children))
 
     true # children are other container nodes
     (let [offsprings @[]]
