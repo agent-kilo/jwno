@@ -1021,7 +1021,7 @@
     (printf "%sRoot Container" indent)
 
     :layout
-    (printf "%sVirtual Desktop (name=\"%s\", id=%s)"
+    (printf "%sVirtual Desktop (name=%n, id=%n)"
             indent
             (in self :name)
             (in self :id))
@@ -2166,18 +2166,57 @@
 
 
 (defn wm-focus-changed [self]
-  (:call-hook (in self :hook-manager) :focus-changed)
+  (def {:uia-manager uia-man
+        :hook-manager hook-man}
+    self)
 
-  (def uia-man (in self :uia-manager))
   (with-uia [uia-win (:get-focused-window uia-man)]
     (when (nil? uia-win)
       (log/debug "No focused window")
       (break))
 
     (def hwnd (:get_CachedNativeWindowHandle uia-win))
+    (def last-focused-hwnd (in self :last-focused-hwnd))
+    (def last-vd-name (in self :last-vd-name))
+    (def cur-vd-name (:get_CurrentName (in uia-man :root)))
+    (when (and (= hwnd last-focused-hwnd)
+               (= cur-vd-name last-vd-name))
+      (log/debug "Focus on same window")
+      (break))
+    (put self :last-focused-hwnd hwnd)
+
+    # Clean up the ignored list
+    (def ignored (in self :ignored-hwnds))
+    (each h (keys ignored)
+      (when (= FALSE (IsWindow h))
+        (put ignored h nil)))
+
+    # Clean up dead windows
+    # XXX: If the focus change is caused by a closing window, that
+    # window may still be alive, so it won't be purged immediately.
+    # Maybe I shoud check the hwnds everytime a window is manipulated?
+    (each layout (get-in self [:root :children])
+      (def dead
+        (:purge-windows layout |(window-purge-pred $ self layout)))
+      (each dw dead
+        (:call-hook hook-man :window-removed dw))
+      (log/debug "purged %n dead windows from desktop %n"
+                 (length dead)
+                 (in layout :id)))
+
+    # XXX: Will also trigger when the current virtual desktop is changed
+    (:call-hook (in self :hook-manager) :focus-changed hwnd)
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
-      #Already managed
+      # Already managed
+      (def lo (:get-layout win))
+      (def cur-vd-name (in lo :name))
+      # XXX: We use the virtual desktop's name to check if we have
+      # switched or not, so the names must be unique, and can't be
+      # changed while Jwno is running.
+      (unless (= cur-vd-name last-vd-name)
+        (put self :last-vd-name cur-vd-name)
+        (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo))
       (with-activation-hooks self
         (:activate win))
       (break))
@@ -2188,8 +2227,29 @@
                      (in self :vdm-com)
                      uia-win))
     (when (nil? hwnd-info)
-      (log/debug "Window %n vanished?" hwnd)
+      # Bad window, use what we got to detect vd changes
+      (unless (= cur-vd-name last-vd-name)
+        (put self :last-vd-name cur-vd-name)
+        (def lo (find |(= (in $ :name) cur-vd-name) (get-in self [:root :children])))
+        # XXX: lo may be nil
+        (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo)
+        (when lo
+          (with-activation-hooks self
+            (:activate self lo))))
       (break))
+
+    (def desktop-info (in hwnd-info :virtual-desktop))
+    (unless (= cur-vd-name last-vd-name)
+      (put self :last-vd-name cur-vd-name)
+      (def lo
+        (if (in desktop-info :id)
+          (let [fr (:get-current-frame-on-desktop (in self :root) desktop-info)]
+            (:get-layout fr))
+          # We may have focused e.g. the desktop or toolbox windows, which
+          # don't have associated virtual desktop ID. Use the name instead.
+          (find |(= (in $ :name) cur-vd-name) (get-in self [:root :children]))))
+      # XXX: lo may be nil
+      (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo))
 
     (with-uia [_uia-win (in hwnd-info :uia-element)]
       (def manage-state (:should-manage-hwnd? self hwnd-info))
@@ -2389,7 +2449,8 @@
        :uia-manager uia-man
        :ui-man ui-man
        :hook-manager hook-man
-       :ignored-hwnds @{}}
+       :ignored-hwnds @{}
+       :last-vd-name (:get_CurrentName (in uia-man :root))}
      window-manager-proto))
   (put wm-obj :root (virtual-desktop-container wm-obj hook-man))
 
@@ -2403,25 +2464,6 @@
 
          true
          true)))
-  (:add-hook hook-man :focus-changed
-     (fn []
-       (def ignored (in wm-obj :ignored-hwnds))
-       # Clean up the ignored list
-       (each h (keys ignored)
-         (when (= FALSE (IsWindow h))
-           (put ignored h nil)))
-
-       # XXX: If the focus change is caused by a closing window, that
-       # window may still be alive, so it won't be purged immediately.
-       # Maybe I shoud check the hwnds everytime a window is manipulated?
-       (each layout (get-in wm-obj [:root :children])
-         (def dead
-           (:purge-windows layout |(window-purge-pred $ wm-obj layout)))
-         (each dw dead
-           (:call-hook hook-man :window-removed dw))
-         (log/debug "purged %n dead windows from desktop %n"
-                    (length dead)
-                    (in layout :id)))))
   (:add-hook hook-man :frame-activated
      (fn [fr]
        (def rect (in fr :rect))
