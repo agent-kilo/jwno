@@ -2177,10 +2177,7 @@
 
     (def hwnd (:get_CachedNativeWindowHandle uia-win))
     (def last-focused-hwnd (in self :last-focused-hwnd))
-    (def last-vd-name (in self :last-vd-name))
-    (def cur-vd-name (:get_CurrentName (in uia-man :root)))
-    (when (and (= hwnd last-focused-hwnd)
-               (= cur-vd-name last-vd-name))
+    (when (= hwnd last-focused-hwnd)
       (log/debug "Focus on same window")
       (break))
     (put self :last-focused-hwnd hwnd)
@@ -2204,19 +2201,10 @@
                  (length dead)
                  (in layout :id)))
 
-    # XXX: Will also trigger when the current virtual desktop is changed
     (:call-hook (in self :hook-manager) :focus-changed hwnd)
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       # Already managed
-      (def lo (:get-layout win))
-      (def cur-vd-name (in lo :name))
-      # XXX: We use the virtual desktop's name to check if we have
-      # switched or not, so the names must be unique, and can't be
-      # changed while Jwno is running.
-      (unless (= cur-vd-name last-vd-name)
-        (put self :last-vd-name cur-vd-name)
-        (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo))
       (with-activation-hooks self
         (:activate win))
       (break))
@@ -2227,29 +2215,8 @@
                      (in self :vdm-com)
                      uia-win))
     (when (nil? hwnd-info)
-      # Bad window, use what we got to detect vd changes
-      (unless (= cur-vd-name last-vd-name)
-        (put self :last-vd-name cur-vd-name)
-        (def lo (find |(= (in $ :name) cur-vd-name) (get-in self [:root :children])))
-        # XXX: lo may be nil
-        (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo)
-        (when lo
-          (with-activation-hooks self
-            (:activate self lo))))
+      # Bad window
       (break))
-
-    (def desktop-info (in hwnd-info :virtual-desktop))
-    (unless (= cur-vd-name last-vd-name)
-      (put self :last-vd-name cur-vd-name)
-      (def lo
-        (if (in desktop-info :id)
-          (let [fr (:get-current-frame-on-desktop (in self :root) desktop-info)]
-            (:get-layout fr))
-          # We may have focused e.g. the desktop or toolbox windows, which
-          # don't have associated virtual desktop ID. Use the name instead.
-          (find |(= (in $ :name) cur-vd-name) (get-in self [:root :children]))))
-      # XXX: lo may be nil
-      (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo))
 
     (with-uia [_uia-win (in hwnd-info :uia-element)]
       (def manage-state (:should-manage-hwnd? self hwnd-info))
@@ -2286,6 +2253,19 @@
       (break))
 
     (:add-hwnd self hwnd-info manage-state)))
+
+
+(defn wm-desktop-name-changed [self vd-name]
+  (def root (in self :root))
+  (def layouts (in root :children))
+
+  (def last-vd-name (in self :last-vd-name))
+  (unless (= vd-name last-vd-name)
+    # XXX: lo may be nil. The desktop names should be unique, and
+    # they should not be changed while Jwno is running.
+    (def lo (find |(= (in $ :name) vd-name) layouts))
+    (:call-hook (in self :hook-manager) :virtual-desktop-changed vd-name lo)
+    (put self :last-vd-name vd-name)))
 
 
 (defn wm-activate [self node]
@@ -2407,6 +2387,7 @@
 (def- window-manager-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
+    :desktop-name-changed wm-desktop-name-changed
 
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state

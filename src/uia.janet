@@ -39,6 +39,15 @@
   S_OK)
 
 
+(defn- handle-desktop-name-changed-event [sender prop-id prop-val chan]
+  (log/debug "#################### handle-desktop-name-changed-event ####################")
+  (log/debug "++++ prop-id: %n" prop-id)
+  (log/debug "++++ prop-val: %n" prop-val)
+  (when (= prop-id UIA_NamePropertyId)
+    (ev/give chan [:uia/desktop-name-changed prop-val]))
+  S_OK)
+
+
 (defn uia-manager-get-root [self uia-elem]
   (def {:root root
         :focus-cr focus-cr
@@ -251,6 +260,16 @@
       (:Release cr)
       handler))
 
+  (def desktop-name-changed-handler
+    (:AddPropertyChangedEventHandler
+       uia-com
+       element
+       TreeScope_Element
+       nil
+       (fn [sender prop-id prop-val]
+         (handle-desktop-name-changed-event sender prop-id prop-val chan))
+       [UIA_NamePropertyId]))
+
   [(fn []
      (:RemoveAutomationEventHandler
         uia-com
@@ -260,7 +279,12 @@
    (fn []
      (:RemoveFocusChangedEventHandler
         uia-com
-        focus-changed-handler))])
+        focus-changed-handler))
+   (fn []
+     (:RemovePropertyChangedEventHandler
+        uia-com
+        element
+        desktop-name-changed-handler))])
 
 
 (defn uia-manager-init-event-handlers [self]
