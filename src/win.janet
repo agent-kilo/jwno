@@ -2265,7 +2265,10 @@
     # they should not be changed while Jwno is running.
     (def lo (find |(= (in $ :name) vd-name) layouts))
     (:call-hook (in self :hook-manager) :virtual-desktop-changed vd-name lo)
-    (put self :last-vd-name vd-name)))
+    (put self :last-vd-name vd-name)
+    (when lo
+      (with-activation-hooks self
+        (:activate self lo)))))
 
 
 (defn wm-activate [self node]
