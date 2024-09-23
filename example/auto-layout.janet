@@ -12,6 +12,68 @@
 (use jw32/_uiautomation)
 
 
+# ================== Auto-Close Empyt Frame ==================
+#
+# Automatically check for empty frames and close them, when a window
+# is removed. To use it, add these in your config:
+#
+#     (def auto-close-empty-frame (auto-layout/close-empty-frame jwno/context))
+#     (:enable auto-close-empty-frame)
+#
+# To stop it:
+#
+#     (:disable auto-close-empty-frame)
+#
+
+(defn close-empty-frame-on-window-removed [self dead-win]
+  (def parent (in dead-win :parent))
+  (unless (:attached? parent)
+    (break))
+
+  (def {:window-manager window-man} self)
+  (when (and (empty? (in parent :children))
+             # Don't touch the top-level frame
+             (nil? (in parent :monitor)))
+    (util/with-activation-hooks window-man
+      (:close parent))
+    (def to-retile (in parent :parent))
+    # ev/spawn to put the :retile call in the event queue
+    (ev/spawn
+     (:retile window-man to-retile))))
+
+
+(defn close-empty-frame-enable [self]
+  (:disable self) # To prevent multiple hook entries
+  (def hook-fn
+    (:add-hook (in self :hook-manager) :window-removed
+       (fn [& args]
+         (:on-window-removed self ;args))))
+  (put self :hook-fn hook-fn))
+
+
+(defn close-empty-frame-disable [self]
+  (def hook-fn (in self :hook-fn))
+  (when hook-fn
+    (put self :hook-fn nil)
+    (:remove-hook (in self :hook-manager) :window-removed hook-fn)))
+
+
+(def close-empty-frame-proto
+  @{:on-window-removed close-empty-frame-on-window-removed
+    :enable close-empty-frame-enable
+    :disable close-empty-frame-disable})
+
+
+(defn close-empty-frame [context]
+  (def {:window-manager window-man
+        :hook-manager hook-man}
+    context)
+  (table/setproto
+   @{:window-manager window-man
+     :hook-manager hook-man}
+   close-empty-frame-proto))
+
+
 # ================== BSP Layout ==================
 #
 # Automatically split and arrange frames in the good old BSP fasion.
@@ -43,9 +105,10 @@
       (:split cur-frame :vertical)
       (:split cur-frame :horizontal))
     (put (in win :tags) :frame (get-in cur-frame [:children 1]))
+    (def to-retile (get-in cur-frame [:children 0]))
     # ev/spawn to put the :retile call in the event queue
     (ev/spawn
-     (:retile window-man (get-in cur-frame [:children 0])))))
+     (:retile window-man to-retile))))
 
 
 (defn bsp-enable [self]
