@@ -1955,9 +1955,9 @@
                  monitors)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
+  (:call-hook (in self :hook-manager) :layout-created new-layout)
   (each fr (in new-layout :children)
     (:call-hook (in self :hook-manager) :monitor-updated fr))
-  (:call-hook (in self :hook-manager) :layout-created new-layout)
   new-layout)
 
 
