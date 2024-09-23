@@ -527,6 +527,20 @@
              dummy-frame)))
 
 
+(defn test-tree-node-has-child? []
+  (def dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (assert (= false (:attached? dummy-frame)))
+
+  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+  (assert (= false (:attached? dummy-layout)))
+  (assert (= false (:attached? dummy-frame)))
+
+  (def dummy-vdc (virtual-desktop-container :dummy-wm :dummy-hm [dummy-layout]))
+  (assert (= true (:attached? dummy-vdc)))
+  (assert (= true (:attached? dummy-layout)))
+  (assert (= true (:attached? dummy-frame))))
+
+
 (defn main [&]
   (test-tree-node-activate)
   (test-frame-constructor)
@@ -536,4 +550,5 @@
   (test-frame-find-hwnd)
   (test-frame-get-current-frame)
   (test-frame-transform)
-  (test-layout-get-adjacent-frame))
+  (test-layout-get-adjacent-frame)
+  (test-tree-node-has-child?))

@@ -528,6 +528,36 @@
     (set parent (in parent :parent))))
 
 
+(defn tree-node-attached? [self]
+  (def parent (in self :parent))
+
+  (cond
+    (= :virtual-desktop-container (in self :type))
+    # The root is always attached
+    true
+
+    (nil? parent)
+    false
+
+    (not (:has-child? parent self))
+    false
+
+    (not (:attached? parent))
+    false
+
+    true))
+
+
+(defn tree-node-has-child? [self child]
+  (def children (in self :children))
+  (var ret false)
+  (each c children
+    (when (= c child)
+      (set ret true)
+      (break)))
+  ret)
+
+
 (defn tree-node-get-next-child [self child]
   (let [all-children (in self :children)
         child-count (length all-children)]
@@ -1090,6 +1120,8 @@
 
 (def- tree-node-proto
   @{:activate tree-node-activate
+    :attached? tree-node-attached?
+    :has-child? tree-node-has-child?
     :get-next-child tree-node-get-next-child
     :get-prev-child tree-node-get-prev-child
     :get-next-sibling tree-node-get-next-sibling
