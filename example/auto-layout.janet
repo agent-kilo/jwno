@@ -12,7 +12,7 @@
 (use jw32/_uiautomation)
 
 
-# ================== Auto-Close Empyt Frame ==================
+# ================== Auto-Close Empty Frame ==================
 #
 # Automatically check for empty frames and close them, when a window
 # is removed. To use it, add these in your config:
