@@ -2197,6 +2197,29 @@
   (put (in self :ignored-hwnds) hwnd true))
 
 
+(defn wm-clean-up-hwnds [self]
+  (def {:hook-manager hook-man} self)
+
+  # Clean up the ignored list
+  (def ignored (in self :ignored-hwnds))
+  (each h (keys ignored)
+    (when (= FALSE (IsWindow h))
+      (put ignored h nil)))
+
+  # Clean up dead windows
+  # XXX: If the focus change is caused by a closing window, that
+  # window may still be alive, so it won't be purged immediately.
+  # Maybe I shoud check the hwnds everytime a window is manipulated?
+  (each layout (get-in self [:root :children])
+    (def dead
+      (:purge-windows layout |(window-purge-pred $ self layout)))
+    (each dw dead
+      (:call-hook hook-man :window-removed dw))
+    (log/debug "purged %n dead windows from desktop %n"
+               (length dead)
+               (in layout :id))))
+
+
 (defn wm-focus-changed [self]
   (def {:uia-manager uia-man
         :hook-manager hook-man}
@@ -2214,24 +2237,7 @@
       (break))
     (put self :last-focused-hwnd hwnd)
 
-    # Clean up the ignored list
-    (def ignored (in self :ignored-hwnds))
-    (each h (keys ignored)
-      (when (= FALSE (IsWindow h))
-        (put ignored h nil)))
-
-    # Clean up dead windows
-    # XXX: If the focus change is caused by a closing window, that
-    # window may still be alive, so it won't be purged immediately.
-    # Maybe I shoud check the hwnds everytime a window is manipulated?
-    (each layout (get-in self [:root :children])
-      (def dead
-        (:purge-windows layout |(window-purge-pred $ self layout)))
-      (each dw dead
-        (:call-hook hook-man :window-removed dw))
-      (log/debug "purged %n dead windows from desktop %n"
-                 (length dead)
-                 (in layout :id)))
+    (:clean-up-hwnds self)
 
     (:call-hook (in self :hook-manager) :focus-changed hwnd)
 
@@ -2441,6 +2447,7 @@
     :remove-hwnd wm-remove-hwnd
     :filter-hwnd wm-filter-hwnd
     :ignore-hwnd wm-ignore-hwnd
+    :clean-up-hwnds wm-clean-up-hwnds
 
     :close-hwnd wm-close-hwnd
 
