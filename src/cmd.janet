@@ -316,8 +316,7 @@
 
   (if win-pat
     (with-uia [_win-pat win-pat]
-      (with-activation-hooks wm
-        (:Close win-pat)))
+      (:Close win-pat))
     # else
     (if-let [root (in wm :root)
              cur-win (:get-current-window root)]
@@ -340,8 +339,7 @@
 
   (if win-pat
     (with-uia [_win-pat win-pat]
-      (with-activation-hooks wm
-        (:Close win-pat)))
+      (:Close win-pat))
     # else
     (let [root (in wm :root)
           cur-frame (:get-current-frame root)]
