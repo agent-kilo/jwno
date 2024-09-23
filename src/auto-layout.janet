@@ -1,15 +1,11 @@
 #
-# This module contains some basic demo of automatically managing
-# the layout of frames. To use this module, place it alongside your
-# config file and import it:
-#
-#     (import auto-layout)
-#
-# See comments below for the usage of a specific object.
+# To use the objects below, `(import jwno/auto-layout)` in your
+# config file.
 #
 
-(import jwno/util)
 (use jw32/_uiautomation)
+
+(use ./util)
 
 
 # ================== Auto-Close Empty Frame ==================
@@ -34,7 +30,7 @@
   (when (and (empty? (in parent :children))
              # Don't touch the top-level frame
              (nil? (in parent :monitor)))
-    (util/with-activation-hooks window-man
+    (with-activation-hooks window-man
       (:close parent))
     (def to-retile (in parent :parent))
     # ev/spawn to put the :retile call in the event queue
@@ -100,7 +96,7 @@
     (:get-current-frame-on-desktop (in window-man :root) desktop-info))
   (unless (empty? (in cur-frame :children))
     (def rect (in cur-frame :rect))
-    (def [width height] (util/rect-size rect))
+    (def [width height] (rect-size rect))
     (if (> height width)
       (:split cur-frame :vertical)
       (:split cur-frame :horizontal))
@@ -142,7 +138,7 @@
   (var fr top-frame)
   # The first window is already in fr
   (each w (slice all-wins 1)
-    (def [fr-width fr-height] (util/rect-size (in fr :rect)))
+    (def [fr-width fr-height] (rect-size (in fr :rect)))
     (if (> fr-height fr-width)
       (:split fr :vertical)
       (:split fr :horizontal))

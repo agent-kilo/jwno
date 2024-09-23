@@ -4,6 +4,7 @@
 (use jw32/_util)
 (use jwno/util)
 (import jwno/log)
+(import jwno/auto-layout)
 
 
 (def {:window-manager window-man
@@ -12,6 +13,10 @@
       :command-manager command-man
       :hook-manager hook-man}
   jwno/context)
+
+
+(def *auto-close-empty-frame*
+  (auto-layout/close-empty-frame jwno/context))
 
 
 (def CONTINUE-KEY "Space")
@@ -891,13 +896,7 @@ Some windows have minimum size requirements, but Jwno's frames don't have that l
   [id total keymap]
 
   # Start removing empty frames
-  (:add-hook hook-man :window-removed
-     (fn [dead-win]
-       (def parent (in dead-win :parent))
-       (when (empty? (in parent :children))
-         (with-activation-hooks window-man
-           (:close parent))
-         (:retile window-man))))
+  (:enable *auto-close-empty-frame*)
 
   (enable-command :close-window-or-frame)
 

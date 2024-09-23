@@ -5,6 +5,7 @@
 #
 # See the source code in `mod.janet` for a complete list.
 #
+(import jwno/auto-layout)
 (import jwno/util)
 (import jwno/log)
 
@@ -276,6 +277,16 @@
 
 
 #
+# The auto-layout module has some code to help you manage the frame
+# layout automatically. For example, with the code snippet below, Jwno
+# will check for empty frames and close them, when a window is removed.
+#
+(def auto-close-empty-frame
+  (auto-layout/close-empty-frame jwno/context))
+(:enable auto-close-empty-frame)
+
+
+#
 # Some windows declare their abilities incorrectly, and Jwno will not
 # manage those windows by default. For example, some windows can be moved,
 # but they declared otherwise. In that case you'll need to use this hook
@@ -316,14 +327,6 @@
 
        (= "#32770" class-name) # Dialog window class
        (put (in win :tags) :no-expand true))))
-
-(:add-hook hook-man :window-removed
-   (fn [dead-win]
-     (def parent (in dead-win :parent))
-     (when (empty? (in parent :children))
-       (util/with-activation-hooks window-man
-         (:close parent))
-       (:retile window-man))))
 
 (:add-hook hook-man :monitor-updated
    (fn [frame]
