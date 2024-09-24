@@ -80,7 +80,45 @@
     (:activate wm cur-frame)))
 
 
-(defn cmd-insert-frame [wm location &opt after-insertion-fn]
+(defn- call-frame-resized-hooks [hook-man frame-list]
+  (each fr frame-list
+    (when (= :frame (get-in fr [:children 0 :type]))
+      (call-frame-resized-hooks hook-man (in fr :children)))
+    (:call-hook hook-man :frame-resized fr)))
+
+
+(defn- check-for-frame-resized-hooks [hook-man frame old-rect]
+  (def new-rect (in frame :rect))
+  (def [new-width new-height] (rect-size new-rect))
+  (def [old-width old-height] (rect-size old-rect))
+
+  (cond
+    (and (not= new-width old-width)
+         (not= new-height old-height))
+    (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children]))
+
+    (and (= new-width old-width)
+         (= new-height old-height))
+    :nop
+
+    (not= new-width old-width)
+    (case (:get-direction (in frame :parent))
+      :horizontal
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :children]))
+
+      :vertical
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children])))
+
+    (not= new-height old-height)
+    (case (:get-direction (in frame :parent))
+      :horizontal
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children]))
+
+      :vertical
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :children])))))
+
+
+(defn cmd-insert-frame [wm hook-man location &opt after-insertion-fn]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when (or (in cur-frame :monitor)
             (nil? (in cur-frame :parent)))
@@ -97,8 +135,12 @@
   (with-activation-hooks wm
     (:insert-sub-frame parent insert-idx)
 
+    (def new-frame (get-in parent [:children insert-idx]))
+    (def siblings (filter |(not= $ new-frame) (in parent :children)))
+    (call-frame-resized-hooks hook-man siblings)
+
     (when after-insertion-fn
-      (after-insertion-fn (get-in parent [:children insert-idx])))
+      (after-insertion-fn new-frame))
 
     (:retile wm parent)
     (:activate wm parent)))
@@ -195,18 +237,23 @@
       (:activate wm cur-win))))
 
 
-(defn cmd-resize-frame [wm dw dh]
+(defn cmd-resize-frame [wm hook-man dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
+  (when (in cur-frame :monitor)
+    # Skip top-level frames
+    (break))
+
   (def rect (in cur-frame :rect))
   (:resize cur-frame
            {:left (in rect :left)
             :top (in rect :top)
             :right (+ dw (in rect :right))
             :bottom (+ dh (in rect :bottom))})
+  (check-for-frame-resized-hooks hook-man cur-frame rect)
   (:retile wm))
 
 
-(defn cmd-zoom-in [wm ratio]
+(defn cmd-zoom-in [wm hook-man ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def parent-frame
     (if-let [parent (in cur-frame :parent)]
@@ -230,8 +277,8 @@
     (when ortho-frame
       (:get-padded-rect ortho-frame)))
 
-  (def [cur-width cur-height]
-    (rect-size (in cur-frame :rect)))
+  (def old-rect (in cur-frame :rect))
+  (def [cur-width cur-height] (rect-size old-rect))
 
   (def [new-width new-height]
     (cond
@@ -268,6 +315,7 @@
               :top 0
               :right new-width
               :bottom new-height})
+    (check-for-frame-resized-hooks hook-man cur-frame old-rect)
     (:retile wm)))
 
 
@@ -586,6 +634,7 @@
         :uia-manager uia-man
         :key-manager key-man
         :window-manager wm
+        :hook-manager hook-man
         :repl repl}
     context)
 
@@ -656,7 +705,7 @@
      ```)
   (:add-command command-man :insert-frame
      (fn [location &opt after-insertion-fn]
-       (cmd-insert-frame wm location after-insertion-fn))
+       (cmd-insert-frame wm hook-man location after-insertion-fn))
      ```
      (:insert-frame location &opt after-insertion-fn)
 
@@ -676,7 +725,7 @@
      ```)
 
   (:add-command command-man :resize-frame
-     (fn [dw dh] (cmd-resize-frame wm dw dh))
+     (fn [dw dh] (cmd-resize-frame wm hook-man dw dh))
      ```
      (:resize-frame dw dh)
 
@@ -707,7 +756,7 @@
      parent have the same size.
      ```)
   (:add-command command-man :zoom-in
-     (fn [ratio] (cmd-zoom-in wm ratio))
+     (fn [ratio] (cmd-zoom-in wm hook-man ratio))
      ```
      (:zoom-in ratio)
 
