@@ -1692,11 +1692,10 @@
     nil
 
     (= :window (get-in children [0 :type]))
-    (if-let [top-win (:get-top-window self)]
+    (when-let [top-win (:get-top-window self)]
       (when (not= top-win (in self :current-child))
         (log/debug "Resetting current window to %n" (in top-win :hwnd))
-        (put self :current-child top-win))
-      (error "inconsistent states for frame tree"))
+        (put self :current-child top-win)))
 
     true
     (each c children
@@ -2226,20 +2225,28 @@
     self)
 
   (with-uia [uia-win (:get-focused-window uia-man)]
-    (when (nil? uia-win)
-      (log/debug "No focused window")
-      (break))
-
-    (def hwnd (:get_CachedNativeWindowHandle uia-win))
+    (def hwnd
+      (when uia-win
+        (:get_CachedNativeWindowHandle uia-win)))
     (def last-focused-hwnd (in self :last-focused-hwnd))
-    (when (= hwnd last-focused-hwnd)
+
+    # When hwnd is nil, we don't have a valid window focused, and
+    # we can't be sure the focus actually changed or not, so we
+    # always proceed in that case.
+    (when (and hwnd (= hwnd last-focused-hwnd))
       (log/debug "Focus on same window")
       (break))
     (put self :last-focused-hwnd hwnd)
 
+    (log/debug "Focused hwnd = %n" hwnd)
+
     (:clean-up-hwnds self)
 
     (:call-hook (in self :hook-manager) :focus-changed hwnd)
+
+    (when (nil? hwnd)
+      # No focused window, don't proceed
+      (break))
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       # Already managed
