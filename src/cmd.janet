@@ -329,6 +329,8 @@
 
 
 (defn cmd-balance-frames [wm hook-man &opt recursive?]
+  (default recursive? true)
+
   (def cur-frame (:get-current-frame (in wm :root)))
   (if recursive?
     (let [top-fr (:get-top-frame cur-frame)]
