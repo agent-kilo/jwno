@@ -162,7 +162,9 @@
   (def hmon (MonitorFromRect rect MONITOR_DEFAULTTONULL))
   (def [dpi-x dpi-y]
     (if (null? hmon)
-      (errorf "failed to get monitor info for rect: %n" rect)
+      # XXX: Some windows spawn themselves outside of any monitor, use
+      # the default DPI in this case.
+      [(int/u64 const/USER-DEFAULT-SCREEN-DPI) (int/u64 const/USER-DEFAULT-SCREEN-DPI)]
       # GetDpiForWindow will always return 96 for windows that are not
       # DPI-aware, which is incorrect for DWM border size calculation.
       # Have to use GetDpiForMonitor here instead.
