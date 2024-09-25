@@ -82,9 +82,18 @@
 
 (defn- call-frame-resized-hooks [hook-man frame-list]
   (each fr frame-list
-    (when (= :frame (get-in fr [:children 0 :type]))
-      (call-frame-resized-hooks hook-man (in fr :children)))
-    (:call-hook hook-man :frame-resized fr)))
+    (def children (in fr :children))
+
+    # Only call hooks on leaf frames
+    (cond
+      (empty? children)
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :window (get-in fr [:children 0 :type]))
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :frame (get-in fr [:children 0 :type]))
+      (call-frame-resized-hooks hook-man (in fr :children)))))
 
 
 (defn- check-for-frame-resized-hooks [hook-man frame old-rect]
@@ -357,7 +366,7 @@
       (:activate wm (:get-current-window root)))))
 
 
-(defn cmd-frame-to-window-size [wm]
+(defn cmd-frame-to-window-size [wm hook-man]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (when (nil? cur-win)
@@ -370,7 +379,9 @@
     (combine-rect-border-space (:get-margins cur-win)
                                (:get-paddings cur-frame)))
 
+  (def old-rect (in cur-frame :rect))
   (:resize cur-frame (expand-rect win-rect border-space))
+  (check-for-frame-resized-hooks hook-man cur-frame old-rect)
   (:retile wm))
 
 
@@ -758,7 +769,7 @@
      Closes the current frame.
      ```)
   (:add-command command-man :frame-to-window-size
-     (fn [] (cmd-frame-to-window-size wm))
+     (fn [] (cmd-frame-to-window-size wm hook-man))
      ```
      (:frame-to-window-size)
 
