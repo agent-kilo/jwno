@@ -1322,17 +1322,19 @@
     (put first-sub-frame :current-child old-active-child)))
 
 
-(defn frame-balance [self &opt recursive]
+(defn frame-balance [self &opt recursive resized-frames]
   (default recursive false)
 
   (def all-children (in self :children))
 
   (cond
     (empty? all-children)
-    nil
+    (when resized-frames
+      (array/push resized-frames self))
 
     (not= :frame (get-in self [:children 0 :type]))
-    nil
+    (when resized-frames
+      (array/push resized-frames self))
 
     true
     (let [child-count (length all-children)
@@ -1344,14 +1346,18 @@
       (def new-rects (:calculate-sub-rects self (fn [_sub-fr _i] balanced-len)))
       (if recursive
         (map (fn [sub-fr rect]
+               (def old-rect (in sub-fr :rect))
                (put sub-fr :rect rect)
-               (:balance sub-fr recursive))
+               (if (rect-same-size? rect old-rect)
+                 (:balance sub-fr recursive nil)
+                 (:balance sub-fr recursive resized-frames)))
              all-children
              new-rects)
         (map (fn [sub-fr rect]
                (:transform sub-fr rect))
              all-children
-             new-rects)))))
+             new-rects))))
+  resized-frames)
 
 
 (defn frame-flatten [self]

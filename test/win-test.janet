@@ -498,6 +498,100 @@
   (assert (= 94 (get-in dummy-sub-frame2 [:rect :right]))))
 
 
+(defn test-frame-balance []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  #
+  # dummy-frame -+- dummy-sub-frame1
+  #              |
+  #              +- dummy-sub-frame2
+  #
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
+  (table/setproto dummy-frame horizontal-frame-proto)
+  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
+  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+
+  (def resized-frames (:balance dummy-frame true @[]))
+
+  (assert (empty? resized-frames))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:rect :bottom])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:rect :right])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
+  (table/setproto dummy-frame horizontal-frame-proto)
+  (set dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 50}))
+  (set dummy-sub-frame2 (frame {:top 10 :left 50 :bottom 110 :right 110}))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+
+  (def resized-frames (:balance dummy-frame true @[]))
+
+  (assert (= 2 (length resized-frames)))
+  (assert (= dummy-sub-frame1 (in resized-frames 0)))
+  (assert (= dummy-sub-frame2 (in resized-frames 1)))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:rect :bottom])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:rect :right])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -+- dummy-sub-frame-3
+  #              |                    |
+  #              +- dummy-sub-frame2  +- dummy-sub-frame-4
+  #
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
+  (table/setproto dummy-frame horizontal-frame-proto)
+  (set dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 50}))
+  (table/setproto dummy-sub-frame1 horizontal-frame-proto)
+  (set dummy-sub-frame2 (frame {:top 10 :left 50 :bottom 110 :right 110}))
+  (var dummy-sub-frame3 (frame {:top 10 :left 10 :bottom 110 :right 30}))
+  (var dummy-sub-frame4 (frame {:top 10 :left 30 :bottom 110 :right 50}))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+  (:add-child dummy-sub-frame1 dummy-sub-frame3)
+  (:add-child dummy-sub-frame1 dummy-sub-frame4)
+
+  (def resized-frames (:balance dummy-frame true @[]))
+
+  (assert (= 3 (length resized-frames)))
+  (assert (= dummy-sub-frame3 (in resized-frames 0)))
+  (assert (= dummy-sub-frame4 (in resized-frames 1)))
+  (assert (= dummy-sub-frame2 (in resized-frames 2)))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+
+  (assert (= 10 (get-in dummy-sub-frame3 [:rect :top])))
+  (assert (= 10 (get-in dummy-sub-frame3 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame3 [:rect :bottom])))
+  (assert (= 35 (get-in dummy-sub-frame3 [:rect :right])))
+
+  (assert (= 10 (get-in dummy-sub-frame4 [:rect :top])))
+  (assert (= 35 (get-in dummy-sub-frame4 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame4 [:rect :bottom])))
+  (assert (= 60 (get-in dummy-sub-frame4 [:rect :right]))))
+
+
 (defn test-layout-get-adjacent-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -550,5 +644,6 @@
   (test-frame-find-hwnd)
   (test-frame-get-current-frame)
   (test-frame-transform)
+  (test-frame-balance)
   (test-layout-get-adjacent-frame)
   (test-tree-node-has-child?))

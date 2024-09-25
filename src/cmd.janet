@@ -328,11 +328,12 @@
     (:retile wm)))
 
 
-(defn cmd-balance-frames [wm]
+(defn cmd-balance-frames [wm hook-man]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-layout (:get-layout cur-frame))
   (each fr (in cur-layout :children)
-    (:balance fr true))
+    (def resized (:balance fr true @[]))
+    (call-frame-resized-hooks hook-man resized))
   (:retile wm))
 
 
@@ -777,7 +778,7 @@
      current active window. Constraints from the parent frame apply.
      ```)
   (:add-command command-man :balance-frames
-     (fn [] (cmd-balance-frames wm))
+     (fn [] (cmd-balance-frames wm hook-man))
      ```
      (:balance-frames)
 
