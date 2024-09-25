@@ -328,12 +328,17 @@
     (:retile wm)))
 
 
-(defn cmd-balance-frames [wm hook-man]
+(defn cmd-balance-frames [wm hook-man &opt recursive?]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (def cur-layout (:get-layout cur-frame))
-  (each fr (in cur-layout :children)
-    (def resized (:balance fr true @[]))
-    (call-frame-resized-hooks hook-man resized))
+  (if recursive?
+    (let [top-fr (:get-top-frame cur-frame)]
+      (def resized (:balance top-fr recursive? @[]))
+      (call-frame-resized-hooks hook-man resized))
+    (let [parent (in cur-frame :parent)]
+      (when (and parent
+                 (= :frame (in parent :type)))
+        (def resized (:balance parent recursive? @[]))
+        (call-frame-resized-hooks hook-man resized))))
   (:retile wm))
 
 
@@ -778,12 +783,14 @@
      current active window. Constraints from the parent frame apply.
      ```)
   (:add-command command-man :balance-frames
-     (fn [] (cmd-balance-frames wm hook-man))
+     (fn [&opt recursive?] (cmd-balance-frames wm hook-man recursive?))
      ```
-     (:balance-frames)
+     (:balance-frames &opt recursive?)
 
-     Resizes all frames, so that all siblings belonging to the same
-     parent have the same size.
+     Resizes frames, so that all siblings belonging to the same parent
+     have the same size. When recursive? is true (the default), resizes
+     all frames in the current monitor. Otherwise, only resizes the
+     siblings of the current frame.
      ```)
   (:add-command command-man :zoom-in
      (fn [ratio] (cmd-zoom-in wm hook-man ratio))

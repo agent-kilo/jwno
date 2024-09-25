@@ -1354,7 +1354,7 @@
              all-children
              new-rects)
         (map (fn [sub-fr rect]
-               (:transform sub-fr rect))
+               (:transform sub-fr rect nil resized-frames))
              all-children
              new-rects))))
   resized-frames)
@@ -1382,7 +1382,7 @@
   (table/setproto self frame-proto))
 
 
-(defn frame-transform [self new-rect &opt to-dpi]
+(defn frame-transform [self new-rect &opt to-dpi resized-frames]
   (def old-rect (in self :rect))
   (def old-padded-rect (:get-padded-rect self))
 
@@ -1407,11 +1407,13 @@
   (def all-children (in self :children))
   (cond
     (empty? all-children)
-    (break)
+    (when resized-frames
+      (array/push resized-frames self))
 
     (= :window (get-in all-children [0 :type]))
     # Do not actually resize the windows until next retile
-    (break)
+    (when resized-frames
+      (array/push resized-frames self))
 
     (= :frame (get-in all-children [0 :type]))
     (let [dx (- (in new-padded-rect :left) (in old-padded-rect :left))
@@ -1440,9 +1442,12 @@
               (+ h sub-dh)))))
       (def new-rects (:calculate-sub-rects self calc-fn nil new-padded-rect))
       (map (fn [sub-fr rect]
-             (:transform sub-fr rect to-dpi))
+             (if (rect-same-size? rect (in sub-fr :rect))
+               (:transform sub-fr rect to-dpi nil)
+               (:transform sub-fr rect to-dpi resized-frames)))
            all-children
-           new-rects))))
+           new-rects)))
+  resized-frames)
 
 
 (defn frame-resize [self new-rect]

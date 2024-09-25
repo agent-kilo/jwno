@@ -438,7 +438,17 @@
   (:add-child dummy-sub-frame1 dummy-window1)
   (:add-child dummy-sub-frame2 dummy-window2)
 
-  (:transform dummy-frame {:top 10 :left 20 :bottom 110 :right 100})
+  (var resized-frames
+    (:transform dummy-frame {:top 10 :left 10 :bottom 110 :right 110} nil @[]))
+
+  (assert (empty? resized-frames))
+
+  (set resized-frames
+    (:transform dummy-frame {:top 10 :left 20 :bottom 110 :right 100} nil @[]))
+
+  (assert (= 2 (length resized-frames)))
+  (assert (= dummy-sub-frame1 (in resized-frames 0)))
+  (assert (= dummy-sub-frame2 (in resized-frames 1)))
 
   (assert (= 10 (get-in dummy-frame [:rect :top])))
   (assert (= 20 (get-in dummy-frame [:rect :left])))
