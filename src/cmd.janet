@@ -327,12 +327,30 @@
   (:retile wm))
 
 
-(defn cmd-close-frame [wm]
+(defn cmd-close-frame [wm hook-man]
   (def root (in wm :root))
   (def cur-frame (:get-current-frame root))
+  (when (in cur-frame :monitor)
+    # Skip top-level frames
+    (break))
+
   (def cur-win (:get-current-window cur-frame))
   (with-activation-hooks wm
     (:close cur-frame)
+
+    (def parent-cur-children (get-in cur-frame [:parent :children]))
+    (cond
+      (empty? parent-cur-children)
+      # All sibling frames are closed
+      :nop
+
+      (= :frame (get-in parent-cur-children [0 :type]))
+      (call-frame-resized-hooks hook-man parent-cur-children)
+
+      # :nop when the parent's current children are windows, since
+      # in that case all sibling frames are closed too.
+      )
+
     (:retile wm)
     (if cur-win
       (:activate wm cur-win)
@@ -733,7 +751,7 @@
      height, respectively. Both of them are in physical pixels.
      ```)
   (:add-command command-man :close-frame
-     (fn [] (cmd-close-frame wm))
+     (fn [] (cmd-close-frame wm hook-man))
      ```
      (:close-frame)
 
