@@ -344,9 +344,9 @@
   (:retile wm))
 
 
-(defn cmd-close-frame [wm hook-man]
-  (def root (in wm :root))
-  (def cur-frame (:get-current-frame root))
+(defn cmd-close-frame [wm hook-man &opt cur-frame]
+  (default cur-frame (:get-current-frame (in wm :root)))
+
   (when (in cur-frame :monitor)
     # Skip top-level frames
     (break))
@@ -371,7 +371,7 @@
     (:retile wm)
     (if cur-win
       (:activate wm cur-win)
-      (:activate wm (:get-current-window root)))))
+      (:activate wm (:get-current-window (in wm :root))))))
 
 
 (defn cmd-frame-to-window-size [wm hook-man]
@@ -415,7 +415,7 @@
       (:show-tooltip ui-man :close-window "No focused window."))))
 
 
-(defn cmd-close-window-or-frame [wm ui-man]
+(defn cmd-close-window-or-frame [wm ui-man hook-man]
   # This will be nil when SHELLDLL_DefView (the desktop) is focused
   (def win-pat
     (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
@@ -437,10 +437,7 @@
             # The current window lost focus, do nothing
             (:show-tooltip ui-man :close-window "No focused window.")))
         # The frame is empty, assume that we want to close it
-        (with-activation-hooks wm
-          (:close cur-frame)
-          (:retile wm)
-          (:activate wm (:get-current-window root)))))))
+        (cmd-close-frame wm hook-man cur-frame)))))
 
 
 (defn cmd-change-window-alpha [wm delta]
@@ -870,7 +867,7 @@
      ```)
 
   (:add-command command-man :close-window-or-frame
-     (fn [] (cmd-close-window-or-frame wm ui-man))
+     (fn [] (cmd-close-window-or-frame wm ui-man hook-man))
      ```
      (:close-window-or-frame)
 
