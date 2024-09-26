@@ -573,23 +573,40 @@
   0)
 
 
-(defn- msg-wnd-handle-add-custom-msg [hwnd _msg wparam _lparam _hook-handler state]
+(defn- alloc-new-message [msg-wndproc-state]
+  (def last-msg (in msg-wndproc-state :last-custom-message))
+  (def custom-msgs (in msg-wndproc-state :custom-messages))
+  (var new-msg nil)
+  (for i (+ 1 CUSTOM-MSG) (+ 1 last-msg)
+    (unless (has-key? custom-msgs i)
+      (set new-msg i)
+      (break)))
+  (unless new-msg
+    (set new-msg (+ 1 last-msg))
+    (if (> new-msg (int/u64 0xBFFF))
+      (do
+        (log/error "Custom message ID overflow")
+        (set new-msg nil))
+      # else
+      (put msg-wndproc-state :last-custom-message new-msg)))
+  new-msg)
+
+
+(defn- msg-wnd-handle-add-custom-msg [_hwnd _msg wparam _lparam _hook-handler state]
   (def handler-fn (unmarshal-and-free wparam))
   (unless (or (function? handler-fn) (cfunction? handler-fn))
-    (log/warning "Invalid custom message handler function: %n" handler-fn)
-    (break 0))
-
-  (def new-msg (+ 1 (in state :last-custom-message)))
-  (when (> new-msg (int/u64 0xBFFF))
-    (log/error "Custom message ID overflow")
+    (log/error "Invalid custom message handler function: %n" handler-fn)
     (break -1))
-  (put state :last-custom-message new-msg)
+
+  (def new-msg (alloc-new-message state))
+  (unless new-msg
+    (break -1))
 
   (put (in state :custom-messages) new-msg handler-fn)
   (int/to-number new-msg))
 
 
-(defn- msg-wnd-handle-remove-custom-msg [hwnd _msg wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-remove-custom-msg [_hwnd _msg wparam _lparam _hook-handler state]
   # WPARAM and messages all use int/u64
   (def msg wparam)
   (def custom-msgs (in state :custom-messages))
@@ -730,19 +747,28 @@
   (log/debug "wparam = %p" wparam)
   (log/debug "lparam = %p" lparam)
 
-  (if-let [handler (in msg-wnd-handlers msg)]
-    (handler hwnd msg wparam lparam hook-handler state)
-    (if-let [custom-msgs (in state :custom-messages)
-             custom-handler (in custom-msgs msg)]
-      (try
-        (custom-handler hwnd msg wparam lparam hook-handler state)
-        ((err fib)
-         (log/warning "Custom message handler failed: %n\n%s"
-                      err
-                      (get-stack-trace fib))
-         0 # !!! IMPORTANT
-         ))
-      (DefWindowProc hwnd msg wparam lparam))))
+  (def handler-ret
+    (if-let [handler (in msg-wnd-handlers msg)]
+      (handler hwnd msg wparam lparam hook-handler state)
+      (if-let [custom-msgs (in state :custom-messages)
+               custom-handler (in custom-msgs msg)]
+        (try
+          (custom-handler hwnd msg wparam lparam hook-handler state)
+          ((err fib)
+           (log/warning "Custom message handler failed: %n\n%s"
+                        err
+                        (get-stack-trace fib))
+           0 # !!! IMPORTANT
+           ))
+        (DefWindowProc hwnd msg wparam lparam))))
+
+  (if (or (int? handler-ret)
+          (= :core/s64 (type handler-ret)))
+    handler-ret
+    (do
+      (log/warning "UI Message handler returned: %n" handler-ret)
+      # XXX: Coerce to zero
+      0)))
 
 
 (defn- create-msg-window [hInstance hook-handler]
