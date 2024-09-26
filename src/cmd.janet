@@ -80,7 +80,54 @@
     (:activate wm cur-frame)))
 
 
-(defn cmd-insert-frame [wm location &opt after-insertion-fn]
+(defn- call-frame-resized-hooks [hook-man frame-list]
+  (each fr frame-list
+    (def children (in fr :children))
+
+    # Only call hooks on leaf frames
+    (cond
+      (empty? children)
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :window (get-in fr [:children 0 :type]))
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :frame (get-in fr [:children 0 :type]))
+      (call-frame-resized-hooks hook-man (in fr :children)))))
+
+
+(defn- check-for-frame-resized-hooks [hook-man frame old-rect]
+  (def new-rect (in frame :rect))
+  (def [new-width new-height] (rect-size new-rect))
+  (def [old-width old-height] (rect-size old-rect))
+
+  (cond
+    (and (not= new-width old-width)
+         (not= new-height old-height))
+    (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children]))
+
+    (and (= new-width old-width)
+         (= new-height old-height))
+    :nop
+
+    (not= new-width old-width)
+    (case (:get-direction (in frame :parent))
+      :horizontal
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :children]))
+
+      :vertical
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children])))
+
+    (not= new-height old-height)
+    (case (:get-direction (in frame :parent))
+      :horizontal
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children]))
+
+      :vertical
+      (call-frame-resized-hooks hook-man (get-in frame [:parent :children])))))
+
+
+(defn cmd-insert-frame [wm hook-man location &opt after-insertion-fn]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when (or (in cur-frame :monitor)
             (nil? (in cur-frame :parent)))
@@ -97,8 +144,12 @@
   (with-activation-hooks wm
     (:insert-sub-frame parent insert-idx)
 
+    (def new-frame (get-in parent [:children insert-idx]))
+    (def siblings (filter |(not= $ new-frame) (in parent :children)))
+    (call-frame-resized-hooks hook-man siblings)
+
     (when after-insertion-fn
-      (after-insertion-fn (get-in parent [:children insert-idx])))
+      (after-insertion-fn new-frame))
 
     (:retile wm parent)
     (:activate wm parent)))
@@ -195,18 +246,23 @@
       (:activate wm cur-win))))
 
 
-(defn cmd-resize-frame [wm dw dh]
+(defn cmd-resize-frame [wm hook-man dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
+  (when (in cur-frame :monitor)
+    # Skip top-level frames
+    (break))
+
   (def rect (in cur-frame :rect))
   (:resize cur-frame
            {:left (in rect :left)
             :top (in rect :top)
             :right (+ dw (in rect :right))
             :bottom (+ dh (in rect :bottom))})
+  (check-for-frame-resized-hooks hook-man cur-frame rect)
   (:retile wm))
 
 
-(defn cmd-zoom-in [wm ratio]
+(defn cmd-zoom-in [wm hook-man ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def parent-frame
     (if-let [parent (in cur-frame :parent)]
@@ -230,8 +286,8 @@
     (when ortho-frame
       (:get-padded-rect ortho-frame)))
 
-  (def [cur-width cur-height]
-    (rect-size (in cur-frame :rect)))
+  (def old-rect (in cur-frame :rect))
+  (def [cur-width cur-height] (rect-size old-rect))
 
   (def [new-width new-height]
     (cond
@@ -268,30 +324,57 @@
               :top 0
               :right new-width
               :bottom new-height})
+    (check-for-frame-resized-hooks hook-man cur-frame old-rect)
     (:retile wm)))
 
 
-(defn cmd-balance-frames [wm]
+(defn cmd-balance-frames [wm hook-man &opt recursive?]
+  (default recursive? true)
+
   (def cur-frame (:get-current-frame (in wm :root)))
-  (def cur-layout (:get-layout cur-frame))
-  (each fr (in cur-layout :children)
-    (:balance fr true))
+  (if recursive?
+    (let [top-fr (:get-top-frame cur-frame)]
+      (def resized (:balance top-fr recursive? @[]))
+      (call-frame-resized-hooks hook-man resized))
+    (let [parent (in cur-frame :parent)]
+      (when (and parent
+                 (= :frame (in parent :type)))
+        (def resized (:balance parent recursive? @[]))
+        (call-frame-resized-hooks hook-man resized))))
   (:retile wm))
 
 
-(defn cmd-close-frame [wm]
-  (def root (in wm :root))
-  (def cur-frame (:get-current-frame root))
+(defn cmd-close-frame [wm hook-man &opt cur-frame]
+  (default cur-frame (:get-current-frame (in wm :root)))
+
+  (when (in cur-frame :monitor)
+    # Skip top-level frames
+    (break))
+
   (def cur-win (:get-current-window cur-frame))
   (with-activation-hooks wm
     (:close cur-frame)
+
+    (def parent-cur-children (get-in cur-frame [:parent :children]))
+    (cond
+      (empty? parent-cur-children)
+      # All sibling frames are closed
+      :nop
+
+      (= :frame (get-in parent-cur-children [0 :type]))
+      (call-frame-resized-hooks hook-man parent-cur-children)
+
+      # :nop when the parent's current children are windows, since
+      # in that case all sibling frames are closed too.
+      )
+
     (:retile wm)
     (if cur-win
       (:activate wm cur-win)
-      (:activate wm (:get-current-window root)))))
+      (:activate wm (:get-current-window (in wm :root))))))
 
 
-(defn cmd-frame-to-window-size [wm]
+(defn cmd-frame-to-window-size [wm hook-man]
   (def cur-frame (:get-current-frame (in wm :root)))
   (def cur-win (:get-current-window cur-frame))
   (when (nil? cur-win)
@@ -304,7 +387,9 @@
     (combine-rect-border-space (:get-margins cur-win)
                                (:get-paddings cur-frame)))
 
+  (def old-rect (in cur-frame :rect))
   (:resize cur-frame (expand-rect win-rect border-space))
+  (check-for-frame-resized-hooks hook-man cur-frame old-rect)
   (:retile wm))
 
 
@@ -316,8 +401,7 @@
 
   (if win-pat
     (with-uia [_win-pat win-pat]
-      (with-activation-hooks wm
-        (:Close win-pat)))
+      (:Close win-pat))
     # else
     (if-let [root (in wm :root)
              cur-win (:get-current-window root)]
@@ -331,7 +415,7 @@
       (:show-tooltip ui-man :close-window "No focused window."))))
 
 
-(defn cmd-close-window-or-frame [wm ui-man]
+(defn cmd-close-window-or-frame [wm ui-man hook-man]
   # This will be nil when SHELLDLL_DefView (the desktop) is focused
   (def win-pat
     (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
@@ -340,8 +424,7 @@
 
   (if win-pat
     (with-uia [_win-pat win-pat]
-      (with-activation-hooks wm
-        (:Close win-pat)))
+      (:Close win-pat))
     # else
     (let [root (in wm :root)
           cur-frame (:get-current-frame root)]
@@ -354,10 +437,7 @@
             # The current window lost focus, do nothing
             (:show-tooltip ui-man :close-window "No focused window.")))
         # The frame is empty, assume that we want to close it
-        (with-activation-hooks wm
-          (:close cur-frame)
-          (:retile wm)
-          (:activate wm (:get-current-window root)))))))
+        (cmd-close-frame wm hook-man cur-frame)))))
 
 
 (defn cmd-change-window-alpha [wm delta]
@@ -588,6 +668,7 @@
         :uia-manager uia-man
         :key-manager key-man
         :window-manager wm
+        :hook-manager hook-man
         :repl repl}
     context)
 
@@ -658,7 +739,7 @@
      ```)
   (:add-command command-man :insert-frame
      (fn [location &opt after-insertion-fn]
-       (cmd-insert-frame wm location after-insertion-fn))
+       (cmd-insert-frame wm hook-man location after-insertion-fn))
      ```
      (:insert-frame location &opt after-insertion-fn)
 
@@ -678,7 +759,7 @@
      ```)
 
   (:add-command command-man :resize-frame
-     (fn [dw dh] (cmd-resize-frame wm dw dh))
+     (fn [dw dh] (cmd-resize-frame wm hook-man dw dh))
      ```
      (:resize-frame dw dh)
 
@@ -686,14 +767,14 @@
      height, respectively. Both of them are in physical pixels.
      ```)
   (:add-command command-man :close-frame
-     (fn [] (cmd-close-frame wm))
+     (fn [] (cmd-close-frame wm hook-man))
      ```
      (:close-frame)
 
      Closes the current frame.
      ```)
   (:add-command command-man :frame-to-window-size
-     (fn [] (cmd-frame-to-window-size wm))
+     (fn [] (cmd-frame-to-window-size wm hook-man))
      ```
      (:frame-to-window-size)
 
@@ -701,15 +782,17 @@
      current active window. Constraints from the parent frame apply.
      ```)
   (:add-command command-man :balance-frames
-     (fn [] (cmd-balance-frames wm))
+     (fn [&opt recursive?] (cmd-balance-frames wm hook-man recursive?))
      ```
-     (:balance-frames)
+     (:balance-frames &opt recursive?)
 
-     Resizes all frames, so that all siblings belonging to the same
-     parent have the same size.
+     Resizes frames, so that all siblings belonging to the same parent
+     have the same size. When recursive? is true (the default), resizes
+     all frames in the current monitor. Otherwise, only resizes the
+     siblings of the current frame.
      ```)
   (:add-command command-man :zoom-in
-     (fn [ratio] (cmd-zoom-in wm ratio))
+     (fn [ratio] (cmd-zoom-in wm hook-man ratio))
      ```
      (:zoom-in ratio)
 
@@ -784,7 +867,7 @@
      ```)
 
   (:add-command command-man :close-window-or-frame
-     (fn [] (cmd-close-window-or-frame wm ui-man))
+     (fn [] (cmd-close-window-or-frame wm ui-man hook-man))
      ```
      (:close-window-or-frame)
 

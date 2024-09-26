@@ -64,8 +64,9 @@
 (defn hook-manager-add-hook [self hook-name hook-fn]
   (def hooks (in self :hooks))
   (def hook-fn-list (in hooks hook-name @[]))
-  (array/push hook-fn-list hook-fn)
-  (put hooks hook-name hook-fn-list)
+  (unless (find |(= $ hook-fn) hook-fn-list)
+    (array/push hook-fn-list hook-fn)
+    (put hooks hook-name hook-fn-list))
   hook-fn)
 
 

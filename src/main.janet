@@ -62,7 +62,6 @@
                              err
                              (get-stack-trace fib)))
            nil)))
-      (log/debug "config-env = %n" config-env)
       (when config-env
         # Only proceed after the config file is successfully loaded
         (:init-event-handlers (in context :uia-manager))))
@@ -124,6 +123,9 @@
 
        :uia/focus-changed
        (:focus-changed (in context :window-manager))
+
+       [:uia/desktop-name-changed vd-name]
+       (:desktop-name-changed (in context :window-manager) vd-name)
 
        [:key/command cmd-info]
        (let [{:cmd cmd} cmd-info]

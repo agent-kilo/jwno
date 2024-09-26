@@ -162,7 +162,9 @@
   (def hmon (MonitorFromRect rect MONITOR_DEFAULTTONULL))
   (def [dpi-x dpi-y]
     (if (null? hmon)
-      (errorf "failed to get monitor info for rect: %n" rect)
+      # XXX: Some windows spawn themselves outside of any monitor, use
+      # the default DPI in this case.
+      [(int/u64 const/USER-DEFAULT-SCREEN-DPI) (int/u64 const/USER-DEFAULT-SCREEN-DPI)]
       # GetDpiForWindow will always return 96 for windows that are not
       # DPI-aware, which is incorrect for DWM border size calculation.
       # Have to use GetDpiForMonitor here instead.
@@ -526,6 +528,36 @@
     (put parent :current-child child)
     (set child parent)
     (set parent (in parent :parent))))
+
+
+(defn tree-node-attached? [self]
+  (def parent (in self :parent))
+
+  (cond
+    (= :virtual-desktop-container (in self :type))
+    # The root is always attached
+    true
+
+    (nil? parent)
+    false
+
+    (not (:has-child? parent self))
+    false
+
+    (not (:attached? parent))
+    false
+
+    true))
+
+
+(defn tree-node-has-child? [self child]
+  (def children (in self :children))
+  (var ret false)
+  (each c children
+    (when (= c child)
+      (set ret true)
+      (break)))
+  ret)
 
 
 (defn tree-node-get-next-child [self child]
@@ -1090,6 +1122,8 @@
 
 (def- tree-node-proto
   @{:activate tree-node-activate
+    :attached? tree-node-attached?
+    :has-child? tree-node-has-child?
     :get-next-child tree-node-get-next-child
     :get-prev-child tree-node-get-prev-child
     :get-next-sibling tree-node-get-next-sibling
@@ -1290,17 +1324,19 @@
     (put first-sub-frame :current-child old-active-child)))
 
 
-(defn frame-balance [self &opt recursive]
+(defn frame-balance [self &opt recursive resized-frames]
   (default recursive false)
 
   (def all-children (in self :children))
 
   (cond
     (empty? all-children)
-    nil
+    (when resized-frames
+      (array/push resized-frames self))
 
     (not= :frame (get-in self [:children 0 :type]))
-    nil
+    (when resized-frames
+      (array/push resized-frames self))
 
     true
     (let [child-count (length all-children)
@@ -1312,14 +1348,18 @@
       (def new-rects (:calculate-sub-rects self (fn [_sub-fr _i] balanced-len)))
       (if recursive
         (map (fn [sub-fr rect]
+               (def old-rect (in sub-fr :rect))
                (put sub-fr :rect rect)
-               (:balance sub-fr recursive))
+               (if (rect-same-size? rect old-rect)
+                 (:balance sub-fr recursive nil)
+                 (:balance sub-fr recursive resized-frames)))
              all-children
              new-rects)
         (map (fn [sub-fr rect]
-               (:transform sub-fr rect))
+               (:transform sub-fr rect nil resized-frames))
              all-children
-             new-rects)))))
+             new-rects))))
+  resized-frames)
 
 
 (defn frame-flatten [self]
@@ -1344,7 +1384,7 @@
   (table/setproto self frame-proto))
 
 
-(defn frame-transform [self new-rect &opt to-dpi]
+(defn frame-transform [self new-rect &opt to-dpi resized-frames]
   (def old-rect (in self :rect))
   (def old-padded-rect (:get-padded-rect self))
 
@@ -1369,11 +1409,13 @@
   (def all-children (in self :children))
   (cond
     (empty? all-children)
-    (break)
+    (when resized-frames
+      (array/push resized-frames self))
 
     (= :window (get-in all-children [0 :type]))
     # Do not actually resize the windows until next retile
-    (break)
+    (when resized-frames
+      (array/push resized-frames self))
 
     (= :frame (get-in all-children [0 :type]))
     (let [dx (- (in new-padded-rect :left) (in old-padded-rect :left))
@@ -1402,9 +1444,12 @@
               (+ h sub-dh)))))
       (def new-rects (:calculate-sub-rects self calc-fn nil new-padded-rect))
       (map (fn [sub-fr rect]
-             (:transform sub-fr rect to-dpi))
+             (if (rect-same-size? rect (in sub-fr :rect))
+               (:transform sub-fr rect to-dpi nil)
+               (:transform sub-fr rect to-dpi resized-frames)))
            all-children
-           new-rects))))
+           new-rects)))
+  resized-frames)
 
 
 (defn frame-resize [self new-rect]
@@ -1660,11 +1705,10 @@
     nil
 
     (= :window (get-in children [0 :type]))
-    (if-let [top-win (:get-top-window self)]
+    (when-let [top-win (:get-top-window self)]
       (when (not= top-win (in self :current-child))
         (log/debug "Resetting current window to %n" (in top-win :hwnd))
-        (put self :current-child top-win))
-      (error "inconsistent states for frame tree"))
+        (put self :current-child top-win)))
 
     true
     (each c children
@@ -1923,9 +1967,9 @@
                  monitors)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
+  (:call-hook (in self :hook-manager) :layout-created new-layout)
   (each fr (in new-layout :children)
     (:call-hook (in self :hook-manager) :monitor-updated fr))
-  (:call-hook (in self :hook-manager) :layout-created new-layout)
   new-layout)
 
 
@@ -2165,58 +2209,60 @@
   (put (in self :ignored-hwnds) hwnd true))
 
 
+(defn wm-clean-up-hwnds [self]
+  (def {:hook-manager hook-man} self)
+
+  # Clean up the ignored list
+  (def ignored (in self :ignored-hwnds))
+  (each h (keys ignored)
+    (when (= FALSE (IsWindow h))
+      (put ignored h nil)))
+
+  # Clean up dead windows
+  # XXX: If the focus change is caused by a closing window, that
+  # window may still be alive, so it won't be purged immediately.
+  # Maybe I shoud check the hwnds everytime a window is manipulated?
+  (each layout (get-in self [:root :children])
+    (def dead
+      (:purge-windows layout |(window-purge-pred $ self layout)))
+    (each dw dead
+      (:call-hook hook-man :window-removed dw))
+    (log/debug "purged %n dead windows from desktop %n"
+               (length dead)
+               (in layout :id))))
+
+
 (defn wm-focus-changed [self]
   (def {:uia-manager uia-man
         :hook-manager hook-man}
     self)
 
   (with-uia [uia-win (:get-focused-window uia-man)]
-    (when (nil? uia-win)
-      (log/debug "No focused window")
-      (break))
-
-    (def hwnd (:get_CachedNativeWindowHandle uia-win))
+    (def hwnd
+      (when uia-win
+        (:get_CachedNativeWindowHandle uia-win)))
     (def last-focused-hwnd (in self :last-focused-hwnd))
-    (def last-vd-name (in self :last-vd-name))
-    (def cur-vd-name (:get_CurrentName (in uia-man :root)))
-    (when (and (= hwnd last-focused-hwnd)
-               (= cur-vd-name last-vd-name))
+
+    # When hwnd is nil, we don't have a valid window focused, and
+    # we can't be sure the focus actually changed or not, so we
+    # always proceed in that case.
+    (when (and hwnd (= hwnd last-focused-hwnd))
       (log/debug "Focus on same window")
       (break))
     (put self :last-focused-hwnd hwnd)
 
-    # Clean up the ignored list
-    (def ignored (in self :ignored-hwnds))
-    (each h (keys ignored)
-      (when (= FALSE (IsWindow h))
-        (put ignored h nil)))
+    (log/debug "Focused hwnd = %n" hwnd)
 
-    # Clean up dead windows
-    # XXX: If the focus change is caused by a closing window, that
-    # window may still be alive, so it won't be purged immediately.
-    # Maybe I shoud check the hwnds everytime a window is manipulated?
-    (each layout (get-in self [:root :children])
-      (def dead
-        (:purge-windows layout |(window-purge-pred $ self layout)))
-      (each dw dead
-        (:call-hook hook-man :window-removed dw))
-      (log/debug "purged %n dead windows from desktop %n"
-                 (length dead)
-                 (in layout :id)))
+    (:clean-up-hwnds self)
 
-    # XXX: Will also trigger when the current virtual desktop is changed
     (:call-hook (in self :hook-manager) :focus-changed hwnd)
+
+    (when (nil? hwnd)
+      # No focused window, don't proceed
+      (break))
 
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       # Already managed
-      (def lo (:get-layout win))
-      (def cur-vd-name (in lo :name))
-      # XXX: We use the virtual desktop's name to check if we have
-      # switched or not, so the names must be unique, and can't be
-      # changed while Jwno is running.
-      (unless (= cur-vd-name last-vd-name)
-        (put self :last-vd-name cur-vd-name)
-        (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo))
       (with-activation-hooks self
         (:activate win))
       (break))
@@ -2227,29 +2273,8 @@
                      (in self :vdm-com)
                      uia-win))
     (when (nil? hwnd-info)
-      # Bad window, use what we got to detect vd changes
-      (unless (= cur-vd-name last-vd-name)
-        (put self :last-vd-name cur-vd-name)
-        (def lo (find |(= (in $ :name) cur-vd-name) (get-in self [:root :children])))
-        # XXX: lo may be nil
-        (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo)
-        (when lo
-          (with-activation-hooks self
-            (:activate self lo))))
+      # Bad window
       (break))
-
-    (def desktop-info (in hwnd-info :virtual-desktop))
-    (unless (= cur-vd-name last-vd-name)
-      (put self :last-vd-name cur-vd-name)
-      (def lo
-        (if (in desktop-info :id)
-          (let [fr (:get-current-frame-on-desktop (in self :root) desktop-info)]
-            (:get-layout fr))
-          # We may have focused e.g. the desktop or toolbox windows, which
-          # don't have associated virtual desktop ID. Use the name instead.
-          (find |(= (in $ :name) cur-vd-name) (get-in self [:root :children]))))
-      # XXX: lo may be nil
-      (:call-hook hook-man :virtual-desktop-changed cur-vd-name lo))
 
     (with-uia [_uia-win (in hwnd-info :uia-element)]
       (def manage-state (:should-manage-hwnd? self hwnd-info))
@@ -2286,6 +2311,22 @@
       (break))
 
     (:add-hwnd self hwnd-info manage-state)))
+
+
+(defn wm-desktop-name-changed [self vd-name]
+  (def root (in self :root))
+  (def layouts (in root :children))
+
+  (def last-vd-name (in self :last-vd-name))
+  (unless (= vd-name last-vd-name)
+    # XXX: lo may be nil. The desktop names should be unique, and
+    # they should not be changed while Jwno is running.
+    (def lo (find |(= (in $ :name) vd-name) layouts))
+    (:call-hook (in self :hook-manager) :virtual-desktop-changed vd-name lo)
+    (put self :last-vd-name vd-name)
+    (when lo
+      (with-activation-hooks self
+        (:activate self lo)))))
 
 
 (defn wm-activate [self node]
@@ -2407,6 +2448,7 @@
 (def- window-manager-proto
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
+    :desktop-name-changed wm-desktop-name-changed
 
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
@@ -2425,6 +2467,7 @@
     :remove-hwnd wm-remove-hwnd
     :filter-hwnd wm-filter-hwnd
     :ignore-hwnd wm-ignore-hwnd
+    :clean-up-hwnds wm-clean-up-hwnds
 
     :close-hwnd wm-close-hwnd
 

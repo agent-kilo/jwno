@@ -82,6 +82,19 @@
   (assert (nil? hook-fn4-called-with)))
 
 
+(defn test-duplicate-hook-fns []
+  (def hook-man (hook-manager))
+  (def hook-fn
+    (fn [] :nop))
+
+  (:add-hook hook-man :dummy-hook hook-fn)
+  (assert (= 1 (length (get-in hook-man [:hooks :dummy-hook]))))
+
+  (:add-hook hook-man :dummy-hook hook-fn)
+  (assert (= 1 (length (get-in hook-man [:hooks :dummy-hook])))))
+
+
 (defn main [&]
   (test-hook-manager)
-  (test-call-filter-hook))
+  (test-call-filter-hook)
+  (test-duplicate-hook-fns))

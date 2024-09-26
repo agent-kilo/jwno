@@ -1,15 +1,73 @@
 #
-# This module contains some basic demo of automatically managing
-# the layout of frames. To use this module, place it alongside your
-# config file and import it:
-#
-#     (import auto-layout)
-#
-# See comments below for the usage of a specific object.
+# To use the objects below, `(import jwno/auto-layout)` in your
+# config file.
 #
 
-(import jwno/util)
 (use jw32/_uiautomation)
+
+(use ./util)
+
+
+# ================== Auto-Close Empty Frame ==================
+#
+# Automatically check for empty frames and close them, when a window
+# is removed. To use it, add these in your config:
+#
+#     (def auto-close-empty-frame (auto-layout/close-empty-frame jwno/context))
+#     (:enable auto-close-empty-frame)
+#
+# To stop it:
+#
+#     (:disable auto-close-empty-frame)
+#
+
+(defn close-empty-frame-on-window-removed [self dead-win]
+  (def parent (in dead-win :parent))
+  (unless (:attached? parent)
+    (break))
+
+  (def {:window-manager window-man} self)
+  (when (and (empty? (in parent :children))
+             # Don't touch the top-level frame
+             (nil? (in parent :monitor)))
+    (with-activation-hooks window-man
+      (:close parent))
+    (def to-retile (in parent :parent))
+    # ev/spawn to put the :retile call in the event queue
+    (ev/spawn
+     (:retile window-man to-retile))))
+
+
+(defn close-empty-frame-enable [self]
+  (:disable self) # To prevent multiple hook entries
+  (def hook-fn
+    (:add-hook (in self :hook-manager) :window-removed
+       (fn [& args]
+         (:on-window-removed self ;args))))
+  (put self :hook-fn hook-fn))
+
+
+(defn close-empty-frame-disable [self]
+  (def hook-fn (in self :hook-fn))
+  (when hook-fn
+    (put self :hook-fn nil)
+    (:remove-hook (in self :hook-manager) :window-removed hook-fn)))
+
+
+(def close-empty-frame-proto
+  @{:on-window-removed close-empty-frame-on-window-removed
+    :enable close-empty-frame-enable
+    :disable close-empty-frame-disable})
+
+
+(defn close-empty-frame [context]
+  (def {:window-manager window-man
+        :hook-manager hook-man}
+    context)
+  (table/setproto
+   @{:window-manager window-man
+     :hook-manager hook-man}
+   close-empty-frame-proto))
 
 
 # ================== BSP Layout ==================
@@ -38,14 +96,15 @@
     (:get-current-frame-on-desktop (in window-man :root) desktop-info))
   (unless (empty? (in cur-frame :children))
     (def rect (in cur-frame :rect))
-    (def [width height] (util/rect-size rect))
+    (def [width height] (rect-size rect))
     (if (> height width)
       (:split cur-frame :vertical)
       (:split cur-frame :horizontal))
     (put (in win :tags) :frame (get-in cur-frame [:children 1]))
+    (def to-retile (get-in cur-frame [:children 0]))
     # ev/spawn to put the :retile call in the event queue
     (ev/spawn
-     (:retile window-man (get-in cur-frame [:children 0])))))
+     (:retile window-man to-retile))))
 
 
 (defn bsp-enable [self]
@@ -79,7 +138,7 @@
   (var fr top-frame)
   # The first window is already in fr
   (each w (slice all-wins 1)
-    (def [fr-width fr-height] (util/rect-size (in fr :rect)))
+    (def [fr-width fr-height] (rect-size (in fr :rect)))
     (if (> fr-height fr-width)
       (:split fr :vertical)
       (:split fr :horizontal))

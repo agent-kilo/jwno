@@ -103,6 +103,9 @@
   ~[(- (in ,rect :right) (in ,rect :left))
     (- (in ,rect :bottom) (in ,rect :top))])
 
+(defmacro rect-same-size? [r1 r2]
+  ~(= (rect-size ,r1) (rect-size ,r2)))
+
 (defn shrink-rect [rect amounts]
   (def top (math/ceil (+ (in rect :top)
                          (in amounts :top 0))))
