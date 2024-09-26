@@ -116,15 +116,6 @@
 ################## ^^^^ Runs in UI thread ^^^^ ##################
 
 
-(defn current-frame-mark-add-custom-messages [self]
-  (def {:ui-manager ui-man} self)
-
-  (def show-msg (:add-custom-message ui-man handle-show-frame-area))
-  (def hide-msg (:add-custom-message ui-man handle-hide-frame-area))
-
-  [show-msg hide-msg])
-
-
 (defn current-frame-mark-maybe-show-mark [self frame]
   (def {:ui-manager ui-man
         :show-msg show-msg
@@ -227,10 +218,10 @@
     self)
 
   (def show-msg (:add-custom-message ui-man handle-show-frame-area))
-  (when (< show-msg 0)
+  (when (< show-msg (int/s64 0))
     (error "failed to register show-frame-area message"))
   (def hide-msg (:add-custom-message ui-man handle-hide-frame-area))
-  (when (< hide-msg 0)
+  (when (< hide-msg (int/s64 0))
     (:remove-custom-message ui-man show-msg)
     (error "failed to register hide-frame-area message"))
 
@@ -270,7 +261,7 @@
 
   (def cleanup-msg
     (:add-custom-message ui-man handle-cleanup-frame-area))
-  (if (< cleanup-msg 0)
+  (if (< cleanup-msg (int/s64 0))
     (log/warning "failed to clean up hwnd")
     # else
     (:send-message ui-man cleanup-msg 0 0))
