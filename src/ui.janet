@@ -246,14 +246,14 @@
   [tt-hwnd t-info])
 
 
-(defn- msg-wnd-handle-set-keymap [_hwnd wparam _lparam hook-handler _state]
+(defn- msg-wnd-handle-set-keymap [_hwnd _msg wparam _lparam hook-handler _state]
   (let [keymap (unmarshal-and-free wparam)]
     (:set-keymap hook-handler keymap))
   0 # !!! IMPORTANT
   )
 
 
-(defn- msg-wnd-handle-set-hooks [_hwnd _wparam _lparam hook-handler _state]
+(defn- msg-wnd-handle-set-hooks [_hwnd _msg _wparam _lparam hook-handler _state]
   (let [old-hook (in hook-handler :hook-id)]
     (when (and (not (nil? old-hook))
                (not (null? old-hook)))
@@ -275,7 +275,7 @@
   0)
 
 
-(defn- msg-wnd-handle-remove-hooks [_hwnd _wparam _lparam hook-handler _state]
+(defn- msg-wnd-handle-remove-hooks [_hwnd _msg _wparam _lparam hook-handler _state]
   (when-let [old-hook (in hook-handler :hook-id)]
     (log/debug "Removing old hook: %n" old-hook)
     (UnhookWindowsHookEx old-hook)
@@ -443,7 +443,7 @@
       [(in work-area :left) (in work-area :top)])))
 
 
-(defn- msg-wnd-handle-show-tooltip [hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-show-tooltip [hwnd _msg wparam _lparam _hook-handler state]
   (let [[tt-id text opt-x opt-y opt-timeout opt-anchor] (unmarshal-and-free wparam)]
     (def tooltip (get-in state [:tooltips tt-id]))
 
@@ -519,7 +519,7 @@
   0)
 
 
-(defn- msg-wnd-handle-hide-tooltip [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-hide-tooltip [_hwnd _msg wparam _lparam _hook-handler state]
   (let [tt-id (unmarshal-and-free wparam)]
     (when-let [tooltip (get-in state [:tooltips tt-id])]
       (def {:hwnd tt-hwnd
@@ -539,7 +539,7 @@
   (put tooltips tt-id tooltip))
 
 
-(defn- msg-wnd-handle-set-tooltip-timeouts [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-set-tooltip-timeouts [_hwnd _msg wparam _lparam _hook-handler state]
   (let [timeouts (unmarshal-and-free wparam)
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-timeout] timeouts
@@ -548,7 +548,7 @@
   0)
 
 
-(defn- msg-wnd-handle-set-tooltip-anchors [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-set-tooltip-anchors [_hwnd _msg wparam _lparam _hook-handler state]
   (let [anchors (unmarshal-and-free wparam)
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-anchor] anchors
@@ -557,7 +557,7 @@
   0)
 
 
-(defn- msg-wnd-handle-set-tooltip-max-widths [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-set-tooltip-max-widths [_hwnd _msg wparam _lparam _hook-handler state]
   (let [max-widths (unmarshal-and-free wparam)
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-max-width] max-widths
@@ -566,14 +566,14 @@
   0)
 
 
-(defn- msg-wnd-handle-update-work-area [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-update-work-area [_hwnd _msg wparam _lparam _hook-handler state]
   (def work-area (unmarshal-and-free wparam))
   (log/debug "Updated work area: %n" work-area)
   (put state :last-active-work-area work-area)
   0)
 
 
-(defn- msg-wnd-handle-add-custom-msg [hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-add-custom-msg [hwnd _msg wparam _lparam _hook-handler state]
   (def handler-fn (unmarshal-and-free wparam))
   (unless (or (function? handler-fn) (cfunction? handler-fn))
     (log/warning "Invalid custom message handler function: %n" handler-fn)
@@ -589,7 +589,7 @@
   (int/to-number new-msg))
 
 
-(defn- msg-wnd-handle-remove-custom-msg [hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-remove-custom-msg [hwnd _msg wparam _lparam _hook-handler state]
   # WPARAM and messages all use int/u64
   (def msg wparam)
   (def custom-msgs (in state :custom-messages))
@@ -602,7 +602,7 @@
   0)
 
 
-(defn- msg-wnd-handle-notify-icon-callback [hwnd wparam lparam _hook-handler _state]
+(defn- msg-wnd-handle-notify-icon-callback [hwnd _msg wparam lparam _hook-handler _state]
   (def notif-event (LOWORD lparam))
   (def anchor-x (GET_X_LPARAM wparam))
   (def anchor-y (GET_Y_LPARAM wparam))
@@ -613,7 +613,7 @@
   0)
 
 
-(defn- msg-wnd-handle-wm-command [hwnd wparam _lparam hook-handler state]
+(defn- msg-wnd-handle-wm-command [hwnd _msg wparam _lparam hook-handler state]
   (case wparam
     ID_MENU_EXIT
     (do
@@ -637,7 +637,7 @@
   0)
 
 
-(defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam hook-handler state]
+(defn- msg-wnd-handle-wm-timer [hwnd _msg wparam _lparam hook-handler state]
   (case wparam
     TIMER-ID-DISPLAY-CHANGE
     (do
@@ -658,7 +658,7 @@
   0)
 
 
-(defn- msg-wnd-handle-wm-displaychange [hwnd wparam lparam hook-handler state]
+(defn- msg-wnd-handle-wm-displaychange [hwnd _msg wparam lparam hook-handler state]
   # Clear cached desktop rect, see get-desktop-rect and get-current-work-area
   (put state :desktop-rect nil)
 
@@ -677,19 +677,19 @@
   0)
 
 
-(defn- msg-wnd-handle-show-error-and-exit [hwnd wparam _lparam _hook-handler _state]
+(defn- msg-wnd-handle-show-error-and-exit [hwnd _msg wparam _lparam _hook-handler _state]
   (let [msg (unmarshal-and-free wparam)]
     (MessageBox hwnd msg "Error" (bor MB_ICONEXCLAMATION MB_OK))
     (PostMessage hwnd WM_COMMAND ID_MENU_EXIT 0))
   0)
 
 
-(defn- msg-wnd-handle-wm-close [hwnd _wparam _lparam _hook-handler _state]
+(defn- msg-wnd-handle-wm-close [hwnd _msg _wparam _lparam _hook-handler _state]
   (DestroyWindow hwnd)
   0)
 
 
-(defn- msg-wnd-handle-wm-destroy [_hwnd _wparam _lparam _hook-handler _state]
+(defn- msg-wnd-handle-wm-destroy [_hwnd _msg _wparam _lparam _hook-handler _state]
   (PostQuitMessage 0)
   0)
 
@@ -735,7 +735,7 @@
     (if-let [custom-msgs (in state :custom-messages)
              custom-handler (in custom-msgs msg)]
       (try
-        (custom-handler hwnd wparam lparam hook-handler state)
+        (custom-handler hwnd msg wparam lparam hook-handler state)
         ((err fib)
          (log/warning "Custom message handler failed: %n\n%s"
                       err
