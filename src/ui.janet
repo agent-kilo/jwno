@@ -734,7 +734,14 @@
     (handler hwnd wparam lparam hook-handler state)
     (if-let [custom-msgs (in state :custom-messages)
              custom-handler (in custom-msgs msg)]
-      (custom-handler hwnd wparam lparam hook-handler state)
+      (try
+        (custom-handler hwnd wparam lparam hook-handler state)
+        ((err fib)
+         (log/warning "Custom message handler failed: %n\n%s"
+                      err
+                      (get-stack-trace fib))
+         0 # !!! IMPORTANT
+         ))
       (DefWindowProc hwnd msg wparam lparam))))
 
 
