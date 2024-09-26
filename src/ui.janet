@@ -731,7 +731,7 @@
   (log/debug "lparam = %p" lparam)
 
   (if-let [handler (in msg-wnd-handlers msg)]
-    (handler hwnd wparam lparam hook-handler state)
+    (handler hwnd msg wparam lparam hook-handler state)
     (if-let [custom-msgs (in state :custom-messages)
              custom-handler (in custom-msgs msg)]
       (try
