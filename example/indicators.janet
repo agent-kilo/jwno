@@ -76,13 +76,12 @@
         (put state :frame-area-hwnd new-hwnd)
         new-hwnd)))
 
-  # TODO: Properly scaled margins
   (SetWindowPos area-hwnd
                 HWND_BOTTOM
-                (+ 10 (in rect :left))
-                (+ 10 (in rect :top))
-                (- width 20)
-                (- height 20)
+                (in rect :left)
+                (in rect :top)
+                width
+                height
                 (bor SWP_NOACTIVATE))
 
   (log/debug "--------- AREA-HWND = %n" area-hwnd)
@@ -115,6 +114,22 @@
 
 ################## ^^^^ Runs in UI thread ^^^^ ##################
 
+(defn calc-rect-with-margin [rect margins &opt scaled]
+  (default scaled true)
+
+  (def [scale-x scale-y]
+    (if scaled
+      (calc-pixel-scale rect)
+      [1 1]))
+  (def scaled-margins
+    (if (and (= 1 scale-x) (= 1 scale-y))
+      margins
+      {:left (* scale-x (in margins :left))
+       :top (* scale-y (in margins :top))
+       :right (* scale-x (in margins :right))
+       :bottom (* scale-y (in margins :bottom))}))
+  (shrink-rect rect scaled-margins))
+
 
 (defn current-frame-mark-maybe-show-mark [self frame]
   (def {:ui-manager ui-man
@@ -126,8 +141,11 @@
                                       (= FALSE (IsIconic (in $ :hwnd))))
                                 (in frame :children)))
   (if (empty? visible-children)
-    (let [rect (:get-padded-rect frame)]
-      (:post-message ui-man show-msg (alloc-and-marshal rect) 0))
+    (let [rect (:get-padded-rect frame)
+          margin (in self :margin)
+          margins {:left margin :top margin :right margin :bottom margin}
+          rect-with-margin (calc-rect-with-margin rect margins)]
+      (:post-message ui-man show-msg (alloc-and-marshal rect-with-margin) 0))
     (do
       (:post-message ui-man hide-msg 0 0))))
 
@@ -293,5 +311,6 @@
    @{:hook-manager hook-man
      :ui-manager ui-man
      :uia-manager uia-man
-     :window-manager window-man}
+     :window-manager window-man
+     :margin 0}
    current-frame-mark-proto))
