@@ -9,8 +9,75 @@
 (use ./util)
 
 
-(def FRAME-AREA-WINDOW-CLASS-NAME "jwno-frame-area-window")
+# ================== Show a tooltip on the current frame ==================
+#
+# Shows a simple tooltip when a frame is activated. To use it, add these
+# in your config:
+#
+#     (def current-frame-tooltip (indicator/current-frame-tooltip jwno/context))
+#     (:enable current-frame-tooltip)
+#
+# To stop it:
+#
+#     (:disable current-frame-tooltip)
+#
 
+(defn current-frame-tooltip-on-frame-activated [self fr]
+  (def {:ui-manager ui-man} self)
+  (def rect (in fr :rect))
+  (def center-x (brshift (+ (in rect :left) (in rect :right)) 1))
+  (def center-y (brshift (+ (in rect :top) (in rect :bottom)) 1))
+  (:show-tooltip ui-man :current-frame "Current Frame" center-x center-y))
+
+
+(defn current-frame-tooltip-enable [self]
+  (:disable self)
+  (def hook-fn
+    (:add-hook (in self :hook-manager) :frame-activated
+       (fn [& args]
+         (:on-frame-activated self ;args))))
+  (put self :hook-fn hook-fn))
+
+
+(defn current-frame-tooltip-disable [self]
+  (def hook-fn (in self :hook-fn))
+  (when hook-fn
+    (put self :hook-fn nil)
+    (:remove-hook (in self :hook-manager) :frame-activated hook-fn)))
+
+
+(def current-frame-tooltip-proto
+  @{:on-frame-activated current-frame-tooltip-on-frame-activated
+    :enable current-frame-tooltip-enable
+    :disable current-frame-tooltip-disable})
+
+
+(defn current-frame-tooltip [context]
+  (def {:hook-manager hook-man
+        :ui-manager ui-man}
+    context)
+  (table/setproto
+   @{:hook-manager hook-man
+     :ui-manager ui-man}
+   current-frame-tooltip-proto))
+
+
+# ================== Highlights the current frame ==================
+#
+# Fills an empty frame with a blank window when it's activated, so
+# that it stands out from empty desktop areas nearby. To use it, add
+# these in your config:
+#
+#     (def current-frame-area (indicator/current-frame-area jwno/context))
+#     (put current-frame-area :margin 10) # Or other values you like. Defaults to zero.
+#     (:enable current-frame-area)
+#
+# To stop it:
+#
+#     (:disable current-frame-area)
+#
+
+(def FRAME-AREA-WINDOW-CLASS-NAME "jwno-frame-area-window")
 
 ################## vvvv Runs in UI thread vvvv ##################
 
