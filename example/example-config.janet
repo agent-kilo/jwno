@@ -296,6 +296,14 @@
 (put current-frame-area :margin 10)
 (:enable current-frame-area)
 
+#
+# And if you prefer the old behavior, which shows a simple tooltip
+# instead, use the current-frame-tooltip object:
+#
+#(def current-frame-tooltip
+#  (indicator/current-frame-tooltip jwno/context))
+#(:enable current-frame-tooltip)
+
 
 #
 # Some windows declare their abilities incorrectly, and Jwno will not
