@@ -108,10 +108,10 @@
   (when-let [custom-msgs (in state :custom-messages)
              cleanup-fn (in custom-msgs msg)]
     (put custom-msgs msg nil))
-
   0)
 
 ################## ^^^^ Runs in UI thread ^^^^ ##################
+
 
 (defn calc-rect-with-margin [rect margins &opt scaled]
   (default scaled true)
@@ -130,7 +130,7 @@
   (shrink-rect rect scaled-margins))
 
 
-(defn current-frame-mark-maybe-show-mark [self frame]
+(defn current-frame-area-maybe-show-area [self frame]
   (def {:ui-manager ui-man
         :show-msg show-msg
         :hide-msg hide-msg}
@@ -149,7 +149,7 @@
       (:post-message ui-man hide-msg 0 0))))
 
 
-(defn current-frame-mark-on-frame-activated [self frame]
+(defn current-frame-area-on-frame-activated [self frame]
   (def {:ui-manager ui-man
         :uia-manager uia-man
         :hide-msg hide-msg}
@@ -160,7 +160,7 @@
     (not= (in lo :name)
           (:get_CurrentName (in uia-man :root)))
     # The frame is on a virtual desktop that's different from our active one,
-    # The mark window should have been closed in the :virtual-desktop-changed
+    # The area window should have been closed in the :virtual-desktop-changed
     # hook, no need to do anything here.
     # This would happen if the user switched to a new virtual desktop for the
     # first time, and don't have any window opened there.
@@ -168,14 +168,14 @@
 
     (and (in frame :monitor)
          (<= (length (in lo :children)) 1))
-    # Hide the mark when there's only one monitor and one frame
+    # Hide the area when there's only one monitor and one frame
     (:post-message ui-man hide-msg 0 0)
 
     true
-    (:maybe-show-mark self frame)))
+    (:maybe-show-area self frame)))
 
 
-(defn current-frame-mark-on-virtual-desktop-changed [self _vd-name _layout]
+(defn current-frame-area-on-virtual-desktop-changed [self _vd-name _layout]
   (def {:ui-manager ui-man
         :hide-msg hide-msg}
     self)
@@ -183,7 +183,7 @@
   (:post-message ui-man hide-msg 0 0))
 
 
-(defn current-frame-mark-on-window-created [self win _uia-win _exe-path desktop-info]
+(defn current-frame-area-on-window-created [self win _uia-win _exe-path desktop-info]
   (def {:ui-manager ui-man
         :window-manager window-man
         :hide-msg hide-msg}
@@ -193,11 +193,11 @@
             (= frame
                (:get-current-frame-on-desktop (in window-man :root)
                                               desktop-info)))
-    # A window is created in our current frame, hide the mark
+    # A window is created in our current frame, hide the area
     (:post-message ui-man hide-msg 0 0)))
 
 
-(defn current-frame-mark-on-window-removed [self dead-win]
+(defn current-frame-area-on-window-removed [self dead-win]
   (def parent-fr (in dead-win :parent))
 
   (cond
@@ -217,17 +217,17 @@
     :nop
 
     true
-    (:maybe-show-mark self parent-fr)))
+    (:maybe-show-area self parent-fr)))
 
 
-(defn current-frame-mark-on-frame-resized [self frame]
+(defn current-frame-area-on-frame-resized [self frame]
   (def {:window-manager window-man} self)
   (def cur-frame (:get-current-frame (in window-man :root)))
   (when (= frame cur-frame)
-    (:maybe-show-mark self frame)))
+    (:maybe-show-area self frame)))
 
 
-(defn current-frame-mark-enable [self]
+(defn current-frame-area-enable [self]
   (:disable self)
 
   (def {:hook-manager hook-man
@@ -261,7 +261,7 @@
   (put self :hook-fns hook-fns))
 
 
-(defn current-frame-mark-disable [self]
+(defn current-frame-area-disable [self]
   (def {:hook-manager hook-man
         :ui-manager ui-man
         :hook-fns hook-fns
@@ -289,19 +289,19 @@
   (put self :hook-fns nil))
 
 
-(def current-frame-mark-proto
-  @{:on-frame-activated current-frame-mark-on-frame-activated
-    :on-virtual-desktop-changed current-frame-mark-on-virtual-desktop-changed
-    :on-window-created current-frame-mark-on-window-created
-    :on-window-removed current-frame-mark-on-window-removed
-    :on-frame-resized current-frame-mark-on-frame-resized
+(def current-frame-area-proto
+  @{:on-frame-activated current-frame-area-on-frame-activated
+    :on-virtual-desktop-changed current-frame-area-on-virtual-desktop-changed
+    :on-window-created current-frame-area-on-window-created
+    :on-window-removed current-frame-area-on-window-removed
+    :on-frame-resized current-frame-area-on-frame-resized
 
-    :maybe-show-mark current-frame-mark-maybe-show-mark
-    :enable current-frame-mark-enable
-    :disable current-frame-mark-disable})
+    :maybe-show-area current-frame-area-maybe-show-area
+    :enable current-frame-area-enable
+    :disable current-frame-area-disable})
 
 
-(defn current-frame-mark [context]
+(defn current-frame-area [context]
   (def {:hook-manager hook-man
         :ui-manager ui-man
         :uia-manager uia-man
@@ -312,4 +312,4 @@
      :uia-manager uia-man
      :window-manager window-man
      :margin 0}
-   current-frame-mark-proto))
+   current-frame-area-proto))
