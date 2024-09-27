@@ -53,6 +53,7 @@
   (when (null? new-hwnd)
     (errorf "failed to create window: 0x%x" (GetLastError)))
 
+  (SetLayeredWindowAttributes new-hwnd 0 64 LWA_ALPHA)
   (try
     # Raises E_INVALIDARG on Windows 10
     (DwmSetWindowAttribute new-hwnd DWMWA_WINDOW_CORNER_PREFERENCE DWMWCP_ROUND)
@@ -72,10 +73,12 @@
       # else
       (do
         (def new-hwnd (create-frame-area-window))
-        (SetLayeredWindowAttributes new-hwnd 0 64 LWA_ALPHA)
         (put state :frame-area-hwnd new-hwnd)
         new-hwnd)))
 
+  (log/debug "--------- AREA-HWND = %n" area-hwnd)
+  (ShowWindow area-hwnd SW_SHOW)
+  (UpdateWindow hwnd)
   (SetWindowPos area-hwnd
                 HWND_BOTTOM
                 (in rect :left)
@@ -83,10 +86,6 @@
                 width
                 height
                 (bor SWP_NOACTIVATE))
-
-  (log/debug "--------- AREA-HWND = %n" area-hwnd)
-  (ShowWindow area-hwnd SW_SHOW)
-  (UpdateWindow hwnd)
   0)
 
 
