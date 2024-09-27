@@ -4,9 +4,9 @@
 (use jw32/_dwmapi)
 (use jw32/_util)
 
-(import jwno/log)
+(import ./log)
 
-(use jwno/util)
+(use ./util)
 
 
 (def FRAME-AREA-WINDOW-CLASS-NAME "jwno-frame-area-window")

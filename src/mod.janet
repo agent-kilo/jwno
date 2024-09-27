@@ -39,6 +39,7 @@
     (build-module-cache
      cache
      [["./auto-layout" "jwno/auto-layout"]
+      ["./indicator" "jwno/indicator"]
       ["./util" "jwno/util"]
       ["./log" "jwno/log"]])
 
