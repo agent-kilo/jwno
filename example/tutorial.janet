@@ -5,6 +5,7 @@
 (use jwno/util)
 (import jwno/log)
 (import jwno/auto-layout)
+(import jwno/indicator)
 
 
 (def {:window-manager window-man
@@ -13,6 +14,10 @@
       :command-manager command-man
       :hook-manager hook-man}
   jwno/context)
+
+
+(def current-frame-tooltip (indicator/current-frame-tooltip jwno/context))
+(:enable current-frame-tooltip)
 
 
 (def *auto-close-empty-frame*
@@ -364,6 +369,10 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
   # spawned windows before the cascade command is called.
   (ev/spawn
    (ev/sleep 1)
+   # Wait for the windows we spawned
+   (while (or (nil? (:get-current-frame (in window-man :root)))
+              (< (length (:get-all-windows (in window-man :root))) 2))
+     (ev/sleep 1))
    (:call-command command-man :cascade-windows-in-frame)
    (def w (:get-top-window (:get-current-frame (in window-man :root))))
    (def w-rect (DwmGetWindowAttribute (in w :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS))
