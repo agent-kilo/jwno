@@ -687,7 +687,10 @@
     (error "invalid operation")
 
     (empty? children)
-    self
+    (if (= :frame (in self :type))
+      self
+      # else
+      nil)
 
     (= :window (in (first children) :type))
     self
@@ -708,7 +711,10 @@
     (error "invalid operation")
 
     (empty? children)
-    self
+    (if (= :frame (in self :type))
+      self
+      # else
+      nil)
 
     (= :window (in (first children) :type))
     self
@@ -725,7 +731,10 @@
     (error "invalid operation")
 
     (empty? children)
-    self
+    (if (= :frame (in self :type))
+      self
+      # else
+      nil)
 
     (= :window (in (first children) :type))
     self
