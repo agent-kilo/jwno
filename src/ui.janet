@@ -17,17 +17,22 @@
 
 (def NOTIFY-ICON-ID 1)
 
-(def NOTIFY-ICON-CALLBACK-MSG (+ WM_APP 1))
-(def SET-KEYMAP-MSG (+ WM_APP 2))
-(def SET-HOOKS-MSG (+ WM_APP 3))
-(def REMOVE-HOOKS-MSG (+ WM_APP 4))
-(def SHOW-ERROR-AND-EXIT-MSG (+ WM_APP 5))
-(def SHOW-TOOLTIP-MSG (+ WM_APP 6))
-(def HIDE-TOOLTIP-MSG (+ WM_APP 7))
-(def SET-TOOLTIP-TIMEOUTS-MSG (+ WM_APP 8))
-(def SET-TOOLTIP-ANCHORS-MSG (+ WM_APP 9))
-(def SET-TOOLTIP-MAX-WIDTHS-MSG (+ WM_APP 10))
-(def UPDATE-WORK-AREA-MSG (+ WM_APP 11))
+(def NOTIFY-ICON-CALLBACK-MSG    (+ WM_APP 0x01))
+(def SET-KEYMAP-MSG              (+ WM_APP 0x02))
+(def SET-HOOKS-MSG               (+ WM_APP 0x03))
+(def REMOVE-HOOKS-MSG            (+ WM_APP 0x04))
+(def SHOW-ERROR-AND-EXIT-MSG     (+ WM_APP 0x05))
+(def SHOW-TOOLTIP-MSG            (+ WM_APP 0x06))
+(def HIDE-TOOLTIP-MSG            (+ WM_APP 0x07))
+(def SET-TOOLTIP-TIMEOUTS-MSG    (+ WM_APP 0x08))
+(def SET-TOOLTIP-ANCHORS-MSG     (+ WM_APP 0x09))
+(def SET-TOOLTIP-MAX-WIDTHS-MSG  (+ WM_APP 0x0A))
+(def UPDATE-WORK-AREA-MSG        (+ WM_APP 0x0B))
+(def ADD-CUSTOM-MSG-MSG          (+ WM_APP 0x0C))
+(def REMOVE-CUSTOM-MSG-MSG       (+ WM_APP 0x0D))
+
+# Where custom messages begin
+(def CUSTOM-MSG (+ WM_APP 0x400))
 
 (def TIMER-ID-DISPLAY-CHANGE (int/u64 1))
 # The tooltip timers are generated from tooltip numeric IDs.
@@ -241,12 +246,14 @@
   [tt-hwnd t-info])
 
 
-(defn- msg-wnd-handle-set-keymap [_hwnd wparam _lparam hook-handler _state]
+(defn- msg-wnd-handle-set-keymap [_hwnd _msg wparam _lparam hook-handler _state]
   (let [keymap (unmarshal-and-free wparam)]
-    (:set-keymap hook-handler keymap)))
+    (:set-keymap hook-handler keymap))
+  0 # !!! IMPORTANT
+  )
 
 
-(defn- msg-wnd-handle-set-hooks [_hwnd _wparam _lparam hook-handler _state]
+(defn- msg-wnd-handle-set-hooks [_hwnd _msg _wparam _lparam hook-handler _state]
   (let [old-hook (in hook-handler :hook-id)]
     (when (and (not (nil? old-hook))
                (not (null? old-hook)))
@@ -264,14 +271,16 @@
     (when (null? new-hook)
       (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
     (log/debug "Registered new hook: %n" new-hook)
-    (put hook-handler :hook-id new-hook)))
+    (put hook-handler :hook-id new-hook))
+  0)
 
 
-(defn- msg-wnd-handle-remove-hooks [_hwnd _wparam _lparam hook-handler _state]
+(defn- msg-wnd-handle-remove-hooks [_hwnd _msg _wparam _lparam hook-handler _state]
   (when-let [old-hook (in hook-handler :hook-id)]
     (log/debug "Removing old hook: %n" old-hook)
     (UnhookWindowsHookEx old-hook)
-    (put hook-handler :hook-id nil)))
+    (put hook-handler :hook-id nil))
+  0)
 
 
 (defn- get-desktop-rect [ui-state]
@@ -434,7 +443,7 @@
       [(in work-area :left) (in work-area :top)])))
 
 
-(defn- msg-wnd-handle-show-tooltip [hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-show-tooltip [hwnd _msg wparam _lparam _hook-handler state]
   (let [[tt-id text opt-x opt-y opt-timeout opt-anchor] (unmarshal-and-free wparam)]
     (def tooltip (get-in state [:tooltips tt-id]))
 
@@ -506,17 +515,19 @@
                  (SetTimer hwnd timer-id timeout nil))
           (log/debug "SetTimer failed for tooltip %n(%n): %n"
                      tt-id (in tt-info :uId) (GetLastError)))
-        (KillTimer hwnd timer-id)))))
+        (KillTimer hwnd timer-id))))
+  0)
 
 
-(defn- msg-wnd-handle-hide-tooltip [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-hide-tooltip [_hwnd _msg wparam _lparam _hook-handler state]
   (let [tt-id (unmarshal-and-free wparam)]
     (when-let [tooltip (get-in state [:tooltips tt-id])]
       (def {:hwnd tt-hwnd
             :info tt-info}
         tooltip)
       (when tt-hwnd
-        (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address))))))
+        (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address)))))
+  0)
 
 
 (defn- set-tooltip-property [tooltips tt-id prop value]
@@ -528,47 +539,98 @@
   (put tooltips tt-id tooltip))
 
 
-(defn- msg-wnd-handle-set-tooltip-timeouts [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-set-tooltip-timeouts [_hwnd _msg wparam _lparam _hook-handler state]
   (let [timeouts (unmarshal-and-free wparam)
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-timeout] timeouts
       (set-tooltip-property tooltips tt-id :timeout tt-timeout))
-    (log/debug "New tooltips: %n" tooltips)))
+    (log/debug "New tooltips: %n" tooltips))
+  0)
 
 
-(defn- msg-wnd-handle-set-tooltip-anchors [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-set-tooltip-anchors [_hwnd _msg wparam _lparam _hook-handler state]
   (let [anchors (unmarshal-and-free wparam)
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-anchor] anchors
       (set-tooltip-property tooltips tt-id :anchor tt-anchor))
-    (log/debug "New tooltips: %n" tooltips)))
+    (log/debug "New tooltips: %n" tooltips))
+  0)
 
 
-(defn- msg-wnd-handle-set-tooltip-max-widths [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-set-tooltip-max-widths [_hwnd _msg wparam _lparam _hook-handler state]
   (let [max-widths (unmarshal-and-free wparam)
         tooltips (in state :tooltips)]
     (eachp [tt-id tt-max-width] max-widths
       (set-tooltip-property tooltips tt-id :max-width tt-max-width))
-    (log/debug "New tooltips: %n" tooltips)))
+    (log/debug "New tooltips: %n" tooltips))
+  0)
 
 
-(defn- msg-wnd-handle-update-work-area [_hwnd wparam _lparam _hook-handler state]
+(defn- msg-wnd-handle-update-work-area [_hwnd _msg wparam _lparam _hook-handler state]
   (def work-area (unmarshal-and-free wparam))
   (log/debug "Updated work area: %n" work-area)
-  (put state :last-active-work-area work-area))
+  (put state :last-active-work-area work-area)
+  0)
 
 
-(defn- msg-wnd-handle-notify-icon-callback [hwnd wparam lparam _hook-handler _state]
+(defn- alloc-new-message [msg-wndproc-state]
+  (def last-msg (in msg-wndproc-state :last-custom-message))
+  (def custom-msgs (in msg-wndproc-state :custom-messages))
+  (var new-msg nil)
+  (for i (+ 1 CUSTOM-MSG) (+ 1 last-msg)
+    (unless (has-key? custom-msgs i)
+      (set new-msg i)
+      (break)))
+  (unless new-msg
+    (set new-msg (+ 1 last-msg))
+    (if (> new-msg (int/u64 0xBFFF))
+      (do
+        (log/error "Custom message ID overflow")
+        (set new-msg nil))
+      # else
+      (put msg-wndproc-state :last-custom-message new-msg)))
+  new-msg)
+
+
+(defn- msg-wnd-handle-add-custom-msg [_hwnd _msg wparam _lparam _hook-handler state]
+  (def handler-fn (unmarshal-and-free wparam))
+  (unless (or (function? handler-fn) (cfunction? handler-fn))
+    (log/error "Invalid custom message handler function: %n" handler-fn)
+    (break -1))
+
+  (def new-msg (alloc-new-message state))
+  (unless new-msg
+    (break -1))
+
+  (put (in state :custom-messages) new-msg handler-fn)
+  (int/to-number new-msg))
+
+
+(defn- msg-wnd-handle-remove-custom-msg [_hwnd _msg wparam _lparam _hook-handler state]
+  # WPARAM and messages all use int/u64
+  (def msg wparam)
+  (def custom-msgs (in state :custom-messages))
+
+  (def handler-fn (in custom-msgs msg))
+  (unless handler-fn
+    (log/warning "Unknown custom message: %n" msg)
+    (break -1))
+  (put custom-msgs msg nil)
+  0)
+
+
+(defn- msg-wnd-handle-notify-icon-callback [hwnd _msg wparam lparam _hook-handler _state]
   (def notif-event (LOWORD lparam))
   (def anchor-x (GET_X_LPARAM wparam))
   (def anchor-y (GET_Y_LPARAM wparam))
 
   (case (int/u64 notif-event)
     WM_CONTEXTMENU
-    (show-notify-icon-menu hwnd anchor-x anchor-y)))
+    (show-notify-icon-menu hwnd anchor-x anchor-y))
+  0)
 
 
-(defn- msg-wnd-handle-wm-command [hwnd wparam _lparam hook-handler state]
+(defn- msg-wnd-handle-wm-command [hwnd _msg wparam _lparam hook-handler state]
   (case wparam
     ID_MENU_EXIT
     (do
@@ -588,10 +650,11 @@
     (PostMessage hwnd SET-HOOKS-MSG 0 0)
 
     ID_MENU_UPDATE_MONITOR_LAYOUT
-    (ev/give (in hook-handler :chan) :ui/display-changed)))
+    (ev/give (in hook-handler :chan) :ui/display-changed))
+  0)
 
 
-(defn- msg-wnd-handle-wm-timer [hwnd wparam _lparam hook-handler state]
+(defn- msg-wnd-handle-wm-timer [hwnd _msg wparam _lparam hook-handler state]
   (case wparam
     TIMER-ID-DISPLAY-CHANGE
     (do
@@ -608,10 +671,11 @@
             (def timer-id (tooltip-uid-to-timer-id (in tt-info :uId)))
             (when (= wparam timer-id)
               (PostMessage hwnd HIDE-TOOLTIP-MSG (alloc-and-marshal tt-id) 0)))))
-      (log/warning "Unknown timer: %n" wparam))))
+      (log/warning "Unknown timer: %n" wparam)))
+  0)
 
 
-(defn- msg-wnd-handle-wm-displaychange [hwnd wparam lparam hook-handler state]
+(defn- msg-wnd-handle-wm-displaychange [hwnd _msg wparam lparam hook-handler state]
   # Clear cached desktop rect, see get-desktop-rect and get-current-work-area
   (put state :desktop-rect nil)
 
@@ -626,21 +690,25 @@
     (log/debug "SetTimer failed for TIMER-ID-DISPLAY-CHANGE: %n" (GetLastError))
     # :ui/display-changed should be sent when the timer fires, but
     # since SetTimer failed, we fall back to send it here directly.
-    (ev/give (in hook-handler :chan) :ui/display-changed)))
+    (ev/give (in hook-handler :chan) :ui/display-changed))
+  0)
 
 
-(defn- msg-wnd-handle-show-error-and-exit [hwnd wparam _lparam _hook-handler _state]
+(defn- msg-wnd-handle-show-error-and-exit [hwnd _msg wparam _lparam _hook-handler _state]
   (let [msg (unmarshal-and-free wparam)]
     (MessageBox hwnd msg "Error" (bor MB_ICONEXCLAMATION MB_OK))
-    (PostMessage hwnd WM_COMMAND ID_MENU_EXIT 0)))
+    (PostMessage hwnd WM_COMMAND ID_MENU_EXIT 0))
+  0)
 
 
-(defn- msg-wnd-handle-wm-close [hwnd _wparam _lparam _hook-handler _state]
-  (DestroyWindow hwnd))
+(defn- msg-wnd-handle-wm-close [hwnd _msg _wparam _lparam _hook-handler _state]
+  (DestroyWindow hwnd)
+  0)
 
 
-(defn- msg-wnd-handle-wm-destroy [_hwnd _wparam _lparam _hook-handler _state]
-  (PostQuitMessage 0))
+(defn- msg-wnd-handle-wm-destroy [_hwnd _msg _wparam _lparam _hook-handler _state]
+  (PostQuitMessage 0)
+  0)
 
 
 (def msg-wnd-handlers
@@ -656,6 +724,9 @@
    SET-TOOLTIP-MAX-WIDTHS-MSG msg-wnd-handle-set-tooltip-max-widths
 
    UPDATE-WORK-AREA-MSG msg-wnd-handle-update-work-area
+
+   ADD-CUSTOM-MSG-MSG msg-wnd-handle-add-custom-msg
+   REMOVE-CUSTOM-MSG-MSG msg-wnd-handle-remove-custom-msg
 
    NOTIFY-ICON-CALLBACK-MSG msg-wnd-handle-notify-icon-callback
 
@@ -676,11 +747,28 @@
   (log/debug "wparam = %p" wparam)
   (log/debug "lparam = %p" lparam)
 
-  (if-let [handler (in msg-wnd-handlers msg)]
+  (def handler-ret
+    (if-let [handler (in msg-wnd-handlers msg)]
+      (handler hwnd msg wparam lparam hook-handler state)
+      (if-let [custom-msgs (in state :custom-messages)
+               custom-handler (in custom-msgs msg)]
+        (try
+          (custom-handler hwnd msg wparam lparam hook-handler state)
+          ((err fib)
+           (log/warning "Custom message handler failed: %n\n%s"
+                        err
+                        (get-stack-trace fib))
+           0 # !!! IMPORTANT
+           ))
+        (DefWindowProc hwnd msg wparam lparam))))
+
+  (if (or (int? handler-ret)
+          (= :core/s64 (type handler-ret)))
+    handler-ret
     (do
-      (handler hwnd wparam lparam hook-handler state)
-      0)
-    (DefWindowProc hwnd msg wparam lparam)))
+      (log/warning "UI Message handler returned: %n" handler-ret)
+      # XXX: Coerce to zero
+      0)))
 
 
 (defn- create-msg-window [hInstance hook-handler]
@@ -689,7 +777,9 @@
     @{:tooltips @{:current-frame @{:timeout const/DEFAULT-CURRENT-FRAME-TOOLTIP-TIMEOUT
                                    :anchor const/DEFAULT-CURRENT-FRAME-TOOLTIP-ANCHOR}
                   :keymap @{:timeout const/DEFAULT-KEYMAP-TOOLTIP-TIMEOUT}}
-      :tooltip-uid-generator (tooltip-uid-generator 0)})
+      :tooltip-uid-generator (tooltip-uid-generator 0)
+      :custom-messages @{}
+      :last-custom-message CUSTOM-MSG})
   (def wc
     (WNDCLASSEX
      :lpfnWndProc (fn [hwnd msg wparam lparam]
@@ -779,6 +869,12 @@
     (error "ui thread is not initialized")))
 
 
+(defn ui-manager-send-message [self msg wparam lparam]
+  (if-let [msg-hwnd (in self :msg-hwnd)]
+    (SendMessage msg-hwnd msg wparam lparam)
+    (error "ui thread is not initialized")))
+
+
 (defn ui-manager-set-keymap [self keymap]
   (def buf-ptr (alloc-and-marshal keymap))
   (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
@@ -831,6 +927,20 @@
                            0))
 
 
+(defn ui-manager-add-custom-message [self handler-fn]
+  (ui-manager-send-message self
+                           ADD-CUSTOM-MSG-MSG
+                           (alloc-and-marshal handler-fn)
+                           0))
+
+
+(defn ui-manager-remove-custom-message [self msg]
+  (ui-manager-send-message self
+                           REMOVE-CUSTOM-MSG-MSG
+                           msg
+                           0))
+
+
 (defn ui-manager-show-error-and-exit [self msg]
   (def buf-ptr (alloc-and-marshal msg))
   (ui-manager-post-message self SHOW-ERROR-AND-EXIT-MSG buf-ptr 0))
@@ -843,6 +953,7 @@
 (def ui-manager-proto
   @{:initialized ui-manager-initialized
     :post-message ui-manager-post-message
+    :send-message ui-manager-send-message
     :set-keymap ui-manager-set-keymap
     :set-hooks ui-manager-set-hooks
     :remove-hooks ui-manager-remove-hooks
@@ -852,6 +963,8 @@
     :set-tooltip-anchor ui-manager-set-tooltip-anchor
     :set-tooltip-max-width ui-manager-set-tooltip-max-width
     :update-work-area ui-manager-update-work-area
+    :add-custom-message ui-manager-add-custom-message
+    :remove-custom-message ui-manager-remove-custom-message
     :show-error-and-exit ui-manager-show-error-and-exit
     :destroy ui-manager-destroy})
 

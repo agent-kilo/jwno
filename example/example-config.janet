@@ -6,6 +6,7 @@
 # See the source code in `mod.janet` for a complete list.
 #
 (import jwno/auto-layout)
+(import jwno/indicator)
 (import jwno/util)
 (import jwno/log)
 
@@ -284,6 +285,24 @@
 (def auto-close-empty-frame
   (auto-layout/close-empty-frame jwno/context))
 (:enable auto-close-empty-frame)
+
+#
+# The indicator module provides some visual hints about the current
+# frame. The current-frame-area object created here highlights an
+# empty active frame by drawing a rectangle in it.
+#
+(def current-frame-area
+  (indicator/current-frame-area jwno/context))
+(put current-frame-area :margin 10)
+(:enable current-frame-area)
+
+#
+# And if you prefer the old behavior, which shows a simple tooltip
+# instead, use the current-frame-tooltip object:
+#
+#(def current-frame-tooltip
+#  (indicator/current-frame-tooltip jwno/context))
+#(:enable current-frame-tooltip)
 
 
 #

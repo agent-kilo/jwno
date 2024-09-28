@@ -158,22 +158,6 @@
        :right v})))
 
 
-(defn- calc-pixel-scale [rect]
-  (def hmon (MonitorFromRect rect MONITOR_DEFAULTTONULL))
-  (def [dpi-x dpi-y]
-    (if (null? hmon)
-      # XXX: Some windows spawn themselves outside of any monitor, use
-      # the default DPI in this case.
-      [(int/u64 const/USER-DEFAULT-SCREEN-DPI) (int/u64 const/USER-DEFAULT-SCREEN-DPI)]
-      # GetDpiForWindow will always return 96 for windows that are not
-      # DPI-aware, which is incorrect for DWM border size calculation.
-      # Have to use GetDpiForMonitor here instead.
-      (GetDpiForMonitor hmon MDT_DEFAULT)))
-  # int/u64 doesn't support floating point arithmetic, thus int/to-number
-  [(/ (int/to-number dpi-x) const/USER-DEFAULT-SCREEN-DPI)
-   (/ (int/to-number dpi-y) const/USER-DEFAULT-SCREEN-DPI)])
-
-
 (defn- set-window-pos [hwnd x y w h &opt scaled]
   (default scaled false)
 
@@ -2509,10 +2493,6 @@
          true)))
   (:add-hook hook-man :frame-activated
      (fn [fr]
-       (def rect (in fr :rect))
-       (def center-x (brshift (+ (in rect :left) (in rect :right)) 1))
-       (def center-y (brshift (+ (in rect :top) (in rect :bottom)) 1))
-       (:show-tooltip ui-man :current-frame "Current Frame" center-x center-y)
        (:update-work-area ui-man (in (:get-top-frame fr) :rect))))
 
   wm-obj)
