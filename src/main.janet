@@ -97,7 +97,8 @@
       (each lo layouts
         (:update-work-areas lo monitors))
       (:retile wm)
-      (:activate wm (:get-current-frame root)))))
+      (when-let [cur-frame (:get-current-frame root)]
+        (:activate wm cur-frame)))))
 
 
 (defn main-loop [cli-args context]

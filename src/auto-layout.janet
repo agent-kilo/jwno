@@ -126,6 +126,8 @@
 (defn bsp-refresh [self]
   (def {:window-manager window-man} self)
   (def cur-frame (:get-current-frame (in window-man :root)))
+  (unless cur-frame
+    (break))
   (def top-frame (:get-top-frame cur-frame))
 
   (:flatten top-frame)
