@@ -69,6 +69,8 @@
   (default ratios [0.5])
 
   (def cur-frame (:get-current-frame (in wm :root)))
+  (unless cur-frame
+    (break))
 
   (with-activation-hooks wm
     (:split cur-frame dir nfr ratios)
@@ -129,7 +131,8 @@
 
 (defn cmd-insert-frame [wm hook-man location &opt after-insertion-fn]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (when (or (in cur-frame :monitor)
+  (when (or (nil? cur-frame)
+            (in cur-frame :monitor)
             (nil? (in cur-frame :parent)))
     (break))
 
@@ -157,6 +160,9 @@
 
 (defn cmd-flatten-parent [wm]
   (def cur-frame (:get-current-frame (in wm :root)))
+  (unless cur-frame
+    (break))
+
   (def parent (in cur-frame :parent))
   (cond
     (nil? parent)
@@ -173,16 +179,16 @@
 
 
 (defn cmd-enum-frame [wm dir]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (when-let [fr (:enumerate-node (:get-layout cur-frame) cur-frame dir)]
+  (when-let [cur-frame (:get-current-frame (in wm :root))
+             fr (:enumerate-node (:get-layout cur-frame) cur-frame dir)]
     (with-activation-hooks wm
       (:sync-current-window fr)
       (:activate wm fr))))
 
 
 (defn cmd-adjacent-frame [wm dir]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (when-let [adj-fr (:get-adjacent-frame cur-frame dir)]
+  (when-let [cur-frame (:get-current-frame (in wm :root))
+             adj-fr (:get-adjacent-frame cur-frame dir)]
     (with-activation-hooks wm
       (:sync-current-window adj-fr)
       (:activate wm adj-fr))))
@@ -190,8 +196,9 @@
 
 (defn cmd-enum-window-in-frame [wm dir &opt skip-minimized]
   (default skip-minimized true)
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (when-let [cur-win (:get-current-window cur-frame)]
+
+  (when-let [cur-frame (:get-current-frame (in wm :root))
+             cur-win (:get-current-window cur-frame)]
     (var sibling (:enumerate-node cur-frame cur-win dir))
     (when skip-minimized
       (while (and (not= sibling cur-win)
@@ -207,6 +214,8 @@
   (default dy dx)
 
   (def frame (:get-current-frame (in wm :root)))
+  (unless frame
+    (break))
 
   (def top-frame (:get-top-frame frame))
   (def [dpi-x dpi-y] (get-in top-frame [:monitor :dpi]))
@@ -234,12 +243,9 @@
 
 
 (defn cmd-move-window [wm dir]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (def cur-win (:get-current-window cur-frame))
-
-  (when (nil? cur-win) (break))
-
-  (when-let [adj-fr (:get-adjacent-frame cur-frame dir)]
+  (when-let [cur-frame (:get-current-frame (in wm :root))
+             cur-win (:get-current-window cur-frame)
+             adj-fr (:get-adjacent-frame cur-frame dir)]
     (with-activation-hooks wm
       (:add-child adj-fr cur-win)
       (:retile wm adj-fr)
@@ -248,8 +254,9 @@
 
 (defn cmd-resize-frame [wm hook-man dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (when (in cur-frame :monitor)
-    # Skip top-level frames
+  (when (or (nil? cur-frame)
+            # Skip top-level frames
+            (in cur-frame :monitor))
     (break))
 
   (def rect (in cur-frame :rect))
@@ -264,6 +271,9 @@
 
 (defn cmd-zoom-in [wm hook-man ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
+  (unless cur-frame
+    (break))
+
   (def parent-frame
     (if-let [parent (in cur-frame :parent)]
       (if (= :frame (in parent :type))
@@ -332,6 +342,9 @@
   (default recursive? true)
 
   (def cur-frame (:get-current-frame (in wm :root)))
+  (unless cur-frame
+    (break))
+
   (if recursive?
     (let [top-fr (:get-top-frame cur-frame)]
       (def resized (:balance top-fr recursive? @[]))
@@ -347,8 +360,9 @@
 (defn cmd-close-frame [wm hook-man &opt cur-frame]
   (default cur-frame (:get-current-frame (in wm :root)))
 
-  (when (in cur-frame :monitor)
-    # Skip top-level frames
+  (when (or (nil? cur-frame)
+            # Skip top-level frames
+            (in cur-frame :monitor))
     (break))
 
   (def cur-win (:get-current-window cur-frame))
@@ -375,22 +389,19 @@
 
 
 (defn cmd-frame-to-window-size [wm hook-man]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (def cur-win (:get-current-window cur-frame))
-  (when (nil? cur-win)
-    (break))
+  (when-let [cur-frame (:get-current-frame (in wm :root))
+             cur-win (:get-current-window cur-frame)]
+    (def win-rect
+      (DwmGetWindowAttribute (in cur-win :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS))
 
-  (def win-rect
-    (DwmGetWindowAttribute (in cur-win :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS))
+    (def border-space
+      (combine-rect-border-space (:get-margins cur-win)
+                                 (:get-paddings cur-frame)))
 
-  (def border-space
-    (combine-rect-border-space (:get-margins cur-win)
-                               (:get-paddings cur-frame)))
-
-  (def old-rect (in cur-frame :rect))
-  (:resize cur-frame (expand-rect win-rect border-space))
-  (check-for-frame-resized-hooks hook-man cur-frame old-rect)
-  (:retile wm))
+    (def old-rect (in cur-frame :rect))
+    (:resize cur-frame (expand-rect win-rect border-space))
+    (check-for-frame-resized-hooks hook-man cur-frame old-rect)
+    (:retile wm)))
 
 
 (defn cmd-close-window [wm ui-man]
@@ -426,8 +437,8 @@
     (with-uia [_win-pat win-pat]
       (:Close win-pat))
     # else
-    (let [root (in wm :root)
-          cur-frame (:get-current-frame root)]
+    (when-let [root (in wm :root)
+               cur-frame (:get-current-frame root)]
       (if-let [cur-win (:get-current-window cur-frame)]
         (let [fg-hwnd (GetForegroundWindow)]
           (if (= fg-hwnd (in cur-win :hwnd))
