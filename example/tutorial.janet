@@ -95,6 +95,15 @@
                  "Win + Shift + Q"
                  :quit
                  "Stop this tutorial and quit Jwno")
+
+    (:define-key keymap
+                 "Win + Enter Enter"
+                 :nop
+                 "Cancel")
+    (:define-key keymap
+                 "Win + Enter Esc"
+                 :nop
+                 "Cancel")
     (:define-key keymap
                  "Win + Enter R"
                  [:repl true "127.0.0.1" 9999]
@@ -505,7 +514,7 @@ And if we open a new window... (I'll spawn an Explorer window for you.)```
      (format-slide-text
       id total
 
-```Jwno has the concept of "active frames." An active frame is a frame that currently has the input focus. New windows will snap into the active frame, and all frame selection commands are relative to that frame too.
+```An active frame is a frame that currently has the input focus. New windows will snap into the active frame, and all frame selection commands are relative to that frame too.
 
 A frame can be activated in one of these ways:
 
@@ -841,6 +850,7 @@ To fit the windows to their frames again, press Win + R to :retile.```
       (:define-key km "I" [:resize-frame 0 100])
       (:define-key km "O" [:resize-frame 100 0])
       (:define-key km "Enter" :pop-keymap)
+      (:define-key km "Esc" :pop-keymap)
       km))
   (:define-key *acc-keymap* "Win + S" [:push-keymap resize-mode-keymap] "Resize mode")
 
