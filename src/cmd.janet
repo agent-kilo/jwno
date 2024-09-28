@@ -18,6 +18,9 @@
 (import ./log)
 
 
+(defn cmd-nop [])
+
+
 (defn cmd-quit [ui-man]
   (try
     (:destroy ui-man)
@@ -683,6 +686,14 @@
         :repl repl}
     context)
 
+  (:add-command command-man :nop cmd-nop
+     ```
+     (:nop)
+
+     Does nothing. When you want to return from a sub-keymap, without
+     executing any actual commands, map a key to call this command, and
+     it'll act as a "cancel" key.
+     ```)
   (:add-command command-man :quit
      (fn [] (cmd-quit ui-man))
      ```
