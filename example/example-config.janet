@@ -126,6 +126,7 @@
     # or there will be no way to deactivate this key map.
     #
     (k "enter" :pop-keymap)
+    (k "esc" :pop-keymap)
     keymap))
 
 
@@ -138,6 +139,7 @@
     (each dir [:down :up :left :right]
       (k (in dir-keys dir) [:move-window dir]))
     (k "enter" :pop-keymap)
+    (k "esc" :pop-keymap)
     keymap))
 
 
@@ -151,6 +153,7 @@
     (k (in dir-keys :down) [:change-window-alpha -25])
     (k (in dir-keys :up) [:change-window-alpha 25])
     (k "enter" :pop-keymap)
+    (k "esc" :pop-keymap)
     keymap))
 
 
@@ -198,6 +201,10 @@
     (k "win + shift + q" :quit)
     (k "win + r" :retile)
 
+    (k "win + enter esc" :nop
+       "Cancel")
+    (k "win + enter enter" :nop
+       "Cancel")
     (k "win + enter  t" [:summon
                          (match-exe-name "WindowsTerminal.exe")
                          true
@@ -260,6 +267,8 @@
     (k "win + a" [:push-keymap alpha-mode-keymap]
        "Alpha mode")
 
+    (k "win + w esc" :nop "Cancel")
+    (k "win + w enter" :nop "Cancel")
     (k "win + w d" :describe-window)
     (k "win + w m" :manage-window)
     (k "win + w i" :ignore-window)
