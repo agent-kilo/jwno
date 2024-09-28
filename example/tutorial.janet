@@ -21,7 +21,8 @@
 
 (def CONTINUE-KEY "Space")
 (def *allowed-commands*
-  @{:quit true
+  @{:nop true
+    :quit true
     :exec true
     :cascade-windows-in-frame true
     :retile true})
