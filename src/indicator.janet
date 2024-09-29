@@ -15,6 +15,10 @@
 # in your config:
 #
 #     (def current-frame-tooltip (indicator/current-frame-tooltip jwno/context))
+#     # The text shown in the tooltip. Defaults to "Current Frame"
+#     (put current-frame-tooltip :text "Current Frame")
+#     # How long the tooltip will be shown, in milliseconds. Defaults to 1500
+#     (put current-frame-tooltip :timeout 1500)
 #     (:enable current-frame-tooltip)
 #
 # To stop it:
@@ -23,15 +27,18 @@
 #
 
 (defn current-frame-tooltip-on-frame-activated [self fr]
-  (def {:ui-manager ui-man} self)
+  (def {:ui-manager ui-man
+        :text text}
+    self)
   (def rect (in fr :rect))
   (def center-x (brshift (+ (in rect :left) (in rect :right)) 1))
   (def center-y (brshift (+ (in rect :top) (in rect :bottom)) 1))
-  (:show-tooltip ui-man :current-frame "Current Frame" center-x center-y))
+  (:show-tooltip ui-man :current-frame text center-x center-y))
 
 
 (defn current-frame-tooltip-enable [self]
   (:disable self)
+  (:set-tooltip-timeout (in self :ui-manager):current-frame (in self :timeout))
   (def hook-fn
     (:add-hook (in self :hook-manager) :frame-activated
        (fn [& args]
@@ -56,9 +63,15 @@
   (def {:hook-manager hook-man
         :ui-manager ui-man}
     context)
+
   (table/setproto
    @{:hook-manager hook-man
-     :ui-manager ui-man}
+     :ui-manager ui-man
+
+     # Default settings
+     :timeout 1500 # In milliseconds
+     :text "Current Frame"}
+
    current-frame-tooltip-proto))
 
 
@@ -69,7 +82,9 @@
 # these in your config:
 #
 #     (def current-frame-area (indicator/current-frame-area jwno/context))
-#     (put current-frame-area :margin 10) # Or other values you like. Defaults to zero.
+#     # The empty space reserved around the area, in virtual pixels (scales with DPI).
+#     # Defaults to zero.
+#     (put current-frame-area :margin 10)
 #     (:enable current-frame-area)
 #
 # To stop it:
@@ -373,10 +388,14 @@
         :ui-manager ui-man
         :uia-manager uia-man
         :window-manager window-man} context)
+
   (table/setproto
    @{:hook-manager hook-man
      :ui-manager ui-man
      :uia-manager uia-man
      :window-manager window-man
+
+     # Default settings
      :margin 0}
+
    current-frame-area-proto))
