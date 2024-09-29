@@ -18,7 +18,6 @@
 # Jwno will start with the log level set to "quiet" by default.
 #
 (log/info "++++++++ HELLO THERE ++++++++")
-(log/info "++++++++ Keys in jwno/context: %n ++++++++" (keys jwno/context))
 
 
 #
@@ -65,7 +64,9 @@
 #
 # Most of Jwno's APIs are exported as methods in these "manager" objects.
 # You can inspect them in the Jwno REPL by looking into their prototypes.
-# For example: `(table/getproto (in jwno/context :window-manager))`
+# For example, to see all methods available in the window manager object:
+#
+#     (keys (table/proto-flatten (table/getproto (in jwno/context :window-manager))))
 #
 (def {:key-manager key-man
       :command-manager command-man
@@ -191,9 +192,15 @@
     (k "win + shift + q" :quit)
     (k "win + r" :retile)
 
-    (k "win + enter esc" :nop
+    #
+    # When a series of keys are specified, sub-keymaps are automatically
+    # defined. They can be used as multi-level menus. Press the first
+    # key combo, and the keys defined in the next level will be shown in
+    # the top-left corner of your current monitor by default.
+    #
+    (k "win + enter  esc" :nop
        "Cancel")
-    (k "win + enter enter" :nop
+    (k "win + enter  enter" :nop
        "Cancel")
     (k "win + enter  t" [:summon
                          (match-exe-name "WindowsTerminal.exe")
@@ -266,7 +273,7 @@
     # XXX: If a remapped key is used to trigger keymap switching, and
     # the switched keymap doesn't have the same remap, the translated key
     # will be stuck down.
-    (k "ralt" [:map-to (:get-key-code key-man "rwin")])
+    #(k "ralt" [:map-to (:get-key-code key-man "rwin")])
 
     (log/debug "keymap = %n" keymap)
     keymap))
@@ -309,6 +316,12 @@
 # manage those windows by default. For example, some windows can be moved,
 # but they declared otherwise. In that case you'll need to use this hook
 # to match those windows and force Jwno to manage them.
+#
+# The uia-win object used here is a UIAutomation element, you can do much
+# more with it, besides checking the name of the window. See docs from
+# Microsoft for details:
+#
+#     https://learn.microsoft.com/en-us/windows/win32/api/uiautomationclient/nn-uiautomationclient-iuiautomationelement
 #
 (:add-hook hook-man :filter-forced-window
    (fn [_hwnd uia-win _exe-path _desktop-info]
