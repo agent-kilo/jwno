@@ -88,16 +88,6 @@
 
 
 #
-# Jwno uses different types of tooltip windows to show info or
-# get your attention. The :current-frame tooltip is used to show
-# which frame is activated. The duration they stay on the screen
-# can be set separately. A timeout value of zero means that the
-# tooltip should not automatically disappear.
-#
-(:set-tooltip-timeout ui-man :current-frame 1500) # In milliseconds
-
-
-#
 # A macro to simplify key map definitions. Of course you can call
 # :define-key method from the keymap object directly instead.
 #
@@ -306,8 +296,8 @@
 (:enable current-frame-area)
 
 #
-# And if you prefer the old behavior, which shows a simple tooltip
-# instead, use the current-frame-tooltip object:
+# And if you prefer the old behavior, which shows a simple tooltip for
+# every activated frame instead, use the current-frame-tooltip object:
 #
 #(def current-frame-tooltip
 #  (indicator/current-frame-tooltip jwno/context))
