@@ -599,6 +599,40 @@
   (assert (= 10 (get-in dummy-sub-frame4 [:rect :top])))
   (assert (= 35 (get-in dummy-sub-frame4 [:rect :left])))
   (assert (= 110 (get-in dummy-sub-frame4 [:rect :bottom])))
+  (assert (= 60 (get-in dummy-sub-frame4 [:rect :right])))
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -+- dummy-sub-frame-3
+  #              |                    |
+  #              +- dummy-sub-frame2  +- dummy-sub-frame-4
+  #
+  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (put dummy-frame :monitor dummy-monitor)
+  (table/setproto dummy-frame horizontal-frame-proto)
+  (set dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
+  (table/setproto dummy-sub-frame1 horizontal-frame-proto)
+  (set dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
+  (var dummy-sub-frame3 (frame {:top 10 :left 10 :bottom 110 :right 30}))
+  (var dummy-sub-frame4 (frame {:top 10 :left 30 :bottom 110 :right 60}))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+  (:add-child dummy-sub-frame1 dummy-sub-frame3)
+  (:add-child dummy-sub-frame1 dummy-sub-frame4)
+
+  (def resized-frames (:balance dummy-frame true @[]))
+
+  (assert (= 2 (length resized-frames)))
+  (assert (= dummy-sub-frame3 (in resized-frames 0)))
+  (assert (= dummy-sub-frame4 (in resized-frames 1)))
+
+  (assert (= 10 (get-in dummy-sub-frame3 [:rect :top])))
+  (assert (= 10 (get-in dummy-sub-frame3 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame3 [:rect :bottom])))
+  (assert (= 35 (get-in dummy-sub-frame3 [:rect :right])))
+
+  (assert (= 10 (get-in dummy-sub-frame4 [:rect :top])))
+  (assert (= 35 (get-in dummy-sub-frame4 [:rect :left])))
+  (assert (= 110 (get-in dummy-sub-frame4 [:rect :bottom])))
   (assert (= 60 (get-in dummy-sub-frame4 [:rect :right]))))
 
 

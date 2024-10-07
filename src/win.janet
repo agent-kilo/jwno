@@ -1324,12 +1324,10 @@
 
   (cond
     (empty? all-children)
-    (when resized-frames
-      (array/push resized-frames self))
+    :nop
 
     (not= :frame (get-in self [:children 0 :type]))
-    (when resized-frames
-      (array/push resized-frames self))
+    :nop
 
     true
     (let [child-count (length all-children)
@@ -1343,9 +1341,11 @@
         (map (fn [sub-fr rect]
                (def old-rect (in sub-fr :rect))
                (put sub-fr :rect rect)
-               (if (rect-same-size? rect old-rect)
-                 (:balance sub-fr recursive nil)
-                 (:balance sub-fr recursive resized-frames)))
+               # Only keep track of leaf frames that actually have their rects altered
+               (unless (or (rect-same-size? rect old-rect)
+                           (= :frame (get-in sub-fr [:children 0 :type])))
+                 (array/push resized-frames sub-fr))
+               (:balance sub-fr recursive resized-frames))
              all-children
              new-rects)
         (map (fn [sub-fr rect]
