@@ -33,3 +33,7 @@
 (def ID_MENU_UPDATE_MONITOR_LAYOUT
   "Update Monitor Layout command in the notify icon menu."
   (int/u64 90003))
+
+(def ID_MENU_LAUNCH_REPL
+  "Launch REPL command in the notify icon menu."
+  (int/u64 90004))

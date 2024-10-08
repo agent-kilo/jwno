@@ -101,6 +101,22 @@
         (:activate wm cur-frame)))))
 
 
+(defn handle-launch-repl [context]
+  (def command-man (in context :command-manager))
+  (def ui-man (in context :ui-manager))
+  (def host const/DEFAULT-REPL-HOST)
+  (def port const/DEFAULT-REPL-PORT)
+  (try
+    (:call-command command-man :repl true host port)
+    ((err fib)
+     (:show-tooltip ui-man :repl
+        (string/format "Failed to launch REPL at %s:%d\n%s\n%s"
+                       host
+                       port
+                       err
+                       (get-stack-trace fib))))))
+
+
 (defn main-loop [cli-args context]
   (forever
    (def event (ev/select ;(in context :event-sources)))
@@ -115,6 +131,9 @@
 
        :ui/display-changed
        (handle-display-changed context)
+
+       :ui/launch-repl
+       (handle-launch-repl context)
 
        :ui/exit
        (break)

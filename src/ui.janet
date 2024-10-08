@@ -71,8 +71,9 @@
 
 (defn- create-notify-icon-menu []
   (def hMenu (CreatePopupMenu))
+  (AppendMenu hMenu MF_STRING ID_MENU_LAUNCH_REPL "Launch &REPL")
   (AppendMenu hMenu MF_STRING ID_MENU_UPDATE_MONITOR_LAYOUT "Update &Monitor Layout")
-  (AppendMenu hMenu MF_STRING ID_MENU_RESET_KBD_HOOKS "&Reset Keyboard Hooks")
+  (AppendMenu hMenu MF_STRING ID_MENU_RESET_KBD_HOOKS "Reset &Keyboard Hooks")
   (AppendMenu hMenu MF_SEPARATOR 0 0)
   (AppendMenu hMenu MF_STRING ID_MENU_EXIT "E&xit")
   hMenu)
@@ -650,7 +651,10 @@
     (PostMessage hwnd SET-HOOKS-MSG 0 0)
 
     ID_MENU_UPDATE_MONITOR_LAYOUT
-    (ev/give (in hook-handler :chan) :ui/display-changed))
+    (ev/give (in hook-handler :chan) :ui/display-changed)
+
+    ID_MENU_LAUNCH_REPL
+    (ev/give (in hook-handler :chan) :ui/launch-repl))
   0)
 
 
