@@ -616,20 +616,25 @@
      (filter |(not= $ child) (in self :children))))
 
 
-(defn tree-node-get-all-windows [self]
+(defn tree-node-get-all-windows [self &opt arr]
+  (default arr @[])
+
   (def children (in self :children))
   (cond
     (or (nil? children) (empty? children))
-    @[]
+    arr
 
     (= :window (in (first children) :type))
-    (array/slice (in self :children))
+    (do
+      (each w children
+        (array/push arr w))
+      arr)
 
     true # children are other container nodes
-    (let [offsprings @[]]
+    (do
       (each c children
-        (array/push offsprings ;(:get-all-windows c)))
-      offsprings)))
+        (:get-all-windows c arr))
+      arr)))
 
 
 (defn tree-node-get-top-window [self]
