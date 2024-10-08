@@ -954,7 +954,16 @@
       found)))
 
 
-(defn tree-node-purge-windows [self pred]
+(defn tree-node-purge-windows [self &opt pred?]
+  (def pred
+    (if pred?
+      pred?
+      # XXX: Does not work for the root node. The root node has its own
+      # :purge-windows method
+      (let [wm (:get-window-manager self)
+            lo (:get-layout self)]
+        |(window-purge-pred $ wm lo))))
+
   (def children (in self :children))
 
   (cond
@@ -1000,7 +1009,7 @@
 (defn tree-node-get-layout [self]
   (if (or (nil? self) (= :layout (in self :type)))
     self
-    (tree-node-get-layout (in self :parent))))
+    (:get-layout (in self :parent))))
 
 
 (defn tree-node-get-root [self]
@@ -1983,10 +1992,26 @@
   new-layout)
 
 
+(defn vdc-purge-windows [self &opt pred]
+  (def wm (in self :window-manager))
+  (def dead @[])
+  (each lo (in self :children)
+    (def dw
+      (if pred
+        (:purge-windows lo |(pred $ lo))
+        (:purge-windows lo |(window-purge-pred $ wm lo))))
+    (array/push dead ;dw)
+    (log/debug "Purged %n dead windows from virtual desktop %n"
+               (length dw)
+               (in lo :id)))
+  dead)
+
+
 (def- virtual-desktop-container-proto
   (table/setproto
    @{:new-layout vdc-new-layout
-     :get-current-frame-on-desktop vdc-get-current-frame-on-desktop}
+     :get-current-frame-on-desktop vdc-get-current-frame-on-desktop
+     :purge-windows vdc-purge-windows}
    tree-node-proto))
 
 
@@ -2232,14 +2257,9 @@
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (each layout (get-in self [:root :children])
-    (def dead
-      (:purge-windows layout |(window-purge-pred $ self layout)))
+  (let [dead (:purge-windows (in self :root))]
     (each dw dead
-      (:call-hook hook-man :window-removed dw))
-    (log/debug "purged %n dead windows from desktop %n"
-               (length dead)
-               (in layout :id))))
+      (:call-hook hook-man :window-removed dw))))
 
 
 (defn wm-focus-changed [self]
