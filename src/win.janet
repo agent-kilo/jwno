@@ -959,7 +959,7 @@
       found)))
 
 
-(defn tree-node-purge-windows [self &opt pred?]
+(defn tree-node-purge-windows [self &opt pred? dead-arr]
   (def pred
     (if pred?
       pred?
@@ -976,7 +976,7 @@
     (error "invalid operation")
 
     (empty? children)
-    @[]
+    dead-arr
 
     (= :window (in (first children) :type))
     (let [[alive dead] (reduce
@@ -1002,13 +1002,17 @@
 
         true # There are children, but none of them is active
         (error "inconsistent states for frame tree"))
-      dead)
+      
+      (when dead-arr
+        (each dw dead
+          (array/push dead-arr dw))
+        dead-arr))
 
     true # children are other container nodes
-    (let [dead @[]]
+    (do
       (each c children
-        (array/push dead ;(:purge-windows c pred)))
-      dead)))
+        (:purge-windows c pred dead-arr))
+      dead-arr)))
 
 
 (defn tree-node-get-layout [self]
@@ -1997,19 +2001,15 @@
   new-layout)
 
 
-(defn vdc-purge-windows [self &opt pred]
+(defn vdc-purge-windows [self &opt pred dead-arr]
   (def wm (in self :window-manager))
-  (def dead @[])
   (each lo (in self :children)
-    (def dw
-      (if pred
-        (:purge-windows lo |(pred $ lo))
-        (:purge-windows lo |(window-purge-pred $ wm lo))))
-    (array/push dead ;dw)
-    (log/debug "Purged %n dead windows from virtual desktop %n"
-               (length dw)
-               (in lo :id)))
-  dead)
+    (if pred
+      (:purge-windows lo |(pred $ lo) dead-arr)
+      (:purge-windows lo |(window-purge-pred $ wm lo) dead-arr)))
+  (when dead-arr
+    (log/debug "Purged %n dead windows" (length dead-arr)))
+  dead-arr)
 
 
 (def- virtual-desktop-container-proto
@@ -2262,7 +2262,7 @@
   # XXX: If the focus change is caused by a closing window, that
   # window may still be alive, so it won't be purged immediately.
   # Maybe I shoud check the hwnds everytime a window is manipulated?
-  (let [dead (:purge-windows (in self :root))]
+  (let [dead (:purge-windows (in self :root) nil @[])]
     (each dw dead
       (:call-hook hook-man :window-removed dw))))
 
