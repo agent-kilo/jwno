@@ -703,6 +703,22 @@
     (error "inconsistent states for frame tree")))
 
 
+(defn tree-node-get-current-top-frame [self]
+  (case (in self :type)
+    :window
+    (:get-top-frame self)
+
+    :frame
+    (:get-top-frame self)
+
+    :layout
+    (in self :current-child)
+
+    :virtual-desktop-container
+    (when-let [lo (in self :current-child)]
+      (in lo :current-child))))
+
+
 (defn tree-node-get-first-frame [self]
   (def children (in self :children))
 
@@ -1128,6 +1144,7 @@
     :get-window-stack tree-node-get-window-stack
     :get-current-window tree-node-get-current-window
     :get-current-frame tree-node-get-current-frame
+    :get-current-top-frame tree-node-get-current-top-frame
     :get-first-frame tree-node-get-first-frame
     :get-last-frame tree-node-get-last-frame
     :enumerate-node tree-node-enumerate-node
