@@ -7,3 +7,27 @@
 @p{
 @em{Jwno} is a highly customizable tiling window manager for Windows 10/11, built with @link[https://janet-lang.org/]{Janet} and ❤️.
 }
+
+Some screenshots:
+
+@html```
+<div class="row">
+<div class="six columns">
+<div class="figure">
+  <a href="./img/jwno-emacs-repl.png">
+    <img alt="Jwno managing some Emacs frames, and its own REPL window." src="./img/jwno-emacs-repl.png">
+  </a>
+  <p class="caption">Jwno managing some <a href="https://www.gnu.org/software/emacs/">Emacs</a> frames, and its own REPL window.</p>
+</div>
+</div>
+
+<div class="six columns">
+<div class="figure">
+  <a href="./img/jwno-sonic-pi.png">
+    <img alt="Jwno managing Sonic Pi." src="./img/jwno-sonic-pi.png">
+  </a>
+  <p class="caption">Jwno managing <a href="https://sonic-pi.net/">Sonic Pi</a>.</p>
+</div>
+</div>
+</div>
+```

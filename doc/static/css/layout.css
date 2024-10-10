@@ -37,7 +37,7 @@ table.docutils.citation td {
 }
 .figure p.caption,
 .figure div.legend {
-    padding-left: 15px;
+    padding: 10px 0px 10px 15px;
 }
 .figure img {
     display: block;
