@@ -1,0 +1,9 @@
+{:title "Jwno: Your Friendly Neighborhood Window Manager"
+ :author "Chibidou"
+ :template "main.html"
+ :order 1}
+---
+
+@p{
+@em{Jwno} is a highly customizable tiling window manager for Windows 10/11, built with @link[https://janet-lang.org/]{Janet} and ❤️.
+}

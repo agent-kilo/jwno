@@ -1,0 +1,94 @@
+.entry-title.row {
+    margin-bottom: 5rem;
+}
+
+.last.list.row {
+    margin-bottom: 2.5rem;
+}
+
+.paginator.row {
+    margin-bottom: 2.5rem;
+}
+
+.footer.row {
+    margin-bottom: 1rem;
+}
+
+table.docutils.footnote,
+table.docutils.citation {
+    margin-bottom: 0;
+}
+table.docutils.footnote:last-of-type,
+table.docutils.citation:last-of-type {
+    margin-bottom: 2.5rem;
+}
+
+table.docutils.footnote td,
+table.docutils.citation td {
+    padding-top: 0;
+    padding-bottom: 0;
+}
+
+.figure {
+    margin-bottom: 2.5rem;
+}
+.figure p {
+    margin-bottom: 0;
+}
+.figure p.caption,
+.figure div.legend {
+    padding-left: 15px;
+}
+.figure img {
+    display: block;
+    max-width: 100%;
+}
+
+#toc-toggle {
+    text-align: center;
+    padding: 6px;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+}
+#toc-toggle .bar {
+    margin: 7px;
+    height: 4px;
+    width: 28px;
+    border-radius: 2px;
+    background: #CCC;
+}
+#toc-toggle.open .topbar {
+    transform: rotate(-45deg) translate(-5px, -2px);
+}
+#toc-toggle.open .botbar {
+    transform: rotate(45deg) translate(-5px, 2px);
+}
+
+.toc-hidden {
+    display: none;
+}
+.toc {
+    padding-left: 16px;
+    padding-right: 16px;
+    padding-top: 72px;
+    padding-bottom: 16px;
+    position: absolute;
+    z-index: 1;
+    border-radius: 0 0px 10px 0px;
+}
+.toc ul {
+    list-style: none;
+}
+.toc ul li {
+    padding: 2px;
+}
+.toc span {
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#main-banner {
+    margin-top: 64px;
+}

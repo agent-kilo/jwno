@@ -1,0 +1,118 @@
+{$
+  (static-file "css")
+  (use ./toc)
+$}
+
+{% 
+  (def page-prev (findrel url -1))
+  (def page-next (findrel url 1))
+%}
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width">
+
+    <link rel="stylesheet" href="{{ (relative-url `/css/normalize.css`) }}" type="text/css" charset="utf-8">
+    <link rel="stylesheet" href="{{ (relative-url `/css/skeleton.css`) }}" type="text/css" charset="utf-8">
+    <link rel="stylesheet" href="{{ (relative-url `/css/colors.css`) }}" type="text/css" charset="utf-8">
+    <link rel="stylesheet" href="{{ (relative-url `/css/layout.css`) }}" type="text/css" charset="utf-8">
+
+    <title>{{ (dyn :title) }}</title>
+    <meta name="description" content="{{ (dyn :description) }}">
+  </head>
+
+  <body>
+    <!-- Toggles Navigation -->
+    <div id="toc-toggle" class="">
+      <div class="bar topbar"></div>
+      <div class="bar"></div>
+      <div class="bar botbar"></div>
+    </div>
+
+    <div class="toc toc-hidden">
+      <ul>
+        {{ (seq [sm :in (sitemap :pages)] (render-toc sm)) }}
+      </ul>
+    </div>
+
+    <div id="main-container" class="container">
+
+      <div class="row">
+        <div class="twelve columns">
+          <header id="main-banner">
+            <h1><a href="{{ (relative-url `/index.html`) }}">Jwno Documentation</a></h1>
+          </header>
+        </div>
+      </div>
+
+      <section id="content">
+
+        <div class="entry-title row">
+          <div class="eight columns">
+            <header>
+              <h2><a href="{{ (relative-url (dyn :url)) }}">{{ (dyn :title) }}</a></h2>
+            </header>
+          </div>
+
+          <div class="four columns">
+            <footer class="post-info">
+              {% (when page-prev %}
+              <div class="tags">
+                Previous:
+                <a href="{{ (relative-url (page-prev :url)) }}">{{ (page-prev :title) }}</a>
+              </div>
+              {% ) %}
+
+              {% (when page-next %}
+              <div class="tags">
+                Next:
+                <a href="{{ (relative-url (page-next :url)) }}">{{ (page-next :title) }}</a>
+              </div>
+              {% ) %}
+            </footer>
+          </div>
+        </div>
+
+        <div class="entry-content row">
+          <div class="twelve columns">
+            {{ content }}
+          </div>
+        </div>
+
+      </section> <!-- id: content -->
+
+      <div class="footer row">
+        <div class="twelve columns">
+          <footer>
+            <div>Copyright &copy; {{ (dyn :author "") }} {{ ((os/date) :year) }}</div>
+            <div>
+              Proudly powered by <a href="https://janet-lang.org/">Janet</a> and <a href="https://bakpakin.github.io/mendoza/">Mendoza</a>.
+            </div>
+          </footer>
+        </div>
+      </div>
+
+    </div> <!-- id: main-container -->
+
+    <script charset="utf-8">
+      function toggleToc() {
+        var toggler = document.getElementById('toc-toggle');
+        var wrapper = document.querySelector('.toc');
+        wrapper.classList.toggle('toc-hidden');
+        toggler.classList.toggle('open');
+        window.localStorage.setItem('show-toc', toggler.classList.contains('open'));
+      }
+      function addTocToggle() {
+        var el = document.getElementById('toc-toggle');
+        el.addEventListener('click', toggleToc);
+      }
+      window.addEventListener('DOMContentLoaded', addTocToggle);
+      if (window.localStorage.getItem('show-toc') === 'true') {
+        toggleToc()
+      }
+    </script>
+
+  </body>
+</html>
