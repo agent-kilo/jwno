@@ -109,3 +109,16 @@ code {
 hr {
     border-color: var(--color-comment);
 }
+
+.mdzsyn-comment {color: var(--color-comment);}
+.mdzsyn-operator {color: var(--color-pink);}
+.mdzsyn-number {color: var(--color-foreground);}
+.mdzsyn-keyword {color: var(--color-cyan);}
+.mdzsyn-string {color: var(--color-yellow);}
+.mdzsyn-identifier {color: var(--color-green);}
+.mdzsyn-symbol {color: var(--color-foreground);}
+.mdzsyn-coresym {color: var(--color-pink);}
+.mdzsyn-constant { color: var(--color-purple); }
+.mdzsyn-character { color: var(--color-red); }
+.mdzsyn-type { color: var(--color-green); }
+.mdzsyn-line { color: var(--color-selection); }
