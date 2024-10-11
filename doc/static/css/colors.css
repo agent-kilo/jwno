@@ -1,16 +1,16 @@
 :root {
-    --color-background: #1d1f21;
-    --color-current-line: #282a2e;
-    --color-selection: #373b41;
-    --color-foreground: #c5c8c6;
-    --color-comment: #969896;
-    --color-red: #cc6666;
-    --color-orange: #de935f;
-    --color-yellow: #f0c674;
-    --color-green: #b5bd68;
-    --color-aqua: #8abeb7;
-    --color-blue: #81a2be;
-    --color-purple: #b294bb;
+    --color-background: #282A36;
+    --color-foreground: #F8F8F2;
+    --color-selection: #44475A;
+    --color-comment: #6272A4;
+    --color-red: #FF5555;
+    --color-orange: #FFB86C;
+    --color-yellow: #F1FA8C;
+    --color-green: #50FA7B;
+    --color-purple: #BD93F9;
+    --color-cyan: #8BE9FD;
+    --color-pink: #FF79C6;
+    --color-black: #21222C;
 }
 
 body {
@@ -19,12 +19,12 @@ body {
 }
 
 a {
-    color: var(--color-blue);
+    color: var(--color-purple);
     text-decoration: none;
 }
 
 .list.row:hover {
-    background-color: var(--color-current-line);
+    background-color: var(--color-selection);
 }
 
 .list-category a {
@@ -45,15 +45,15 @@ a:hover,
 .list-category a:hover,
 .list-title a.title:hover,
 .list-title a.tag:hover {
-    color: var(--color-orange);
+    color: var(--color-pink);
 }
 
 .button {
-    color: var(--color-blue);
+    color: var(--color-purple);
     border-color: var(--color-selection);
 }
 .button:hover, .button:focus, .button.active {
-    color: var(--color-orange);
+    color: var(--color-pink);
     background-color: var(--color-selection);
     border-color: var(--color-comment);
 }
@@ -92,7 +92,7 @@ tt.docutils.literal, code {
     margin: 0 0.2rem;
     font-size: 90%;
     white-space: nowrap;
-    background-color: var(--color-current-line);
+    background-color: var(--color-selection);
     border: none;
     border-radius: 4px;
     font-family: "Inconsolata", monospace;
@@ -117,11 +117,15 @@ table.docutils.citation td.label {
 }
 
 .toc {
-    background-color: var(--color-selection);
+    background-color: var(--color-black);
 }
 .toc span.selected {
-    background-color: var(--color-current-line);
+    background-color: var(--color-selection);
 }
 .toc span:hover {
-    background-color: var(--color-current-line);
+    background-color: var(--color-selection);
+}
+
+hr {
+    border-color: var(--color-comment);
 }

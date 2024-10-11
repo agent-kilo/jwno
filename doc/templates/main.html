@@ -40,11 +40,19 @@ $}
     <div id="main-container" class="container">
 
       <div class="row">
-        <div class="twelve columns">
-          <header id="main-banner">
-            <h1><a href="{{ (relative-url `/index.html`) }}">Jwno Documentation</a></h1>
-          </header>
-        </div>
+        <header id="main-banner">
+          <h1>
+            <div id="jwno-logo">
+              <img alt="Jwno Logo" src="{{ (relative-url `/img/jwno.png`) }}"> 
+            </div>
+            <div id="top-title">
+              <a href="{{ (relative-url `/index.html`) }}">
+                Jwno Documentation
+              </a>
+              <hr/>
+            </div>
+          </h1>
+        </header>
       </div>
 
       <section id="content">
