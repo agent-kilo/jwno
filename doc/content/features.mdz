@@ -1,0 +1,47 @@
+{:title "Features"
+ :author "Chibidou"
+ :template "main.html"
+ :order 2}
+---
+
+Jwno is still in active development, but it already has many desirable features.
+
+### 🪶 It's super lightweight.
+
+You can take a guess at how large Jwno is, before going to the @link[https://github.com/agent-kilo/jwno/releases]{download page}. If the actual size exceeds your expectation, please do click the download link and give it a try 😎.
+
+### 💼 It's a single portable executable file.
+
+Just grab the exe and you are good to go.
+
+### 🤗 It tries to be as non-intrusive as possible.
+
+Jwno only changes the layout or moves your windows when you tell it to.
+
+### 🪄 It's Highly customizable.
+
+You can call native Win32 APIs in user scripts/plugins to implement your own features. For example, to move a window using the low-level @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos]{SetWindowPos} function:
+
+@codeblock[janet]```
+(use jw32/_winuser)
+(SetWindowPos hwnd nil 100 100 500 500 (bor SWP_NOZORDER))
+```
+
+### ⌨️ It has a powerful key binding system...
+
+...Which supports multi-level and transient keymaps. For example, this defines a multi-level keymap:
+
+@codeblock[janet]```
+(:define-key keymap "Win + Enter  A" :command1)
+(:define-key keymap "Win + Enter  B" :command2)
+```
+
+To run @code{:command1}, one should press @code{Win + Enter}, and then the @code{A} key. To run @code{:command2}, press @code{Win + Enter} followed by @code{B} key instead. The code above essentially "groups" @code{:command1} and @code{:command2} under @code{Win + Enter}.
+
+### 👽 It gives you an REPL.
+
+Like most Lisp systems, Jwno has REPL support. That means you can hack it while it's still running 🤘.
+
+### ✨ ...And there are more to come!
+
+Please support Jwno's development by using it and giving some feedback.
