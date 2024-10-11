@@ -5,7 +5,7 @@
 ---
 
 @p{
-@em{Jwno} is a highly customizable window manager for Windows 10/11, built with @link[https://janet-lang.org/]{Janet} and ❤️. It brings to your desktop magical parentheses power, which, @smaller{I assure you, @smaller{is not suspicious at all, @smaller{and totally controllable.}}}
+@em{Jwno} is a highly customizable tiling window manager for Windows 10/11, built with @link[https://janet-lang.org/]{Janet} and ❤️. It brings to your desktop magical parentheses power, which, @smaller{I assure you, @smaller{is not suspicious at all, @smaller{and totally controllable.}}}
 }
 
 ### Cute Pictures
