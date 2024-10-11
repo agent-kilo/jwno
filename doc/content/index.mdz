@@ -5,8 +5,10 @@
 ---
 
 @p{
-@em{Jwno} is a highly customizable tiling window manager for Windows 10/11, built with @link[https://janet-lang.org/]{Janet} and ❤️.
+@em{Jwno} is a highly customizable window manager for Windows 10/11, built with @link[https://janet-lang.org/]{Janet} and ❤️. It brings to your desktop magical parentheses power, which, @smaller{I assure you, @smaller{is not suspicious at all, @smaller{and totally controllable.}}}
 }
+
+### Cute Pictures
 
 @html```
 <div class="row">
@@ -40,3 +42,28 @@
 
 </div>
 ```
+
+### Quick Links
+
+New users please start from the @link[installation.html]{installation guide}. Veterans can go directly to the @link[reference.html]{reference manual}.
+
+@ul{
+  @li{
+    ✨ @link[features.html]{Features}
+  }
+  @li{
+    📥 @link[https://github.com/agent-kilo/jwno/releases]{Download Links}
+  }
+  @li{
+    🚀 @link[installation.html]{Installation Guide}
+  }
+  @li{
+    📖 @link[reference.html]{Reference Manual}
+  }
+  @li{
+    🛠️ @link[https://github.com/agent-kilo/jwno]{Source Code on Github}
+  }
+  @li{
+    🛠️ @link[https://chiselapp.com/user/agentkilo/repository/jwno]{Source Code on Chisel}
+  }
+}
