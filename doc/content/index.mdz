@@ -45,20 +45,45 @@
 
 ### Quick Links
 
-New users please start from the @link[installation.html]{installation guide}. Veterans can go directly to the @link[reference.html]{reference manual}.
+@html```
+<div class="row">
+<div class="four columns">
+```
+
+For new users:
 
 @ul{
   @li{
     ✨ @link[features.html]{Features}
   }
   @li{
-    📥 @link[https://github.com/agent-kilo/jwno/releases]{Download Links}
-  }
-  @li{
     🚀 @link[installation.html]{Installation Guide}
   }
+}
+
+@html```
+</div>
+<div class="four columns">
+```
+
+For veterans:
+
+@ul{
   @li{
     📖 @link[reference.html]{Reference Manual}
+  }
+}
+
+@html```
+</div>
+<div class="four columns">
+```
+
+Other links:
+
+@ul{
+  @li{
+    📥 @link[https://github.com/agent-kilo/jwno/releases]{Download Links}
   }
   @li{
     🛠️ @link[https://github.com/agent-kilo/jwno]{Source Code on Github}
@@ -67,3 +92,8 @@ New users please start from the @link[installation.html]{installation guide}. Ve
     🛠️ @link[https://chiselapp.com/user/agentkilo/repository/jwno]{Source Code on Chisel}
   }
 }
+
+@html```
+</div>
+</div>
+```
