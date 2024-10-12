@@ -6,19 +6,75 @@
 
 Jwno is still in active development, but it already has many desirable features.
 
-### 🪶 It's super lightweight.
+@html```
+<div class="row feature-list">
 
-You can take a guess at how large Jwno is, before going to the @link[https://github.com/agent-kilo/jwno/releases]{download page}. If the actual size exceeds your expectation, please do click the download link and give it a try 😎.
+<div class="four columns">
+```
 
-### 💼 It's a single portable executable file.
+#### 🪶 Super lightweight.
+
+Please, go to the @link[https://github.com/agent-kilo/jwno/releases]{download page} and checkout the file size. Maybe click on the download link too 😎.
+
+@html```
+</div>
+
+<div class="four columns">
+```
+
+#### 💼 Single portable executable.
 
 Just grab the exe and you are good to go.
 
-### 🤗 It tries to be as non-intrusive as possible.
+@html```
+</div>
+
+<div class="four columns">
+```
+
+#### 🤗 Non-intrusive.
 
 Jwno only changes the layout or moves your windows when you tell it to.
 
-### 🪄 It's Highly customizable.
+@html```
+</div>
+
+</div>
+```
+
+@html```
+<div class="row feature-list">
+
+<div class="six columns">
+```
+
+#### 🖥️ Native virtual desktops.
+
+It's designed to work with native Windows @link[https://support.microsoft.com/en-us/windows/multiple-desktops-in-windows-36f52e38-5b4a-557b-2ff9-e1a60c976434]{virtual desktops}.
+
+@html```
+</div>
+
+<div class="six columns">
+```
+
+#### 👾 Hackable REPL.
+
+Like most Lisp systems, Jwno has REPL support. That means you can hack it while it's still running 🤘.
+
+@html```
+</div>
+
+</div>
+```
+
+@html```
+<div class="row feature-list">
+
+<div class="twelve columns">
+```
+
+#### 🪄 Highly customizable.
 
 You can call native Win32 APIs in user scripts/plugins to implement your own features. For example, to move a window using the low-level @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos]{SetWindowPos} function:
 
@@ -27,9 +83,21 @@ You can call native Win32 APIs in user scripts/plugins to implement your own fea
 (SetWindowPos hwnd nil 100 100 500 500 (bor SWP_NOZORDER))
 ```
 
-### ⌨️ It has a powerful key binding system...
+@html```
+</div>
 
-...Which supports multi-level and transient keymaps. For example, this defines a multi-level keymap:
+</div>
+```
+
+@html```
+<div class="row feature-list">
+
+<div class="twelve columns">
+```
+
+#### ⌨️ Powerful key binding system.
+
+It supports multi-level and transient keymaps. For example, this defines a multi-level keymap:
 
 @codeblock[janet]```
 (:define-key keymap "Win + Enter  A" :command1)
@@ -38,10 +106,12 @@ You can call native Win32 APIs in user scripts/plugins to implement your own fea
 
 To run @code{:command1}, one should press @code{Win + Enter}, and then the @code{A} key. To run @code{:command2}, press @code{Win + Enter} followed by @code{B} key instead. The code above essentially "groups" @code{:command1} and @code{:command2} under @code{Win + Enter}.
 
-### 👽 It gives you an REPL.
+@html```
+</div>
 
-Like most Lisp systems, Jwno has REPL support. That means you can hack it while it's still running 🤘.
+</div>
+```
 
-### ✨ ...And there are more to come!
+#### ✨ ...And there are more to come!
 
 Please support Jwno's development by using it and giving some feedback.
