@@ -35,7 +35,11 @@ env:
 
 jobs:
   Jwno-Release:
+    permissions:
+      contents: write  # For releases
+
     runs-on: windows-2022
+
     steps:
       - run: echo "Working in directory ${{ github.workspace }}."
 
@@ -45,7 +49,6 @@ jobs:
           repository: agent-kilo/jwno
           path: ${{ env.JWNO_DIR }}
           ref: ${{ github.sha }}
-          token: ${{ secrets.CHECKOUT_PAT }}
 
       - name: Setup MSVC Developer Command Prompt
         uses: TheMrMilchmann/setup-msvc-dev@v3.0.0
@@ -95,7 +98,6 @@ jobs:
           repository: agent-kilo/jw32
           path: ${{ env.JW32_DIR }}
           ref: ${{ env.JW32_VERSION }}
-          token: ${{ secrets.CHECKOUT_PAT }}
 
       - name: Build Jw32
         working-directory: ${{ env.JW32_DIR }}
@@ -144,4 +146,3 @@ jobs:
             ./jwno/build/jwno.exe.sha256
             ./jwno/build/jwno.lib
             ./jwno/build/jwno.exp
-          token: ${{ secrets.RELEASE_PAT }}
