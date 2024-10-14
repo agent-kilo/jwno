@@ -35,7 +35,12 @@ env:
 
 jobs:
   Jwno-Docs-Deployment:
+    permissions:
+      pages: write
+      id-token: write
+
     runs-on: windows-2022
+
     steps:
       - run: echo "Working in directory ${{ github.workspace }}."
 
@@ -45,7 +50,6 @@ jobs:
           repository: agent-kilo/jwno
           path: ${{ env.JWNO_DIR }}
           ref: ${{ github.sha }}
-          token: ${{ secrets.CHECKOUT_PAT }}
 
       - name: Setup MSVC Developer Command Prompt
         uses: TheMrMilchmann/setup-msvc-dev@v3.0.0
@@ -106,4 +110,3 @@ jobs:
         uses: actions/deploy-pages@v4
         with:
           artifact_name: jwno-docs-${{ github.ref_name }}-${{ github.sha }}
-          token: ${{ secrets.PAGES_PAT }}
