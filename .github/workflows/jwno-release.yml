@@ -35,7 +35,11 @@ env:
 
 jobs:
   Jwno-Release:
+    permissions:
+      contents: write  # For releases
+
     runs-on: windows-2022
+
     steps:
       - run: echo "Working in directory ${{ github.workspace }}."
 
@@ -142,4 +146,3 @@ jobs:
             ./jwno/build/jwno.exe.sha256
             ./jwno/build/jwno.lib
             ./jwno/build/jwno.exp
-          token: ${{ secrets.RELEASE_PAT }}
