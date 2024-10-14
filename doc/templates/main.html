@@ -14,6 +14,8 @@ $}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width">
 
+    <link href="//fonts.googleapis.com/css?family=Raleway|Inconsolata" rel="stylesheet">
+
     <link rel="stylesheet" href="{{ (relative-url `/css/normalize.css`) }}" type="text/css" charset="utf-8">
     <link rel="stylesheet" href="{{ (relative-url `/css/skeleton.css`) }}" type="text/css" charset="utf-8">
     <link rel="stylesheet" href="{{ (relative-url `/css/colors.css`) }}" type="text/css" charset="utf-8">
@@ -40,11 +42,19 @@ $}
     <div id="main-container" class="container">
 
       <div class="row">
-        <div class="twelve columns">
-          <header id="main-banner">
-            <h1><a href="{{ (relative-url `/index.html`) }}">Jwno Documentation</a></h1>
-          </header>
-        </div>
+        <header id="main-banner">
+          <h1>
+            <div id="jwno-logo">
+              <img alt="Jwno Logo" src="{{ (relative-url `/img/jwno.png`) }}"> 
+            </div>
+            <div id="top-title">
+              <a href="{{ (relative-url `/index.html`) }}">
+                Jwno Documentation
+              </a>
+              <hr>
+            </div>
+          </h1>
+        </header>
       </div>
 
       <section id="content">

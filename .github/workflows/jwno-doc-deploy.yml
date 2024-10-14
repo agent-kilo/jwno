@@ -1,0 +1,101 @@
+name: Jwno Docs Deployment
+
+run-name: Docs Deployment Process for ${{ github.ref }} (${{ github.sha }})
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  BUILD_IS_VERSIONED: ${{ startsWith(github.ref, 'refs/tags/v') }}
+
+  JANET_VERSION: "1.36.0"
+  JANET_DIR: "${{ github.workspace }}\\janet"
+  JANET_PATH: "${{ github.workspace }}\\janet\\Library"
+  JANET_BINPATH: "${{ github.workspace }}\\janet\\bin"
+  JANET_HEADERPATH: "${{ github.workspace }}\\janet\\C"
+  JANET_LIBPATH: "${{ github.workspace }}\\janet\\C"
+  JANET_MANPATH: "${{ github.workspace }}\\janet\\docs"
+
+  JPM_VERSION: "d93b7c243645d31410a81fb9ab8f7a5e5608f0d0"
+  JPM_DIR: "${{ github.workspace }}\\jpm"
+  JPM_CMD: "${{ github.workspace }}\\janet\\bin\\janet.exe ${{ github.workspace }}\\janet\\bin\\jpm"
+
+  MDZ_CMD: "${{ github.workspace }}\\janet\\bin\\janet.exe ${{ github.workspace }}\\janet\\bin\\mdz"
+
+  JWNO_DIR: "${{ github.workspace }}\\jwno"
+  JWNO_DOC_DIR: "${{ github.workspace }}\\jwno\\doc"
+  JWNO_DOC_OUTPUT_DIR: "${{ github.workspace }}\\jwno\\doc\\site"
+
+  MSI_INSTALL_SCRIPT: "${{ github.workspace }}\\jwno\\.github\\workflows\\install_janet_msi.ps1"
+
+jobs:
+  Jwno-Docs-Deployment:
+    runs-on: windows-2022
+    steps:
+      - run: echo "Working in directory ${{ github.workspace }}."
+
+      - name: Checkout Jwno Source
+        uses: actions/checkout@v4
+        with:
+          repository: agent-kilo/jwno
+          path: ${{ env.JWNO_DIR }}
+          ref: ${{ github.sha }}
+          token: ${{ secrets.CHECKOUT_PAT }}
+
+      - name: Download Janet Installer
+        uses: robinraju/release-downloader@v1.10
+        with:
+          repository: janet-lang/janet
+          tag: v${{ env.JANET_VERSION }}
+          fileName: janet-${{ env.JANET_VERSION }}-windows-x64-installer.msi
+          out-file-path: ${{ github.workspace }}
+
+      - name: Install Janet
+        run: powershell -file "${{ env.MSI_INSTALL_SCRIPT }}" -msi_file janet-${{ env.JANET_VERSION }}-windows-x64-installer.msi -app_folder "${{ env.JANET_DIR }}"
+
+      - name: Checkout JPM Source
+        uses: actions/checkout@v4
+        with:
+          repository: janet-lang/jpm
+          path: ${{ env.JPM_DIR }}
+          ref: ${{ env.JPM_VERSION }}
+
+      - name: Bootstrap JPM
+        working-directory: ${{ env.JPM_DIR }}
+        run: ${{ env.JANET_DIR }}\bin\janet.exe ${{ env.JPM_DIR }}\bootstrap.janet
+
+      - name: JPM show-paths
+        run: ${{ env.JPM_CMD }} show-paths
+
+      - name: Show Janet Installation
+        working-directory: ${{ env.JANET_DIR }}
+        run: tree /f /a
+
+      - name: Install Mendoza
+        run: ${{ env.JPM_CMD }} install mendoza
+
+      - name: Build HTML docs
+        working-directory: ${{ env.JWNO_DOC_DIR }}
+        run: ${{ env.MDZ_CMD }} build
+
+      - name: List HTML docs
+        working-directory: ${{ env.JWNO_DOC_OUTPUT_DIR }}
+        run: tree /f /a
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Doc Artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: jwno-docs-${{ github.ref_name }}-${{ github.sha }}
+          path: ${{ env.JWNO_DOC_OUTPUT_DIR }}
+
+      - name: Deploy Docs to Pages
+        uses: actions/deploy-pages@v4
+        with:
+          artifact_name: jwno-docs-${{ github.ref_name }}-${{ github.sha }}
+          token: ${{ secrets.PAGES_PAT }}
