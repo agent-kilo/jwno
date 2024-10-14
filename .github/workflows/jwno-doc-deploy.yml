@@ -44,6 +44,11 @@ jobs:
     steps:
       - run: echo "Working in directory ${{ github.workspace }}."
 
+      - name: Override Default Git Line Ending Setting
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
       - name: Checkout Jwno Source
         uses: actions/checkout@v4
         with:
