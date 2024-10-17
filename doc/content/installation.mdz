@@ -4,7 +4,7 @@
  :order 3}
 ---
 
-You only need a portable @code{exe} file to run Jwno, so it doesn't really need any "installation". These are just recommended steps to get it up and running, plus some things you should know before using it.
+You only need a portable @code{exe} file to run Jwno, so there isn't really any "installation". These are just recommended steps to get it up and running, plus some things you should know before using it.
 
 ### Prerequisites
 
@@ -18,7 +18,7 @@ You only need a portable @code{exe} file to run Jwno, so it doesn't really need 
 
 You can find releases and download them from @link[https://github.com/agent-kilo/jwno/releases]{Github}.
 
-Only @code{jwno.exe} is needed for normal usage, and you can place it anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native Jwno modules, see the @link[development.html]{development guide} if you're interested.
+Among the downloadable assets, only @code{jwno.exe} is needed for normal usage, and you can place it anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native Jwno modules, see the @link[development.html]{development guide} if you're interested.
 
 It's highly recommended that you also check out @code{jwno.exe.sha256}, and see if the actual checksum of the @code{exe} file matches. A Powershell command can be used to calculate @code{jwno.exe}'s checksum:
 
@@ -28,5 +28,53 @@ $(CertUtil -hashfile path\to\jwno.exe SHA256)[1]
 
 ### Your First Config File
 
+You need to specify a config file for Jwno, before it can do anything meaningful. There are multiple ways to do so:
+
+@ul{
+  @li{
+    By default, Jwno looks for a file named @code{jwno-config.janet} in the directory where @code{jwno.exe} resides.
+  }
+  @li{
+    You can drag-n-drop a config file from anywhere to @code{jwno.exe}.
+  }
+  @li{
+    When running Jwno from the command line or a shortcut, pass a path to @code{jwno.exe}: @code```jwno.exe path\to\your\config.janet```
+  }
+}
+
+The config file is a text file containing some @link[https://janet-lang.org/]{Janet} code, which gets evaluated when you launch Jwno. Here are some examples:
+
+@ul{
+  @li{
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/tutorial.janet]{Tutorial.janet} is an interactive tutorial implemented as a single config file. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/tutorial.janet]{Download})
+  }
+  @li{
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{Example-config.janet} contains some practical config suitable for daily use. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/example-config.janet]{Download})
+  }
+}
+
+You can download either of them, then drag-n-drop it to @code{jwno.exe} to try it out. I recommend going through the tutorial first, before trying out @code{example-config.janet}, and maybe modifying it to build your own config.
 
 ### Automatically Start Jwno When You Log In
+
+A shortcut can be created in the @code{shell:startup} directory to achieve this:
+
+@ol{
+  @li{
+    Press @code{Win + X} then @code{R} on your keyboard. The @code{Run} dialog should pop up.
+  }
+  @li{
+    Put @code{shell:startup} in the @code{Open} input box, and press @code{Enter} to confirm.
+  }
+  @li{
+    A File Explorer window will open. Create a shortcut which points to @code{jwno.exe} in that directory.
+  }
+}
+
+### Next Steps
+
+@ul{
+  @li{
+    @link[reference.html]{Reference Manual}
+  }
+}
