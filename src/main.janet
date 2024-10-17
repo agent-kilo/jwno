@@ -117,7 +117,9 @@
                        (get-stack-trace fib))))))
 
 
-(defn main-loop [cli-args context]
+(defn main-loop [args]
+  (def [cli-args context] args)
+
   (forever
    (def event (ev/select ;(in context :event-sources)))
 
@@ -162,6 +164,9 @@
 
        [:key/pop-keymap cur-keymap]
        (:call-hook (in context :hook-manager) :keymap-popped cur-keymap)
+
+       [:debug/thunk thunk]
+       (thunk context)
 
        _
        (log/warning "Unknown message: %n" msg))
@@ -295,7 +300,42 @@
 
   (add-default-commands command-man context)
 
-  (main-loop cli-args context)
+  (def main-loop-sup (ev/chan))
+  (def main-loop-fib (ev/go main-loop [cli-args context] main-loop-sup))
+
+  (forever
+   (match (ev/take main-loop-sup)
+     [stat (@ main-loop-fib) & _rest]
+     # TODO: Restart it when errors were raised?
+     (do
+       (log/debug "Main loop stopped")
+       (unless (= :ok stat)
+         (log/error "%n signal from main loop: %n\n%s"
+                    stat
+                    (fiber/last-value main-loop-fib)
+                    (get-stack-trace main-loop-fib))
+         # In normal shutdown sequence, the UI thread will end itself
+         # and then tells us to quit.
+         # But when the main loop errored out, we need to wait for the
+         # UI thread instead.
+         (:destroy ui-man)
+         (var ui-ev (ev/take (in ui-man :chan)))
+         (while (not= :ui/exit ui-ev)
+           (log/warning "Not handled event from UI thread: %n" ui-ev)
+           (set ui-ev (ev/take (in ui-man :chan)))))
+       (break))
+
+     [stat fib & _rest]
+     # Some signals from child fibers bubbled up, we can't do anything
+     # meaningful here except writing down the log.
+     (unless (= :ok stat)
+       (log/error "%n signal from fiber spawned by main loop: %n\n%s"
+                  stat
+                  (fiber/last-value fib)
+                  (get-stack-trace fib)))
+
+     unknown-ev
+     (log/warning "Unknown event from main loop supervisor: %n" unknown-ev)))
 
   (:stop-all-servers repl-man)
   (:unregister-loader module-man)
