@@ -2296,6 +2296,24 @@
       # No focused window, don't proceed
       (break))
 
+    (when (null? hwnd)
+      # (:get-focused-window uia-man) returned a bad window
+      # XXX: I don't really know what it is, more logs for postmortem.
+      (log/debug "NULL HWND: name=%n, class=%n, controltype=%n"
+                 (try
+                   (:get_CachedName uia-win)
+                   ((err _fib)
+                    (string/format "<error %n>" err)))
+                 (try
+                   (:get_CachedClassName uia-win)
+                   ((err _fib)
+                    (string/format "<error %n>" err)))
+                 (try
+                   (:GetCachedPropertyValue uia-win UIA_ControlTypePropertyId)
+                   ((err _fib)
+                    (string/format "<error %n>" err))))
+      (break))
+
     (when-let [win (:find-hwnd (in self :root) hwnd)]
       # Already managed
       (with-activation-hooks self
