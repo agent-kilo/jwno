@@ -4,7 +4,7 @@
  :order 3}
 ---
 
-As stated in the @link[features.html]{features} page, you only need a portable `exe` file to run Jwno, so it doesn't actually need any "installation", yet there are things you need to know before using it.
+You only need a portable @code{exe} file to run Jwno, so it doesn't really need any "installation". These are just recommended steps to get it up and running, plus some things you should know before using it.
 
 ### Prerequisites
 
@@ -12,7 +12,21 @@ As stated in the @link[features.html]{features} page, you only need a portable `
   @li{
     Windows 10/11 (x64)
   }
-  @li{
-    A keyboard
-  }
 }
+
+### Downloading
+
+You can find releases and download them from @link[https://github.com/agent-kilo/jwno/releases]{Github}.
+
+Only @code{jwno.exe} is needed for normal usage, and you can place it anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native Jwno modules, see the @link[development.html]{development guide} if you're interested.
+
+It's highly recommended that you also check out @code{jwno.exe.sha256}, and see if the actual checksum of the @code{exe} file matches. A Powershell command can be used to calculate @code{jwno.exe}'s checksum:
+
+@codeblock[text]```
+$(CertUtil -hashfile path\to\jwno.exe SHA256)[1]
+```
+
+### Your First Config File
+
+
+### Automatically Start Jwno When You Log In
