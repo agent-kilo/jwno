@@ -4,4 +4,15 @@
  :order 3}
 ---
 
-### TODO
+As stated in the @link[features.html]{features} page, you only need a portable `exe` file to run Jwno, so it doesn't actually need any "installation", yet there are things you need to know before using it.
+
+### Prerequisites
+
+@ul{
+  @li{
+    Windows 10/11 (x64)
+  }
+  @li{
+    A keyboard
+  }
+}
