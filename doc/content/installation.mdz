@@ -16,23 +16,25 @@ You only need a portable @code{exe} file to run Jwno, so there isn't really any 
 
 ### Downloading
 
-You can find releases and download them from @link[https://github.com/agent-kilo/jwno/releases]{Github}.
+Jwno releases can be found on @link[https://github.com/agent-kilo/jwno/releases]{Github}.
 
-Among the downloadable assets, only @code{jwno.exe} is needed for normal usage, and you can place it anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native Jwno modules, see the @link[development.html]{development guide} if you're interested.
+Just grab @code{jwno.exe} and you are good to go. It can be saved to anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native modules, we don't need them just yet.
 
-It's highly recommended that you also check out @code{jwno.exe.sha256}, and see if the actual checksum of the @code{exe} file matches. A Powershell command can be used to calculate @code{jwno.exe}'s checksum:
+You may optionally check the checksum of @code{jwno.exe}. For example, calculate it in Powershell:
 
 @codeblock[text]```
 $(CertUtil -hashfile path\to\jwno.exe SHA256)[1]
 ```
 
+And then compare it with the value stored in @code{jwno.exe.sha256}.
+
 ### Your First Config File
 
-You need to specify a config file for Jwno, before it can do anything meaningful. There are multiple ways to do so:
+Jwno needs a config file to work. It's a text file containing some @link[https://janet-lang.org/]{Janet} code, which gets evaluated when you launch Jwno. There are multiple ways to specify a config file:
 
 @ul{
   @li{
-    By default, Jwno looks for a file named @code{jwno-config.janet} in the directory where @code{jwno.exe} resides.
+    By default, Jwno looks for a file named @code{jwno-config.janet} in the same directory where @code{jwno.exe} resides.
   }
   @li{
     You can drag-n-drop a config file from anywhere to @code{jwno.exe}.
@@ -42,7 +44,7 @@ You need to specify a config file for Jwno, before it can do anything meaningful
   }
 }
 
-The config file is a text file containing some @link[https://janet-lang.org/]{Janet} code, which gets evaluated when you launch Jwno. Here are some examples:
+Here are some examples:
 
 @ul{
   @li{
@@ -53,18 +55,18 @@ The config file is a text file containing some @link[https://janet-lang.org/]{Ja
   }
 }
 
-You can download either of them, then drag-n-drop it to @code{jwno.exe} to try it out. I recommend going through the tutorial first, before trying out @code{example-config.janet}, and maybe modifying it to build your own config.
+To try out either of them, just download the file, then drag-n-drop it to @code{jwno.exe}. I recommend going through the tutorial first, before trying out @code{example-config.janet}. You can build your own config based on @code{example-config.janet} afterwards.
 
 ### Automatically Start Jwno When You Log In
 
-A shortcut can be created in the @code{shell:startup} directory to achieve this:
+A shortcut can be created in the @code{shell:startup} directory to achieve this.
 
 @ol{
   @li{
     Press @code{Win + X} then @code{R} on your keyboard. The @code{Run} dialog should pop up.
   }
   @li{
-    Put @code{shell:startup} in the @code{Open} input box, and press @code{Enter} to confirm.
+    Put @code{shell:startup} in the @code{Open:} input box, and press @code{Enter} to confirm.
   }
   @li{
     A File Explorer window will open. Create a shortcut which points to @code{jwno.exe} in that directory.
@@ -74,6 +76,9 @@ A shortcut can be created in the @code{shell:startup} directory to achieve this:
 ### Next Steps
 
 @ul{
+  @li{
+    @link[config-reference.html]{More About Config Files}
+  }
   @li{
     @link[reference.html]{Reference Manual}
   }
