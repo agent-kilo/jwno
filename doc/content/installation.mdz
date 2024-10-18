@@ -73,6 +73,10 @@ A shortcut can be created in the @code{shell:startup} directory to achieve this.
   }
 }
 
+## Problems?
+
+If you encountered any problem, please open an issue @link[https://github.com/agent-kilo/jwno/issues]{here}.
+
 ### Next Steps
 
 @ul{
