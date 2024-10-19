@@ -57,6 +57,25 @@ Here are some examples:
 
 To try out either of them, just download the file, then drag-n-drop it to @code{jwno.exe}. I recommend going through the tutorial first, before trying out @code{example-config.janet}. You can build your own config based on @code{example-config.janet} afterwards.
 
+### Check if Jwno Is Alive
+
+An icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="./img/jwno.png">``` will be shown in the notification area on the taskbar when Jwno is running. Right-clicking on the icon will bring up a menu with several commands:
+
+@ul{
+  @li{
+    @em{Launch REPL}: Opens the REPL window.
+  }
+  @li{
+    @em{Update Monitor Layout}: Normally Jwno will adjust to monitor layout changes automatically, but you can use this command to do that manually. It will also retile all managed windows.
+  }
+  @li{
+    @em{Reset Keyboard Hooks}: Sometimes Jwno's keyboard hooks (which are needed for global key bindings to work) may get overridden by other programs, and this command is to fix that.
+  }
+  @li{
+    @em{Exit}: Tells Jwno to quit.
+  }
+}
+
 ### Automatically Start Jwno When You Log In
 
 A shortcut can be created in the @code{shell:startup} directory to achieve this.
@@ -81,9 +100,12 @@ If you encountered any problem, please open an issue @link[https://github.com/ag
 
 @ul{
   @li{
-    @link[config-reference.html]{More About Config Files}
+    @link[defining-key-bindings.html]{Defining Key Bindings}
   }
   @li{
-    @link[reference.html]{Reference Manual}
+    @link[config-env.html]{The Config File Environment}
+  }
+  @li{
+    @link[ref-index.html]{Reference Index}
   }
 }
