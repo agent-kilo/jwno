@@ -109,3 +109,5 @@ If you encountered any problem, please open an issue @link[https://github.com/ag
     @link[ref-index.html]{Reference Index}
   }
 }
+
+To fully leverage the power of Jwno, you need to know some @link[https://janet-lang.org/]{Janet}. Don't worry, it's a simple programming language, and there's a whole fantastic @em{real book} that can teach you about it: @link[https://janet.guide/]{@em{Janet for Mortals}} \(by @link[https://ianthehenry.com/]{Ian Henry}\).
