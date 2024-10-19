@@ -82,10 +82,10 @@ A shortcut can be created in the @code{shell:startup} directory to achieve this.
 
 @ol{
   @li{
-    Press @code{Win + X} then @code{R} on your keyboard. The @code{Run} dialog should pop up.
+    Press @code{Win + X} then @code{R} on your keyboard. The @em{Run} dialog should pop up.
   }
   @li{
-    Put @code{shell:startup} in the @code{Open:} input box, and press @code{Enter} to confirm.
+    Put @code{shell:startup} in the @em{Open:} input box, and press @code{Enter} to confirm.
   }
   @li{
     A File Explorer window will open. Create a shortcut which points to @code{jwno.exe} in that directory.
