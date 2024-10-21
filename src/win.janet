@@ -2363,7 +2363,15 @@
       (log/debug "Ignoring window: %n" hwnd)
       (break))
 
-    (:add-hwnd self hwnd-info manage-state)))
+    (if-let [new-win (:add-hwnd self hwnd-info manage-state)
+             fg-hwnd (GetForegroundWindow)]
+      # Some windows only send one window-opened event, but no focus-changed
+      # event, when they firt appear, even though they have input focus
+      # (e.g. Windows Terminal). We need to explicitly activate their nodes
+      # here if they're opened in the foreground.
+      (when (= hwnd fg-hwnd)
+        (with-activation-hooks self
+          (:activate new-win))))))
 
 
 (defn wm-desktop-name-changed [self vd-name]
