@@ -59,7 +59,11 @@ To try out either of them, just download the file, then drag-n-drop it to @code{
 
 ### Check if Jwno Is Alive
 
-An icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="./img/jwno.png">``` will be shown in the notification area on the taskbar when Jwno is running. Right-clicking on the icon will bring up a menu with several commands:
+Once launched, Jwno will start to tile new windows. Existing windows will get tiled @em{when they get focus}. An icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="./img/jwno.png">``` will be shown in the notification area on the taskbar when Jwno is running. If you're using @code{example-config.janet} mentioned above, you can also press @code{Win + Shift + /} \(the slash key) to show all key bindings defined in Jwno.
+
+### The Notification Icon Menu
+
+Right-clicking on the notification area icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="./img/jwno.png">``` will bring up a menu with several commands:
 
 @ul{
   @li{
@@ -88,26 +92,22 @@ A shortcut can be created in the @code{shell:startup} directory to achieve this.
     Put @code{shell:startup} in the @em{Open:} input box, and press @code{Enter} to confirm.
   }
   @li{
-    A File Explorer window will open. Create a shortcut which points to @code{jwno.exe} in that directory.
+    A File Explorer window will open. In that directory, Create a shortcut which points to @code{jwno.exe}.
   }
 }
 
-## Problems?
+### Problems?
 
 If you encountered any problem, please open an issue @link[https://github.com/agent-kilo/jwno/issues]{here}.
 
-### Next Steps
+### About Janet
+
+To fully leverage the power of Jwno, you need to know some Janet. Don't worry, it's a simple programming language. The @link[https://janet-lang.org/docs/syntax.html]{official documentation} is a good starting point, and there's a whole fantastic @link[https://janet.guide/]{@em{real book}} that can also teach you about it. Some Janet gurus hang out on the @link[https://janet.zulipchat.com]{Janet Zulip server}, you can seek help there too.
+
+### Next Step
 
 @ul{
   @li{
     @link[defining-key-bindings.html]{Defining Key Bindings}
   }
-  @li{
-    @link[config-env.html]{The Config File Environment}
-  }
-  @li{
-    @link[ref-index.html]{Reference Index}
-  }
 }
-
-To fully leverage the power of Jwno, you need to know some @link[https://janet-lang.org/]{Janet}. Don't worry, it's a simple programming language, and there's a whole fantastic @em{real book} that can teach you about it: @link[https://janet.guide/]{@em{Janet for Mortals}} \(by @link[https://ianthehenry.com/]{Ian Henry}\).
