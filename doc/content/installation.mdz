@@ -116,6 +116,6 @@ To fully leverage the power of Jwno, you need to know some Janet. Don't worry, i
 
 @ul{
   @li{
-    @link[command-line-options.html]{Command Line Options}
+    @link[ref-command-line-options.html]{Command Line Options}
   }
 }

@@ -99,6 +99,12 @@ Yeah, seriously, transient keymaps stick around. You should know by now how bad 
 
 @ul{
   @li{
-    @link[key-names.html]{List of Key Names}
+    @link[ref-keymap-objects.html]{Keymap Objects}
+  }
+  @li{
+    @link[ref-key-manager-object.html]{The Key Manager Object}
+  }
+  @li{
+    @link[ref-key-names.html]{List of Key Names}
   }
 }
