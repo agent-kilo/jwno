@@ -87,6 +87,16 @@ Well, they both look like some "namespacing" mechanism, in that you can enable t
 
 Yeah, seriously, transient keymaps stick around. You should know by now how bad I am at naming things.
 
+### Setting the Root Keymap
+
+We call the keymap where your top-level key bindings are defined the @em{root keymap}. You can invoke those key bindings directly, without any prefix. For example, to make @code{awesome-keymap} your root keymap:
+
+@codeblock[janet]```
+(:set-keymap (in jwno/context :key-manager) awesome-keymap)
+```
+
+Jwno has no default key bindings, so you have to call the @code{:set-keymap} method with the keymap you defined, or it won't respond to any key events.
+
 ### Next Step
 
 @ul{
