@@ -34,7 +34,7 @@ You can build your own modules using pure Janet, C/C++, or some other language o
 
 Take the @link[https://github.com/janet-lang/spork]{Spork} library as an example. Say you want to use the @code{spork/infix} module for @link[https://janet-lang.org/api/spork/infix.html]{infix syntax}. Since the module is written in pure Janet, you can just clone the Spork repo into somewhere Jwno has access to, and import it in your code. No compilation needed.
 
-But, if you intend to use some native DLL module, say @code{spork/zip}, you need to recompile it, since DLLs compiled for @code{janet.exe} can not be used directly. For example, you can tell @link[https://github.com/janet-lang/jpm]{JPM} to link the modules with @code{jwno.exe} in your @link[development.html]{development environment}:
+But, if you intend to use some native DLL module, say @code{spork/zip}, you need to recompile it specifically for Jwno, since DLLs compiled for @code{janet.exe} can not be used directly. For example, you can tell @link[https://github.com/janet-lang/jpm]{JPM} to link the modules with @code{jwno.exe} in your @link[development.html]{development environment}:
 
 @codeblock[text]```
 jpm -l build --janet-importlib=C:\path\to\jwno.lib
@@ -44,13 +44,16 @@ jpm -l build --janet-importlib=C:\path\to\jwno.lib
 
 @ul{
   @li{
-    @link[development.html]{Development Guide}
+    @link[repl.html]{The REPL}
   }
 }
 
 ### See Also
 
 @ul{
+  @li{
+    @link[development.html]{Development Guide}
+  }
   @li{
     @link[ref-command-line-options.html]{Command Line Options}
   }
