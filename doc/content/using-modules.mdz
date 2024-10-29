@@ -1,0 +1,60 @@
+{:title "Using Modules"
+ :author "Chibidou"
+ :template "main.html"
+ :order 7}
+---
+
+### Loading Modules
+
+Jwno can utilize @link[https://janet-lang.org/docs/modules.html]{Janet modules} to extend itself. To make it more convenient for the user, it will first search for modules in the same directory where its config file resides. Say you have a config file @code```C:\path\to\jwno-config.janet```. When evaluating the code below to import a module,
+
+@codeblock[janet]```
+(import awesome-module)
+```
+
+Jwno will search in the directory @code```C:\path\to\```, for a file named @code{awesome-module.janet}. Compiled @code{.jimage} and @code{.dll} files can be loaded too, but see the @em{Custom Modules} section below for caveats.
+
+Besides the default location, you can specify extra paths for Jwno to search modules from. Just use the @code{--mod-path} (or simply @code{-m}) command line option when launching @code{jwno.exe}:
+
+@codeblock[text]```
+jwno.exe --mod-path C:\path\to\some\modules\ --mod-path C:\path\to\some\other\modules\
+```
+
+As you can see, @code{--mod-path} can be specified multiple times. Jwno will first search the paths given by @code{--mod-path}, in the order they appear in the command line, then it will fallback to the directory where your config file resides. In other words, @code{--mod-path} @em{overrides} the default location.
+
+### Built-In Modules
+
+Jwno comes with some built-in modules that are embeded in @code{jwno.exe}, so you can import and use them directly in your code, without requiring separate @code{.janet} or @code{.dll} files.
+
+Built-in modules providing high-level APIs have the @code{jwno/} prefix, and those providing low-level Win32 APIs have the @code{jw32/} prefix instead.
+
+### Custom Modules
+
+You can build your own modules using pure Janet, C/C++, or some other language of your choice - as long as it can interface with C, and be compiled into DLLs. All pure Janet modules can be used as-is, but native DLL modules for Janet need to be recompiled and linked with @code{jwno.exe}, instead of @code{janet.exe}.
+
+Take the @link[https://github.com/janet-lang/spork]{Spork} library as an example. Say you want to use the @code{spork/infix} module for @link[https://janet-lang.org/api/spork/infix.html]{infix syntax}. Since the module is written in pure Janet, you can just clone the Spork repo into somewhere Jwno has access to, and import it in your code. No compilation needed.
+
+But, if you intend to use some native DLL module, say @code{spork/zip}, you need to recompile it, since DLLs compiled for @code{janet.exe} can not be used directly. For example, you can tell @link[https://github.com/janet-lang/jpm]{JPM} to link the modules with @code{jwno.exe} in your @link[development.html]{development environment}:
+
+@codeblock[text]```
+jpm -l build --janet-importlib=C:\path\to\jwno.lib
+```
+
+### Next Step
+
+@ul{
+  @li{
+    @link[development.html]{Development Guide}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref-command-line-options.html]{Command Line Options}
+  }
+  @li{
+    @link[ref-built-in-modules.html]{Built-In Modules}
+  }
+}
