@@ -1,0 +1,113 @@
+{:title "Development Guide"
+ :author "Chibidou"
+ :template "main.html"
+ :order 9}
+---
+
+Congratulations! You endured this boring documentation, and reached the fun part! (Or you skipped it all... a wise choice, I guess?)
+
+Jwno can be extended via pure Janet code, but sometimes that's not enough. Maybe you want to call some native code. Maybe you found a bug in Jwno's core. Or maybe you just want to peek inside. We'll set your dev environment up here, so you can do whatever you want with it.
+
+### Compiling Jwno From Source
+
+I recommend doing this even if you don't want to touch the core of Jwno, since it's the most straightforward way to ensure all the dependencies are in place.
+
+First, you need these things:
+
+@ul{
+  @li{
+    Visurl Studio 2022 (The Community version will do.)
+  }
+  @li{
+    Janet (Preferably the latest release version. The binaries should be compiled with the MSVC toolchain.)
+  }
+  @li{
+    @link[https://github.com/janet-lang/jpm]{JPM}
+  }
+  @li{
+    @link[https://github.com/agent-kilo/jw32]{Jw32}
+  }
+}
+
+Then, follow these steps:
+
+@ol{
+  @li{
+    Set @code{JANET_SOURCE_PATH} environment variable to point to the Janet source tree. Make sure the version of Janet's source matches Janet's binaries.
+  }
+  @li{
+    Start an @code{x64 Native Tools Command Prompt for VS 2022}.
+  }
+  @li{
+    Run @code{jpm -l build} in @em{Jw32} source directory.
+  }
+  @li{
+    Run @code{jpm --tree=path\to\jwno\jpm_tree install} in @em{Jw32} source directory, to install it as a dependency for @em{Jwno}.
+  }
+  @li{
+    Run @code{jpm -l deps} in @em{Jwno} source directory.
+  }
+  @li{
+    In @em{Jwno} source directory, run @code{jpm -l run embed-manifest}. This is important, the build won't fail if you skipped this, but the resulting @code{exe} file will not run properly.
+  }
+  @li{
+    Check out the built artifact @code{jwno.exe}, @code{jwno.exp} and @code{jwno.lib} in @code```build\```.
+  }
+}
+
+If you encountered any problem or have any question when following these steps, please file an issue @link[https://github.com/agent-kilo/jwno/issues]{here}.
+
+### Compiling Native Modules
+
+When dealing with native modules (i.e. DLL files), Jwno is @em{source-compatible} with Janet. That means if a native module works with @code{janet.exe}, it can also work with @code{jwno.exe}, but you need to @em{recompile it specifically for Jwno}.
+
+For example, if you have the @link[https://github.com/janet-lang/spork]{Spork} library installed for Janet, you can import its pure Janet modules in Jwno \(e.g. @code{spork/infix}), but can not load the modules written in C directly \(e.g. @code{spork/zip}). To use Spork native modules in Jwno, recompile Spork and tell @code{jpm} to link it with @code{jwno.lib}:
+
+@codeblock[text]```
+# Run in Spork source directory
+jpm -l build --janet-importlib=C:\path\to\jwno.lib
+```
+
+You can get @code{jwno.exp} and @code{jwno.lib} for a specific version separately from @link[https://github.com/agent-kilo/jwno/releases]{Github releases}, and they can be placed anywhere in your disks, not necessarily in the same place as @code{jwno.exe}.
+
+### About Jw32
+
+Jw32 is @em{the} support library for Jwno, which wraps low-level Win32 APIs, so that we can use them in Janet code.
+
+All names in Jw32 correnspond 1:1 to official Win32 names, e.g. @code{UNDER_SCORES_IN_CONSTANT_NAMES} and @code{CapitalCaseInFunctionNames} are preserved, so you can easily search in the official Win32 documentation with the names appearing in Jwno code.
+
+In most cases, @code{NULL} pointers are mapped to @code{nil} in Janet code, Win32 handles are mapped to the @code{pointer} type, and numbers are mapped to Janet numbers or @code{int/s64}/@code{int/u64} types. You can check @link[https://github.com/agent-kilo/jw32/blob/master/types.h]{@code{types.h}} in Jw32 source to see how most of other Win32 types are mapped to Janet types.
+
+All Win32 COM instances in Jw32 are represented as Janet tables, and the table prototypes contain their methods. You can check out the implemented methods of a COM object by inspecting its prototype:
+
+@codeblock[janet]```
+(keys (table/proto-flatten com-obj))
+```
+
+Again, the method names map 1:1 to the names in Win32 documentation \(sans the colon character @code{:} from Janet keywords, of course).
+
+Note that Jw32 COM objects will not get garbage collected automatically, you need to call their @code{:Release} method to free them:
+
+@codeblock[janet]```
+(:Release com-obj)
+```
+
+Or use the @code{with-uia} macro:
+
+@codeblock[janet]```
+(import jwno/util)
+(util/with-uia [com-obj (construct-com-obj ...)]
+  # Do stuff with `com-obj` here. Its `:Release` method will
+  # be called automatically when leaving this scope.
+  )
+```
+
+And lastly, given the vastness of Win32 APIs, Jw32 will not and can not wrap up all of them.
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref-index.html]{Reference Index}
+  }
+}
