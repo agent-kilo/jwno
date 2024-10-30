@@ -72,7 +72,7 @@ You can get @code{jwno.exp} and @code{jwno.lib} for a specific version separatel
 
 ### About Jw32
 
-Jw32 is @em{the} support library for Jwno, which wraps low-level Win32 APIs, so that we can use them in Janet code.
+Jw32 is @em{the} support library for Jwno, which wraps low-level Win32 APIs, so that we can use them in Janet code. Despite its name, Jw32 only works on x64 systems.
 
 All names in Jw32 correnspond 1:1 to official Win32 names, e.g. @code{UNDER_SCORES_IN_CONSTANT_NAMES} and @code{CapitalCaseInFunctionNames} are preserved, so you can easily search in the official Win32 documentation with the names appearing in Jwno code.
 
@@ -101,8 +101,6 @@ Or use the @code{with-uia} macro:
   # be called automatically when leaving this scope.
   )
 ```
-
-Despite its name, Jw32 only works on x64 systems.
 
 And lastly, given the vastness of Win32 APIs, Jw32 will not and can not wrap up all of them. If something you need is missing, please file an issue in the @link[https://github.com/agent-kilo/jw32/issues]{Jw32 repo}, and see whether I want to add it or not 🤪. As last resorts, you can always use the @link[https://janet-lang.org/docs/ffi.html]{FFI APIs} or build your own native modules. 
 
