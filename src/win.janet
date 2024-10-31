@@ -1279,6 +1279,12 @@
   (get-hwnd-dwm-border-margins hwnd bounding-rect))
 
 
+(defn window-set-focus [self &opt wm]
+  (default wm (:get-window-manager self))
+  (def uia-man (in wm :uia-manager))
+  (:set-focus-to-window uia-man (in self :hwnd)))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
@@ -1293,7 +1299,8 @@
      :get-virtual-desktop window-get-virtual-desktop
      :get-info window-get-info
      :get-margins window-get-margins
-     :get-dwm-border-margins window-get-dwm-border-margins}
+     :get-dwm-border-margins window-get-dwm-border-margins
+     :set-focus window-set-focus}
    tree-node-proto))
 
 
@@ -2401,22 +2408,18 @@
   (def defview (in uia-man :def-view))
   (def defview-hwnd (:get_CachedNativeWindowHandle defview))
 
-  (def hwnd
-    (cond
-      (nil? node)
-      defview-hwnd
+  (cond
+    (nil? node)
+    (:set-focus-to-window uia-man defview-hwnd)
 
-      (= :window (in node :type))
-      (in node :hwnd)
+    (= :window (in node :type))
+    (:set-focus node self)
 
-      (or (= :frame (in node :type))
-          (= :layout (in node :type)))
-      (if-let [cur-win (:get-current-window node)]
-        (in cur-win :hwnd)
-        defview-hwnd)))
-
-  (log/debug "setting focus to window: %n" hwnd)
-  (:set-focus-to-window uia-man hwnd))
+    (or (= :frame (in node :type))
+        (= :layout (in node :type)))
+    (if-let [cur-win (:get-current-window node)]
+      (:set-focus cur-win self)
+      (:set-focus-to-window uia-man defview-hwnd))))
 
 
 (defn wm-retile [self &opt fr]

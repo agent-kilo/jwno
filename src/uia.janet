@@ -217,6 +217,7 @@
 
 
 (defn uia-manager-set-focus-to-window [self hwnd]
+  (log/debug "setting focus to window: %n" hwnd)
   (def {:com uia-com} self)
   (with-uia [uia-win (try
                        (:ElementFromHandle uia-com hwnd)
