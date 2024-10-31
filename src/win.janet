@@ -2401,9 +2401,6 @@
 
 
 (defn wm-activate [self node]
-  (when node
-    (:activate node))
-
   (def uia-man (in self :uia-manager))
   (def defview (in uia-man :def-view))
   (def defview-hwnd (:get_CachedNativeWindowHandle defview))
@@ -2419,7 +2416,9 @@
         (= :layout (in node :type)))
     (if-let [cur-win (:get-current-window node)]
       (:set-focus cur-win self)
-      (:set-focus-to-window uia-man defview-hwnd))))
+      (do
+        (:activate node)
+        (:set-focus-to-window uia-man defview-hwnd)))))
 
 
 (defn wm-retile [self &opt fr]
