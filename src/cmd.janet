@@ -82,7 +82,7 @@
       (after-split-fn cur-frame))
 
     (:retile wm cur-frame)
-    (:activate wm cur-frame)))
+    (:set-focus wm cur-frame)))
 
 
 (defn- call-frame-resized-hooks [hook-man frame-list]
@@ -158,7 +158,7 @@
       (after-insertion-fn new-frame))
 
     (:retile wm parent)
-    (:activate wm parent)))
+    (:set-focus wm parent)))
 
 
 (defn cmd-flatten-parent [wm]
@@ -178,7 +178,7 @@
     (with-activation-hooks wm
       (:flatten parent)
       (:retile wm parent)
-      (:activate wm (:get-current-window parent)))))
+      (:set-focus wm (:get-current-window parent)))))
 
 
 (defn cmd-enum-frame [wm dir]
@@ -186,7 +186,7 @@
              fr (:enumerate-node (:get-layout cur-frame) cur-frame dir)]
     (with-activation-hooks wm
       (:sync-current-window fr)
-      (:activate wm fr))))
+      (:set-focus wm fr))))
 
 
 (defn cmd-adjacent-frame [wm dir]
@@ -194,7 +194,7 @@
              adj-fr (:get-adjacent-frame cur-frame dir)]
     (with-activation-hooks wm
       (:sync-current-window adj-fr)
-      (:activate wm adj-fr))))
+      (:set-focus wm adj-fr))))
 
 
 (defn cmd-enum-window-in-frame [wm dir &opt skip-minimized]
@@ -209,7 +209,7 @@
         (set sibling (:enumerate-node cur-frame sibling dir))))
     (unless (= sibling cur-win)
       (with-activation-hooks wm
-        (:activate wm sibling)))))
+        (:set-focus wm sibling)))))
 
 
 (defn cmd-cascade-windows-in-frame [wm &opt dx dy]
@@ -252,7 +252,9 @@
     (with-activation-hooks wm
       (:add-child adj-fr cur-win)
       (:retile wm adj-fr)
-      (:activate wm cur-win))))
+      # The focus is still on cur-win, so focus-changed event will not
+      # fire, we need to activate its new parent frame manually here
+      (:activate cur-win))))
 
 
 (defn cmd-resize-frame [wm hook-man dw dh]
@@ -387,8 +389,8 @@
 
     (:retile wm)
     (if cur-win
-      (:activate wm cur-win)
-      (:activate wm (:get-current-window (in wm :root))))))
+      (:set-focus wm cur-win)
+      (:set-focus wm (:get-current-window (in wm :root))))))
 
 
 (defn cmd-frame-to-window-size [wm hook-man]
@@ -631,7 +633,7 @@
           (:add-child cur-frame win-found)
           (:retile wm cur-frame)))
       (with-activation-hooks wm
-        (:activate wm win-found)))
+        (:set-focus wm win-found)))
     (if (empty? cli)
       (:show-tooltip ui-man :summon "Summoning failed. Window not found.")
       (cmd-exec wm ui-man true cli))))

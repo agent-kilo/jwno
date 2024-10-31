@@ -148,7 +148,8 @@
     (:add-child fr w))
 
   (:retile window-man top-frame)
-  (:activate window-man last-focus))
+  (when last-focus
+    (:set-focus window-man last-focus)))
 
 
 (def bsp-proto

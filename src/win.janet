@@ -2397,10 +2397,10 @@
     (put self :last-vd-name vd-name)
     (when lo
       (with-activation-hooks self
-        (:activate self lo)))))
+        (:set-focus self lo)))))
 
 
-(defn wm-activate [self node]
+(defn wm-set-focus [self node]
   (def uia-man (in self :uia-manager))
   (def defview (in uia-man :def-view))
   (def defview-hwnd (:get_CachedNativeWindowHandle defview))
@@ -2516,7 +2516,7 @@
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
     :retile wm-retile
-    :activate wm-activate
+    :set-focus wm-set-focus
 
     :get-hwnd-path wm-get-hwnd-path
     :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
