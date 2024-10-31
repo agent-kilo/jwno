@@ -1,0 +1,26 @@
+{:title "The Frame Tree"
+ :author "Chibidou"
+ :template "main.html"
+ :order 8}
+---
+
+
+
+### Next Step
+
+@ul{
+  @li{
+    @link[repl.html]{The REPL}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref-window-manager-object.html]{The Window Manager Object}
+  }
+  @li{
+    @link[ref-tree-node-objects.html]{Tree Node Objects}
+  }
+}

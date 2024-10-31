@@ -1,7 +1,7 @@
 {:title "The REPL"
  :author "Chibidou"
  :template "main.html"
- :order 8}
+ :order 9}
 ---
 
 The term @em{REPL} stands for @em{Read-Eval-Print Loop}. Even the C language has REPL implementations these days, but the first REPL was a Lisp invention. Jwno inherited the tradition of providing this great @html```<del>&nbsp;toy&nbsp;</del>``` tool.

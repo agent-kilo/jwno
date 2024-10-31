@@ -1,7 +1,7 @@
 {:title "Development Guide"
  :author "Chibidou"
  :template "main.html"
- :order 9}
+ :order 10}
 ---
 
 Congratulations! You endured this boring documentation, and reached the fun part! (Or you skipped it all... a wise choice, I guess?)
