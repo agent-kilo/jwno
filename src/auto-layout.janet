@@ -129,27 +129,28 @@
   (unless cur-frame
     (break))
   (def top-frame (:get-top-frame cur-frame))
-
-  (:flatten top-frame)
   (def last-focus (:get-current-window top-frame))
-  (def all-wins (in top-frame :children))
 
-  (when (empty? all-wins)
-    (break))
+  (with-activation-hooks window-man
+    (:flatten top-frame)
+    (def all-wins (in top-frame :children))
 
-  (var fr top-frame)
-  # The first window is already in fr
-  (each w (slice all-wins 1)
-    (def [fr-width fr-height] (rect-size (in fr :rect)))
-    (if (> fr-height fr-width)
-      (:split fr :vertical)
-      (:split fr :horizontal))
-    (set fr (get-in fr [:children 1]))
-    (:add-child fr w))
+    (when (empty? all-wins)
+      (break))
 
-  (:retile window-man top-frame)
-  (when last-focus
-    (:set-focus window-man last-focus)))
+    (var fr top-frame)
+    # The first window is already in fr
+    (each w (slice all-wins 1)
+      (def [fr-width fr-height] (rect-size (in fr :rect)))
+      (if (> fr-height fr-width)
+        (:split fr :vertical)
+        (:split fr :horizontal))
+      (set fr (get-in fr [:children 1]))
+      (:add-child fr w))
+
+    (:retile window-man top-frame)
+    (when last-focus
+      (:activate last-focus))))
 
 
 (def bsp-proto
