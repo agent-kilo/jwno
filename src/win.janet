@@ -1022,9 +1022,11 @@
 
 
 (defn tree-node-get-root [self]
-  (if-let [layout (:get-layout self)]
-    (in layout :parent)
-    nil))
+  (if (= :virtual-desktop-container (in self :type))
+    self
+    (if-let [layout (:get-layout self)]
+      (in layout :parent)
+      nil)))
 
 
 (defn tree-node-get-window-manager [self]
@@ -1067,10 +1069,11 @@
    (in rect :bottom)])
 
 
-(defn tree-node-dump-subtree [self &opt level indent-width indent-char]
+(defn tree-node-dump-subtree [self &opt level indent-width indent-char wm]
   (default level 0)
   (default indent-width const/DEFAULT-FRAME-TREE-DUMP-INDENT-WIDTH)
   (default indent-char const/DEFAULT-FRAME-TREE-DUMP-INDENT-CHAR)
+  (default wm (:get-window-manager self))
 
   (def indent
     (buffer/new-filled (* level indent-width) indent-char))
@@ -1112,7 +1115,7 @@
                 ;(unwrap-rect rect))))
 
     :window
-    (if-let [win-info (:get-info self)]
+    (if-let [win-info (:get-info self wm)]
       (with-uia [_uia-win (in win-info :uia-element)]
         (def more-indent
           (string indent (buffer/new-filled indent-width indent-char)))
@@ -1144,7 +1147,7 @@
 
   (when-let [children (in self :children)]
     (each child children
-      (:dump-subtree child (+ 1 level) indent-width indent-char))))
+      (:dump-subtree child (+ 1 level) indent-width indent-char wm))))
 
 
 (def- tree-node-proto
@@ -1204,17 +1207,17 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
-(defn window-transform [self rect &opt tags]
+(defn window-transform [self rect &opt tags wm]
   (default tags @{})
-  (def wm (:get-window-manager self))
+  (default wm (:get-window-manager self))
   (:transform-hwnd wm
                    (in self :hwnd)
                    rect
                    (merge (in self :tags) tags)))
 
 
-(defn window-reset-visual-state [self &opt restore-minimized restore-maximized]
-  (def wm (:get-window-manager self))
+(defn window-reset-visual-state [self &opt restore-minimized restore-maximized wm]
+  (default wm (:get-window-manager self))
   (:reset-hwnd-visual-state wm
                             (in self :hwnd)
                             restore-minimized
@@ -1237,18 +1240,18 @@
   (get-hwnd-path (in self :hwnd)))
 
 
-(defn window-get-uia-element [self &opt cr]
-  (def wm (:get-window-manager self))
+(defn window-get-uia-element [self &opt cr wm]
+  (default wm (:get-window-manager self))
   (:get-hwnd-uia-element wm (in self :hwnd) cr))
 
 
-(defn window-get-virtual-desktop [self &opt uia-win]
-  (def wm (:get-window-manager self))
+(defn window-get-virtual-desktop [self &opt uia-win wm]
+  (default wm (:get-window-manager self))
   (:get-hwnd-virtual-desktop wm (in self :hwnd) uia-win))
 
 
-(defn window-get-info [self]
-  (def wm (:get-window-manager self))
+(defn window-get-info [self &opt wm]
+  (default wm (:get-window-manager self))
   (:get-hwnd-info wm (in self :hwnd)))
 
 
@@ -1881,12 +1884,14 @@
    frame-proto))
 
 
-(defn layout-update-work-areas [self monitors]
+(defn layout-update-work-areas [self monitors &opt wm]
+  (default wm (:get-window-manager self))
+
   (def top-frames (in self :children))
   (def fr-count (length top-frames))
   (def mon-count (length monitors))
 
-  (def hook-man (in (:get-window-manager self) :hook-manager))
+  (def hook-man (in wm :hook-manager))
 
   (cond
     (= fr-count mon-count)
@@ -2132,10 +2137,8 @@
       (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
-  (:transform-hwnd self
-                   (in new-win :hwnd)
-                   (:get-padded-rect frame-found)
-                   (in new-win :tags))
+  (:transform new-win (:get-padded-rect frame-found) nil self)
+
   new-win)
 
 
@@ -2429,10 +2432,7 @@
 
       (= :window (get-in fr [:children 0 :type]))
       (each w (in fr :children)
-        (:transform-hwnd self
-                         (in w :hwnd)
-                         (:get-padded-rect fr)
-                         (in w :tags)))
+        (:transform w (:get-padded-rect fr) nil self))
 
       (or (= :frame (get-in fr [:children 0 :type]))
           (= :layout (get-in fr [:children 0 :type])))

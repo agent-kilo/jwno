@@ -238,7 +238,7 @@
     (unless (or (= FALSE (IsWindow hwnd))
                 (= FALSE (IsWindowVisible hwnd))
                 (not= FALSE (IsIconic hwnd)))
-      (:transform win cur-rect {:anchor :top-left})
+      (:transform win cur-rect {:anchor :top-left} wm)
       (+= (cur-rect :left) scaled-dx)
       (+= (cur-rect :top) scaled-dy)))
   # Update frame's window list so that it matches the z-order
@@ -619,11 +619,11 @@
 
   (if win-found
     (do
-      (:reset-visual-state win-found true false)
+      (:reset-visual-state win-found true false wm)
       (when pull?
         (def cur-frame (:get-current-frame (in wm :root)))
         (def cur-vd (in (:get-layout cur-frame) :id))
-        (def win-vd (in (:get-virtual-desktop win-found) :id))
+        (def win-vd (in (:get-virtual-desktop win-found nil wm) :id))
         # Only pull the window when it's in the same virtual desktop,
         # since the Windows API doesn't support moving windows across
         # virtual desktops.
