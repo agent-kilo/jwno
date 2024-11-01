@@ -95,6 +95,18 @@ We call the keymap where your top-level key bindings are defined the @em{root ke
 (:set-keymap (in jwno/context :key-manager) awesome-keymap)
 ```
 
+Modifications to keymaps @em{will not take effect} before the @code{:set-keymap} method is called again, e.g.:
+
+@codeblock[janet]```
+(:set-keymap (in jwno/context :key-manager) awesome-keymap)
+
+# We defined a new key binding after calling `:set-keymap`:
+(:define-key awesome-keymap "Win + Ctrl + Shift + Alt + B" :brew-coffee)
+
+# But it won't work until we properly set the keymap again:
+(:set-keymap (in jwno/context :key-manager) awesome-keymap)
+```
+
 Jwno has no default key bindings, so you have to call the @code{:set-keymap} method with the keymap you defined, or it won't respond to any key events.
 
 ### Next Step
