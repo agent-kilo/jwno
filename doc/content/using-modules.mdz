@@ -28,18 +28,6 @@ Jwno comes with some built-in modules that are embeded in @code{jwno.exe}, so yo
 
 Built-in modules providing high-level APIs have the @code{jwno/} prefix, and those providing low-level Win32 APIs have the @code{jw32/} prefix instead.
 
-### Custom Modules
-
-You can build your own modules using pure Janet, C/C++, or some other language of your choice - as long as it can interface with C, and be compiled into DLLs. All pure Janet modules can be used as-is, but native DLL modules for Janet need to be recompiled and linked with @code{jwno.exe}, instead of @code{janet.exe}.
-
-Take the @link[https://github.com/janet-lang/spork]{Spork} library as an example. Say you want to use the @code{spork/infix} module for @link[https://janet-lang.org/api/spork/infix.html]{infix syntax}. Since the module is written in pure Janet, you can just clone the Spork repo into somewhere Jwno has access to, and import it in your code. No compilation needed.
-
-But, if you intend to use some native DLL module, say @code{spork/zip}, you need to recompile it specifically for Jwno, since DLLs compiled for @code{janet.exe} can not be used directly. For example, you can tell @link[https://github.com/janet-lang/jpm]{JPM} to link the modules with @code{jwno.exe} in your @link[development.html]{development environment}:
-
-@codeblock[text]```
-jpm -l build --janet-importlib=C:\path\to\jwno.lib
-```
-
 ### Next Step
 
 @ul{
