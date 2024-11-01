@@ -186,7 +186,7 @@
 #     (:disable auto-zoom-in)
 #
 
-(defn zoom-in-on-window-activated [self win]
+(defn zoom-in-on-frame-activated [self win]
   (ev/spawn
    (:call-command (in self :command-manager) :zoom-in (in self :ratio))))
 
@@ -194,9 +194,9 @@
 (defn zoom-in-enable [self]
   (:disable self) # To prevent multiple hook entries
   (def hook-fn
-    (:add-hook (in self :hook-manager) :window-activated
+    (:add-hook (in self :hook-manager) :frame-activated
        (fn [& args]
-         (:on-window-activated self ;args))))
+         (:on-frame-activated self ;args))))
   (put self :hook-fn hook-fn))
 
 
@@ -204,11 +204,11 @@
   (def hook-fn (in self :hook-fn))
   (when hook-fn
     (put self :hook-fn nil)
-    (:remove-hook (in self :hook-manager) :window-activated hook-fn)))
+    (:remove-hook (in self :hook-manager) :frame-activated hook-fn)))
 
 
 (def zoom-in-proto
-  @{:on-window-activated zoom-in-on-window-activated
+  @{:on-frame-activated zoom-in-on-frame-activated
     :enable zoom-in-enable
     :disable zoom-in-disable})
 
