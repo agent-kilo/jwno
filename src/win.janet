@@ -648,11 +648,14 @@
   (EnumChildWindows nil
                     (fn [hwnd]
                       (if-let [w (in win-set hwnd)]
-                        (do
-                          (set top-win w)
-                          # Stop enumeration
-                          0)
-                        # Carry on
+                        (if (:visible? w)
+                          (do
+                            (set top-win w)
+                            # Stop enumeration
+                            0)
+                          # Invisible window, carry on
+                          1)
+                        # Not our window, carry on
                         1)))
   top-win)
 
@@ -1207,6 +1210,12 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
+# XXX: Check cloaking states as well?
+(defn window-visible? [self]
+  (and (:alive? self)
+       (= FALSE (IsIconic (in self :hwnd)))))
+
+
 (defn window-transform [self rect &opt tags wm]
   (default tags @{})
   (default wm (:get-window-manager self))
@@ -1282,6 +1291,11 @@
 (defn window-set-focus [self &opt wm]
   (default wm (:get-window-manager self))
   (def uia-man (in wm :uia-manager))
+  (def old-v-state (:reset-visual-state self true false wm))
+  (def parent (in self :parent))
+  (when (and parent
+             (= old-v-state WindowVisualState_Minimized))
+    (:transform self (:get-padded-rect parent) nil wm))
   (:set-focus-to-window uia-man (in self :hwnd)))
 
 
@@ -1289,6 +1303,7 @@
   (table/setproto
    @{:close window-close
      :alive? window-alive?
+     :visible? window-visible?
      :transform window-transform
      :reset-visual-state window-reset-visual-state
      :get-alpha window-get-alpha
@@ -2397,13 +2412,10 @@
     (put self :last-vd-name vd-name)
     (when lo
       (with-activation-hooks self
-        (:activate self lo)))))
+        (:set-focus self lo)))))
 
 
-(defn wm-activate [self node]
-  (when node
-    (:activate node))
-
+(defn wm-set-focus [self node]
   (def uia-man (in self :uia-manager))
   (def defview (in uia-man :def-view))
   (def defview-hwnd (:get_CachedNativeWindowHandle defview))
@@ -2419,7 +2431,9 @@
         (= :layout (in node :type)))
     (if-let [cur-win (:get-current-window node)]
       (:set-focus cur-win self)
-      (:set-focus-to-window uia-man defview-hwnd))))
+      (do
+        (:activate node)
+        (:set-focus-to-window uia-man defview-hwnd)))))
 
 
 (defn wm-retile [self &opt fr]
@@ -2517,7 +2531,7 @@
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
     :retile wm-retile
-    :activate wm-activate
+    :set-focus wm-set-focus
 
     :get-hwnd-path wm-get-hwnd-path
     :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop

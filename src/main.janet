@@ -98,7 +98,7 @@
         (:update-work-areas lo monitors wm))
       (:retile wm)
       (when-let [cur-frame (:get-current-frame root)]
-        (:activate wm cur-frame)))))
+        (:set-focus wm cur-frame)))))
 
 
 (defn handle-launch-repl [context]
