@@ -648,11 +648,14 @@
   (EnumChildWindows nil
                     (fn [hwnd]
                       (if-let [w (in win-set hwnd)]
-                        (do
-                          (set top-win w)
-                          # Stop enumeration
-                          0)
-                        # Carry on
+                        (if (:visible? w)
+                          (do
+                            (set top-win w)
+                            # Stop enumeration
+                            0)
+                          # Invisible window, carry on
+                          1)
+                        # Not our window, carry on
                         1)))
   top-win)
 
@@ -1207,6 +1210,12 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
+# XXX: Check cloaking states as well?
+(defn window-visible? [self]
+  (and (:alive? self)
+       (= FALSE (IsIconic (in self :hwnd)))))
+
+
 (defn window-transform [self rect &opt tags wm]
   (default tags @{})
   (default wm (:get-window-manager self))
@@ -1282,6 +1291,11 @@
 (defn window-set-focus [self &opt wm]
   (default wm (:get-window-manager self))
   (def uia-man (in wm :uia-manager))
+  (def old-v-state (:reset-visual-state self true false wm))
+  (def parent (in self :parent))
+  (when (and parent
+             (= old-v-state WindowVisualState_Minimized))
+    (:transform self (:get-padded-rect parent) nil wm))
   (:set-focus-to-window uia-man (in self :hwnd)))
 
 
@@ -1289,6 +1303,7 @@
   (table/setproto
    @{:close window-close
      :alive? window-alive?
+     :visible? window-visible?
      :transform window-transform
      :reset-visual-state window-reset-visual-state
      :get-alpha window-get-alpha

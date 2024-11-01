@@ -218,8 +218,7 @@
         :hide-msg hide-msg}
     self)
 
-  (def visible-children (filter |(and (:alive? $)
-                                      (= FALSE (IsIconic (in $ :hwnd))))
+  (def visible-children (filter |(:visible? $)
                                 (in frame :children)))
   (if (empty? visible-children)
     (let [rect (:get-padded-rect frame)

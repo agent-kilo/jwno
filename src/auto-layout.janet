@@ -140,12 +140,14 @@
 
     (var fr top-frame)
     # The first window is already in fr
+    (:reset-visual-state (first all-wins) true false)
     (each w (slice all-wins 1)
       (def [fr-width fr-height] (rect-size (in fr :rect)))
       (if (> fr-height fr-width)
         (:split fr :vertical)
         (:split fr :horizontal))
       (set fr (get-in fr [:children 1]))
+      (:reset-visual-state w true false)
       (:add-child fr w))
 
     (:retile window-man top-frame)
