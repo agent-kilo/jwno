@@ -44,7 +44,7 @@ jpm -l build --janet-importlib=C:\path\to\jwno.lib
 
 @ul{
   @li{
-    @link[frame-tree.html]{The Frame Tree}
+    @link[repl.html]{The REPL}
   }
 }
 
