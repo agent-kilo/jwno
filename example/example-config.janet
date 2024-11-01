@@ -230,6 +230,12 @@
     (k "win + enter  r" [:repl true "127.0.0.1" 9999]
        "Launch Jwno REPL")
 
+    (let [win-enter-key (first (:parse-key keymap "win + enter"))
+          win-enter-map (:get-key-binding keymap win-enter-key)]
+      (:define-key win-enter-map
+                   "up up down down left right left right b a"
+                   :grant-lives))
+
     (k "win + shift + c" :close-window-or-frame)
     (k "win + shift + f" :close-frame)
     (k "win + ctrl + f" :flatten-parent)
@@ -406,3 +412,14 @@
 
    Shows the root keymap defined in the config file.
    ```)
+
+(:add-command command-man :grant-lives
+   (fn []
+     (:show-tooltip
+        ui-man
+        :grant-lives
+        "Congratulations! You've been granted infinite lives ;)"
+        nil
+        nil
+        5000
+        :center)))

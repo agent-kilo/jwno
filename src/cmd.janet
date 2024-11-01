@@ -82,7 +82,7 @@
       (after-split-fn cur-frame))
 
     (:retile wm cur-frame)
-    (:activate wm cur-frame)))
+    (:set-focus wm cur-frame)))
 
 
 (defn- call-frame-resized-hooks [hook-man frame-list]
@@ -158,7 +158,7 @@
       (after-insertion-fn new-frame))
 
     (:retile wm parent)
-    (:activate wm parent)))
+    (:set-focus wm parent)))
 
 
 (defn cmd-flatten-parent [wm]
@@ -178,7 +178,7 @@
     (with-activation-hooks wm
       (:flatten parent)
       (:retile wm parent)
-      (:activate wm (:get-current-window parent)))))
+      (:set-focus wm (:get-current-window parent)))))
 
 
 (defn cmd-enum-frame [wm dir]
@@ -186,7 +186,7 @@
              fr (:enumerate-node (:get-layout cur-frame) cur-frame dir)]
     (with-activation-hooks wm
       (:sync-current-window fr)
-      (:activate wm fr))))
+      (:set-focus wm fr))))
 
 
 (defn cmd-adjacent-frame [wm dir]
@@ -194,7 +194,7 @@
              adj-fr (:get-adjacent-frame cur-frame dir)]
     (with-activation-hooks wm
       (:sync-current-window adj-fr)
-      (:activate wm adj-fr))))
+      (:set-focus wm adj-fr))))
 
 
 (defn cmd-enum-window-in-frame [wm dir &opt skip-minimized]
@@ -209,7 +209,7 @@
         (set sibling (:enumerate-node cur-frame sibling dir))))
     (unless (= sibling cur-win)
       (with-activation-hooks wm
-        (:activate wm sibling)))))
+        (:set-focus wm sibling)))))
 
 
 (defn cmd-cascade-windows-in-frame [wm &opt dx dy]
@@ -238,7 +238,7 @@
     (unless (or (= FALSE (IsWindow hwnd))
                 (= FALSE (IsWindowVisible hwnd))
                 (not= FALSE (IsIconic hwnd)))
-      (:transform win cur-rect {:anchor :top-left})
+      (:transform win cur-rect {:anchor :top-left} wm)
       (+= (cur-rect :left) scaled-dx)
       (+= (cur-rect :top) scaled-dy)))
   # Update frame's window list so that it matches the z-order
@@ -251,8 +251,10 @@
              adj-fr (:get-adjacent-frame cur-frame dir)]
     (with-activation-hooks wm
       (:add-child adj-fr cur-win)
-      (:retile wm adj-fr)
-      (:activate wm cur-win))))
+      (:transform cur-win (:get-padded-rect adj-fr) nil wm)
+      # The focus is still on cur-win, so focus-changed event will not
+      # fire, we need to activate its new parent frame manually here
+      (:activate cur-win))))
 
 
 (defn cmd-resize-frame [wm hook-man dw dh]
@@ -269,7 +271,7 @@
             :right (+ dw (in rect :right))
             :bottom (+ dh (in rect :bottom))})
   (check-for-frame-resized-hooks hook-man cur-frame rect)
-  (:retile wm))
+  (:retile wm (:get-top-frame cur-frame)))
 
 
 (defn cmd-zoom-in [wm hook-man ratio]
@@ -338,7 +340,7 @@
               :right new-width
               :bottom new-height})
     (check-for-frame-resized-hooks hook-man cur-frame old-rect)
-    (:retile wm)))
+    (:retile wm (:get-top-frame cur-frame))))
 
 
 (defn cmd-balance-frames [wm hook-man &opt recursive?]
@@ -351,13 +353,14 @@
   (if recursive?
     (let [top-fr (:get-top-frame cur-frame)]
       (def resized (:balance top-fr recursive? @[]))
-      (call-frame-resized-hooks hook-man resized))
+      (call-frame-resized-hooks hook-man resized)
+      (:retile wm top-fr))
     (let [parent (in cur-frame :parent)]
       (when (and parent
                  (= :frame (in parent :type)))
         (def resized (:balance parent recursive? @[]))
-        (call-frame-resized-hooks hook-man resized))))
-  (:retile wm))
+        (call-frame-resized-hooks hook-man resized)
+        (:retile wm parent)))))
 
 
 (defn cmd-close-frame [wm hook-man &opt cur-frame]
@@ -385,10 +388,10 @@
       # in that case all sibling frames are closed too.
       )
 
-    (:retile wm)
+    (:retile wm (in cur-frame :parent))
     (if cur-win
-      (:activate wm cur-win)
-      (:activate wm (:get-current-window (in wm :root))))))
+      (:set-focus wm cur-win)
+      (:set-focus wm (:get-current-window (in wm :root))))))
 
 
 (defn cmd-frame-to-window-size [wm hook-man]
@@ -404,7 +407,7 @@
     (def old-rect (in cur-frame :rect))
     (:resize cur-frame (expand-rect win-rect border-space))
     (check-for-frame-resized-hooks hook-man cur-frame old-rect)
-    (:retile wm)))
+    (:retile wm (:get-top-frame cur-frame))))
 
 
 (defn cmd-close-window [wm ui-man]
@@ -619,19 +622,19 @@
 
   (if win-found
     (do
-      (:reset-visual-state win-found true false)
+      (:reset-visual-state win-found true false wm)
       (when pull?
         (def cur-frame (:get-current-frame (in wm :root)))
         (def cur-vd (in (:get-layout cur-frame) :id))
-        (def win-vd (in (:get-virtual-desktop win-found) :id))
+        (def win-vd (in (:get-virtual-desktop win-found nil wm) :id))
         # Only pull the window when it's in the same virtual desktop,
         # since the Windows API doesn't support moving windows across
         # virtual desktops.
         (when (= cur-vd win-vd)
           (:add-child cur-frame win-found)
-          (:retile wm cur-frame)))
+          (:transform win-found (:get-padded-rect cur-frame) nil wm)))
       (with-activation-hooks wm
-        (:activate wm win-found)))
+        (:set-focus wm win-found)))
     (if (empty? cli)
       (:show-tooltip ui-man :summon "Summoning failed. Window not found.")
       (cmd-exec wm ui-man true cli))))

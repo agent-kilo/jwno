@@ -648,11 +648,14 @@
   (EnumChildWindows nil
                     (fn [hwnd]
                       (if-let [w (in win-set hwnd)]
-                        (do
-                          (set top-win w)
-                          # Stop enumeration
-                          0)
-                        # Carry on
+                        (if (:visible? w)
+                          (do
+                            (set top-win w)
+                            # Stop enumeration
+                            0)
+                          # Invisible window, carry on
+                          1)
+                        # Not our window, carry on
                         1)))
   top-win)
 
@@ -1022,9 +1025,11 @@
 
 
 (defn tree-node-get-root [self]
-  (if-let [layout (:get-layout self)]
-    (in layout :parent)
-    nil))
+  (if (= :virtual-desktop-container (in self :type))
+    self
+    (if-let [layout (:get-layout self)]
+      (in layout :parent)
+      nil)))
 
 
 (defn tree-node-get-window-manager [self]
@@ -1067,10 +1072,11 @@
    (in rect :bottom)])
 
 
-(defn tree-node-dump-subtree [self &opt level indent-width indent-char]
+(defn tree-node-dump-subtree [self &opt level indent-width indent-char wm]
   (default level 0)
   (default indent-width const/DEFAULT-FRAME-TREE-DUMP-INDENT-WIDTH)
   (default indent-char const/DEFAULT-FRAME-TREE-DUMP-INDENT-CHAR)
+  (default wm (:get-window-manager self))
 
   (def indent
     (buffer/new-filled (* level indent-width) indent-char))
@@ -1112,7 +1118,7 @@
                 ;(unwrap-rect rect))))
 
     :window
-    (if-let [win-info (:get-info self)]
+    (if-let [win-info (:get-info self wm)]
       (with-uia [_uia-win (in win-info :uia-element)]
         (def more-indent
           (string indent (buffer/new-filled indent-width indent-char)))
@@ -1144,7 +1150,7 @@
 
   (when-let [children (in self :children)]
     (each child children
-      (:dump-subtree child (+ 1 level) indent-width indent-char))))
+      (:dump-subtree child (+ 1 level) indent-width indent-char wm))))
 
 
 (def- tree-node-proto
@@ -1204,17 +1210,23 @@
        (not= FALSE (IsWindowVisible hwnd))))
 
 
-(defn window-transform [self rect &opt tags]
+# XXX: Check cloaking states as well?
+(defn window-visible? [self]
+  (and (:alive? self)
+       (= FALSE (IsIconic (in self :hwnd)))))
+
+
+(defn window-transform [self rect &opt tags wm]
   (default tags @{})
-  (def wm (:get-window-manager self))
+  (default wm (:get-window-manager self))
   (:transform-hwnd wm
                    (in self :hwnd)
                    rect
                    (merge (in self :tags) tags)))
 
 
-(defn window-reset-visual-state [self &opt restore-minimized restore-maximized]
-  (def wm (:get-window-manager self))
+(defn window-reset-visual-state [self &opt restore-minimized restore-maximized wm]
+  (default wm (:get-window-manager self))
   (:reset-hwnd-visual-state wm
                             (in self :hwnd)
                             restore-minimized
@@ -1237,18 +1249,18 @@
   (get-hwnd-path (in self :hwnd)))
 
 
-(defn window-get-uia-element [self &opt cr]
-  (def wm (:get-window-manager self))
+(defn window-get-uia-element [self &opt cr wm]
+  (default wm (:get-window-manager self))
   (:get-hwnd-uia-element wm (in self :hwnd) cr))
 
 
-(defn window-get-virtual-desktop [self &opt uia-win]
-  (def wm (:get-window-manager self))
+(defn window-get-virtual-desktop [self &opt uia-win wm]
+  (default wm (:get-window-manager self))
   (:get-hwnd-virtual-desktop wm (in self :hwnd) uia-win))
 
 
-(defn window-get-info [self]
-  (def wm (:get-window-manager self))
+(defn window-get-info [self &opt wm]
+  (default wm (:get-window-manager self))
   (:get-hwnd-info wm (in self :hwnd)))
 
 
@@ -1276,10 +1288,22 @@
   (get-hwnd-dwm-border-margins hwnd bounding-rect))
 
 
+(defn window-set-focus [self &opt wm]
+  (default wm (:get-window-manager self))
+  (def uia-man (in wm :uia-manager))
+  (def old-v-state (:reset-visual-state self true false wm))
+  (def parent (in self :parent))
+  (when (and parent
+             (= old-v-state WindowVisualState_Minimized))
+    (:transform self (:get-padded-rect parent) nil wm))
+  (:set-focus-to-window uia-man (in self :hwnd)))
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
      :alive? window-alive?
+     :visible? window-visible?
      :transform window-transform
      :reset-visual-state window-reset-visual-state
      :get-alpha window-get-alpha
@@ -1290,7 +1314,8 @@
      :get-virtual-desktop window-get-virtual-desktop
      :get-info window-get-info
      :get-margins window-get-margins
-     :get-dwm-border-margins window-get-dwm-border-margins}
+     :get-dwm-border-margins window-get-dwm-border-margins
+     :set-focus window-set-focus}
    tree-node-proto))
 
 
@@ -1881,12 +1906,14 @@
    frame-proto))
 
 
-(defn layout-update-work-areas [self monitors]
+(defn layout-update-work-areas [self monitors &opt wm]
+  (default wm (:get-window-manager self))
+
   (def top-frames (in self :children))
   (def fr-count (length top-frames))
   (def mon-count (length monitors))
 
-  (def hook-man (in (:get-window-manager self) :hook-manager))
+  (def hook-man (in wm :hook-manager))
 
   (cond
     (= fr-count mon-count)
@@ -2132,10 +2159,8 @@
       (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
-  (:transform-hwnd self
-                   (in new-win :hwnd)
-                   (:get-padded-rect frame-found)
-                   (in new-win :tags))
+  (:transform new-win (:get-padded-rect frame-found) nil self)
+
   new-win)
 
 
@@ -2387,33 +2412,28 @@
     (put self :last-vd-name vd-name)
     (when lo
       (with-activation-hooks self
-        (:activate self lo)))))
+        (:set-focus self lo)))))
 
 
-(defn wm-activate [self node]
-  (when node
-    (:activate node))
-
+(defn wm-set-focus [self node]
   (def uia-man (in self :uia-manager))
   (def defview (in uia-man :def-view))
   (def defview-hwnd (:get_CachedNativeWindowHandle defview))
 
-  (def hwnd
-    (cond
-      (nil? node)
-      defview-hwnd
+  (cond
+    (nil? node)
+    (:set-focus-to-window uia-man defview-hwnd)
 
-      (= :window (in node :type))
-      (in node :hwnd)
+    (= :window (in node :type))
+    (:set-focus node self)
 
-      (or (= :frame (in node :type))
-          (= :layout (in node :type)))
-      (if-let [cur-win (:get-current-window node)]
-        (in cur-win :hwnd)
-        defview-hwnd)))
-
-  (log/debug "setting focus to window: %n" hwnd)
-  (:set-focus-to-window uia-man hwnd))
+    (or (= :frame (in node :type))
+        (= :layout (in node :type)))
+    (if-let [cur-win (:get-current-window node)]
+      (:set-focus cur-win self)
+      (do
+        (:activate node)
+        (:set-focus-to-window uia-man defview-hwnd)))))
 
 
 (defn wm-retile [self &opt fr]
@@ -2429,10 +2449,7 @@
 
       (= :window (get-in fr [:children 0 :type]))
       (each w (in fr :children)
-        (:transform-hwnd self
-                         (in w :hwnd)
-                         (:get-padded-rect fr)
-                         (in w :tags)))
+        (:transform w (:get-padded-rect fr) nil self))
 
       (or (= :frame (get-in fr [:children 0 :type]))
           (= :layout (get-in fr [:children 0 :type])))
@@ -2514,7 +2531,7 @@
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
     :retile wm-retile
-    :activate wm-activate
+    :set-focus wm-set-focus
 
     :get-hwnd-path wm-get-hwnd-path
     :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop

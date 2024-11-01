@@ -129,26 +129,31 @@
   (unless cur-frame
     (break))
   (def top-frame (:get-top-frame cur-frame))
-
-  (:flatten top-frame)
   (def last-focus (:get-current-window top-frame))
-  (def all-wins (in top-frame :children))
 
-  (when (empty? all-wins)
-    (break))
+  (with-activation-hooks window-man
+    (:flatten top-frame)
+    (def all-wins (in top-frame :children))
 
-  (var fr top-frame)
-  # The first window is already in fr
-  (each w (slice all-wins 1)
-    (def [fr-width fr-height] (rect-size (in fr :rect)))
-    (if (> fr-height fr-width)
-      (:split fr :vertical)
-      (:split fr :horizontal))
-    (set fr (get-in fr [:children 1]))
-    (:add-child fr w))
+    (when (empty? all-wins)
+      (break))
 
-  (:retile window-man top-frame)
-  (:activate window-man last-focus))
+    (var fr top-frame)
+    # The first window is already in fr
+    (:reset-visual-state (first all-wins) true false)
+    (each w (slice all-wins 1)
+      (def [fr-width fr-height] (rect-size (in fr :rect)))
+      (if (> fr-height fr-width)
+        (:split fr :vertical)
+        (:split fr :horizontal))
+      (set fr (get-in fr [:children 1]))
+      (:reset-visual-state w true false)
+      (:add-child fr w))
+
+    (:retile window-man top-frame)
+    (if last-focus
+      (:activate last-focus)
+      (:set-focus window-man top-frame))))
 
 
 (def bsp-proto
@@ -181,7 +186,7 @@
 #     (:disable auto-zoom-in)
 #
 
-(defn zoom-in-on-window-activated [self win]
+(defn zoom-in-on-frame-activated [self win]
   (ev/spawn
    (:call-command (in self :command-manager) :zoom-in (in self :ratio))))
 
@@ -189,9 +194,9 @@
 (defn zoom-in-enable [self]
   (:disable self) # To prevent multiple hook entries
   (def hook-fn
-    (:add-hook (in self :hook-manager) :window-activated
+    (:add-hook (in self :hook-manager) :frame-activated
        (fn [& args]
-         (:on-window-activated self ;args))))
+         (:on-frame-activated self ;args))))
   (put self :hook-fn hook-fn))
 
 
@@ -199,11 +204,11 @@
   (def hook-fn (in self :hook-fn))
   (when hook-fn
     (put self :hook-fn nil)
-    (:remove-hook (in self :hook-manager) :window-activated hook-fn)))
+    (:remove-hook (in self :hook-manager) :frame-activated hook-fn)))
 
 
 (def zoom-in-proto
-  @{:on-window-activated zoom-in-on-window-activated
+  @{:on-frame-activated zoom-in-on-frame-activated
     :enable zoom-in-enable
     :disable zoom-in-disable})
 

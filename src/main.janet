@@ -95,10 +95,10 @@
     (def [monitors _main-idx] mon-info)
     (with-activation-hooks wm
       (each lo layouts
-        (:update-work-areas lo monitors))
+        (:update-work-areas lo monitors wm))
       (:retile wm)
       (when-let [cur-frame (:get-current-frame root)]
-        (:activate wm cur-frame)))))
+        (:set-focus wm cur-frame)))))
 
 
 (defn handle-launch-repl [context]
