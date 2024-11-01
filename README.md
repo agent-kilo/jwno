@@ -17,7 +17,7 @@ A tiling window manager for Windows 10/11, built with [Janet](https://janet-lang
 * Visual Studio 2022 (the Community version will do)
 * Janet >= 1.34.0 (compiled with the MSVC toolchain)
 * [Jpm](https://janet-lang.org/docs/jpm.html)
-* [Jw32](#)
+* [Jw32](https://github.com/agent-kilo/jw32)
 
 ## Compiling ##
 
