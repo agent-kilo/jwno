@@ -1,0 +1,23 @@
+{:title "Cookbook"
+ :author "Chibidou"
+ :template "main.html"
+ :order 10}
+---
+
+⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️
+
+### Next Step
+
+@ul{
+  @li{
+    @link[development.html]{Development Guide}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref-index.html]{Reference Index}
+  }
+}
