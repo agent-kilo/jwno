@@ -8,6 +8,19 @@
 @em{Jwno} is a highly customizable tiling window manager for Windows 10/11, built with @link[https://janet-lang.org/]{Janet} and ❤️. It brings to your desktop magical parentheses power, which, @smaller{I assure you, @smaller{is not suspicious at all, @smaller{and totally controllable.}}}
 }
 
+@html```
+<div class="row">
+  <div class="eight columns offset-by-two">
+    <div class="figure">
+      <a href="./img/jwno-notepad-demo.gif">
+        <img alt="Jwno in Action" src="./img/jwno-notepad-demo.gif">
+      </a>
+      <p class="caption">Jwno in Action</p>
+    </div>
+  </div>
+</div>
+```
+
 @p{@strong{Note: This documentation is work-in-progress. Some links may return 404, because I have not finished writing those pages yet 😅.}}
 
 ### Cute Pictures
