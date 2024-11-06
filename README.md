@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="33%" src="https://agent-kilo.github.io/jwno/img/jwno.png" alt="Jwno Logo">
+  <img width="25%" src="https://agent-kilo.github.io/jwno/img/jwno.png" alt="Jwno Logo">
 </p>
 <p align="center">
   <b>Jwno: Your Friendly Neighborhood Window Manager</b>
