@@ -15,7 +15,7 @@
 (def VERSION_PATCH
   "Patch level."
   {:resource :versioninfo}
-  8)
+  9)
 (def VERSION_INTERNAL
   "Internal version number."
   {:resource :versioninfo}
