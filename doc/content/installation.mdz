@@ -16,7 +16,7 @@ You only need a portable @code{exe} file to run Jwno, so there isn't really any 
 
 ### Downloading
 
-Jwno releases can be found on @link[https://github.com/agent-kilo/jwno/releases]{Github}.
+You can download Jwno executable files from @link[https://github.com/agent-kilo/jwno/releases]{Github}, or purchase it from @link[https://agentkilo.itch.io/jwno]{itch.io}. You get the exact same executable files either way.
 
 Just grab @code{jwno.exe} and you are good to go. It can be saved to anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native modules, we don't need them just yet.
 
