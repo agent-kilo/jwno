@@ -180,6 +180,13 @@ Note that certain tag names are used by Jwno to layout the windows, you can set 
   }
 }
 
+All these properties, except @code{:frame}, take effect when retiling or transforming a window. For example, you can experiment with the @code{:margin} setting in the REPL, like this:
+
+@codeblock[janet]```
+(put (in win :tags) :margin 100) # Or any other value you prefer
+(:call-command (in jwno/context :command-manager) :retile)
+```
+
 ### Frame Nodes
 
 ⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️
