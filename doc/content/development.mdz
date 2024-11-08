@@ -42,7 +42,7 @@ Then, follow these steps:
     Run @code{jpm -l build} in @em{Jw32} source directory.
   }
   @li{
-    Run @code{jpm --tree=path\to\jwno\jpm_tree install} in @em{Jw32} source directory, to install it as a dependency for @em{Jwno}.
+    Run @code```jpm --tree=path\to\jwno\jpm_tree install``` in @em{Jw32} source directory, to install it as a dependency for @em{Jwno}.
   }
   @li{
     Run @code{jpm -l deps} in @em{Jwno} source directory.
