@@ -71,8 +71,118 @@ The @code{tree-node-dump-subtree} function in @link[https://github.com/agent-kil
 
 ### Types of Tree Nodes
 
-⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️
+There are currently four types of nodes in the frame tree. You can check the @code{:type} property of a node to determine its type:
 
+@codeblock[janet]```
+(case (in node :type)
+  # A managed window, which has no children
+  :window
+  ...
+
+  # A frame, which contains windows or other frames
+  :frame
+  ...
+
+  # A virtual desktop, which contains top-level frames (monitors)
+  :layout
+  ...
+
+  # The root of the frame tree, which contains layouts (virtual desktops)
+  :virtual-desktop-container
+  ...
+  )
+```
+
+There's no monitor type though. In Jwno, a monitor is just a special @code{:frame}, called a @em{top-level} frame. You can check a frame node's @code{:monitor} property to see if it's a monitor:
+
+@codeblock[janet]```
+(if-let [monitor (in node :monitor)]
+  (do
+    # It's a monitor
+    )
+  (do
+    # It's a normal frame otherwise
+    )
+  )
+```
+
+For all types of tree nodes, their supported methods can be inspected by peeking inside their prototypes:
+
+@codeblock[janet]```
+(keys (table/proto-flatten node))
+```
+
+### Window Nodes
+
+Only @em{managed} windows have corresponding window nodes. Besides the generic tree node properties (i.e. @code{:type}, @code{:parent} and @code{:children}), a window object currently only have two extra properties: @code{:hwnd} and @code{:tags}.
+
+The @code{:hwnd} property is the window's native Win32 @link[https://learn.microsoft.com/en-us/windows/win32/winmsg/about-windows#window-handle]{window handle}, which can be passed to low-level Win32 functions. For example, we can call @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow]{@code{ShowWindow}} to hide/show a window in the REPL:
+
+@codeblock[janet]```
+Welcome to Jwno REPL!
+[127.0.0.1:9999]:1: (use jw32/_winuser)
+
+# Put this line (without the prompt, of course) into the REPL,
+# and switch to the managed window you want to manipulate while
+# the REPL is sleeping
+[127.0.0.1:9999]:2: (ev/sleep 3) (def win (:get-current-window (get-in jwno/context [:window-manager :root])))
+
+# Be careful when doing this, you may lose track of the hidden
+# window. Use some window you can throw away, e.g. an empty
+# Notepad window. It's a fun trick to play with though 😜
+[127.0.0.1:9999]:3: (ShowWindow (in win :hwnd) SW_HIDE)
+
+# Do this to get your window back
+[127.0.0.1:9999]:4: (ShowWindow (in win :hwnd) SW_SHOW)
+```
+
+The @code{ev/sleep} trick is something I use when debugging Jwno itself. Given the power of the REPL, you can certainly find other ways to retrieve a window node.
+
+The next window property we'll talk about is @code{:tags}. It's a Janet @link[https://janet-lang.org/docs/data_structures/tables.html]{table} that stores any user-defined properties for that window. For example, you can mark your favorite windows when they're created:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win _uia _exe _desktop]
+     (when (is-my-favorite-window? win)
+       (put (in win :tags) :favorite true))))
+```
+
+And then pull them up by checking their @code{:tags} when using the @code{:summon} command:
+
+@codeblock[janet]```
+(:call-command (in jwno/context :command-manager)
+               :summon
+               (fn [win]
+                 (def tags (in win :tags))
+                 (= true (in tags :favorite))))
+```
+
+Note that certain tag names are used by Jwno to layout the windows, you can set them to the values you prefer, but cannot use these names for other purposes:
+
+@ul{
+  @li{
+    @code{:anchor}: Used to determine where the window should be placed when it does not fill the whole frame. Can be one of @code{:center}, @code{:top-left}, @code{:top}, @code{:top-right}, @code{:left}, @code{:right}, @code{:bottom-left}, @code{:bottom}, @code{:bottom-right}. It's only meaningful when @code{:no-expand} or @code{:no-resize} is specified, or when the window can not be resized.
+  }
+  @li{
+    @code{:forced}: Whether this window is managed forcibly.
+  }
+  @li{
+    @code{:frame}: A specific frame to put this window into. This overrides the default window placement rules, and can only be set in the @code{:window-created} hook.
+  }
+  @li{
+    @code{:margin} and @code{:margins}: Used to specify margins (gaps) around the window, when fitting it into a frame. You can specify non-uniform margins in @code{:margins} like this: @code```(put tags :margins {:left 10 :top 20 :right 30 :bottom 40})```, and they will override the value in @code{:margin}.
+  }
+  @li{
+    @code{:no-expand}: Tell Jwno not to enlarge a window when putting it into a frame (but shrinking can still happen). Can be used when dealing with modal dialog boxes, so that they fit nicely inside the frame, without covering their owner windows.
+  }
+  @li{
+    @code{:no-resize}: Tell Jwno not to resize a window when taking it under management.
+  }
+}
+
+### Frame Nodes
+
+⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️
 
 ### Next Step
 
