@@ -4,7 +4,7 @@
  :order 10}
 ---
 
-This page is a collection of recipes for some tasks in Jwno. They may need to be modified before getting incorporated into your own config file. You can usually try them out in @link[repl.html]{the REPL} first.
+This page is a collection of recipes for some @html```<del>&nbsp;funny tricks&nbsp;</del>``` tasks in Jwno. They may need to be modified before getting incorporated into your own config file. You can usually try them out in @link[repl.html]{the REPL} first.
 
 ### Get Detailed Info From a Window
 
@@ -99,6 +99,32 @@ Most dialog windows show little info, and don't need to expand to cover the whol
        # Change :no-expand to :no-resize, if you don't
        # want no resizing at all.
        (put (in win :tags) :no-expand true))))
+```
+
+### Keymap Hint Placement
+
+By default, Jwno shows the keymap hints at the top-left corner of your active monitor. You can, for example, change it to the top edge of your monitor:
+
+@codeblock[janet]```
+(:set-tooltip-anchor (in jwno/context :ui-manager) :keymap :top)
+```
+
+Or the bottom-right corner, etc.:
+
+@codeblock[janet]```
+(:set-tooltip-anchor (in jwno/context :ui-manager) :keymap :bottom-right)
+```
+
+### Automatically Put a Window Into a Specific Frame
+
+It can be done in the @code{:window-created} hook:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win _uia _exe _desktop]
+     (when (is-my-special-window? win)
+       (def frame (get-my-special-frame))
+       (put (in win :tags) :frame frame))))
 ```
 
 ### Get Notified When a Window's Title Changes
