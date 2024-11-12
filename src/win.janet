@@ -2155,7 +2155,7 @@
     (if-let [override-frame (in tags :frame)]
       (do 
         (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
-        override-frame)
+        (:get-current-frame override-frame))
       (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
