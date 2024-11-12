@@ -49,4 +49,7 @@
   @li{
     @link[ref-repl-server-objects.html]{REPL Server Objects}
   }
+  @li{
+    @link[ref-ui-automation-objects.html]{UIAutomation Objects}
+  }
 }
