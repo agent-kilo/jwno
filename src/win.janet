@@ -27,9 +27,20 @@
 
 ######### Helpers #########
 
-(defn- calc-win-coords-in-frame [win-rect fr-rect fit anchor]
+(defn calc-win-coords-in-frame [win-rect fr-rect fit anchor win-scale fr-scale]
   (def [fr-width fr-height] (rect-size fr-rect))
   (def [win-width win-height] (rect-size win-rect))
+  (def [fr-scale-x fr-scale-y] fr-scale)
+  (def [win-scale-x win-scale-y] win-scale)
+  (def scaled (not= win-scale fr-scale))
+  (def win-scaled-width
+    (if scaled
+      (* (/ win-width win-scale-x) fr-scale-x)
+      win-width))
+  (def win-scaled-height
+    (if scaled
+      (* (/ win-height win-scale-y) fr-scale-y)
+      win-height))
 
   (def [x y]
     (cond
@@ -37,39 +48,43 @@
       [(math/floor
         (+ (in fr-rect :left)
            (/ fr-width 2)
-           (/ win-width -2)))
+           (/ win-scaled-width -2)))
        (math/floor
         (+ (in fr-rect :top)
            (/ fr-height 2)
-           (/ win-height -2)))]
+           (/ win-scaled-height -2)))]
 
       (= :left anchor)
       [(in fr-rect :left)
        (math/floor
         (+ (in fr-rect :top)
            (/ fr-height 2)
-           (/ win-height -2)))]
+           (/ win-scaled-height -2)))]
 
       (= :right anchor)
-      [(- (in fr-rect :right) win-width)
+      [(math/floor
+        (- (in fr-rect :right)
+           win-scaled-width))
        (math/floor
         (+ (in fr-rect :top)
            (/ fr-height 2)
-           (/ win-height -2)))]
+           (/ win-scaled-height -2)))]
 
       (= :top anchor)
       [(math/floor
         (+ (in fr-rect :left)
            (/ fr-width 2)
-           (/ win-width -2)))
+           (/ win-scaled-width -2)))
        (in fr-rect :top)]
 
       (= :bottom anchor)
       [(math/floor
         (+ (in fr-rect :left)
            (/ fr-width 2)
-           (/ win-width -2)))
-       (- (in fr-rect :bottom) win-height)]
+           (/ win-scaled-width -2)))
+       (math/floor
+        (- (in fr-rect :bottom)
+           win-scaled-height))]
 
       (or (= :top-left anchor)
           (= :left-top anchor))
@@ -78,28 +93,36 @@
 
       (or (= :top-right anchor)
           (= :right-top anchor))
-      [(- (in fr-rect :right) win-width)
+      [(math/floor
+        (- (in fr-rect :right)
+           win-scaled-width))
        (in fr-rect :top)]
 
       (or (= :bottom-left anchor)
           (= :left-bottom anchor))
       [(in fr-rect :left)
-       (- (in fr-rect :bottom) win-height)]
+       (math/floor
+        (- (in fr-rect :bottom)
+           win-scaled-height))]
 
       (or (= :bottom-right anchor)
           (= :right-bottom anchor))
-      [(- (in fr-rect :right) win-width)
-       (- (in fr-rect :bottom) win-height)]
+      [(math/floor
+        (- (in fr-rect :right)
+           win-scaled-width))
+       (math/floor
+        (- (in fr-rect :bottom)
+           win-scaled-height))]
 
       (errorf "unknown anchor: %n" anchor)))
 
   (if fit
     (let [fitted-x (max x (in fr-rect :left))
-          fitted-width (min win-width fr-width)
+          fitted-width (min (math/floor win-scaled-width) fr-width)
           fitted-y (max y (in fr-rect :top))
-          fitted-height (min win-height fr-height)]
+          fitted-height (min (math/floor win-scaled-height) fr-height)]
       [fitted-x fitted-y fitted-width fitted-height])
-    [x y win-width win-height]))
+    [x y (math/floor win-scaled-width) (math/floor win-scaled-height)]))
 
 
 (defn- reset-hwnd-visual-state [hwnd uia-com restore-minimized restore-maximized]
@@ -176,8 +199,7 @@
       (errorf "SetWindowPos failed for window %n: %n" hwnd (GetLastError)))))
 
 
-(defn calc-window-rect-with-margins [win-rect orig-rect cur-scale scale dwm-margins margins]
-  (log/debug "win-rect = %n" win-rect)
+(defn calc-window-rect-with-margins [orig-rect cur-scale scale dwm-margins margins]
   (log/debug "orig-rect = %n" orig-rect)
   (log/debug "cur-scale = %n" cur-scale)
   (log/debug "scale = %n" scale)
@@ -254,9 +276,9 @@
             (def margins (get-margins-or-paddings-from-tags tags :margin :margins))
             (def dwm-margins (get-hwnd-dwm-border-margins hwnd win-rect))
 
+            (log/debug "win-rect = %n" win-rect)
             (def rect
-              (calc-window-rect-with-margins win-rect
-                                             orig-rect
+              (calc-window-rect-with-margins orig-rect
                                              cur-scale
                                              scale
                                              dwm-margins
@@ -275,11 +297,11 @@
               (cond
                 (or (not can-resize)
                     no-resize)
-                (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor)]
+                (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor cur-scale scale)]
                   (set-window-pos hwnd x y 0 0 scaled))
 
                 no-expand
-                (let [[x y w h] (calc-win-coords-in-frame win-rect rect true anchor)]
+                (let [[x y w h] (calc-win-coords-in-frame win-rect rect true anchor cur-scale scale)]
                   (set-window-pos hwnd x y w h scaled))
 
                 true
