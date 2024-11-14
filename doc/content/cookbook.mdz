@@ -62,6 +62,44 @@ Window "gaps" are implemented by @em{window margins} and @em{frame paddings} in 
 
 The code above will create gaps with a size of @em{20 virtual pixels} \(the gaps will scale with monitor DPI settings).
 
+### Adjust Top-Level Frames for Ultrawide Monitors
+
+Sometimes an ultrawide monitor is just... too wide. You can adjust Jwno's top-level frames, so that they show your managed windows around the center of your screen. This can be achieved in multiple ways.
+
+You can @code{:transform} a top-level frame directly:
+
+@codeblock[janet]```
+(import jwno/util)
+
+(def top-frame (:get-current-top-frame (get-in jwno/context [:window-manager :root])))
+(def rect (in top-frame :rect))
+
+# This will reserve 500 pixels of space on the left and right sides of your monitor.
+(:transform top-frame (util/shrink-rect rect {:left 500 :right 500 :top 0 :bottom 0}))
+(:retile (in jwno/context :window-manager) top-frame)
+
+# To restore the layout that fills the whole screen:
+(:transform top-frame (get-in top-frame [:monitor :work-area]))
+(:retile (in jwno/context :window-manager) top-frame)
+```
+
+Or, you can use frame paddings to do the same thing automatically:
+
+@codeblock[janet]```
+(import jwno/util)
+
+(defn is-my-ultrawide-monitor? [monitor]
+  (def [width height] (util/rect-size (in monitor :rect)))
+  (>= (/ width height) (/ 21 9)))
+
+(:add-hook (in jwno/context :hook-manager) :monitor-updated
+   (fn [top-frame]
+     (when (is-my-ultrawide-monitor? (in top-frame :monitor))
+       (put (in top-frame :tags) :paddings {:left 500 :right 500 :top 10 :bottom 10}))))
+```
+
+But this second method only takes effect when a new monitor is detected, or when your monitor configuration is actually changed, e.g. you set it to a different DPI or resolution. It will also override your frame's @code{:padding} setting.
+
 ### Adjust Window Transparency (Alpha Value)
 
 Just invoke the @code{:change-window-alpha} command on your window. Pass a negative argument to decrease the alpha value (increase transparency), or a positive argument to increase the alpha value (decrease transparency). This command is bound in a @em{transient} keymap, enabled by @code{Win + A}, in the example config.
