@@ -68,7 +68,13 @@ $}
 
           <div class="four columns">
             <footer class="post-info">
-              {% (when page-prev %}
+              {% (when (dyn :back-to) %}
+              <div class="tags">
+                Back to:
+                <a href="{{ (last (dyn :back-to)) }}">{{ (first (dyn :back-to)) }}</a>
+              </div>
+              {% ) %}
+              {% (when (and page-prev (not= 1 (dyn :order))) %}
               <div class="tags">
                 Previous:
                 <a href="{{ (relative-url (page-prev :url)) }}">{{ (page-prev :title) }}</a>
