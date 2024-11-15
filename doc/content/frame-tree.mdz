@@ -203,9 +203,9 @@ All these properties, except @code{:frame}, take effect when retiling or transfo
 
 @ul{
   @li{
-    @link[ref-window-manager-object.html]{The Window Manager Object}
+    @link[ref/window-manager-object.html]{The Window Manager Object}
   }
   @li{
-    @link[ref-tree-node-objects.html]{Tree Node Objects}
+    @link[ref/tree-node-objects.html]{Tree Node Objects}
   }
 }

@@ -108,6 +108,6 @@ And lastly, given the vastness of Win32 APIs, Jw32 will not and can not wrap up 
 
 @ul{
   @li{
-    @link[ref-index.html]{Reference Index}
+    @link[ref/index.html]{Reference Index}
   }
 }

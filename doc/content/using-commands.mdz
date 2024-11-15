@@ -74,12 +74,12 @@ When the command is not needed anymore, you can remove it by passing its name to
 
 @ul{
   @li{
-    @link[ref-command-manager-object.html]{The Command Manager Object}
+    @link[ref/command-manager-object.html]{The Command Manager Object}
   }
   @li{
-    @link[ref-keymap-objects.html]{Keymap Objects}
+    @link[ref/keymap-objects.html]{Keymap Objects}
   }
   @li{
-    @link[ref-built-in-commands.html]{Built-In Commands}
+    @link[ref/built-in-commands.html]{Built-In Commands}
   }
 }

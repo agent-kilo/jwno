@@ -80,9 +80,9 @@ To define and call a custom @em{or} filter hook:
 
 @ul{
   @li{
-    @link[ref-hook-manager-object.html]{The Hook Manager Object}
+    @link[ref/hook-manager-object.html]{The Hook Manager Object}
   }
   @li{
-    @link[ref-built-in-hooks.html]{Built-In Hooks}
+    @link[ref/built-in-hooks.html]{Built-In Hooks}
   }
 }

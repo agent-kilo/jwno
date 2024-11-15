@@ -359,6 +359,6 @@ It will automatically start an REPL server if no server is already running, and 
 
 @ul{
   @li{
-    @link[ref-index.html]{Reference Index}
+    @link[ref/index.html]{Reference Index}
   }
 }

@@ -88,7 +88,7 @@ For veterans:
     🧾 @link[cookbook.html]{Cookbook}
   }
   @li{
-    📖 @link[ref-index.html]{Reference Index}
+    📖 @link[ref/index.html]{Reference Index}
   }
   @li{
     🏗️ @link[development.html]{Development Guide}

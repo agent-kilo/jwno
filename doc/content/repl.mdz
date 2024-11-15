@@ -134,15 +134,15 @@ And of course you can remove exported names:
 
 @ul{
   @li{
-    @link[ref-command-line-options.html]{Command Line Options}
+    @link[ref/command-line-options.html]{Command Line Options}
   }
   @li{
-    @link[ref-context-object.html]{The Context Object}
+    @link[ref/context-object.html]{The Context Object}
   }
   @li{
-    @link[ref-repl-manager-object.html]{The REPL Manager Object}
+    @link[ref/repl-manager-object.html]{The REPL Manager Object}
   }
   @li{
-    @link[ref-repl-server-objects.html]{REPL Server Objects}
+    @link[ref/repl-server-objects.html]{REPL Server Objects}
   }
 }
