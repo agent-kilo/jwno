@@ -9,7 +9,7 @@ Here are all the keys Jwno currently supports, and the actual key codes used in 
 
 Note that Jwno currently only supports US keyboard layouts. On other layouts, the @code{VK_OEM_*} key codes may map to other characters.
 
-To use a key in a @link[../defining-key-bindings.html]{key spec}, write its name directly. For example:
+To use a key in a @link[../defining-key-bindings.html]{key spec}, write its name directly. All key names are case-insensitive. For example:
 
 @codeblock[janet]```
 "Win + A"        # Use the `A` key
@@ -25,10 +25,16 @@ To use a key in a @link[../defining-key-bindings.html]{key spec}, write its name
     @th{Name} @th{Key Code} @th{Description}
   }
   @tr{
+    @td{Win} @td{} @td{Win key (left or right)}
+  }
+  @tr{
     @td{LWin} @td{VK_LWIN} @td{Win key (left)}
   }
   @tr{
     @td{RWin} @td{VK_RWIN} @td{Win key (right)}
+  }
+  @tr{
+    @td{Alt} @td{} @td{Alt key (left or right)}
   }
   @tr{
     @td{LAlt} @td{VK_LMENU} @td{Alt key (left)}
@@ -37,10 +43,16 @@ To use a key in a @link[../defining-key-bindings.html]{key spec}, write its name
     @td{RAlt} @td{VK_RMENU} @td{Alt key (right)}
   }
   @tr{
+    @td{Ctrl} @td{} @td{Ctrl key (left or right)}
+  }
+  @tr{
     @td{LCtrl} @td{VK_LCONTROL} @td{Ctrl key (left)}
   }
   @tr{
     @td{RCtrl} @td{VK_RCONTROL} @td{Ctrl key (right)}
+  }
+  @tr{
+    @td{Shift} @td{} @td{Shift key (left or right)}
   }
   @tr{
     @td{LShift} @td{VK_LSHIFT} @td{Shift key (left)}
