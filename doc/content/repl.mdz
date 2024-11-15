@@ -58,6 +58,9 @@ The REPL console provides some of the keyboard shortcuts often seen in programs 
     @code{↓} \(Down arrow key): Next line in history.
   }
   @li{
+    @code{Ctrl + G}: Show documentation for the identifier before the cursor.
+  }
+  @li{
     @code{Ctrl + A}: Move the cursor to the beginning of current line.
   }
   @li{
