@@ -19,6 +19,12 @@ Jwno is a tiling window manager for Windows 10/11, built with [Janet](https://ja
 * [Development Guide](https://agent-kilo.github.io/jwno/development.html)
 * [Issue Tracker](https://github.com/agent-kilo/jwno/issues)
 
+<p>
+  <a href="https://agentkilo.itch.io/jwno">
+    <img height="60" src="https://agent-kilo.github.io/jwno/img/available-on-itch-io.svg" alt="Available on itch.io">
+  </a>
+</p>
+
 If you use Jwno in a professional work environment which generates revenue, please consider asking you employer to buy Jwno (and prioritized tech support) for you on [itch.io](https://agentkilo.itch.io/jwno). You get the exact same executable files as downloaded from the Github releases page.
 
 ## License ##
