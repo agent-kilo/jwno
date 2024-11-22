@@ -29,12 +29,6 @@
 
 (defn- handle-focus-changed-event [sender chan]
   (log/debug "#################### handle-focus-changed-event ####################")
-
-  # When sweeping through menu items with the mouse, each item would trigger
-  # a focus-changed event. We don't want these excessive events.
-  (when (= UIA_MenuItemControlTypeId (:get_CachedControlType sender))
-    (break S_OK))
-
   (ev/give chan :uia/focus-changed)
   S_OK)
 
