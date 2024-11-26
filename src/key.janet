@@ -53,12 +53,21 @@
 
 
 (defn- set-key-def [keymap key-struct command-or-keymap &opt doc]
-  (if (keymap? command-or-keymap)
+  (cond
+    (nil? command-or-keymap)
+    # Remove a key binding
+    (put keymap key-struct nil)
+
+    (keymap? command-or-keymap)
+    # It's a sub-keymap
     (let [sub-keymap command-or-keymap]
       # We're now using :current-keymap as a stack to track the real parent
       #(put sub-keymap :parent keymap)
       (put sub-keymap :doc doc)
       (put keymap key-struct sub-keymap))
+
+    true
+    # It's a normal command
     (let [command command-or-keymap]
       (put keymap key-struct @{:cmd command :doc doc}))))
 
