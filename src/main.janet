@@ -17,6 +17,7 @@
 (use ./config)
 (use ./util)
 
+(import ./resource)
 (import ./const)
 (import ./log)
 
@@ -212,6 +213,23 @@
   cli-args)
 
 
+(defn show-version-info [_cli-args]
+  (MessageBox nil
+              (string/format
+               ```
+               Jwno version: %d.%d.%d%s
+               Janet version: %s-%s
+               ```
+               resource/VERSION_MAJOR resource/VERSION_MINOR resource/VERSION_PATCH
+               (if resource/VERSION_VCS
+                 (string "-" resource/VERSION_VCS)
+                 "")
+               janet/version
+               janet/build)
+              "Jwno Version"
+              (bor MB_ICONINFORMATION MB_OK)))
+
+
 (defn run-repl-client [cli-args]
   (def repl-addr (in cli-args "repl"))
   (when (nil? repl-addr)
@@ -249,6 +267,10 @@
 
 (defn main [& args]
   (def cli-args (parse-args))
+
+  (when (in cli-args "version")
+    (show-version-info cli-args)
+    (os/exit 0))
 
   (when (in cli-args "client")
     (run-repl-client cli-args)

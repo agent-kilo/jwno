@@ -53,6 +53,11 @@
     :help (string "\nThe config file to run. Default: " default-config-file-path "\n")
     :kind :accumulate}
 
+   "version"
+   {:short "v"
+    :help (string "\nShows version info then exit.\n")
+    :kind :flag}
+
    "log-file"
    {:help "\nSpecifies a log file to write to. No log file will be generated if this option is omitted.\n"
     :kind :option}

@@ -29,7 +29,9 @@
 (defn generate-resource-header [env out-file-name]
   (with [out-file (file/open out-file-name :wn)]
     (eachp [k v] env
-      (when (and (table? v) (v :resource))
+      (when (and (table? v)
+                 (v :resource)
+                 (v :value))
         (file/write out-file (string/format "#define %s %v\n" k (v :value)))))))
 
 (defn generated [name]

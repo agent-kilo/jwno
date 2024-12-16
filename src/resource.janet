@@ -1,3 +1,6 @@
+(import spork/path)
+
+
 (def IDI_LOGO
   "Main logo."
   {:resource :icon}
@@ -20,6 +23,28 @@
   "Internal version number."
   {:resource :versioninfo}
   0)
+
+(def VERSION_VCS
+  "VCS version."
+  {:resource :versioninfo}
+  (try
+    (do
+      (def print-path |(do (printf "Reading %s for VCS version info..." $) $))
+      (def cur-file (dyn *current-file*))
+      # This happens at compile-time. Should make sure the relative
+      # path to build dir is correct when compiling. The actual version
+      # string is generated in project.janet.
+      (-> cur-file
+          (path/abspath)
+          (path/dirname)
+          (path/join ".." "build" "vcs-version.txt")
+          (print-path)
+          (slurp)
+          (string/trim)))
+    ((_err _fib)
+     (printf "XXX: _err = %n" _err)
+     # XXX: In the case of failure, always assume the version file does not exist.
+     nil)))
 
 
 (def ID_MENU_EXIT
