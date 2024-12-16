@@ -26,6 +26,77 @@
     (error (string/format "subprocess exited abnormally: %d" ret)))
   (:read out :all))
 
+(def fossil-info-peg
+  (peg/compile
+   ~{:main (some :info-line)
+     :info-line (replace
+                 (sequence :info-name ":" :s* :info-value "\n")
+                 ,(fn [& info-pair] info-pair))
+     :info-name (capture (to ":"))
+     :info-value (capture (to "\n"))}))
+
+(defn get-fossil-version []
+  (def fossil-info
+    (try
+      (spawn-and-wait "fossil" "info")
+      ((_err _fib)
+       # Fossil is not installed
+       nil)))
+  (def info-table @{})
+  (when fossil-info
+    (each [k v] (peg/match fossil-info-peg fossil-info)
+      (put info-table k v)))
+  (when-let [hash-and-time (in info-table "checkout")]
+    (def matched
+      (peg/match ~(sequence (capture (some (range "af" "AF" "09"))) :s+ (thru -1))
+                  hash-and-time))
+    (when matched
+      (in matched 0))))
+
+(defn get-git-version []
+  (try
+    (string/trim
+     (spawn-and-wait "git" "rev-parse" "HEAD"))
+    ((_err _fib)
+     nil)))
+
+(def fossil-origin-name-peg
+  (peg/compile
+   ~{:main (sequence (to :fossil-origin-name) :fossil-origin-name :fossil-checkout :s* -1)
+     :fossil-origin-name (sequence "FossilOrigin-Name:" :s*)
+     :fossil-checkout (capture (some (range "af" "AF" "09")))}))
+
+(defn get-git-fossil-origin-version []
+  (when-let [git-version (get-git-version)]
+    (def git-msg
+      (try
+        (spawn-and-wait "git" "show" "-s" "--format=format:%B" git-version)
+        ((_err _fib)
+         nil)))
+    (when (nil? git-msg)
+      (break nil))
+
+    (def matched (peg/match fossil-origin-name-peg git-msg))
+    (when (nil? matched)
+      (break nil))
+
+    (in matched 0)))
+
+(defn get-vcs-version []
+  (def fossil-version (get-fossil-version))
+  (when fossil-version
+    (break [:fossil fossil-version]))
+
+  (def fossil-origin-version (get-git-fossil-origin-version))
+  (when fossil-origin-version
+    (break [:fossil-origin fossil-origin-version]))
+
+  (def git-version (get-git-version))
+  (when git-version
+    (break [:git git-version]))
+
+  nil)
+
 (defn generate-resource-header [env out-file-name]
   (with [out-file (file/open out-file-name :wn)]
     (eachp [k v] env
@@ -45,6 +116,35 @@
        (ensure-dir (find-build-dir))
        ,;body
        (printf "Generated %s" _target))))
+
+
+(gen-rule (generated "vcs-version.txt") []
+  (def vcs-version (get-vcs-version))
+  (printf "Detected source version: %n" vcs-version)
+  (def abbr-hash-len 10)
+  (def cur-version
+    (match vcs-version
+      [:fossil fossil-version]
+      (string/format "fossil-%s" (string/slice fossil-version 0 abbr-hash-len))
+
+      [:fossil-origin fossil-origin-version]
+      (string/format "fossil-%s" (string/slice fossil-origin-version 0 abbr-hash-len))
+
+      [:git git-version]
+      (string/format "git-%s" (string/slice git-version 0 abbr-hash-len))
+
+      nil
+      # There's no version control
+      nil))
+  (def old-version
+    (try
+      (slurp _target)
+      ((_err _fib)
+       nil)))
+
+  (when (and cur-version
+             (not= cur-version old-version))
+    (spit _target cur-version)))
 
 
 (gen-rule (generated "resource.h") ["src/resource.janet"]

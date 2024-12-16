@@ -42,7 +42,6 @@
           (slurp)
           (string/trim)))
     ((_err _fib)
-     (printf "XXX: _err = %n" _err)
      # XXX: In the case of failure, always assume the version file does not exist.
      nil)))
 
