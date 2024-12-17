@@ -61,3 +61,7 @@
 (def ID_MENU_LAUNCH_REPL
   "Launch REPL command in the notify icon menu."
   (int/u64 90004))
+
+(def ID_MENU_VERSION
+  "Jwno version in the notify icon menu."
+  (int/u64 90005))
