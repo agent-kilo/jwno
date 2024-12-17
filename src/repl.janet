@@ -2,6 +2,7 @@
 
 (use ./util)
 
+(import ./resource)
 (import ./const)
 (import ./log)
 
@@ -46,6 +47,13 @@
        (global-ns 'client-stream)
        @{:value client-stream
          :doc "The socket stream for the current REPL client.\n"})
+  (put new-env
+       (global-ns 'version)
+       @{:value [resource/VERSION_MAJOR
+                 resource/VERSION_MINOR
+                 resource/VERSION_PATCH
+                 resource/VERSION_VCS]
+         :doc "Current Jwno version.\n"})
 
   (make-env new-env))
 

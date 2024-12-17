@@ -5,32 +5,18 @@
                  :tag "18938c57212c8d4dc0a37b6ea10b8b859aad7518"}])
 
 
-(defn dir-exists? [name]
-  (def stat (os/stat name))
-  (and (not (nil? stat)) (= (stat :mode) :directory)))
+(import ./script/util)
+(import ./script/vcs)
 
-(defn ensure-dir [name]
-  (when (not (dir-exists? name))
-    (when (not (os/mkdir name))
-      (error (string/format "failed to create directory %s" name)))))
-
-(defn spawn-and-wait [& args]
-  (def os-env (os/environ))
-  (put os-env :out :pipe)
-  (def proc (os/spawn args :ep os-env))
-  (os/proc-wait proc)
-  (def out (in proc :out))
-  (def ret (in proc :return-code))
-  (when (not (= ret 0))
-    (print (:read out :all))
-    (error (string/format "subprocess exited abnormally: %d" ret)))
-  (:read out :all))
 
 (defn generate-resource-header [env out-file-name]
   (with [out-file (file/open out-file-name :wn)]
     (eachp [k v] env
-      (when (and (table? v) (v :resource))
+      (when (and (table? v)
+                 (v :resource)
+                 (v :value))
         (file/write out-file (string/format "#define %s %v\n" k (v :value)))))))
+
 
 (defn generated [name]
   (string (find-build-dir) name))
@@ -40,7 +26,7 @@
   ~(let [_target ,target
          _deps   ,deps]
      (rule _target [;_deps]
-       (ensure-dir (find-build-dir))
+       (util/ensure-dir (find-build-dir))
        ,;body
        (printf "Generated %s" _target))))
 
@@ -52,25 +38,48 @@
 (gen-rule (generated "resource.res") ["res/jwno.rc"
                                       "res/jwno.ico"
                                       (generated "resource.h")]
-  (spawn-and-wait "rc.exe" "/I" (find-build-dir) "/fo" _target (_deps 0)))
+  (util/spawn-and-wait "rc.exe" "/I" (find-build-dir) "/fo" _target (_deps 0)))
 
 
 (gen-rule (generated "resource.obj") [(generated "resource.res")]
-  (spawn-and-wait "cvtres.exe" "/machine:x64" (string "/out:" _target) (_deps 0)))
+  (util/spawn-and-wait "cvtres.exe" "/machine:x64" (string "/out:" _target) (_deps 0)))
 
 
-(gen-rule (generated "winmain_stub.o") []
-  (spawn-and-wait "cl.exe" "/c" "/nologo" "/MD" "/O2" (string "/Fo" _target) "c/winmain_stub.c"))
-
-(add-dep (generated "winmain_stub.o")
-         "c/winmain_stub.c")
+(gen-rule (generated "winmain_stub.o") ["c/winmain_stub.c"]
+  (util/spawn-and-wait "cl.exe" "/c" "/nologo" "/MD" "/O2" (string "/Fo" _target) "c/winmain_stub.c"))
 
 
 (task "embed-manifest" [(generated "jwno.exe")]
   (let [manifest "manifest/jwno.manifest"
         exe-file (generated "jwno.exe")]
-    (spawn-and-wait "mt.exe" "-manifest" manifest (string "-outputresource:" exe-file ";#1"))
+    (util/spawn-and-wait "mt.exe" "-manifest" manifest (string "-outputresource:" exe-file ";#1"))
     (printf "Embedded %s into %s" manifest exe-file)))
+
+
+(task "vcs-version" []
+  (def vcs-version-file (generated "vcs-version.txt"))
+  (def vcs-version (vcs/get-vcs-version))
+  (printf "Detected source version: %n" vcs-version)
+
+  (def cur-version
+    (vcs/format-vcs-version-string vcs-version 10))
+  (def old-version
+    (try
+      (string/trim (slurp vcs-version-file))
+      ((_err _fib)
+       nil)))
+
+  (printf "Old vcs-version: %n" old-version)
+  (printf "Current vcs-version: %n" cur-version)
+
+  (when (and cur-version
+             (not= cur-version old-version))
+    (util/ensure-dir (find-build-dir))
+    (spit vcs-version-file cur-version)
+    (try
+      # So that the next build will try to use the new version info
+      (os/rm (generated "resource.h"))
+      ((_err _fib) :ignore))))
 
 
 (declare-executable
