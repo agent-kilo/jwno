@@ -86,7 +86,7 @@
   (def [git-ver state] git-version)
   (def git-msg
     (try
-      (spawn-and-wait "git" "show" "-s" "--format=format:%B" git-version)
+      (spawn-and-wait "git" "show" "-s" "--format=format:%B" git-ver)
       ((_err _fib)
        nil)))
   (when (nil? git-msg)
