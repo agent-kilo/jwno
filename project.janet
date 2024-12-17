@@ -118,35 +118,6 @@
        (printf "Generated %s" _target))))
 
 
-(gen-rule (generated "vcs-version.txt") []
-  (def vcs-version (get-vcs-version))
-  (printf "Detected source version: %n" vcs-version)
-  (def abbr-hash-len 10)
-  (def cur-version
-    (match vcs-version
-      [:fossil fossil-version]
-      (string/format "fossil-%s" (string/slice fossil-version 0 abbr-hash-len))
-
-      [:fossil-origin fossil-origin-version]
-      (string/format "fossil-%s" (string/slice fossil-origin-version 0 abbr-hash-len))
-
-      [:git git-version]
-      (string/format "git-%s" (string/slice git-version 0 abbr-hash-len))
-
-      nil
-      # There's no version control
-      nil))
-  (def old-version
-    (try
-      (slurp _target)
-      ((_err _fib)
-       nil)))
-
-  (when (and cur-version
-             (not= cur-version old-version))
-    (spit _target cur-version)))
-
-
 (gen-rule (generated "resource.h") ["src/resource.janet"]
   (generate-resource-header (dofile "src/resource.janet") _target))
 
@@ -173,6 +144,44 @@
         exe-file (generated "jwno.exe")]
     (spawn-and-wait "mt.exe" "-manifest" manifest (string "-outputresource:" exe-file ";#1"))
     (printf "Embedded %s into %s" manifest exe-file)))
+
+
+(task "vcs-version" []
+  (def vcs-version-file (generated "vcs-version.txt"))
+  (def vcs-version (get-vcs-version))
+  (printf "Detected source version: %n" vcs-version)
+  (def abbr-hash-len 10)
+  (def cur-version
+    (match vcs-version
+      [:fossil fossil-version]
+      (string/format "fossil-%s" (string/slice fossil-version 0 abbr-hash-len))
+
+      [:fossil-origin fossil-origin-version]
+      (string/format "fossil-%s" (string/slice fossil-origin-version 0 abbr-hash-len))
+
+      [:git git-version]
+      (string/format "git-%s" (string/slice git-version 0 abbr-hash-len))
+
+      nil
+      # There's no version control
+      nil))
+  (def old-version
+    (try
+      (string/trim (slurp vcs-version-file))
+      ((_err _fib)
+       nil)))
+
+  (printf "Old vcs-version: %n" old-version)
+  (printf "Current vcs-version: %n" cur-version)
+
+  (when (and cur-version
+             (not= cur-version old-version))
+    (ensure-dir (find-build-dir))
+    (spit vcs-version-file cur-version)
+    (try
+      # So that the next build will try to use the new version info
+      (os/rm (generated "resource.h"))
+      ((_err _fib) :ignore))))
 
 
 (declare-executable
