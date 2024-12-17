@@ -17,6 +17,7 @@
 (use ./config)
 (use ./util)
 
+(import ./resource)
 (import ./const)
 (import ./log)
 
@@ -249,6 +250,10 @@
 
 (defn main [& args]
   (def cli-args (parse-args))
+
+  (when (in cli-args "version")
+    (show-version-info)
+    (os/exit 0))
 
   (when (in cli-args "client")
     (run-repl-client cli-args)

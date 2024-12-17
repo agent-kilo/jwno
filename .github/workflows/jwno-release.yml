@@ -111,6 +111,10 @@ jobs:
         working-directory: ${{ env.JW32_DIR }}
         run: ${{ env.JPM_CMD }} --tree=${{ env.JWNO_DIR }}\jpm_tree install
 
+      - name: Gather VCS version info
+        working-directory: ${{ env.JWNO_DIR }}
+        run: ${{ env.JPM_CMD }} -l run vcs-version
+
       - name: Build Jwno
         working-directory: ${{ env.JWNO_DIR }}
         run: ${{ env.JPM_CMD }} -l run embed-manifest

@@ -42,6 +42,23 @@
 (def TOOLTIP-TIMER-BASE-MASK (int/u64 0xffff0000))
 
 
+(defn show-version-info []
+  (MessageBox nil
+              (string/format
+               ```
+               Jwno version: %d.%d.%d%s
+               Janet version: %s-%s
+               ```
+               VERSION_MAJOR VERSION_MINOR VERSION_PATCH
+               (if VERSION_VCS
+                 (string "-" VERSION_VCS)
+                 "")
+               janet/version
+               janet/build)
+              "Jwno Version"
+              (bor MB_ICONINFORMATION MB_OK)))
+
+
 (defn- msg-loop [chan gc-timer-id hook-handler]
   (def msg (MSG))
 
@@ -71,6 +88,13 @@
 
 (defn- create-notify-icon-menu []
   (def hMenu (CreatePopupMenu))
+  (AppendMenu hMenu
+              MF_STRING ID_MENU_VERSION
+              (string/format "Jwno %d.%d.%d"
+                             VERSION_MAJOR
+                             VERSION_MINOR
+                             VERSION_PATCH))
+  (AppendMenu hMenu MF_SEPARATOR 0 0)
   (AppendMenu hMenu MF_STRING ID_MENU_LAUNCH_REPL "Launch &REPL")
   (AppendMenu hMenu MF_STRING ID_MENU_UPDATE_MONITOR_LAYOUT "Update &Monitor Layout")
   (AppendMenu hMenu MF_STRING ID_MENU_RESET_KBD_HOOKS "Reset &Keyboard Hooks")
@@ -654,7 +678,10 @@
     (ev/give (in hook-handler :chan) :ui/display-changed)
 
     ID_MENU_LAUNCH_REPL
-    (ev/give (in hook-handler :chan) :ui/launch-repl))
+    (ev/give (in hook-handler :chan) :ui/launch-repl)
+
+    ID_MENU_VERSION
+    (show-version-info))
   0)
 
 
