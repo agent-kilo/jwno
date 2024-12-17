@@ -48,17 +48,29 @@
       (put info-table k v)))
   (when-let [hash-and-time (in info-table "checkout")]
     (def matched
-      (peg/match ~(sequence (capture (some (range "af" "AF" "09"))) :s+ (thru -1))
+      (peg/match ~(sequence (capture (some (range "af" "AF" "09"))) :s* (thru -1))
                   hash-and-time))
     (when matched
-      (in matched 0))))
+      (def ver (in matched 0))
+      (def state
+        (if (nil? (spawn-and-wait "fossil" "diff"))
+          :clean
+          :dirty))
+      [ver state])))
 
 (defn get-git-version []
-  (try
-    (string/trim
-     (spawn-and-wait "git" "rev-parse" "HEAD"))
-    ((_err _fib)
-     nil)))
+  (def ver
+    (try
+      (string/trim
+       (spawn-and-wait "git" "rev-parse" "HEAD"))
+      ((_err _fib)
+       nil)))
+  (if ver
+    (let [state (if (nil? (spawn-and-wait "git" "diff"))
+                  :clean
+                  :dirty)]
+      [ver state])
+    nil))
 
 (def fossil-origin-name-peg
   (peg/compile
@@ -67,20 +79,25 @@
      :fossil-checkout (capture (some (range "af" "AF" "09")))}))
 
 (defn get-git-fossil-origin-version []
-  (when-let [git-version (get-git-version)]
-    (def git-msg
-      (try
-        (spawn-and-wait "git" "show" "-s" "--format=format:%B" git-version)
-        ((_err _fib)
-         nil)))
-    (when (nil? git-msg)
-      (break nil))
+  (def git-version (get-git-version))
+  (when (nil? git-version)
+    (break nil))
 
-    (def matched (peg/match fossil-origin-name-peg git-msg))
-    (when (nil? matched)
-      (break nil))
+  (def [git-ver state] git-version)
+  (def git-msg
+    (try
+      (spawn-and-wait "git" "show" "-s" "--format=format:%B" git-version)
+      ((_err _fib)
+       nil)))
+  (when (nil? git-msg)
+    (break nil))
 
-    (in matched 0)))
+  (def matched (peg/match fossil-origin-name-peg git-msg))
+  (when (nil? matched)
+    (break nil))
+
+  (def ver (in matched 0))
+  [ver state])
 
 (defn get-vcs-version []
   (def fossil-version (get-fossil-version))
@@ -151,16 +168,27 @@
   (def vcs-version (get-vcs-version))
   (printf "Detected source version: %n" vcs-version)
   (def abbr-hash-len 10)
+
+  (defn format-version [prefix version state]
+    (def ver
+      (string/slice version 0 abbr-hash-len))
+    (case state
+      :clean
+      (string/format "%s-%s" prefix ver)
+
+      :dirty
+      (string/format "%s-%s-dirty" prefix ver)))
+
   (def cur-version
     (match vcs-version
-      [:fossil fossil-version]
-      (string/format "fossil-%s" (string/slice fossil-version 0 abbr-hash-len))
+      [:fossil [fossil-version state]]
+      (format-version "fossil" fossil-version state)
 
-      [:fossil-origin fossil-origin-version]
-      (string/format "fossil-%s" (string/slice fossil-origin-version 0 abbr-hash-len))
+      [:fossil-origin [fossil-origin-version state]]
+      (format-version "fossil" fossil-origin-version state)
 
-      [:git git-version]
-      (string/format "git-%s" (string/slice git-version 0 abbr-hash-len))
+      [:git [git-version state]]
+      (format-version "git" git-version state)
 
       nil
       # There's no version control
