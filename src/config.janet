@@ -2,6 +2,7 @@
 
 (use ./util)
 
+(import ./resource)
 (import ./const)
 (import ./log)
 
@@ -107,6 +108,13 @@
        (global-ns 'context)
        @{:value context
          :doc "The Jwno main loop context object.\n"})
+  (put new-env
+       (global-ns 'version)
+       @{:value [resource/VERSION_MAJOR
+                 resource/VERSION_MINOR
+                 resource/VERSION_PATCH
+                 resource/VERSION_VCS]
+         :doc "Current Jwno version.\n"})
   (dofile config-path
           :source config-path
           :env (make-env new-env)))
