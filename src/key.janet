@@ -543,6 +543,35 @@
       [:key/reset-keymap (last (in self :current-keymap))])))
 
 
+(defn keyboard-hook-handler-set-key-mode [self new-mode]
+  (unless (find |(= $ new-mode) [:command :raw])
+    (errorf "unknown key mode: %n" new-mode))
+  (put (in self :key-mode) :pending new-mode))
+
+
+(defn keyboard-hook-handler-check-key-mode [self hook-struct]
+  (def key-up (hook-struct :flags.up))
+  (def key-mode (in self :key-mode))
+  (def pending-mode (in key-mode :pending))
+
+  (when (and (not key-up)
+             (not (nil? pending-mode)))
+    (put key-mode :pending nil)
+    (put key-mode :current pending-mode))
+
+  (in key-mode :current))
+
+
+(defn keyboard-hook-handler-handle-raw-key [self hook-struct mod-states]
+  (def key-up (hook-struct :flags.up))
+  (def key-code (hook-struct :vkCode))
+  (def pass-through? (in MODIFIER-KEYS key-code))
+  (if key-up
+    [pass-through? nil]
+    (let [key-struct (key key-code (sort (keys mod-states)))]
+      [pass-through? {:key/raw key-struct}])))
+
+
 (def- keyboard-hook-handler-proto
   @{:set-keymap keyboard-hook-handler-set-keymap
     :push-keymap keyboard-hook-handler-push-keymap
@@ -552,7 +581,10 @@
     :get-modifier-states keyboard-hook-handler-get-modifier-states
     :reset-keymap keyboard-hook-handler-reset-keymap
     :handle-binding keyboard-hook-handler-handle-binding
-    :handle-unbound keyboard-hook-handler-handle-unbound})
+    :handle-unbound keyboard-hook-handler-handle-unbound
+    :set-key-mode keyboard-hook-handler-set-key-mode
+    :check-key-mode keyboard-hook-handler-check-key-mode
+    :handle-raw-key keyboard-hook-handler-handle-raw-key})
 
 
 (defn keyboard-hook-handler [keymap]
@@ -564,5 +596,13 @@
      # triggered that sub-keymap. This array is used as another stack
      # to record how we reached the current keymap, so that we can get
      # back to its real parent.
-     :current-keymap @[keymap]}
+     :current-keymap @[keymap]
+     :key-mode @{
+       # When switching key modes, pending key-up events should pass
+       # through in the previous mode, so we don't actually change the
+       # mode before the first key-down event is seen. We need two flags
+       # to track this mode-switching process.          
+       :pending nil      # The next mode to switch to
+       :current :command # The current mode
+      }}
    keyboard-hook-handler-proto))

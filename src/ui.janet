@@ -30,6 +30,7 @@
 (def UPDATE-WORK-AREA-MSG        (+ WM_APP 0x0B))
 (def ADD-CUSTOM-MSG-MSG          (+ WM_APP 0x0C))
 (def REMOVE-CUSTOM-MSG-MSG       (+ WM_APP 0x0D))
+(def SET-KEY-MODE-MSG            (+ WM_APP 0x0E))
 
 # Where custom messages begin
 (def CUSTOM-MSG (+ WM_APP 0x400))
@@ -169,6 +170,15 @@
   (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
 
 
+(defn- suppress-start-menu [mod-states key-up? extra-info]
+  (when (or (in mod-states :lwin)
+            (in mod-states :rwin))
+    # Send a dummy key event to stop the Start Menu from popping up
+    (send-input (keyboard-input VK_DUMMY
+                                (if key-up? :up :down)
+                                (bor KEI-FLAG-PASSTHROUGH extra-info)))))
+
+
 # msg-wndproc and this keyboard hook both have access to the
 # same keyboard-hook-handler, but since hook events and window
 # messages are serialized on the same UI thread, there won't be
@@ -197,23 +207,31 @@
                                 (bor KEI-FLAG-REMAPPED extra-info)))
     (break 1))
 
+  (def ev-chan (in handler :chan))
   (def mod-states (:get-modifier-states handler hook-struct))
+
+  (def key-mode (:check-key-mode handler hook-struct))
+  (when (= :raw key-mode)
+    (def [pass-through? msg]
+      (:handle-raw-key handler hook-struct mod-states))
+    (when msg
+      (ev/give ev-chan msg))
+    (if pass-through?
+      (break (CallNextHookEx nil code wparam (hook-struct :address)))
+      (do
+        (suppress-start-menu mod-states key-up extra-info)
+        (break 1))))
 
   (if-let [binding (:find-binding handler hook-struct mod-states)]
     (do
-      (when (or (in mod-states :lwin)
-                (in mod-states :rwin))
-        # Send a dummy key event to stop the Start Menu from popping up
-        (send-input(keyboard-input VK_DUMMY
-                                   (if key-up :up :down)
-                                   (bor KEI-FLAG-PASSTHROUGH extra-info))))
+      (suppress-start-menu mod-states key-up extra-info)
       (when-let [msg (:handle-binding handler hook-struct binding)]
-        (ev/give (in handler :chan) msg))
+        (ev/give ev-chan msg))
       1) # !!! IMPORTANT
 
     (do
       (when-let [msg (:handle-unbound handler hook-struct)]
-        (ev/give (in handler :chan) msg))
+        (ev/give ev-chan msg))
       (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
@@ -274,6 +292,13 @@
 (defn- msg-wnd-handle-set-keymap [_hwnd _msg wparam _lparam hook-handler _state]
   (let [keymap (unmarshal-and-free wparam)]
     (:set-keymap hook-handler keymap))
+  0 # !!! IMPORTANT
+  )
+
+
+(defn- msg-wnd-handle-set-key-mode [_hwnd _msg wparam _lparam hook-handler _state]
+  (let [new-mode (unmarshal-and-free wparam)]
+    (:set-key-mode hook-handler new-mode))
   0 # !!! IMPORTANT
   )
 
@@ -744,6 +769,7 @@
 
 (def msg-wnd-handlers
   {SET-KEYMAP-MSG msg-wnd-handle-set-keymap
+   SET-KEY-MODE-MSG msg-wnd-handle-set-key-mode
 
    SET-HOOKS-MSG msg-wnd-handle-set-hooks
    REMOVE-HOOKS-MSG msg-wnd-handle-remove-hooks
@@ -911,6 +937,11 @@
   (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
 
 
+(defn ui-manager-set-key-mode [self new-mode]
+  (def buf-ptr (alloc-and-marshal new-mode))
+  (ui-manager-post-message self SET-KEY-MODE-MSG buf-ptr 0))
+
+
 (defn ui-manager-set-hooks [self]
   (ui-manager-post-message self SET-HOOKS-MSG 0 0))
 
@@ -986,6 +1017,7 @@
     :post-message ui-manager-post-message
     :send-message ui-manager-send-message
     :set-keymap ui-manager-set-keymap
+    :set-key-mode ui-manager-set-key-mode
     :set-hooks ui-manager-set-hooks
     :remove-hooks ui-manager-remove-hooks
     :show-tooltip ui-manager-show-tooltip
