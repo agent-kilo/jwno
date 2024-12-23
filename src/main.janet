@@ -166,6 +166,9 @@
        [:key/pop-keymap cur-keymap]
        (:call-hook (in context :hook-manager) :keymap-popped cur-keymap)
 
+       [:key/raw raw-key]
+       (:call-hook (in context :hook-manager) :key-pressed raw-key)
+
        [:debug/thunk thunk]
        (thunk context)
 

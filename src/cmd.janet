@@ -11,6 +11,7 @@
 (use ./win)
 (use ./uia)
 (use ./input)
+(use ./key)
 (use ./resource)
 (use ./util)
 
@@ -680,6 +681,48 @@
   (os/execute repl-cli))
 
 
+(var- describe-key-hook-fn nil)
+
+(defn cmd-describe-key [context]
+  (def {:key-manager key-man
+        :hook-manager hook-man
+        :ui-manager ui-man}
+    context)
+
+  (when describe-key-hook-fn
+    (:remove-hook hook-man :key-pressed describe-key-hook-fn))
+
+  (set describe-key-hook-fn
+       (:add-hook hook-man :key-pressed
+          (fn [key]
+            # Ignore modifier key events, since they're included
+            # in (key :modifiers)
+            (when (in MODIFIER-KEYS (in key :key))
+              (break))
+
+            (:set-key-mode key-man :command)
+            (:remove-hook hook-man :key-pressed describe-key-hook-fn)
+            (set describe-key-hook-fn nil)
+
+            (:show-tooltip
+               ui-man
+               :describe-key
+               (string/format
+                ```
+                Key Code: %n
+                Key Name: %n
+                Modifiers : %n
+                ```
+                (in key :key)
+                (in key-code-to-name (in key :key))
+                (in key :modifiers))
+               nil
+               nil))))
+
+  (:set-key-mode key-man :raw)
+  (:show-tooltip ui-man :describe-key "Please press a key." nil nil 0))
+
+
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
         :uia-manager uia-man
@@ -922,6 +965,14 @@
      (:ignore-window)
 
      Removes the current window from the list of managed windows.
+     ```)
+
+  (:add-command command-man :describe-key
+     (fn [] (cmd-describe-key context))
+     ```
+     (:describe-key)
+
+     Interactively reads a key, and shows some info about it.
      ```))
 
 
