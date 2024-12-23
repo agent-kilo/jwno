@@ -1,6 +1,5 @@
 (use jw32/_winuser)
 
-(use ./cmd)
 (use ./input)
 
 (import ./const)
@@ -367,9 +366,14 @@
     (error (string/format "unknown key: %n" key-name))))
 
 
+(defn key-manager-set-key-mode [self new-mode]
+  (:set-key-mode (in self :ui-manager) new-mode))
+
+
 (def- key-manager-proto
   @{:new-keymap key-manager-new-keymap
     :set-keymap key-manager-set-keymap
+    :set-key-mode key-manager-set-key-mode
     :get-key-code key-manager-get-key-code})
 
 
@@ -546,6 +550,7 @@
 (defn keyboard-hook-handler-set-key-mode [self new-mode]
   (unless (find |(= $ new-mode) [:command :raw])
     (errorf "unknown key mode: %n" new-mode))
+  (log/debug "Pending key mode: %n" new-mode)
   (put (in self :key-mode) :pending new-mode))
 
 
@@ -553,23 +558,30 @@
   (def key-up (hook-struct :flags.up))
   (def key-mode (in self :key-mode))
   (def pending-mode (in key-mode :pending))
+  (def current-mode (in key-mode :current))
 
   (when (and (not key-up)
              (not (nil? pending-mode)))
+    (log/debug "Update key mode: %n -> %n" current-mode pending-mode)
     (put key-mode :pending nil)
     (put key-mode :current pending-mode))
 
-  (in key-mode :current))
+  (def ret (in key-mode :current))
+  (log/debug "Actual key mode: %n" ret)
+  ret)
 
 
 (defn keyboard-hook-handler-handle-raw-key [self hook-struct mod-states]
   (def key-up (hook-struct :flags.up))
   (def key-code (hook-struct :vkCode))
+  # All modifier keys needs to go through, or the low-level modifier
+  # states tracked by the OS (i.e. the values returned by GetAsyncKeyState)
+  # would be wrong.
   (def pass-through? (in MODIFIER-KEYS key-code))
   (if key-up
     [pass-through? nil]
     (let [key-struct (key key-code (sort (keys mod-states)))]
-      [pass-through? {:key/raw key-struct}])))
+      [pass-through? [:key/raw key-struct]])))
 
 
 (def- keyboard-hook-handler-proto
