@@ -63,11 +63,27 @@
 
 (defn hook-manager-add-hook [self hook-name hook-fn]
   (def hooks (in self :hooks))
-  (def hook-fn-list (in hooks hook-name @[]))
+  # Make a copy of the fn list. If we modified it in-place, when
+  # new hook fns get registered in a hook fn under the same name,
+  # the new hook fns would get called immediately.
+  (def hook-fn-list (array/slice (in hooks hook-name @[])))
   (unless (find |(= $ hook-fn) hook-fn-list)
     (array/push hook-fn-list hook-fn)
     (put hooks hook-name hook-fn-list))
   hook-fn)
+
+
+(defn hook-manager-add-oneshot-hook [self hook-name hook-fn]
+  (def hooks (in self :hooks))
+  (def hook-fn-list (in hooks hook-name @[]))
+  (var saved-hook-fn nil)
+  (def wrapper
+    (fn [& args]
+      (def ret (hook-fn ;args))
+      (:remove-hook self hook-name saved-hook-fn)
+      ret))
+  (set saved-hook-fn (:add-hook self hook-name wrapper))
+  saved-hook-fn)
 
 
 (defn hook-manager-remove-hook [self hook-name hook-fn]
@@ -80,6 +96,7 @@
   @{:call-hook hook-manager-call-hook
     :call-filter-hook hook-manager-call-filter-hook
     :add-hook hook-manager-add-hook
+    :add-oneshot-hook hook-manager-add-oneshot-hook
     :remove-hook hook-manager-remove-hook})
 
 
