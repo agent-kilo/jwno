@@ -94,7 +94,67 @@
   (assert (= 1 (length (get-in hook-man [:hooks :dummy-hook])))))
 
 
+(defn test-oneshot-hook []
+  (def hook-man (hook-manager))
+
+  (var hook-fn1-called-with nil)
+  (def oneshot-hook-fn1
+    (fn [& args]
+      (set hook-fn1-called-with args)))
+
+  (var hook-fn2-called-with nil)
+  (def oneshot-hook-fn2
+    (fn [& args]
+      (set hook-fn2-called-with args)))
+
+  (var hook-fn3-called-with nil)
+  (def hook-fn3
+    (fn [& args]
+      (set hook-fn3-called-with args)))
+
+  (:add-oneshot-hook hook-man :dummy-hook oneshot-hook-fn1)
+  (:add-hook hook-man :dummy-hook hook-fn3)
+  (:add-oneshot-hook hook-man :dummy-hook oneshot-hook-fn2)
+
+  (:call-hook hook-man :dummy-hook :arg1)
+  (assert (= [:arg1] hook-fn1-called-with))
+  (assert (= [:arg1] hook-fn2-called-with))
+  (assert (= [:arg1] hook-fn3-called-with))
+
+  (:call-hook hook-man :dummy-hook :arg2)
+  (assert (= [:arg1] hook-fn1-called-with))
+  (assert (= [:arg1] hook-fn2-called-with))
+  (assert (= [:arg2] hook-fn3-called-with)))
+
+
+(defn test-hook-op-in-hook-fn []
+  (def hook-man (hook-manager))
+
+  (var hook-fn2-called-with nil)
+  (def hook-fn2
+    (fn [& args]
+      (set hook-fn2-called-with args)))
+
+  (var hook-fn1-called-with nil)
+  (def hook-fn1
+    (fn [& args]
+      (set hook-fn1-called-with args)
+      (:add-hook hook-man :dummy-hook hook-fn2)))
+
+  (:add-hook hook-man :dummy-hook hook-fn1)
+  (:call-hook hook-man :dummy-hook :arg1)
+
+  (assert (= [:arg1] hook-fn1-called-with))
+  (assert (= nil hook-fn2-called-with))
+
+  (:call-hook hook-man :dummy-hook :arg2)
+  (assert (= [:arg2] hook-fn1-called-with))
+  (assert (= [:arg2] hook-fn2-called-with)))
+
+
 (defn main [&]
   (test-hook-manager)
   (test-call-filter-hook)
-  (test-duplicate-hook-fns))
+  (test-duplicate-hook-fns)
+  (test-oneshot-hook)
+  (test-hook-op-in-hook-fn))
