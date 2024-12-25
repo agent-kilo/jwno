@@ -699,17 +699,14 @@
        (:show-tooltip
           ui-man
           :describe-key
-          (string/format
-           ```
-           Key Code: %n
-           Key Name: %n
-           Modifiers : %n
-           ```
-           (in key :key)
-           (in key-code-to-name (in key :key))
-           (in key :modifiers))
-          nil
-          nil)))
+          (string/format (string/join
+                          ["Key Code: %n"
+                           "Key Name: %n"
+                           "Modifiers : %n"]
+                          "\n")
+                         (in key :key)
+                         (in key-code-to-name (in key :key))
+                         (in key :modifiers)))))
 
   (:set-key-mode key-man :raw)
   (:show-tooltip ui-man :describe-key "Please press a key." nil nil 0))
