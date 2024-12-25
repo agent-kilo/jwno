@@ -1,6 +1,5 @@
 (use jw32/_winuser)
 
-(use ./cmd)
 (use ./input)
 
 (import ./const)
@@ -367,9 +366,14 @@
     (error (string/format "unknown key: %n" key-name))))
 
 
+(defn key-manager-set-key-mode [self new-mode]
+  (:set-key-mode (in self :ui-manager) new-mode))
+
+
 (def- key-manager-proto
   @{:new-keymap key-manager-new-keymap
     :set-keymap key-manager-set-keymap
+    :set-key-mode key-manager-set-key-mode
     :get-key-code key-manager-get-key-code})
 
 
@@ -543,6 +547,43 @@
       [:key/reset-keymap (last (in self :current-keymap))])))
 
 
+(defn keyboard-hook-handler-set-key-mode [self new-mode]
+  (unless (find |(= $ new-mode) [:command :raw])
+    (errorf "unknown key mode: %n" new-mode))
+  (log/debug "Pending key mode: %n" new-mode)
+  (put (in self :key-mode) :pending new-mode))
+
+
+(defn keyboard-hook-handler-check-key-mode [self hook-struct]
+  (def key-up (hook-struct :flags.up))
+  (def key-mode (in self :key-mode))
+  (def pending-mode (in key-mode :pending))
+  (def current-mode (in key-mode :current))
+
+  (when (and (not key-up)
+             (not (nil? pending-mode)))
+    (log/debug "Update key mode: %n -> %n" current-mode pending-mode)
+    (put key-mode :pending nil)
+    (put key-mode :current pending-mode))
+
+  (def ret (in key-mode :current))
+  (log/debug "Actual key mode: %n" ret)
+  ret)
+
+
+(defn keyboard-hook-handler-handle-raw-key [self hook-struct mod-states]
+  (def key-up (hook-struct :flags.up))
+  (def key-code (hook-struct :vkCode))
+  # All modifier keys needs to go through, or the low-level modifier
+  # states tracked by the OS (i.e. the values returned by GetAsyncKeyState)
+  # would be wrong.
+  (def pass-through? (in MODIFIER-KEYS key-code))
+  (if key-up
+    [pass-through? nil]
+    (let [key-struct (key key-code (sort (keys mod-states)))]
+      [pass-through? [:key/raw key-struct]])))
+
+
 (def- keyboard-hook-handler-proto
   @{:set-keymap keyboard-hook-handler-set-keymap
     :push-keymap keyboard-hook-handler-push-keymap
@@ -552,7 +593,10 @@
     :get-modifier-states keyboard-hook-handler-get-modifier-states
     :reset-keymap keyboard-hook-handler-reset-keymap
     :handle-binding keyboard-hook-handler-handle-binding
-    :handle-unbound keyboard-hook-handler-handle-unbound})
+    :handle-unbound keyboard-hook-handler-handle-unbound
+    :set-key-mode keyboard-hook-handler-set-key-mode
+    :check-key-mode keyboard-hook-handler-check-key-mode
+    :handle-raw-key keyboard-hook-handler-handle-raw-key})
 
 
 (defn keyboard-hook-handler [keymap]
@@ -564,5 +608,13 @@
      # triggered that sub-keymap. This array is used as another stack
      # to record how we reached the current keymap, so that we can get
      # back to its real parent.
-     :current-keymap @[keymap]}
+     :current-keymap @[keymap]
+     :key-mode @{
+       # When switching key modes, pending key-up events should pass
+       # through in the previous mode, so we don't actually change the
+       # mode before the first key-down event is seen. We need two flags
+       # to track this mode-switching process.          
+       :pending nil      # The next mode to switch to
+       :current :command # The current mode
+      }}
    keyboard-hook-handler-proto))
