@@ -492,6 +492,8 @@
                 ((err fib)
                  (log/debug "DwmGetWindowAttribute failed for %n: %n" hwnd err)
                  nil)))
+            (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
+            (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
             (:show-tooltip ui-man
                            :describe-window
                            (string/format (string/join
@@ -504,6 +506,7 @@
                                             "Virtual Desktop ID: %s"
                                             "Rect: %n"
                                             "EFB Rect: %s"
+                                            "DPI Awareness: %n"
                                             "Filter Result: %n"]
                                            "\n")
                                           hwnd
@@ -521,6 +524,7 @@
                                           (if efb-rect
                                             (string/format "%n" efb-rect)
                                             "n/a")
+                                          dpi-awareness
                                           (:filter-hwnd wm hwnd uia-win exe-path desktop-info))
                            (if efb-rect
                              (in efb-rect :left)
