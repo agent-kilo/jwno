@@ -484,6 +484,11 @@
   (with-uia [_uia-win uia-win]
     (def exe-path
       (unless (nil? hwnd)
+        # get-hwnd-path needs PROCESS_QUERY_INFORMATION and PROCESS_VM_READ
+        # access rights, but some processes explicitly deny them (e.g.
+        # KeePassXC, to prevent memory dumps), so exe-path being nil here
+        # may not necessarily mean that the hwnd is invalid. That's why we
+        # don't check for nil exe-path here.
         (get-hwnd-path hwnd)))
     (def desktop-info
       (unless (nil? hwnd)
@@ -496,10 +501,6 @@
 
       (nil? hwnd)
       # normalize-hwnd-and-uia-element failed
-      nil
-
-      (nil? exe-path)
-      # get-hwnd-path failed
       nil
 
       (nil? desktop-info)
@@ -2194,17 +2195,13 @@
     w))
 
 
-(defn wm-filter-hwnd [self hwnd &opt uia-win? exe-path? desktop-info?]
+(defn wm-filter-hwnd [self hwnd &opt uia-win? _exe-path? desktop-info?]
   (def uia-win
     (if uia-win?
       (do
         (:AddRef uia-win?)
         uia-win?)
       (:get-hwnd-uia-element self hwnd (get-in self [:uia-manager :focus-cr]))))
-  (def exe-path
-    (if exe-path?
-      exe-path?
-      (:get-hwnd-path self hwnd)))
   (def desktop-info
     (if desktop-info?
       desktop-info?

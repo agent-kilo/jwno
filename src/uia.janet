@@ -345,7 +345,8 @@
             (let [dv-hwnd (:get_CachedNativeWindowHandle dve)
                   dv-path (get-hwnd-path dv-hwnd)]
               # XXX: More strict checks?
-              (if (string/has-suffix? "\\explorer.exe" dv-path)
+              (if (and dv-path
+                       (string/has-suffix? "\\explorer.exe" dv-path))
                 (do
                   (:AddRef dve)
                   dve)

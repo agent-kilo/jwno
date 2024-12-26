@@ -507,7 +507,9 @@
                                             "Filter Result: %n"]
                                            "\n")
                                           hwnd
-                                          exe-path
+                                          (if exe-path
+                                            exe-path
+                                            "n/a")
                                           (:get_CachedName uia-win)
                                           (:get_CachedClassName uia-win)
                                           (:get_CachedControlType uia-win)
