@@ -148,7 +148,8 @@
        (log/error "failed to reset visual state for %n: %n%s"
                   hwnd
                   err
-                  (get-stack-trace fib))))))
+                  (get-stack-trace fib))
+       nil))))
 
 
 (defn get-hwnd-dwm-border-margins [hwnd &opt outer-rect]
