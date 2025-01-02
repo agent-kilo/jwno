@@ -12,6 +12,7 @@
 (use ./uia)
 (use ./input)
 (use ./key)
+(use ./ui-hint)
 (use ./resource)
 (use ./util)
 
@@ -968,7 +969,21 @@
      (:describe-key)
 
      Interactively reads a key, and shows some info about it.
-     ```))
+     ```)
+
+  (:add-command command-man :ui-hint
+     (fn [key-list &opt cond-spec] (cmd-ui-hint context key-list cond-spec))
+     ```
+     (:ui-hint key-list &opt cond-spec)
+
+     Shows hints on the UI of the current window, and waits for user's
+     input. Key-list should be a string that contains all possible
+     letters which can be used to generate labels for the hints. Once
+     a label is entered by the user, Tries to activate the labeled UI
+     element. When the UI element is not activatable, set focus to it
+     instead.
+     ```)
+  )
 
 
 (defn command-manager-call-command [self cmd & args]
