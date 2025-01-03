@@ -220,21 +220,22 @@
   (def elem-list @[])
 
   (with-uia [uia-win (:get-focused-window uia-man)]
-    # XXX: Always ignore disabled and off-screen elements
-    (with-uia [cond (make-condition uia-com [:and
-                                             [:property UIA_IsOffscreenPropertyId false]
-                                             [:property UIA_IsEnabledPropertyId true]
-                                             cond-spec])]
-      (with-uia [cr (:CreateCacheRequest uia-com)]
-        (:AddProperty cr UIA_NamePropertyId)
-        (:AddProperty cr UIA_ControlTypePropertyId)
-        (:AddProperty cr UIA_BoundingRectanglePropertyId)
-        (:AddProperty cr UIA_IsInvokePatternAvailablePropertyId)
-        (:AddPattern cr UIA_InvokePatternId)
+    (when uia-win
+      # XXX: Always ignore disabled and off-screen elements
+      (with-uia [cond (make-condition uia-com [:and
+                                               [:property UIA_IsOffscreenPropertyId false]
+                                               [:property UIA_IsEnabledPropertyId true]
+                                               cond-spec])]
+        (with-uia [cr (:CreateCacheRequest uia-com)]
+          (:AddProperty cr UIA_NamePropertyId)
+          (:AddProperty cr UIA_ControlTypePropertyId)
+          (:AddProperty cr UIA_BoundingRectanglePropertyId)
+          (:AddProperty cr UIA_IsInvokePatternAvailablePropertyId)
+          (:AddPattern cr UIA_InvokePatternId)
 
-        (with-uia [elem-arr (:FindAllBuildCache uia-win TreeScope_Subtree cond cr)]
-          (for i 0 (:get_Length elem-arr)
-            (array/push elem-list (:GetElement elem-arr i)))))))
+          (with-uia [elem-arr (:FindAllBuildCache uia-win TreeScope_Subtree cond cr)]
+            (for i 0 (:get_Length elem-arr)
+              (array/push elem-list (:GetElement elem-arr i))))))))
 
   (def elem-count (length elem-list))
   (log/debug "Found %n UI elements" elem-count)
