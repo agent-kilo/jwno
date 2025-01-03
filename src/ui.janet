@@ -495,7 +495,7 @@
       [(in work-area :left) (in work-area :top)])))
 
 
-(defn show-tooltip [state owner-hwnd tt-id text &opt opt-x opt-y opt-timeout opt-anchor]
+(defn show-tooltip [state owner-hwnd tt-id text &opt opt-x opt-y opt-timeout opt-anchor opt-work-area]
   (def tooltip (get-in state [:tooltips tt-id]))
 
   (def timeout
@@ -520,7 +520,8 @@
   (def [x y]
     (if (or (nil? opt-x) (nil? opt-y))
       # Default to the current monitor
-      (if-let [wa (get-current-work-area state)]
+      (if-let [wa (or opt-work-area
+                      (get-current-work-area state))]
         (get-tooltip-default-position wa anchor)
         # Something went wrong, try our best to return a coordinate....
         [0 0])
@@ -579,8 +580,8 @@
 
 
 (defn- msg-wnd-handle-show-tooltip [hwnd _msg wparam _lparam _hook-handler state]
-  (let [[tt-id text opt-x opt-y opt-timeout opt-anchor] (unmarshal-and-free wparam)]
-    (show-tooltip state hwnd tt-id text opt-x opt-y opt-timeout opt-anchor))
+  (let [[tt-id text opt-x opt-y opt-timeout opt-anchor opt-work-area] (unmarshal-and-free wparam)]
+    (show-tooltip state hwnd tt-id text opt-x opt-y opt-timeout opt-anchor opt-work-area))
   0)
 
 
@@ -591,9 +592,9 @@
 
 
 (defn- msg-wnd-handle-show-tooltip-group [hwnd _msg wparam _lparam _hook-handler state]
-  (let [[tg-list opt-timeout opt-anchor] (unmarshal-and-free wparam)]
+  (let [[tg-list opt-timeout opt-anchor opt-work-area] (unmarshal-and-free wparam)]
     (each [tt-id text opt-x opt-y] tg-list
-      (show-tooltip state hwnd tt-id text opt-x opt-y opt-timeout opt-anchor)))
+      (show-tooltip state hwnd tt-id text opt-x opt-y opt-timeout opt-anchor opt-work-area)))
   0)
 
 
@@ -976,10 +977,10 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
-(defn ui-manager-show-tooltip [self tt-id text &opt x y timeout anchor]
+(defn ui-manager-show-tooltip [self tt-id text &opt x y timeout anchor work-area]
   (ui-manager-post-message self
                            SHOW-TOOLTIP-MSG
-                           (alloc-and-marshal [tt-id text x y timeout anchor])
+                           (alloc-and-marshal [tt-id text x y timeout anchor work-area])
                            0))
 
 
@@ -987,10 +988,10 @@
   (ui-manager-post-message self HIDE-TOOLTIP-MSG (alloc-and-marshal tt-id) 0))
 
 
-(defn ui-manager-show-tooltip-group [self tg-list &opt timeout anchor]
+(defn ui-manager-show-tooltip-group [self tg-list &opt timeout anchor work-area]
   (ui-manager-post-message self
                            SHOW-TOOLTIP-GROUP-MSG
-                           (alloc-and-marshal [tg-list timeout anchor])
+                           (alloc-and-marshal [tg-list timeout anchor work-area])
                            0))
 
 
