@@ -1144,9 +1144,8 @@
       (with-uia [_uia-win (in win-info :uia-element)]
         (def more-indent
           (string indent (buffer/new-filled indent-width indent-char)))
-        (printf "%sWindow (hwnd=%n)"
-                indent
-                (in self :hwnd))
+        (def hwnd (in self :hwnd))
+        (printf "%sWindow (hwnd=%n)" indent hwnd)
         (printf "%sName: %s"
                 more-indent
                 (:get_CachedName (in win-info :uia-element)))
@@ -1161,7 +1160,10 @@
                 ;(unwrap-rect (:get_CachedBoundingRectangle (in win-info :uia-element))))
         (printf "%sExtended Frame Bounds: {l:%d,t:%d,r:%d,b:%d}"
                 more-indent
-                ;(unwrap-rect (DwmGetWindowAttribute (in self :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS)))
+                ;(unwrap-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)))
+        (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
+        (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
+        (printf "%sDPI Awareness: %n" more-indent dpi-awareness)
         (printf "%sVirtual Desktop ID: %s"
                 more-indent
                 (get-in win-info [:virtual-desktop :id])))
