@@ -40,6 +40,7 @@
      cache
      [["./auto-layout" "jwno/auto-layout"]
       ["./indicator" "jwno/indicator"]
+      ["./ui-hint" "jwno/ui-hint"]
       ["./util" "jwno/util"]
       ["./log" "jwno/log"]])
 
