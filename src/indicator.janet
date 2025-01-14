@@ -145,7 +145,7 @@
   new-hwnd)
 
 
-(defn handle-show-frame-area [hwnd _msg wparam _lparam _hook-handler state]
+(defn handle-show-frame-area [_hwnd _msg wparam _lparam _hook-handler state]
   (def rect (unmarshal-and-free wparam))
   (def [width height] (rect-size rect))
 
@@ -160,7 +160,7 @@
 
   (log/debug "--------- AREA-HWND = %n" area-hwnd)
   (ShowWindow area-hwnd SW_SHOW)
-  (UpdateWindow hwnd)
+  (UpdateWindow area-hwnd)
   (SetWindowPos area-hwnd
                 HWND_BOTTOM
                 (in rect :left)
@@ -185,7 +185,7 @@
 
   (def unreg-ret (UnregisterClass FRAME-AREA-WINDOW-CLASS-NAME (GetModuleHandle nil)))
   (when (= FALSE unreg-ret)
-    (log/debug "Failed to unregister window class: 0x%x" (GetLastError)))
+    (log/debug "Failed to unregister frame area window class: 0x%x" (GetLastError)))
 
   (when-let [custom-msgs (in state :custom-messages)
              cleanup-fn (in custom-msgs msg)]
