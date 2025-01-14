@@ -18,7 +18,7 @@
 
 
 (defn tooltip-id-from-label [label]
-  (keyword "$" label))
+  (keyword HINT-PREFIX label))
 
 
 (defn make-condition [uia-com spec]
