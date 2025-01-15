@@ -33,6 +33,7 @@
       "jw32/_util"
       "jw32/_winbase"
       "jw32/_winnt"
+      "jw32/_wingdi"
       "jw32/_winuser"])
 
     # Jwno modules
