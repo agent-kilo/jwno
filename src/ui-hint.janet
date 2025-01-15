@@ -39,7 +39,7 @@
         (defer
           (EndPaint hwnd ps)
           (when global-hint-state
-            (log/debug "========= global-hint-state = %n" global-hint-state)
+            (log/debug "global-hint-state = %n" global-hint-state)
             (def {:area-rect client-rect
                   :hint-list hint-list}
               global-hint-state)
@@ -47,23 +47,23 @@
             # Text settings
             (def font (in global-hint-state :font))
             (SelectObject hdc font)
-            (SetTextColor hdc 0x00505050)
             (SetBkMode hdc OPAQUE)
 
             (def dt-format (bor DT_SINGLELINE DT_VCENTER DT_NOCLIP))
             (def offset 2)
+            (def text-color 0x00505050)
+            (def bk-color 0x00f5f5f5)
+            (def shadow-color 0x00828282)
 
             (each [label rect] hint-list
               (def [left top right bottom] rect)
-              (SetBkColor hdc 0x00828282)
+              (SetTextColor hdc shadow-color)
+              (SetBkColor hdc shadow-color)
               (DrawText hdc label [(+ left offset) (+ top offset) (+ right offset) (+ bottom offset)] dt-format)
 
-              (def [height new-rect] (DrawText hdc label rect DT_CALCRECT))
-              (log/debug "========= label = %n, height = %n, new-rect = %n" label height new-rect)
-
-              (SetBkColor hdc 0x00f5f5f5)
-              (DrawText hdc label rect dt-format)
-              ))))
+              (SetTextColor hdc text-color)
+              (SetBkColor hdc bk-color)
+              (DrawText hdc label rect dt-format)))))
       0)
 
     WM_CLOSE
