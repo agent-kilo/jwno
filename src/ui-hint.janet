@@ -302,7 +302,8 @@
 
 (defn ui-hint-process-filter-result [self filtered]
   (def {:context context
-        :current-keys current-keys}
+        :current-keys current-keys
+        :action action}
     self)
   (def {:ui-manager ui-man}
     context)
@@ -316,28 +317,61 @@
       # e.g. a button that opens a dialog box or a pop-up menu, so we send
       # the clean up messages before invoking anything.
       (:clean-up self)
-      (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
-        (try
-          (do
-            (:SetFocus target)
-            (with-uia [invoke-pat (:GetCachedPatternAs target
-                                                       UIA_InvokePatternId
-                                                       IUIAutomationInvokePattern)]
-              (:Invoke invoke-pat)))
-          ((err _fib)
-           (log/debug "failed to invoke UI element: %n, name: %n, control type: %n"
-                      err
-                      (:get_CachedName target)
-                      (:get_CachedControlType target))))
 
-        # No invoke pattern, focus it only
+      (cond
+        (= action :invoke)
+        (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
+          (try
+            (do
+              (:SetFocus target)
+              (with-uia [invoke-pat (:GetCachedPatternAs target
+                                                         UIA_InvokePatternId
+                                                         IUIAutomationInvokePattern)]
+                (:Invoke invoke-pat)))
+            ((err _fib)
+             (log/debug "failed to invoke UI element: %n, name: %n, control type: %n"
+                        err
+                        (:get_CachedName target)
+                        (:get_CachedControlType target))))
+
+          # else: No invoke pattern, focus it only
+          (try
+            (:SetFocus target)
+            ((err _fib)
+             (log/debug "failed to focus UI element: %n, name: %n, control type: %n"
+                        err
+                        (:get_CachedName target)
+                        (:get_CachedControlType target)))))
+
+        (= action :focus)
         (try
           (:SetFocus target)
           ((err _fib)
            (log/debug "failed to focus UI element: %n, name: %n, control type: %n"
                       err
                       (:get_CachedName target)
-                      (:get_CachedControlType target)))))
+                      (:get_CachedControlType target))))
+
+        (= action :click)
+        :todo
+
+        (= action :middle-click)
+        :todo
+
+        (= action :right-click)
+        :todo
+
+        (= action :double-click)
+        :todo
+
+        (= action :move-mouse)
+        :todo
+
+        (or (function? action)
+            (cfunction? action))
+        # Custom action
+        :todo
+        )
       (:Release target))
 
     0
@@ -370,11 +404,12 @@
   (:post-message ui-man show-msg (alloc-and-marshal [win-rect to-show]) 0))
 
 
-(defn ui-hint-cmd [self raw-key-list &opt cond-spec]
+(defn ui-hint-cmd [self raw-key-list &opt cond-spec action]
   (default cond-spec
     [:or
      [:property UIA_IsKeyboardFocusablePropertyId true]
      [:property UIA_IsInvokePatternAvailablePropertyId true]])
+  (default action :invoke)
 
   (def {:context context
         :show-msg show-msg}
@@ -435,6 +470,7 @@
   (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
   (put self :current-keys @"")
   (put self :win-rect win-rect)
+  (put self :action action)
 
   (def hook-fn
     (:add-hook hook-man :key-pressed
@@ -498,16 +534,16 @@
   (put self :hide-msg hide-msg)
 
   (:add-command command-man :ui-hint
-     (fn [key-list &opt cond-spec] (:cmd self key-list cond-spec))
+     (fn [key-list &opt cond-spec action]
+       (:cmd self key-list cond-spec action))
      ```
-     (:ui-hint key-list &opt cond-spec)
+     (:ui-hint key-list &opt cond-spec action)
 
      Shows hints on the UI of the current window, and waits for user's
      input. Key-list should be a string that contains all possible
      letters which can be used to generate labels for the hints. Once
-     a label is entered by the user, Tries to activate the labeled UI
-     element. When the UI element is not activatable, set focus to it
-     instead.
+     a label is entered by the user, tries to carry out the specified
+     action.
      ```))
 
 
