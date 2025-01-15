@@ -82,8 +82,8 @@
      :hInstance (GetModuleHandle nil)
      :lpszClassName HINT-AREA-WINDOW-CLASS-NAME
      :hCursor (LoadCursor nil IDC_ARROW)
-     :hbrBackground (+ 1 COLOR_WINDOW)
-     ))
+     # Black is transparent
+     :hbrBackground (GetStockObject BLACK_BRUSH)))
   (when (null? (RegisterClassEx wc))
     (errorf "window class registration failed: 0x%x" (GetLastError)))
 
@@ -104,12 +104,8 @@
   (when (null? new-hwnd)
     (errorf "failed to create window: 0x%x" (GetLastError)))
 
-  (SetLayeredWindowAttributes new-hwnd (GetSysColor (int/to-number COLOR_WINDOW)) 0 LWA_COLORKEY)
-  (try
-    # Raises E_INVALIDARG on Windows 10
-    (DwmSetWindowAttribute new-hwnd DWMWA_WINDOW_CORNER_PREFERENCE DWMWCP_ROUND)
-    ((err _fib)
-     (log/debug "DwmSetWindowAttribute failed: %n" err)))
+  # Black is transparent
+  (SetLayeredWindowAttributes new-hwnd 0x00000000 0 LWA_COLORKEY)
 
   new-hwnd)
 
