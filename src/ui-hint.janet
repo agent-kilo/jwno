@@ -321,24 +321,30 @@
       (cond
         (= action :invoke)
         (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
-          (try
-            (do
+          (do
+            (try
+              # Some elements can't have focus, and this will return 0x80020003
+              # (Member not found) for them. We just ignore it here.
               (:SetFocus target)
+              ((_err _fib)
+               :ignored))
+            (try
               (with-uia [invoke-pat (:GetCachedPatternAs target
                                                          UIA_InvokePatternId
                                                          IUIAutomationInvokePattern)]
-                (:Invoke invoke-pat)))
-            ((err _fib)
-             (log/debug "failed to invoke UI element: %n, name: %n, control type: %n"
-                        err
-                        (:get_CachedName target)
-                        (:get_CachedControlType target))))
+                (:Invoke invoke-pat))
+              ((err fib)
+               (log/error "failed to invoke UI element: %n, name: %n, control type: %n\n%s"
+                          err
+                          (:get_CachedName target)
+                          (:get_CachedControlType target)
+                          (get-stack-trace fib)))))
 
           # else: No invoke pattern, focus it only
           (try
             (:SetFocus target)
             ((err _fib)
-             (log/debug "failed to focus UI element: %n, name: %n, control type: %n"
+             (log/error "failed to focus UI element: %n, name: %n, control type: %n"
                         err
                         (:get_CachedName target)
                         (:get_CachedControlType target)))))
@@ -347,7 +353,7 @@
         (try
           (:SetFocus target)
           ((err _fib)
-           (log/debug "failed to focus UI element: %n, name: %n, control type: %n"
+           (log/error "failed to focus UI element: %n, name: %n, control type: %n"
                       err
                       (:get_CachedName target)
                       (:get_CachedControlType target))))
