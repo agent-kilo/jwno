@@ -17,7 +17,7 @@
 (var global-hint-state nil)
 
 
-(defn draw-label [hdc label rect text-color bg-color border-color shadow-color]
+(defn draw-label [hdc label rect text-color bg-color border-color shadow-color scale-x scale-y]
   (def dt-format (bor DT_SINGLELINE DT_NOCLIP))
   (def [height text-rect] (DrawText hdc label [0 0 0 0] (bor dt-format DT_CALCRECT)))
   (when (>= 0 height)
@@ -27,7 +27,13 @@
     text-rect)
 
   (def padding 2)
+  (def padding-x (math/floor (* padding scale-x)))
+  (def padding-y (math/floor (* padding scale-y)))
+
   (def shadow-offset 2)
+  (def shadow-offset-x (math/floor (* shadow-offset scale-x)))
+  (def shadow-offset-y (math/floor (* shadow-offset scale-y)))
+
   (def [left top right bottom] rect)
 
   (def text-x left)
@@ -35,20 +41,20 @@
   (def text-right (+ text-x text-width))
   (def text-bottom (+ text-y text-height))
 
-  (def box-x (- text-x padding))
-  (def box-y (- text-y padding))
-  (def box-right (+ text-right padding))
-  (def box-bottom (+ text-bottom padding))
+  (def box-x (- text-x padding-x))
+  (def box-y (- text-y padding-y))
+  (def box-right (+ text-right padding-x))
+  (def box-bottom (+ text-bottom padding-y))
 
   # Shadow
   (unless (= :none shadow-color)
     (SetDCBrushColor hdc shadow-color)
     (SetDCPenColor hdc shadow-color)
     (Rectangle hdc
-               (+ box-x shadow-offset)
-               (+ box-y shadow-offset)
-               (+ box-right shadow-offset)
-               (+ box-bottom shadow-offset)))
+               (+ box-x shadow-offset-x)
+               (+ box-y shadow-offset-y)
+               (+ box-right shadow-offset-x)
+               (+ box-bottom shadow-offset-y)))
 
   # Background
   (SetDCBrushColor hdc bg-color)
@@ -59,6 +65,31 @@
   (SetTextColor hdc text-color)
   (SetBkMode hdc TRANSPARENT)
   (DrawText hdc label [text-x text-y text-right text-bottom] dt-format))
+
+
+(defn create-font [scale]
+  # We simply copy a system font, and apply the scaling here
+  (def [spi-ret spi-ncm] (SystemParametersInfo SPI_GETNONCLIENTMETRICS 0 nil 0))
+  (when (= FALSE spi-ret)
+    (errorf "SystemParametersInfo failed: 0x%x" (GetLastError)))
+  (def cap-font (in spi-ncm :lfCaptionFont))
+  (def hfont (CreateFont (math/floor (* scale (in cap-font :lfHeight)))
+                         0  # Font width matches device aspect ratio
+                         (in cap-font :lfEscapement)
+                         (in cap-font :lfOrientation)
+                         700 # Bold #(in cap-font :lfWeight)
+                         (in cap-font :lfItalic)
+                         (in cap-font :lfUnderline)
+                         (in cap-font :lfStrikeOut)
+                         (in cap-font :lfCharSet)
+                         (in cap-font :lfOutPrecision)
+                         (in cap-font :lfClipPrecision)
+                         (in cap-font :lfQuality)
+                         (in cap-font :lfPitchAndFamily)
+                         (in cap-font :lfFaceName)))
+  (when (null? hfont)
+    (errorf "CreateFont failed"))
+  hfont)
 
 
 (defn hint-area-wndproc [hwnd msg wparam lparam]
@@ -77,20 +108,36 @@
             (def {:area-rect client-rect
                   :hint-list hint-list}
               global-hint-state)
+
             (def colors (in global-hint-state :colors @{}))
             (def text-color (in colors :text 0x505050))
             (def bg-color (in colors :background 0xf5f5f5))
             (def border-color (in colors :border 0x828282))
             (def shadow-color (in colors :shadow 0x828282))
 
-            (def font (in global-hint-state :font))
-            (SelectObject hdc font)
-            (SelectObject hdc (GetStockObject DC_BRUSH))
-            (SelectObject hdc (GetStockObject DC_PEN))
+            (def [scale-x scale-y] (calc-pixel-scale client-rect))
+            (def font (create-font scale-y))
+            (def orig-font (SelectObject hdc font))
 
-            (each [label rect] hint-list
-              (def [left top right bottom] rect)
-              (draw-label hdc label rect text-color bg-color border-color shadow-color)))))
+            (defer
+              (do
+                (SelectObject hdc orig-font)
+                (DeleteObject font))
+              (do
+                (SelectObject hdc (GetStockObject DC_BRUSH))
+                (SelectObject hdc (GetStockObject DC_PEN))
+
+                (each [label rect] hint-list
+                  (def [left top right bottom] rect)
+                  (draw-label hdc
+                              label
+                              rect
+                              text-color
+                              bg-color
+                              border-color
+                              shadow-color
+                              scale-x
+                              scale-y)))))))
       0)
 
     WM_CLOSE
@@ -135,31 +182,6 @@
   new-hwnd)
 
 
-(defn create-font []
-  # We simply copy a system font here
-  (def [spi-ret spi-ncm] (SystemParametersInfo SPI_GETNONCLIENTMETRICS 0 nil 0))
-  (when (= FALSE spi-ret)
-    (errorf "SystemParametersInfo failed: 0x%x" (GetLastError)))
-  (def cap-font (in spi-ncm :lfCaptionFont))
-  (def hfont (CreateFont (in cap-font :lfHeight)
-                         (in cap-font :lfWidth)
-                         (in cap-font :lfEscapement)
-                         (in cap-font :lfOrientation)
-                         700 # Bold #(in cap-font :lfWeight)
-                         (in cap-font :lfItalic)
-                         (in cap-font :lfUnderline)
-                         (in cap-font :lfStrikeOut)
-                         (in cap-font :lfCharSet)
-                         (in cap-font :lfOutPrecision)
-                         (in cap-font :lfClipPrecision)
-                         (in cap-font :lfQuality)
-                         (in cap-font :lfPitchAndFamily)
-                         (in cap-font :lfFaceName)))
-  (when (null? hfont)
-    (errorf "CreateFont failed"))
-  hfont)
-
-
 (defn handle-set-hint-colors [_hwnd _msg wparam _lparam _hook-handler state]
   (def colors (unmarshal-and-free wparam))
   (if (or (struct? colors)
@@ -189,8 +211,6 @@
         (put hint-state :win-hbr win-hbr)
         new-hwnd)))
 
-  (when (nil? (in hint-state :font))
-    (put hint-state :font (create-font)))
   (put hint-state :area-rect rect)
   (put hint-state :hint-list hint-list)
   (put state :hint-state hint-state)
