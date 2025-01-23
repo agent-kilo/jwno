@@ -17,14 +17,48 @@
 (var global-hint-state nil)
 
 
-(defn to-client-coords [rect-tuple client-rect]
-  (def offset-x (in client-rect :left))
-  (def offset-y (in client-rect :top))
-  (def [left top right bottom] rect-tuple)
-  {:left (- left offset-x)
-   :top (- top offset-y)
-   :right (- right offset-x)
-   :bottom (- bottom offset-y)})
+(defn draw-label [hdc label rect text-color bg-color border-color shadow-color]
+  (def dt-format (bor DT_SINGLELINE DT_NOCLIP))
+  (def [height text-rect] (DrawText hdc label [0 0 0 0] (bor dt-format DT_CALCRECT)))
+  (when (>= 0 height)
+    (error "DrawText DT_CALCRECT failed"))
+  (def {:right text-width
+        :bottom text-height}
+    text-rect)
+
+  (def padding 2)
+  (def shadow-offset 2)
+  (def [left top right bottom] rect)
+
+  (def text-x left)
+  (def text-y (brshift (+ top bottom (- text-height)) 1))
+  (def text-right (+ text-x text-width))
+  (def text-bottom (+ text-y text-height))
+
+  (def box-x (- text-x padding))
+  (def box-y (- text-y padding))
+  (def box-right (+ text-right padding))
+  (def box-bottom (+ text-bottom padding))
+
+  # Shadow
+  (unless (= :none shadow-color)
+    (SetDCBrushColor hdc shadow-color)
+    (SetDCPenColor hdc shadow-color)
+    (Rectangle hdc
+               (+ box-x shadow-offset)
+               (+ box-y shadow-offset)
+               (+ box-right shadow-offset)
+               (+ box-bottom shadow-offset)))
+
+  # Background
+  (SetDCBrushColor hdc bg-color)
+  (SetDCPenColor hdc border-color)
+  (Rectangle hdc box-x box-y box-right box-bottom)
+
+  # Text
+  (SetTextColor hdc text-color)
+  (SetBkMode hdc TRANSPARENT)
+  (DrawText hdc label [text-x text-y text-right text-bottom] dt-format))
 
 
 (defn hint-area-wndproc [hwnd msg wparam lparam]
@@ -43,27 +77,20 @@
             (def {:area-rect client-rect
                   :hint-list hint-list}
               global-hint-state)
+            (def colors (in global-hint-state :colors @{}))
+            (def text-color (in colors :text 0x505050))
+            (def bg-color (in colors :background 0xf5f5f5))
+            (def border-color (in colors :border 0x828282))
+            (def shadow-color (in colors :shadow 0x828282))
 
-            # Text settings
             (def font (in global-hint-state :font))
             (SelectObject hdc font)
-            (SetBkMode hdc OPAQUE)
-
-            (def dt-format (bor DT_SINGLELINE DT_VCENTER DT_NOCLIP))
-            (def offset 2)
-            (def text-color 0x00505050)
-            (def bk-color 0x00f5f5f5)
-            (def shadow-color 0x00828282)
+            (SelectObject hdc (GetStockObject DC_BRUSH))
+            (SelectObject hdc (GetStockObject DC_PEN))
 
             (each [label rect] hint-list
               (def [left top right bottom] rect)
-              (SetTextColor hdc shadow-color)
-              (SetBkColor hdc shadow-color)
-              (DrawText hdc label [(+ left offset) (+ top offset) (+ right offset) (+ bottom offset)] dt-format)
-
-              (SetTextColor hdc text-color)
-              (SetBkColor hdc bk-color)
-              (DrawText hdc label rect dt-format)))))
+              (draw-label hdc label rect text-color bg-color border-color shadow-color)))))
       0)
 
     WM_CLOSE
@@ -74,7 +101,7 @@
     (DefWindowProc hwnd msg wparam lparam)))
 
 
-(defn create-hint-area-window []
+(defn create-hint-area-window [key-color win-hbr]
   (def wc
     (WNDCLASSEX
      :style CS_OWNDC
@@ -82,8 +109,7 @@
      :hInstance (GetModuleHandle nil)
      :lpszClassName HINT-AREA-WINDOW-CLASS-NAME
      :hCursor (LoadCursor nil IDC_ARROW)
-     # Black is transparent
-     :hbrBackground (GetStockObject BLACK_BRUSH)))
+     :hbrBackground win-hbr))
   (when (null? (RegisterClassEx wc))
     (errorf "window class registration failed: 0x%x" (GetLastError)))
 
@@ -104,8 +130,7 @@
   (when (null? new-hwnd)
     (errorf "failed to create window: 0x%x" (GetLastError)))
 
-  # Black is transparent
-  (SetLayeredWindowAttributes new-hwnd 0x00000000 0 LWA_COLORKEY)
+  (SetLayeredWindowAttributes new-hwnd key-color 0 LWA_COLORKEY)
 
   new-hwnd)
 
@@ -135,6 +160,19 @@
   hfont)
 
 
+(defn handle-set-hint-colors [_hwnd _msg wparam _lparam _hook-handler state]
+  (def colors (unmarshal-and-free wparam))
+  (if (or (struct? colors)
+          (table? colors))
+    (let [hint-state (in state :hint-state @{})]
+      (put hint-state :colors colors)
+      (put state :hint-state hint-state))
+
+    # else
+    (log/error "Invalid colors value: %n" colors))
+  0)
+
+
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
   (def [rect hint-list] (unmarshal-and-free wparam))
   (def hint-state (in state :hint-state @{}))
@@ -143,8 +181,12 @@
     (if-let [old-hwnd (in hint-state :area-hwnd)]
       old-hwnd
       # else
-      (let [new-hwnd (create-hint-area-window)]
+      (let [colors (in hint-state :colors @{})
+            key-color (in colors :key 0x000000)
+            win-hbr (CreateSolidBrush key-color)
+            new-hwnd (create-hint-area-window key-color win-hbr)]
         (put hint-state :area-hwnd new-hwnd)
+        (put hint-state :win-hbr win-hbr)
         new-hwnd)))
 
   (when (nil? (in hint-state :font))
@@ -189,6 +231,8 @@
   (when (= FALSE unreg-ret)
     (log/debug "Failed to unregister hint window class: 0x%x" (GetLastError)))
 
+  (when-let [hbr (in hint-state :win-hbr)]
+    (DeleteObject hbr))
   (when-let [hfont (in hint-state :font)]
     (DeleteObject hfont))
 
@@ -391,10 +435,15 @@
 
 (defn ui-hint-show-hints [self labeled]
   (def {:context context
+        :colors colors
         :win-rect win-rect
-        :show-msg show-msg}
+        :show-msg show-msg
+        :colors-msg colors-msg}
     self)
   (def {:ui-manager ui-man} context)
+
+  (when colors
+    (:post-message ui-man colors-msg (alloc-and-marshal colors) 0))
 
   (def offset-x (in win-rect :left))
   (def offset-y (in win-rect :top))
@@ -533,11 +582,15 @@
   (when (< show-msg (int/s64 0))
     (error "failed to register show-frame-area message"))
   (def hide-msg (:add-custom-message ui-man handle-hide-hint-area))
-  (when (< show-msg (int/s64 0))
+  (when (< hide-msg (int/s64 0))
     (error "failed to register hide-frame-area message"))
+  (def colors-msg (:add-custom-message ui-man handle-set-hint-colors))
+  (when (< colors-msg (int/s64 0))
+    (error "failed to register set-hint-colors message"))
 
   (put self :show-msg show-msg)
   (put self :hide-msg hide-msg)
+  (put self :colors-msg colors-msg)
 
   (:add-command command-man :ui-hint
      (fn [key-list &opt cond-spec action]
@@ -556,7 +609,8 @@
 (defn ui-hint-disable [self]
   (def {:context context
         :show-msg show-msg
-        :hide-msg hide-msg}
+        :hide-msg hide-msg
+        :colors-msg colors-msg}
     self)
   (def {:ui-manager ui-man
         :command-manager command-man}
@@ -570,6 +624,9 @@
   (when hide-msg
     (:remove-custom-message ui-man hide-msg)
     (put self :show-msg nil))
+  (when colors-msg
+    (:remove-custom-message ui-man colors-msg)
+    (put self :colors-msg nil))
 
   (def cleanup-msg
     (:add-custom-message ui-man handle-cleanup-hint-area))
@@ -592,5 +649,13 @@
 
 (defn ui-hint [context]
   (table/setproto
-   @{:context context}
+   @{:context context
+
+     # Default settings
+     :colors @{:text 0x505050
+               :background 0xf5f5f5
+               :border 0x828282
+               :shadow 0x828282
+               :key 0x000000}
+    }
    ui-hint-proto))
