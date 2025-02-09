@@ -364,10 +364,41 @@
   (:post-message ui-man hide-msg 0 0))
 
 
+(defn handle-action-invoke [_ui-hint target]
+  (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
+    (do
+      (try
+        # Some elements can't have focus, and this will return 0x80020003
+        # (Member not found) for them. We just ignore it here.
+        (:SetFocus target)
+        ((_err _fib)
+         :ignored))
+      (with-uia [invoke-pat (:GetCachedPatternAs target
+                                                 UIA_InvokePatternId
+                                                 IUIAutomationInvokePattern)]
+        (:Invoke invoke-pat)))
+
+    # else: No invoke pattern, focus it only
+    (:SetFocus target)))
+
+
+(defn handle-action-focus [_ui-hint target]
+  (:SetFocus target))
+
+
+(defn handle-action-move-cursor [_ui-hint target]
+  (let [rect (:get_CachedBoundingRectangle target)]
+    # XXX: Should use SetPhysicalCursorPos?
+    (def scp-ret (SetCursorPos ;(rect-center rect)))
+    (when (= scp-ret FALSE)
+      (errorf "SetCursorPos failed: %n" (GetLastError)))))
+
+
 (defn ui-hint-process-filter-result [self filtered]
   (def {:context context
         :current-keys current-keys
-        :action action}
+        :action action
+        :action-handlers action-handlers}
     self)
   (def {:ui-manager ui-man}
     context)
@@ -383,65 +414,23 @@
       (:clean-up self)
 
       (cond
-        (= action :invoke)
-        (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
-          (do
-            (try
-              # Some elements can't have focus, and this will return 0x80020003
-              # (Member not found) for them. We just ignore it here.
-              (:SetFocus target)
-              ((_err _fib)
-               :ignored))
-            (try
-              (with-uia [invoke-pat (:GetCachedPatternAs target
-                                                         UIA_InvokePatternId
-                                                         IUIAutomationInvokePattern)]
-                (:Invoke invoke-pat))
-              ((err fib)
-               (log/error "failed to invoke UI element: %n, name: %n, control type: %n\n%s"
-                          err
-                          (:get_CachedName target)
-                          (:get_CachedControlType target)
-                          (get-stack-trace fib)))))
-
-          # else: No invoke pattern, focus it only
-          (try
-            (:SetFocus target)
-            ((err _fib)
-             (log/error "failed to focus UI element: %n, name: %n, control type: %n"
-                        err
-                        (:get_CachedName target)
-                        (:get_CachedControlType target)))))
-
-        (= action :focus)
-        (try
-          (:SetFocus target)
-          ((err _fib)
-           (log/error "failed to focus UI element: %n, name: %n, control type: %n"
-                      err
-                      (:get_CachedName target)
-                      (:get_CachedControlType target))))
-
-        (= action :click)
-        :todo
-
-        (= action :middle-click)
-        :todo
-
-        (= action :right-click)
-        :todo
-
-        (= action :double-click)
-        :todo
-
-        (= action :move-mouse)
-        :todo
-
         (or (function? action)
             (cfunction? action))
         # Custom action
         :todo
-        )
+
+        true
+        (when-let [handler (in action-handlers action)]
+          (try
+            (handler self target)
+            ((err fib)
+             (log/error "ui-hint action %n failed for element (%n, %n): %n\n%s"
+                        action
+                        (:get_CachedName target)
+                        (:get_CachedControlType target)
+                        err
+                        (get-stack-trace fib))))))
+
       (:Release target))
 
     0
@@ -670,6 +659,14 @@
 (defn ui-hint [context]
   (table/setproto
    @{:context context
+     :action-handlers @{:invoke handle-action-invoke
+                        :focus handle-action-focus
+                        :move-cursor handle-action-move-cursor
+                        :click :todo
+                        :middle-click :todo
+                        :right-click :todo
+                        :double-click :todo
+                        :prompt :todo}
 
      # Default settings
      :colors @{:text 0x505050
