@@ -6,6 +6,7 @@
 (use jw32/_dwmapi)
 (use jw32/_util)
 
+(use ./input)
 (use ./util)
 
 (import ./log)
@@ -394,6 +395,25 @@
       (errorf "SetCursorPos failed: %n" (GetLastError)))))
 
 
+(defn handle-action-click [_ui-hint target]
+  (def [point ret] (:GetClickablePoint target))
+  (def point-to-use
+    (if (= ret FALSE)
+      (do
+        (log/debug "failed to get clickable point for (%n, %n), falling back to center point"
+                   (:get_CachedName target)
+                   (:get_CachedControlType target))
+        (rect-center (:get_CachedBoundingRectangle target)))
+      # else
+      point))
+  # XXX: Should use SetPhysicalCursorPos?
+  (def scp-ret (SetCursorPos ;point-to-use))
+  (when (= scp-ret FALSE)
+    (errorf "SetCursorPos failed: %n" (GetLastError)))
+  (send-input (mouse-key-input :left :down)
+              (mouse-key-input :left :up)))
+
+
 (defn ui-hint-process-filter-result [self filtered]
   (def {:context context
         :current-keys current-keys
@@ -662,7 +682,7 @@
      :action-handlers @{:invoke handle-action-invoke
                         :focus handle-action-focus
                         :move-cursor handle-action-move-cursor
-                        :click :todo
+                        :click handle-action-click
                         :middle-click :todo
                         :right-click :todo
                         :double-click :todo
