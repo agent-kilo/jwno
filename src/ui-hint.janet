@@ -365,6 +365,25 @@
   (:post-message ui-man hide-msg 0 0))
 
 
+(defn get-click-point [target]
+  (def [point ret] (:GetClickablePoint target))
+  (if (= ret FALSE)
+    (do
+      (log/debug "failed to get clickable point for (%n, %n), falling back to center point"
+                 (:get_CachedName target)
+                 (:get_CachedControlType target))
+      (rect-center (:get_CachedBoundingRectangle target)))
+    # else
+    point))
+
+
+(defn move-mouse-cursor [x y]
+  # XXX: Should use SetPhysicalCursorPos?
+  (def scp-ret (SetCursorPos x y))
+  (when (= scp-ret FALSE)
+    (errorf "SetCursorPos failed: %n" (GetLastError))))
+
+
 (defn handle-action-invoke [_ui-hint target]
   (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
     (do
@@ -388,29 +407,33 @@
 
 
 (defn handle-action-move-cursor [_ui-hint target]
-  (let [rect (:get_CachedBoundingRectangle target)]
-    # XXX: Should use SetPhysicalCursorPos?
-    (def scp-ret (SetCursorPos ;(rect-center rect)))
-    (when (= scp-ret FALSE)
-      (errorf "SetCursorPos failed: %n" (GetLastError)))))
+  (def rect (:get_CachedBoundingRectangle target))
+  (move-mouse-cursor ;(rect-center rect)))
 
 
 (defn handle-action-click [_ui-hint target]
-  (def [point ret] (:GetClickablePoint target))
-  (def point-to-use
-    (if (= ret FALSE)
-      (do
-        (log/debug "failed to get clickable point for (%n, %n), falling back to center point"
-                   (:get_CachedName target)
-                   (:get_CachedControlType target))
-        (rect-center (:get_CachedBoundingRectangle target)))
-      # else
-      point))
-  # XXX: Should use SetPhysicalCursorPos?
-  (def scp-ret (SetCursorPos ;point-to-use))
-  (when (= scp-ret FALSE)
-    (errorf "SetCursorPos failed: %n" (GetLastError)))
+  (move-mouse-cursor ;(get-click-point target))
   (send-input (mouse-key-input :left :down)
+              (mouse-key-input :left :up)))
+
+
+(defn handle-action-middle-click [_ui-hint target]
+  (move-mouse-cursor ;(get-click-point target))
+  (send-input (mouse-key-input :middle :down)
+              (mouse-key-input :middle :up)))
+
+
+(defn handle-action-right-click [_ui-hint target]
+  (move-mouse-cursor ;(get-click-point target))
+  (send-input (mouse-key-input :right :down)
+              (mouse-key-input :right :up)))
+
+
+(defn handle-action-double-click [_ui-hint target]
+  (move-mouse-cursor ;(get-click-point target))
+  (send-input (mouse-key-input :left :down)
+              (mouse-key-input :left :up)
+              (mouse-key-input :left :down)
               (mouse-key-input :left :up)))
 
 
@@ -683,9 +706,9 @@
                         :focus handle-action-focus
                         :move-cursor handle-action-move-cursor
                         :click handle-action-click
-                        :middle-click :todo
-                        :right-click :todo
-                        :double-click :todo
+                        :middle-click handle-action-middle-click
+                        :right-click handle-action-right-click
+                        :double-click handle-action-double-click
                         :prompt :todo}
 
      # Default settings
