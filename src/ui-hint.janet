@@ -413,28 +413,28 @@
 
 (defn handle-action-click [_ui-hint target]
   (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-key-input :left :down)
-              (mouse-key-input :left :up)))
+  (send-input (mouse-button-input :left :down)
+              (mouse-button-input :left :up)))
 
 
 (defn handle-action-middle-click [_ui-hint target]
   (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-key-input :middle :down)
-              (mouse-key-input :middle :up)))
+  (send-input (mouse-button-input :middle :down)
+              (mouse-button-input :middle :up)))
 
 
 (defn handle-action-right-click [_ui-hint target]
   (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-key-input :right :down)
-              (mouse-key-input :right :up)))
+  (send-input (mouse-button-input :right :down)
+              (mouse-button-input :right :up)))
 
 
 (defn handle-action-double-click [_ui-hint target]
   (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-key-input :left :down)
-              (mouse-key-input :left :up)
-              (mouse-key-input :left :down)
-              (mouse-key-input :left :up)))
+  (send-input (mouse-button-input :left :down)
+              (mouse-button-input :left :up)
+              (mouse-button-input :left :down)
+              (mouse-button-input :left :up)))
 
 
 (defn ui-hint-process-filter-result [self filtered]
