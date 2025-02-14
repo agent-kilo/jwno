@@ -269,36 +269,7 @@
   (string/ascii-upper key-list))
 
 
-(defn make-condition [uia-com spec]
-  (match spec
-    [:property prop-id prop-val]
-    (:CreatePropertyCondition uia-com prop-id prop-val)
 
-    [:and & spec-list]
-    (do
-      (def cond-list (map |(make-condition uia-com $) spec-list))
-      (def ret (:CreateAndConditionFromArray uia-com cond-list))
-      (each c cond-list
-        (:Release c))
-      ret)
-
-    [:or & spec-list]
-    (do
-      (def cond-list (map |(make-condition uia-com $) spec-list))
-      (def ret (:CreateOrConditionFromArray uia-com cond-list))
-      (each c cond-list
-        (:Release c))
-      ret)
-
-    [:not spec]
-    (do
-      (def orig-cond (make-condition uia-com spec))
-      (def ret (:CreateNotCondition uia-com orig-cond))
-      (:Release orig-cond)
-      ret)
-
-    _
-    (errorf "unknown condition spec: %n" spec)))
 
 
 (defn calc-label-len [elem-count key-count]
@@ -543,17 +514,16 @@
       (set win-rect (DwmGetWindowAttribute win-hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
 
       # XXX: Always ignore disabled and off-screen elements
-      (with-uia [cond (make-condition uia-com [:and
-                                                 [:property UIA_IsOffscreenPropertyId false]
-                                               [:property UIA_IsEnabledPropertyId true]
-                                               cond-spec])]
-        (with-uia [cr (:CreateCacheRequest uia-com)]
-          (:AddProperty cr UIA_NamePropertyId)
-          (:AddProperty cr UIA_ControlTypePropertyId)
-          (:AddProperty cr UIA_BoundingRectanglePropertyId)
-          (:AddProperty cr UIA_IsInvokePatternAvailablePropertyId)
-          (:AddPattern cr UIA_InvokePatternId)
-
+      (with-uia [cond (:create-condition uia-man [:and
+                                                  [:property UIA_IsOffscreenPropertyId false]
+                                                  [:property UIA_IsEnabledPropertyId true]
+                                                  cond-spec])]
+        (with-uia [cr (:create-cache-request uia-man
+                                             [UIA_NamePropertyId
+                                              UIA_ControlTypePropertyId
+                                              UIA_BoundingRectanglePropertyId
+                                              UIA_IsInvokePatternAvailablePropertyId]
+                                             [UIA_InvokePatternId])]
           (with-uia [elem-arr (:FindAllBuildCache uia-win TreeScope_Subtree cond cr)]
             (for i 0 (:get_Length elem-arr)
               (array/push elem-list (:GetElement elem-arr i))))))))
