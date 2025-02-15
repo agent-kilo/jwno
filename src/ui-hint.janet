@@ -349,10 +349,9 @@
 
 
 (defn move-mouse-cursor [x y]
-  # XXX: Should use SetPhysicalCursorPos?
-  (def scp-ret (SetCursorPos x y))
-  (when (= scp-ret FALSE)
-    (errorf "SetCursorPos failed: %n" (GetLastError))))
+  (def spcp-ret (SetPhysicalCursorPos x y))
+  (when (= spcp-ret FALSE)
+    (errorf "SetPhysicalCursorPos failed: %n" (GetLastError))))
 
 
 (defn handle-action-invoke [_ui-hint target]
