@@ -332,7 +332,9 @@
   (:set-key-mode key-man :command)
   (:remove-hook hook-man :key-pressed hook-fn)
   (eachp [l e] labeled-elems
-    (:Release e))
+    (def refc (:Release e))
+    (unless (= refc (int/u64 0))
+      (log/warning "bad ref count in ui-hint-clean-up: %n" refc)))
   (:post-message ui-man hide-msg 0 0))
 
 
@@ -481,6 +483,97 @@
   (:post-message ui-man show-msg (alloc-and-marshal [win-rect to-show]) 0))
 
 
+#
+# Firefox keeps all of its offscreen tabs in the UI tree, and FindAll is
+# not smart enough to skip them, even if we specify [:property UIA_IsOffscreenPropertyId false]
+# in the condition. Traversing complex web pages is reeeeaaaally slow.
+# This is to filter out all the offscreen tabs. It should deal with other
+# browsers based on Firefox too. E.g. Zen browser.
+#
+(defn find-firefox-init-elements [uia-win uia-man &opt cr?]
+  (log/debug "find-firefox-init-elements for window: %n" (:get_CachedName uia-win))
+
+  (def elem-list @[])
+
+  (with-uia [cr (if cr?
+                  (do
+                    (:AddRef cr?)
+                    cr?)
+                  (:create-cache-request uia-man [UIA_ControlTypePropertyId
+                                                  UIA_IsOffscreenPropertyId
+                                                  UIA_IsEnabledPropertyId]))]
+    (with-uia [walker (:create-raw-view-walker uia-man)]
+      (:enumerate-children
+         uia-man
+         uia-win
+         (fn [child]  # Top-level children
+           (cond
+             (= FALSE (:GetCachedPropertyValue child UIA_IsEnabledPropertyId))
+             :nop
+
+             (not= FALSE (:GetCachedPropertyValue child UIA_IsOffscreenPropertyId))
+             :nop
+
+             (= UIA_GroupControlTypeId (:GetCachedPropertyValue child UIA_ControlTypePropertyId))
+             # For some unknown reason, FindAll* don't work well with
+             # [:property UIA_IsControlElementPropertyId false] elements,
+             # so we have to walk the tree ourselves.
+             (do
+               (def group-members @[])
+               (:enumerate-children
+                  uia-man
+                  child
+                  (fn [group-child]  # Children in top-level group controls
+                    (when (and (not= FALSE (:GetCachedPropertyValue group-child UIA_IsEnabledPropertyId))
+                               (= FALSE (:GetCachedPropertyValue group-child UIA_IsOffscreenPropertyId)))
+                      (:AddRef group-child)
+                      (array/push group-members group-child)))
+                  walker
+                  cr)
+               (log/debug "found %n on-screen group members" (length group-members))
+               (array/concat elem-list group-members))
+
+             true
+             (do
+               (:AddRef child)
+               (array/push elem-list child))))
+         walker
+         cr)
+
+      (var next-child (:GetFirstChildElementBuildCache walker uia-win cr))
+      (while next-child
+        (with-uia [child next-child]
+          
+          (set next-child (:GetNextSiblingElementBuildCache walker child cr))))))
+
+  elem-list)
+
+
+(defn ui-hint-find-ui-elements [self uia-win cond-spec &opt cr]
+  (def {:context context} self)
+  (def {:uia-manager uia-man} context)
+
+  (def init-elems
+    (cond
+      (and (= UIA_WindowControlTypeId (:get_CachedControlType uia-win))
+           (= "Gecko" (:get_CachedFrameworkId uia-win))
+           (= "MozillaWindowClass" (:get_CachedClassName uia-win)))
+      (find-firefox-init-elements uia-win uia-man cr)
+
+      true
+      @[uia-win]))
+
+  (def elem-list @[])
+  (with-uia [cond (:create-condition uia-man cond-spec)]
+    (each e init-elems
+      (with-uia [elem-arr (if cr
+                            (:FindAllBuildCache e TreeScope_Subtree cond cr)
+                            (:FindAll e TreeScope_Subtree cond))]
+        (for i 0 (:get_Length elem-arr)
+          (array/push elem-list (:GetElement elem-arr i))))))
+  elem-list)
+
+
 (defn ui-hint-cmd [self raw-key-list &opt cond-spec action]
   (default cond-spec
     [:or
@@ -500,32 +593,39 @@
 
   (def uia-com (in uia-man :com))
 
-  (def elem-list @[])
+  (var elem-list @[])
   (var win-rect nil)
 
-  (with-uia [uia-win (:get-focused-window uia-man)]
-    (when uia-win
-      (def win-hwnd (:get_CachedNativeWindowHandle uia-win))
-      (when (or (nil? win-hwnd)
-                (null? win-hwnd))
-        (log/debug "Invalid HWND for ui-hint: %n" win-hwnd)
-        (break))
-      (set win-rect (DwmGetWindowAttribute win-hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+  (with-uia [cr (:create-cache-request uia-man
+                                       [UIA_NamePropertyId
+                                        UIA_ClassNamePropertyId
+                                        UIA_FrameworkIdPropertyId
+                                        UIA_NativeWindowHandlePropertyId
+                                        UIA_ControlTypePropertyId
+                                        UIA_BoundingRectanglePropertyId
+                                        UIA_IsInvokePatternAvailablePropertyId
+                                        UIA_IsOffscreenPropertyId
+                                        UIA_IsEnabledPropertyId]
+                                       [UIA_InvokePatternId])]
+    (with-uia [uia-win (:get-focused-window uia-man true cr)]
+      (when uia-win
+        (def win-hwnd (:get_CachedNativeWindowHandle uia-win))
+        (when (or (nil? win-hwnd)
+                  (null? win-hwnd))
+          (log/debug "Invalid HWND for ui-hint: %n" win-hwnd)
+          (break))
 
-      # XXX: Always ignore disabled and off-screen elements
-      (with-uia [cond (:create-condition uia-man [:and
-                                                  [:property UIA_IsOffscreenPropertyId false]
-                                                  [:property UIA_IsEnabledPropertyId true]
-                                                  cond-spec])]
-        (with-uia [cr (:create-cache-request uia-man
-                                             [UIA_NamePropertyId
-                                              UIA_ControlTypePropertyId
-                                              UIA_BoundingRectanglePropertyId
-                                              UIA_IsInvokePatternAvailablePropertyId]
-                                             [UIA_InvokePatternId])]
-          (with-uia [elem-arr (:FindAllBuildCache uia-win TreeScope_Subtree cond cr)]
-            (for i 0 (:get_Length elem-arr)
-              (array/push elem-list (:GetElement elem-arr i))))))))
+        (set win-rect (DwmGetWindowAttribute win-hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+        (set elem-list
+             (:find-ui-elements
+                self
+                uia-win
+                # XXX: Always ignore disabled and off-screen elements
+                [:and
+                 [:property UIA_IsOffscreenPropertyId false]
+                 [:property UIA_IsEnabledPropertyId true]
+                 cond-spec]
+                cr)))))
 
   (def elem-count (length elem-list))
   (log/debug "Found %n UI elements" elem-count)
@@ -661,6 +761,7 @@
   @{:on-key-pressed ui-hint-on-key-pressed
 
     :cmd ui-hint-cmd
+    :find-ui-elements ui-hint-find-ui-elements
     :show-hints ui-hint-show-hints
     :process-filter-result ui-hint-process-filter-result
     :clean-up ui-hint-clean-up
