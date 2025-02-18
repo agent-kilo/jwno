@@ -332,9 +332,11 @@
   (:set-key-mode key-man :command)
   (:remove-hook hook-man :key-pressed hook-fn)
   (eachp [l e] labeled-elems
+    (def name (:get_CachedName e))
+    (def control-type (:get_CachedControlType e))
     (def refc (:Release e))
     (unless (= refc (int/u64 0))
-      (log/warning "bad ref count in ui-hint-clean-up: %n" refc)))
+      (log/warning "bad ref count in ui-hint-clean-up: %n (%n, %n)" refc name control-type)))
   (:post-message ui-man hide-msg 0 0))
 
 
