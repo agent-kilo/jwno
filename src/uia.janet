@@ -88,11 +88,11 @@
      nil)))
 
 
-(defn uia-manager-get-parent-window [self uia-elem &opt top-level?]
+(defn uia-manager-get-parent-window [self uia-elem &opt top-level? cr]
   (default top-level? true)
+  (default cr (in self :focus-cr))
 
   (def {:root root
-        :focus-cr focus-cr
         :control-view-walker walker}
     self)
   (def root-hwnd (:get_CachedNativeWindowHandle root))
@@ -101,7 +101,7 @@
 
   (var ret nil)
   (var cur-elem uia-elem)
-  (var parent (get-uia-direct-parent cur-elem walker focus-cr))
+  (var parent (get-uia-direct-parent cur-elem walker cr))
 
   (while true
     (def hwnd (try
@@ -153,20 +153,19 @@
 
     (:Release cur-elem)
     (set cur-elem parent)
-    (set parent (get-uia-direct-parent cur-elem walker focus-cr)))
+    (set parent (get-uia-direct-parent cur-elem walker cr)))
 
   ret)
 
 
-(defn uia-manager-get-focused-window [self &opt top-level?]
+(defn uia-manager-get-focused-window [self &opt top-level? cr]
   (default top-level? true)
+  (default cr (in self :focus-cr))
 
-  (def {:com uia-com
-        :focus-cr focus-cr}
-    self)
+  (def {:com uia-com} self)
 
   (with-uia [focused (try
-                       (:GetFocusedElementBuildCache uia-com focus-cr)
+                       (:GetFocusedElementBuildCache uia-com cr)
                        ((err fib)
                         # This may fail due to e.g. insufficient privileges
                         (log/debug "GetFocusedElementBuildCache failed: %n\n%s"
@@ -174,7 +173,7 @@
                                    (get-stack-trace fib))
                         nil))]
     (if focused
-      (:get-parent-window self focused top-level?)
+      (:get-parent-window self focused top-level? cr)
       nil)))
 
 
@@ -307,6 +306,19 @@
   (:get_RawViewWalker (in self :com)))
 
 
+(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr?]
+  (with-uia [walker (if (nil? walker?)
+                      (:create-raw-view-walker self)
+                      (do
+                        (:AddRef walker?)
+                        walker?))]
+    (var next-child (:GetFirstChildElementBuildCache walker elem cr?))
+    (while next-child
+      (with-uia [child next-child]
+        (enum-fn child)
+        (set next-child (:GetNextSiblingElementBuildCache walker child cr?))))))
+
+
 (defn- init-event-handlers [uia-com element chan]
   (def window-opened-handler
     # Can't use `with` here, or there will be a "can't marshal alive fiber" error
@@ -409,6 +421,7 @@
     :create-control-view-walker uia-manager-create-control-view-walker
     :create-content-view-walker uia-manager-create-content-view-walker
     :create-raw-view-walker uia-manager-create-raw-view-walker
+    :enumerate-children uia-manager-enumerate-children
     :init-event-handlers uia-manager-init-event-handlers
     :destroy uia-manager-destroy})
 
