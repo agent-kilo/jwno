@@ -350,6 +350,9 @@
             # Add your own rules here
             ))))
 
+#
+# This hook is called when a new window gets managed by Jwno.
+#
 (:add-hook hook-man :window-created
    (fn [win uia-win _exe-path _desktop-info]
      (put (in win :tags) :anchor :center)
@@ -357,17 +360,42 @@
 
      (def class-name (:get_CachedClassName uia-win))
      (cond
+       #
+       # Here we make some windows transparent, filtering by their
+       # class names. You can see a window's class name using the
+       # `Win + W  D` key binding (if you are using this example
+       # config, see build-keymap function above).
+       #
        (find |(= $ class-name)
-             ["Emacs"
+             [# The OS that lacks a decent text editor
+              "Emacs"
+              # The good old console window (cmd.exe and Jwno's REPL window, etc.)
               "ConsoleWindowClass"
+              # Windows Terminal (wt.exe)
               "CASCADIA_HOSTING_WINDOW_CLASS"])
        (:set-alpha win (math/floor (* 256 0.9)))
 
        (= "#32770" class-name) # Dialog window class
+       #
+       # Tell Jwno to NOT expand these dialog windows, so that
+       # they won't cover the whole parent frame (shrinking can
+       # still happen though).
+       #
        (put (in win :tags) :no-expand true))))
 
+#
+# This hook is called when a monitor's settings get updated. It
+# can be triggered by change of display resolution, scale setting
+# (DPI), screen work area, or monitor arrangement.
+#
 (:add-hook hook-man :monitor-updated
    (fn [frame]
+     #
+     # We don't actually need to set the padding value each time
+     # the monitor gets updated, but this is currently the only
+     # hook that gets called when a new monitor is connected,
+     # so it may be considered as a place to put our init code.
+     #
      (put (in frame :tags) :padding 10)))
 
 
