@@ -39,6 +39,9 @@ Then, follow these steps:
     Start an @code{x64 Native Tools Command Prompt for VS 2022}.
   }
   @li{
+    @em{(Optional but recommended)} Run @code{jpm -l run vcs-version} in @em{Jw32} source directory.
+  }
+  @li{
     Run @code{jpm -l build} in @em{Jw32} source directory.
   }
   @li{
@@ -48,12 +51,17 @@ Then, follow these steps:
     Run @code{jpm -l deps} in @em{Jwno} source directory.
   }
   @li{
+    @em{(Optional but recommended)} Run @code{jpm -l run vcs-version} in @em{Jwno} source directory.
+  }
+  @li{
     In @em{Jwno} source directory, run @code{jpm -l run embed-manifest}. This is important, the build won't fail if you skipped this, but the resulting @code{exe} file will not run properly.
   }
   @li{
     Check out the built artifact @code{jwno.exe}, @code{jwno.exp} and @code{jwno.lib} in @code```build\```.
   }
 }
+
+After you made any change to the source code, or pulled any update from the public fossil or git repos, it's recommended that you run @code{jpm -l run vcs-version} and then build Jwno again, so that the built binary can report the exact commit it's built upon.
 
 If you encountered any problem or have any question when following these steps, please file an issue @link[https://github.com/agent-kilo/jwno/issues]{here}.
 
