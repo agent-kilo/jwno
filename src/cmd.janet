@@ -693,26 +693,30 @@
         :ui-manager ui-man}
     context)
 
-  (:add-oneshot-hook hook-man :key-pressed
-     (fn [key]
-       # Ignore modifier key events, since they're included
-       # in (key :modifiers)
-       (when (in MODIFIER-KEYS (in key :key))
-         (break))
+  (var saved-hook-fn nil)
+  (set saved-hook-fn 
+       (:add-hook hook-man :key-pressed
+          (fn [key]
+            # Ignore modifier key events, since they're included
+            # in (key :modifiers)
+            (when (in MODIFIER-KEYS (in key :key))
+              (break))
 
-       (:set-key-mode key-man :command)
+            (log/debug "removing :key-pressed hook for :describe-key")
+            (:remove-hook hook-man :key-pressed saved-hook-fn)
+            (:set-key-mode key-man :command)
 
-       (:show-tooltip
-          ui-man
-          :describe-key
-          (string/format (string/join
-                          ["Key Code: %n"
-                           "Key Name: %n"
-                           "Modifiers : %n"]
-                          "\n")
-                         (in key :key)
-                         (in key-code-to-name (in key :key))
-                         (in key :modifiers)))))
+            (:show-tooltip
+               ui-man
+               :describe-key
+               (string/format (string/join
+                               ["Key Code: %n"
+                                "Key Name: %n"
+                                "Modifiers : %n"]
+                               "\n")
+                              (in key :key)
+                              (in key-code-to-name (in key :key))
+                              (in key :modifiers))))))
 
   (:set-key-mode key-man :raw)
   (:show-tooltip ui-man :describe-key "Please press a key." nil nil 0))
