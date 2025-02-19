@@ -756,7 +756,13 @@
   0)
 
 
-(defn- msg-wnd-handle-wm-displaychange [hwnd _msg wparam lparam hook-handler state]
+(defn- msg-wnd-handle-wm-displaychange [hwnd msg wparam _lparam hook-handler state]
+  # XXX: This function also handles WM_SETTINGCHANGE
+  (when (= msg WM_SETTINGCHANGE)
+    (unless (= wparam SPI_SETWORKAREA)
+      (break) # Early return
+      ))
+
   # Clear cached desktop rect, see get-desktop-rect and get-current-work-area
   (put state :desktop-rect nil)
 
@@ -816,7 +822,9 @@
 
    WM_COMMAND msg-wnd-handle-wm-command
    WM_TIMER msg-wnd-handle-wm-timer
+
    WM_DISPLAYCHANGE msg-wnd-handle-wm-displaychange
+   WM_SETTINGCHANGE msg-wnd-handle-wm-displaychange # XXX: Reuse WM_DISPLAYCHANGE handler
 
    SHOW-ERROR-AND-EXIT-MSG msg-wnd-handle-show-error-and-exit
 

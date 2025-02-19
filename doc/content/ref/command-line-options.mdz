@@ -1,0 +1,43 @@
+{:title "Command Line Options"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Reference Index" "index.html"]
+ :order 1}
+---
+
+@ul{
+  @li{
+      @code{-C}, @code{--client} @html```<br/>```
+      Starts in REPL client mode. Connects to the REPL address specified by the @code{--repl} option.
+  }
+  @li{
+      @code{-c <file name>}, @code{--config <file name>} @html```<br/>```
+      The config file to run. Use @code{jwno-config.janet} in the same directory as @code{jwno.exe} by default.
+  }
+  @li{
+      @code{-h}, @code{--help} @html```<br/>```
+      Shows a help message.
+  }
+  @li{
+      @code{--log-file <file name>} @html```<br/>```
+      Specifies a log file to write to. No log file will be generated if this option is omitted.
+  }
+  @li{
+      @code{--log-level <level>} @html```<br/>```
+      The log level. Can be @code{quiet}, @code{error}, @code{warning}, @code{info} or @code{debug}. Default: @code{quiet}.
+  }
+  @li{
+      @code{-m <path name>}, @code{--mod-path <path name>} @html```<br/>```
+      A custom path to load modules from. Can be specified multiple times. Use the directory where @code{jwno.exe} resides by default.
+  }
+  @li{
+      @code{--no-console} @html```<br/>```
+      Supresses console output, when @code{--log-level} is not @code{quiet}.
+  }
+  @li{
+      @code{-r <ip:port>}, @code{--repl <ip:port} @html```<br/>```
+      Specifies the address the REPL should be listening on. The REPL will not be started if this option is omitted.
+  }
+}
+
+All other command line arguments that do not begin with a hyphen @code{-} will be interpreted as config file names, but they can be overridden by the @code{-c} or @code{--config} option.

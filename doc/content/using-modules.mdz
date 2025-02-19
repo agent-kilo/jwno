@@ -1,0 +1,51 @@
+{:title "Using Modules"
+ :author "Chibidou"
+ :template "main.html"
+ :order 7}
+---
+
+### Loading Modules
+
+Jwno can utilize @link[https://janet-lang.org/docs/modules.html]{Janet modules} to extend itself. To make it more convenient for the user, it will first search for modules in the same directory where its config file resides. Say you have a config file @code```C:\path\to\jwno-config.janet```. When evaluating the code below to import a module,
+
+@codeblock[janet]```
+(import awesome-module)
+```
+
+Jwno will search in the directory @code```C:\path\to\```, for a file named @code{awesome-module.janet}. Compiled @code{.jimage} and @code{.dll} files can be loaded too, but see the @link[development.html]{development guide} for caveats.
+
+Besides the default location, you can specify extra paths for Jwno to search modules from. Just use the @code{--mod-path} (or simply @code{-m}) command line option when launching @code{jwno.exe}:
+
+@codeblock[text]```
+jwno.exe --mod-path C:\path\to\some\modules\ --mod-path C:\path\to\some\other\modules\
+```
+
+As you can see, @code{--mod-path} can be specified multiple times. Jwno will first search the paths given by @code{--mod-path}, in the order they appear in the command line, then it will fallback to the directory where your config file resides. In other words, @code{--mod-path} @em{overrides} the default location.
+
+### Built-In Modules
+
+Jwno comes with some built-in modules that are embeded in @code{jwno.exe}, so you can import and use them directly in your code, without requiring separate @code{.janet} or @code{.dll} files.
+
+Built-in modules providing high-level APIs have the @code{jwno/} prefix, and those providing low-level Win32 APIs have the @code{jw32/} prefix instead.
+
+### Next Step
+
+@ul{
+  @li{
+    @link[repl.html]{The REPL}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[development.html]{Development Guide}
+  }
+  @li{
+    @link[ref/command-line-options.html]{Command Line Options}
+  }
+  @li{
+    @link[ref/built-in-modules.html]{Built-In Modules}
+  }
+}
