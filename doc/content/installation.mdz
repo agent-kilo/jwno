@@ -67,6 +67,9 @@ Right-clicking on the notification area icon @html```<img style="height: 1em; wi
 
 @ul{
   @li{
+    @em{Jwno <version>}: Shows the versions of Janet and Jwno itself.
+  }
+  @li{
     @em{Launch REPL}: Opens the REPL window.
   }
   @li{
