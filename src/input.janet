@@ -31,5 +31,30 @@
          :ki.dwExtraInfo ei-to-send))
 
 
+(defn mouse-button-input [btn-name btn-state &opt extra-info]
+  (default extra-info 0)
+  (def ei-to-send (bor KEI-FLAG-INJECTED extra-info))
+  (def combo [btn-name btn-state])
+  (INPUT :type INPUT_MOUSE
+         :mi.dwFlags (match combo
+                       [:left :up] MOUSEEVENTF_LEFTUP
+                       [:left :down] MOUSEEVENTF_LEFTDOWN
+                       [:right :up] MOUSEEVENTF_RIGHTUP
+                       [:right :down] MOUSEEVENTF_RIGHTDOWN
+                       [:middle :up] MOUSEEVENTF_MIDDLEUP
+                       [:middle :down] MOUSEEVENTF_MIDDLEDOWN
+                       [:x [_xid :up]] MOUSEEVENTF_XUP
+                       [:x [_xid :down]] MOUSEEVENTF_XDOWN
+                       [:wheel _amount] MOUSEEVENTF_WHEEL
+                       [:hwheel _amount] MOUSEEVENTF_HWHEEL
+                       (errorf "invalid btn-name and btn-state combo: %n" combo))
+         :mi.mouseData (match combo
+                         [:wheel amount] amount
+                         [:hwheel amount] amount
+                         [:x [xid _state]] xid
+                         0)
+         :mi.dwExtraInfo ei-to-send))
+
+
 (defn send-input [& input-list]
   (SendInput input-list))

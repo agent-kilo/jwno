@@ -1,4 +1,5 @@
 (use jw32/_winuser)
+(use jw32/_wingdi)
 (use jw32/_libloaderapi)
 (use jw32/_errhandlingapi)
 (use jw32/_dwmapi)
@@ -92,9 +93,9 @@
 #     (:disable current-frame-area)
 #
 
-(def FRAME-AREA-WINDOW-CLASS-NAME "jwno-frame-area-window")
-
 ################## vvvv Runs in UI thread vvvv ##################
+
+(def FRAME-AREA-WINDOW-CLASS-NAME "jwno-frame-area-window")
 
 (defn frame-area-wndproc [hwnd msg wparam lparam]
   #(log/debug "################## frame-area-wndproc ##################")
@@ -108,7 +109,7 @@
     (DefWindowProc hwnd msg wparam lparam)))
 
 
-(defn create-frame-area-window []
+(defn create-frame-area-window [win-hbr alpha]
   (def wc
     (WNDCLASSEX
      :lpfnWndProc frame-area-wndproc
@@ -116,7 +117,7 @@
      :lpszClassName FRAME-AREA-WINDOW-CLASS-NAME
      :hCursor (LoadCursor nil IDC_ARROW)
      # When using our own class, hbrBackground is mendatory, or the window will be invisible
-     :hbrBackground (+ 1 COLOR_WINDOW)
+     :hbrBackground win-hbr
      ))
   (when (null? (RegisterClassEx wc))
     (errorf "window class registration failed: 0x%x" (GetLastError)))
@@ -135,7 +136,7 @@
   (when (null? new-hwnd)
     (errorf "failed to create window: 0x%x" (GetLastError)))
 
-  (SetLayeredWindowAttributes new-hwnd 0 64 LWA_ALPHA)
+  (SetLayeredWindowAttributes new-hwnd 0 alpha LWA_ALPHA)
   (try
     # Raises E_INVALIDARG on Windows 10
     (DwmSetWindowAttribute new-hwnd DWMWA_WINDOW_CORNER_PREFERENCE DWMWCP_ROUND)
@@ -145,22 +146,25 @@
   new-hwnd)
 
 
-(defn handle-show-frame-area [hwnd _msg wparam _lparam _hook-handler state]
-  (def rect (unmarshal-and-free wparam))
+(defn handle-show-frame-area [_hwnd _msg wparam _lparam _hook-handler state]
+  (def [rect color alpha] (unmarshal-and-free wparam))
   (def [width height] (rect-size rect))
+  (def frame-area-state (in state :frame-area-state @{}))
 
   (def area-hwnd
-    (if-let [old-hwnd (in state :frame-area-hwnd)]
+    (if-let [old-hwnd (in frame-area-state :hwnd)]
       old-hwnd
       # else
-      (do
-        (def new-hwnd (create-frame-area-window))
-        (put state :frame-area-hwnd new-hwnd)
+      (let [win-hbr (CreateSolidBrush color)
+            new-hwnd (create-frame-area-window win-hbr alpha)]
+        (put frame-area-state :hwnd new-hwnd)
+        (put frame-area-state :win-hbr win-hbr)
         new-hwnd)))
 
-  (log/debug "--------- AREA-HWND = %n" area-hwnd)
+  (put state :frame-area-state frame-area-state)
+
   (ShowWindow area-hwnd SW_SHOW)
-  (UpdateWindow hwnd)
+  (UpdateWindow area-hwnd)
   (SetWindowPos area-hwnd
                 HWND_BOTTOM
                 (in rect :left)
@@ -172,20 +176,25 @@
 
 
 (defn handle-hide-frame-area [_hwnd _msg _wparam _lparam _hook-handler state]
-  (when-let [area-hwnd (in state :frame-area-hwnd)]
-    (log/debug "--------- HIDING AREA-HWND = %n" area-hwnd)
+  (def frame-area-state (in state :frame-area-state @{}))
+  (when-let [area-hwnd (in frame-area-state :hwnd)]
     (ShowWindow area-hwnd SW_HIDE))
   0)
 
 
 (defn handle-cleanup-frame-area [_hwnd msg _wparam _lparam _hook-handler state]
-  (when-let [area-hwnd (in state :frame-area-hwnd)]
-    (put state :frame-area-hwnd nil)
+  (def frame-area-state (in state :frame-area-state @{}))
+  (put state :frame-area-state nil)
+
+  (when-let [area-hwnd (in frame-area-state :hwnd)]
     (DestroyWindow area-hwnd))
 
   (def unreg-ret (UnregisterClass FRAME-AREA-WINDOW-CLASS-NAME (GetModuleHandle nil)))
   (when (= FALSE unreg-ret)
-    (log/debug "Failed to unregister window class: 0x%x" (GetLastError)))
+    (log/debug "Failed to unregister frame area window class: 0x%x" (GetLastError)))
+
+  (when-let [hbr (in frame-area-state :win-hbr)]
+    (DeleteObject hbr))
 
   (when-let [custom-msgs (in state :custom-messages)
              cleanup-fn (in custom-msgs msg)]
@@ -217,6 +226,8 @@
         :show-msg show-msg
         :hide-msg hide-msg}
     self)
+  (def color (in self :color (GetSysColor (int/to-number COLOR_WINDOW))))
+  (def alpha (in self :alpha 64))
 
   (def visible-children (filter |(:visible? $)
                                 (in frame :children)))
@@ -225,7 +236,7 @@
           margin (in self :margin)
           margins {:left margin :top margin :right margin :bottom margin}
           rect-with-margin (calc-rect-with-margin rect margins)]
-      (:post-message ui-man show-msg (alloc-and-marshal rect-with-margin) 0))
+      (:post-message ui-man show-msg (alloc-and-marshal [rect-with-margin color alpha]) 0))
     (do
       (:post-message ui-man hide-msg 0 0))))
 
@@ -395,6 +406,9 @@
      :window-manager window-man
 
      # Default settings
-     :margin 0}
+     :margin 0
+     :color (GetSysColor (int/to-number COLOR_WINDOW))
+     :alpha 64
+    }
 
    current-frame-area-proto))

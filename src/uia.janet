@@ -88,11 +88,11 @@
      nil)))
 
 
-(defn uia-manager-get-parent-window [self uia-elem &opt top-level?]
+(defn uia-manager-get-parent-window [self uia-elem &opt top-level? cr]
   (default top-level? true)
+  (default cr (in self :focus-cr))
 
   (def {:root root
-        :focus-cr focus-cr
         :control-view-walker walker}
     self)
   (def root-hwnd (:get_CachedNativeWindowHandle root))
@@ -101,7 +101,7 @@
 
   (var ret nil)
   (var cur-elem uia-elem)
-  (var parent (get-uia-direct-parent cur-elem walker focus-cr))
+  (var parent (get-uia-direct-parent cur-elem walker cr))
 
   (while true
     (def hwnd (try
@@ -153,20 +153,19 @@
 
     (:Release cur-elem)
     (set cur-elem parent)
-    (set parent (get-uia-direct-parent cur-elem walker focus-cr)))
+    (set parent (get-uia-direct-parent cur-elem walker cr)))
 
   ret)
 
 
-(defn uia-manager-get-focused-window [self &opt top-level?]
+(defn uia-manager-get-focused-window [self &opt top-level? cr]
   (default top-level? true)
+  (default cr (in self :focus-cr))
 
-  (def {:com uia-com
-        :focus-cr focus-cr}
-    self)
+  (def {:com uia-com} self)
 
   (with-uia [focused (try
-                       (:GetFocusedElementBuildCache uia-com focus-cr)
+                       (:GetFocusedElementBuildCache uia-com cr)
                        ((err fib)
                         # This may fail due to e.g. insufficient privileges
                         (log/debug "GetFocusedElementBuildCache failed: %n\n%s"
@@ -174,15 +173,15 @@
                                    (get-stack-trace fib))
                         nil))]
     (if focused
-      (:get-parent-window self focused top-level?)
+      (:get-parent-window self focused top-level? cr)
       nil)))
 
 
 (defn uia-manager-get-window-info [self hwnd]
   (def {:com uia-com} self)
-  (with-uia [cr (:CreateCacheRequest uia-com)]
-    (:AddProperty cr UIA_NamePropertyId)
-    (:AddProperty cr UIA_ClassNamePropertyId)
+  (with-uia [cr (:create-cache-request self
+                                       [UIA_NamePropertyId
+                                        UIA_ClassNamePropertyId])]
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache uia-com hwnd cr)
                          ((err fib)
@@ -197,8 +196,7 @@
 
 (defn uia-manager-get-window-bounding-rect [self hwnd]
   (def {:com uia-com} self)
-  (with-uia [cr (:CreateCacheRequest uia-com)]
-    (:AddProperty cr UIA_BoundingRectanglePropertyId)
+  (with-uia [cr (:create-cache-request self [UIA_BoundingRectanglePropertyId])]
     (with-uia [uia-win (try
                          (:ElementFromHandleBuildCache uia-com hwnd cr)
                          ((err fib)
@@ -222,6 +220,103 @@
                         nil))]
     (when uia-win
       (:SetFocus uia-win))))
+
+
+(defn uia-manager-create-condition [self spec]
+  (def com (in self :com))
+  (match spec
+    :true
+    (:CreateTrueCondition com)
+
+    :false
+    (:CreateFalseCondition com)
+
+    [:property prop-id prop-val]
+    (:CreatePropertyCondition com prop-id prop-val)
+
+    [:and & spec-list]
+    (do
+      (def cond-list (map |(:create-condition self $) spec-list))
+      (def ret (:CreateAndConditionFromArray com cond-list))
+      (each c cond-list
+        (:Release c))
+      ret)
+
+    [:or & spec-list]
+    (do
+      (def cond-list (map |(:create-condition self $) spec-list))
+      (def ret (:CreateOrConditionFromArray com cond-list))
+      (each c cond-list
+        (:Release c))
+      ret)
+
+    [:not spec]
+    (do
+      (def orig-cond (:create-condition self spec))
+      (def ret (:CreateNotCondition com orig-cond))
+      (:Release orig-cond)
+      ret)
+
+    _
+    (errorf "unknown condition spec: %n" spec)))
+
+
+(defn uia-manager-create-cache-request [self &opt prop-list pat-list]
+  (default prop-list [])
+  (default pat-list [])
+
+  (def com (in self :com))
+  (def cr (:CreateCacheRequest com))
+  (each prop prop-list
+    (:AddProperty cr prop))
+  (each pat pat-list
+    (:AddPattern cr pat))
+  cr)
+
+
+(defn uia-manager-create-tree-walker [self cond-or-spec]
+  (def com (in self :com))
+
+  (cond
+    (or (keyword? cond-or-spec)
+        (indexed? cond-or-spec))
+    # it's a spec
+    (with-uia [cond (:create-condition self cond-or-spec)]
+      # XXX: We shouldn't need (:AddRef cond) right? RIGHT?
+      (:CreateTreeWalker com cond))
+
+    (and (table? cond-or-spec)
+         (= "IUIAutomationCondition" (in cond-or-spec :__if_name)))
+    # it's a condition object
+    (:CreateTreeWalker com cond-or-spec)
+
+    true
+    (errorf "expected a condition spec or condition object, got %n" cond-or-spec)))
+
+
+(defn uia-manager-create-control-view-walker [self]
+  (:get_ControlViewWalker (in self :com)))
+
+
+(defn uia-manager-create-content-view-walker [self]
+  (:get_ContentViewWalker (in self :com)))
+
+
+(defn uia-manager-create-raw-view-walker [self]
+  (:get_RawViewWalker (in self :com)))
+
+
+(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr?]
+  (with-uia [walker (if (nil? walker?)
+                      (:create-raw-view-walker self)
+                      (do
+                        (:AddRef walker?)
+                        walker?))]
+    (var next-child (:GetFirstChildElementBuildCache walker elem cr?))
+    (while next-child
+      (with-uia [child next-child]
+        (enum-fn child)
+        (set next-child (:GetNextSiblingElementBuildCache walker child cr?))))))
 
 
 (defn- init-event-handlers [uia-com element chan]
@@ -320,6 +415,13 @@
     :get-window-info uia-manager-get-window-info
     :get-window-bounding-rect uia-manager-get-window-bounding-rect
     :set-focus-to-window uia-manager-set-focus-to-window
+    :create-condition uia-manager-create-condition
+    :create-cache-request uia-manager-create-cache-request
+    :create-tree-walker uia-manager-create-tree-walker
+    :create-control-view-walker uia-manager-create-control-view-walker
+    :create-content-view-walker uia-manager-create-content-view-walker
+    :create-raw-view-walker uia-manager-create-raw-view-walker
+    :enumerate-children uia-manager-enumerate-children
     :init-event-handlers uia-manager-init-event-handlers
     :destroy uia-manager-destroy})
 

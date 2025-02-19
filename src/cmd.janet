@@ -968,7 +968,8 @@
      (:describe-key)
 
      Interactively reads a key, and shows some info about it.
-     ```))
+     ```)
+  )
 
 
 (defn command-manager-call-command [self cmd & args]
