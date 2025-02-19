@@ -180,13 +180,13 @@
        :right v})))
 
 
-(defn- set-window-pos [hwnd x y w h &opt scaled]
-  (default scaled false)
-
+(defn- set-window-pos [hwnd x y w h scaled extra-flags]
+  (def common-flags
+    (bor SWP_NOZORDER SWP_NOACTIVATE extra-flags))
   (def flags
     (if (or (<= w 0) (<= h 0))
-      (bor SWP_NOZORDER SWP_NOACTIVATE SWP_NOSIZE)
-      (bor SWP_NOZORDER SWP_NOACTIVATE)))
+      (bor common-flags SWP_NOSIZE)
+      common-flags))
   (when (= FALSE (SetWindowPos hwnd nil x y w h flags))
     (errorf "SetWindowPos failed for window %n: %n" hwnd (GetLastError)))
   # XXX: I couldn't work out why SetWindowPos sometimes wouldn't respect
@@ -260,6 +260,7 @@
             (def no-expand (in tags :no-expand))
             (def anchor (in tags :anchor :top-left))
             (def forced (in tags :forced))
+            (def swp-flags (in tags :swp-flags 0))
 
             # XXX: When dealing with QT windows, the bounding rectangle returned by
             # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
@@ -297,11 +298,11 @@
                 (or (not can-resize)
                     no-resize)
                 (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor cur-scale scale)]
-                  (set-window-pos hwnd x y 0 0 scaled))
+                  (set-window-pos hwnd x y 0 0 scaled swp-flags))
 
                 no-expand
                 (let [[x y w h] (calc-win-coords-in-frame win-rect rect true anchor cur-scale scale)]
-                  (set-window-pos hwnd x y w h scaled))
+                  (set-window-pos hwnd x y w h scaled swp-flags))
 
                 true
                 (let [x (in rect :left)
@@ -325,7 +326,7 @@
                   # monitor B, it will re-calculate (?) its own geometries and use those.
                   # To remedy this issue, margins or paddings should be added around DPI-unaware
                   # windows, to keep their invisible borders clear from the edges of monitors.
-                  (set-window-pos hwnd x y w h scaled))))))))
+                  (set-window-pos hwnd x y w h scaled swp-flags))))))))
 
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
