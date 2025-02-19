@@ -62,7 +62,7 @@ It's designed to work with native Windows @link[https://support.microsoft.com/en
 
 #### 👾 Hackable REPL.
 
-Like most Lisp systems, Jwno has REPL support. That means you can hack it while it's still running 🤘.
+Like most Lisp systems, Jwno has REPL support. You can hack it while it's still running 🤘.
 
 @html```
 </div>
@@ -78,7 +78,7 @@ Like most Lisp systems, Jwno has REPL support. That means you can hack it while 
 
 #### 🪄 Highly customizable.
 
-You can implement custom commands and hooks to trigger. You can even call native Win32 APIs in your own implementations. For example, to always move a Notepad window to the @code{(100, 100)} coordinates on your screen(s), using the low-level @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos]{SetWindowPos} function:
+You can implement custom commands and hooks to trigger. It's even possible to call native Win32 APIs in your own implementations. For example, to always move a Notepad window to the @code{(100, 100)} coordinates on your screen(s), using the low-level @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos]{SetWindowPos} function:
 
 @codeblock[janet]```
 (use jw32/_winuser)

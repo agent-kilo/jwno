@@ -1,0 +1,132 @@
+{:title "Defining Key Bindings"
+ :author "Chibidou"
+ :template "main.html"
+ :order 4}
+---
+
+### Key Specs
+
+Jwno has its own mini-language to specify key sequences, called @em{key sepcs} \(yeah I know, how creative). They're written as strings enclosed by quotes. The most basic key spec specifies a single key:
+
+@codeblock[janet]```
+"Enter"
+```
+
+Which means @em{press and then release the @code{Enter} key on your keyboard}. From that, you can add modifier keys:
+
+@codeblock[janet]```
+"Win + Shift + Enter"
+```
+
+It means @em{hold the @code{Win} key and the @code{Shift} key, then press and release the @code{Enter} key}. @code{Ctrl} and @code{Alt} modifier keys work too, and you can use @code{-} to separate key names instead of @code{+}. For example:
+
+@codeblock[janet]```
+"Ctrl - Alt - Enter"
+```
+
+Similarly, this means @em{hold @code{Ctrl} and @code{Alt}, then press and release @code{Enter}}. All white-space characters are optional when specifying a single key combo, i.e. the keys you press at the same time. Take these key specs as an example:
+
+@codeblock[janet]```
+"Win+Shift+Enter"
+"Ctrl-Alt-Enter"
+```
+
+They are equivalent to the two key specs with white-spaces we've seen above.
+
+### Multi-Level Keymaps
+
+One of the most powerful features from Jwno's key binding system is that, you can specify multiple key combos in a sequence, and it will automatically define @em{multi-level} keymaps for you (akin to @link[https://www.gnu.org/software/emacs/manual/html_node/elisp/Changing-Key-Bindings.html]{Emacs key bindings}):
+
+@codeblock[janet]```
+"Win + Enter  A  B"
+```
+
+This means @em{press and release @code{Win + Enter} first, then the @code{A} key, and finally the @code{B} key}. You can use multi-level keymaps to group similar commands together, and give them the same "prefix". For example, in the @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{example config}, all the infrequently used window commands begin with @code{Win + W}.
+
+### Actually Defining a Key Binding
+
+To associate a key spec with a command to execute, call the @code{:define-key} method from a keymap object, and you can optionally write some description:
+
+@codeblock[janet]```
+(def keymap (:new-keymap (in jwno/context :key-manager)))  # Create a new keymap
+(:define-key keymap "Win + Shift + Q" :quit
+             "Tell Jwno to exit")
+(:define-key keymap "Win + W  D" :describe-window
+             "Show some info about the current window")
+```
+
+### Transient Keymaps
+
+Another most powerful thing about Jwno's key binding system is that, it has an internal @em{stack} for keymaps. Only the top keymap in the stack takes effect, and we call it the @em{transient keymap}. You can use the @em{special commands} @code{:push-keymap} and @code{:pop-keymap} to manipulate the stack. The commands are special because they operate directly in the UI thread, and you can't use the @code{:call-command} method from the command manager to call them.
+
+For example, we can define a simple transient keymap only for moving windows around:
+
+@codeblock[janet]```
+(def yank-mode-keymap
+  (let [keymap (:new-keymap (in jwno/context :key-manager))]
+    (:define-key keymap "Down"  [:move-window :down])
+    (:define-key keymap "Up"    [:move-window :up])
+    (:define-key keymap "Left"  [:move-window :left])
+    (:define-key keymap "Right" [:move-window :right])
+    (:define-key keymap "Esc"   :pop-keymap)
+    keymap))
+```
+
+And then enable it when we press @code{Win + K}:
+
+@codeblock[janet]```
+(:define-key root-keymap "Win + K" [:push-keymap yank-mode-keymap]
+             "Yank mode")
+```
+
+When @code{yank-mode-keymap} is in effect, you can use the arrow keys without any modifier keys to move your windows. The keymap @em{will remain in effect} until you press the @code{Esc} key, which calls the @code{:pop-keymap} command.
+
+### Differences Between Multi-Level Keymaps and Transient Keymaps
+
+Well, they both look like some "namespacing" mechanism, in that you can enable the next level of key bindings by pressing a certain key combo. But multi-level keymaps will always @em{reset to the root keymap immediately} after a command is triggered or an undefined key is pressed, while transient keymaps will @em{stick around} until you pop it from the stack.
+
+Yeah, seriously, transient keymaps stick around. You should know by now how bad I am at naming things.
+
+### Setting the Root Keymap
+
+We call the keymap where your top-level key bindings are defined the @em{root keymap}. You can invoke those key bindings directly, without any prefix. For example, to make @code{awesome-keymap} your root keymap:
+
+@codeblock[janet]```
+(:set-keymap (in jwno/context :key-manager) awesome-keymap)
+```
+
+Modifications to keymaps @em{will not take effect} before the @code{:set-keymap} method is called again, e.g.:
+
+@codeblock[janet]```
+(:set-keymap (in jwno/context :key-manager) awesome-keymap)
+
+# We defined a new key binding after calling `:set-keymap`:
+(:define-key awesome-keymap "Win + Ctrl + Shift + Alt + B" :brew-coffee)
+
+# But it won't work until we properly set the keymap again:
+(:set-keymap (in jwno/context :key-manager) awesome-keymap)
+```
+
+Jwno has no default key bindings, so you have to call the @code{:set-keymap} method with the keymap you defined, or it won't respond to any key events.
+
+### Next Step
+
+@ul{
+  @li{
+    @link[using-commands.html]{Using Commands}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref/keymap-objects.html]{Keymap Objects}
+  }
+  @li{
+    @link[ref/key-manager-object.html]{The Key Manager Object}
+  }
+  @li{
+    @link[ref/key-names.html]{List of Key Names}
+  }
+}

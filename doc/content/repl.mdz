@@ -1,0 +1,148 @@
+{:title "The REPL"
+ :author "Chibidou"
+ :template "main.html"
+ :order 8}
+---
+
+The term @em{REPL} stands for @em{Read-Eval-Print Loop}. Even the C language has REPL implementations these days, but the first REPL was a Lisp invention. Jwno inherited the tradition of providing this great @html```<del>&nbsp;toy&nbsp;</del>``` tool.
+
+Jwno's REPL have a coding environment that's almost identical to the one you get in the config file, so you can run your experiments in the REPL, then incorporate them into your config file, and your code would have pretty much the same behavior.
+
+### The REPL Server
+
+Jwno's REPL works in a client-server style, communicating via a TCP socket bound on localhost. A server has to be started before the REPL client can connect to it. You can tell Jwno to automatically start a server in some situations, and the server would bind to @code{127.0.0.1:9999} by default. If the server failed to start automatically, check whether that address is occupied by other programs.
+
+### Launching the REPL
+
+There are multiple ways to launch the REPL:
+
+@ul{
+  @li{
+    Right-click on the notification area icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="./img/jwno.png">``` shown on the taskbar, then select @em{Launch REPL}. This command will try to connect to an existing REPL server, and automatically start one if none is running.
+  }
+  @li{
+    Bind a key to call the @code{:repl} command. You can specify in the command's arguments whether a server should be automatically started or not:
+@codeblock[janet]```
+ # The `true` argument tells the command to
+ # automatically start an REPL server
+(:define-key keymap "Win + Enter" [:repl true])
+```
+  }
+  @li{
+    Pass the @code{--client} and @code{--repl} options when starting Jwno from the command line. This will @em{not} start an REPL server automatically, and Jwno will show a network error when no server is running:
+@codeblock[text]```
+jwno.exe --client --repl 127.0.0.1:9999
+```
+  }
+}
+
+When the REPL connected successfully, a console window will pop up, showing a simple prompt:
+
+@codeblock[text]```
+Welcome to Jwno REPL!
+[127.0.0.1:9999]:1: _
+```
+
+### Keyboard Shortcuts
+
+The REPL console provides some of the keyboard shortcuts often seen in programs using the Readline library:
+
+@ul{
+  @li{
+    @code{Tab}: Auto-complete current word.
+  }
+  @li{
+    @code{↑} \(Up arrow key): Previous line in history.
+  }
+  @li{
+    @code{↓} \(Down arrow key): Next line in history.
+  }
+  @li{
+    @code{Ctrl + G}: Show documentation for the identifier before the cursor.
+  }
+  @li{
+    @code{Ctrl + A}: Move the cursor to the beginning of current line.
+  }
+  @li{
+    @code{Ctrl + E}: Move the cursor to the end of current line.
+  }
+  @li{
+    @code{Ctrl + F}: Move the cursor one character forward.
+  }
+  @li{
+    @code{Ctrl + B}: Move the cursor one character backward.
+  }
+  @li{
+    @code{Alt + F}: Move the cursor one word forward.
+  }
+  @li{
+    @code{Alt + B}: Move the cursor one word backward.
+  }
+  @li{
+    @code{Ctrl + D}: Delete one character at the cursor, or send EOF (exit the REPL) when current line is empty.
+  }
+  @li{
+    @code{Ctrl + H}: Delete one character before the cursor.
+  }
+  @li{
+    @code{Ctrl + L}: Clear screen.
+  }
+}
+
+### The Environment
+
+The REPL environment provides the usual APIs from Janet's @link[https://janet-lang.org/api/index.html]{core library}, plus some global variables exported by Jwno (they all have the @code{jwno/} prefix):
+
+@ul{
+  @li{
+    @code{jwno/context}: The context object containing all the states tracked/used by Jwno's main thread. REPL connections also run in the main thread (but in different @link[https://janet-lang.org/docs/fibers/index.html]{fibers}), so you can access most parts of this object in the REPL directly and safely, without triggering race conditions and the like.
+  }
+  @li{
+    @code{jwno/repl-server}: The REPL server we connected to.
+  }
+  @li{
+    @code{jwno/client-name}: The name for the current REPL client, as shown in the REPL prompt.
+  }
+  @li{
+    @code{jwno/client-stream}: The socket stream for the current REPL client.
+  }
+}
+
+Every REPL connection has its own environment. Everything referenced in an REPL session will be cleared when it's closed. And if you defined a variable in one REPL session, it will @em{not} be accessible in other REPL sessions. To make something persist, and be accessible to all REPL sessions, you can @em{export} it:
+
+@codeblock[janet]```
+(import jwno/util)
+(def the-answer 42)
+(util/export-to-repl jwno/repl-server the-answer)
+```
+
+And of course you can remove exported names:
+
+@codeblock[janet]```
+(util/unset-from-repl jwno/repl-server the-answer)
+```
+
+### Next Step
+
+@ul{
+  @li{
+    @link[frame-tree.html]{The Frame Tree}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref/command-line-options.html]{Command Line Options}
+  }
+  @li{
+    @link[ref/context-object.html]{The Context Object}
+  }
+  @li{
+    @link[ref/repl-manager-object.html]{The REPL Manager Object}
+  }
+  @li{
+    @link[ref/repl-server-objects.html]{REPL Server Objects}
+  }
+}

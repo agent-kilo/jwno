@@ -1,0 +1,121 @@
+{:title "Installation Guide"
+ :author "Chibidou"
+ :template "main.html"
+ :order 3}
+---
+
+You only need a portable @code{exe} file to run Jwno, so there isn't really any "installation". These are just recommended steps to get it up and running, plus some things you should know before using it.
+
+### Prerequisites
+
+@ul{
+  @li{
+    Windows 10/11 (x64)
+  }
+}
+
+### Downloading
+
+You can download Jwno executable files from @link[https://github.com/agent-kilo/jwno/releases]{Github}, or purchase it from @link[https://agentkilo.itch.io/jwno]{itch.io}. You get the exact same executable files either way.
+
+Just grab @code{jwno.exe} and you are good to go. It can be saved to anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native modules, we don't need them just yet.
+
+You may optionally check the checksum of @code{jwno.exe}. For example, calculate it in Powershell:
+
+@codeblock[text]```
+$(CertUtil -hashfile path\to\jwno.exe SHA256)[1]
+```
+
+And then compare it with the value stored in @code{jwno.exe.sha256}.
+
+### Your First Config File
+
+Jwno needs a config file to work. It's a text file containing some @link[https://janet-lang.org/]{Janet} code, which gets evaluated when you launch Jwno. There are multiple ways to specify a config file:
+
+@ul{
+  @li{
+    By default, Jwno looks for a file named @code{jwno-config.janet} in the same directory where @code{jwno.exe} resides.
+  }
+  @li{
+    You can drag-n-drop a config file from anywhere to @code{jwno.exe}.
+  }
+  @li{
+    When running Jwno from the command line or a shortcut, pass a path to @code{jwno.exe}: @code```jwno.exe path\to\your\config.janet```
+  }
+}
+
+Here are some examples:
+
+@ul{
+  @li{
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/tutorial.janet]{Tutorial.janet} is an interactive tutorial implemented as a single config file. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/tutorial.janet]{Download})
+  }
+  @li{
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{Example-config.janet} contains some practical config suitable for daily use. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/example-config.janet]{Download})
+  }
+}
+
+To try out either of them, just download the file, then drag-n-drop it to @code{jwno.exe}. I recommend going through the tutorial first, before trying out @code{example-config.janet}. You can build your own config based on @code{example-config.janet} afterwards.
+
+### Check if Jwno Is Alive
+
+Once launched, Jwno will start to tile new windows. Existing windows will get tiled @em{when they get focus}. An icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="./img/jwno.png">``` will be shown in the notification area on the taskbar when Jwno is running. If you're using @code{example-config.janet} mentioned above, you can also press @code{Win + Shift + /} \(the slash key) to show all key bindings defined in Jwno.
+
+### The Notification Icon Menu
+
+Right-clicking on the notification area icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="./img/jwno.png">``` will bring up a menu with several commands:
+
+@ul{
+  @li{
+    @em{Launch REPL}: Opens the REPL window.
+  }
+  @li{
+    @em{Update Monitor Layout}: Normally Jwno will adjust to monitor layout changes automatically, but you can use this command to do that manually. It will also retile all managed windows.
+  }
+  @li{
+    @em{Reset Keyboard Hooks}: Sometimes Jwno's keyboard hooks (which are needed for global key bindings to work) may get overridden by other programs, and this command is to fix that.
+  }
+  @li{
+    @em{Exit}: Tells Jwno to quit.
+  }
+}
+
+### Automatically Start Jwno When You Log In
+
+A shortcut can be created in the @code{shell:startup} directory to achieve this.
+
+@ol{
+  @li{
+    Press @code{Win + X} then @code{R} on your keyboard. The @em{Run} dialog should pop up.
+  }
+  @li{
+    Put @code{shell:startup} in the @em{Open:} input box, and press @code{Enter} to confirm.
+  }
+  @li{
+    A File Explorer window will open. In that directory, Create a shortcut which points to @code{jwno.exe}.
+  }
+}
+
+### Problems?
+
+If you encountered any problem, please open an issue @link[https://github.com/agent-kilo/jwno/issues]{here}.
+
+### About Janet
+
+To fully leverage the power of Jwno, you need to know some Janet. Don't worry, it's a simple programming language. The @link[https://janet-lang.org/docs/syntax.html]{official documentation} is a good starting point, and there's a whole fantastic @link[https://janet.guide/]{@em{real book}} that can also teach you about it. Some Janet gurus hang out on the @link[https://janet.zulipchat.com]{Janet Zulip server}, you can seek help there too.
+
+### Next Step
+
+@ul{
+  @li{
+    @link[defining-key-bindings.html]{Defining Key Bindings}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref/command-line-options.html]{Command Line Options}
+  }
+}

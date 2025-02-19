@@ -1,0 +1,413 @@
+{:title "List of Key Names"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Reference Index" "index.html"]
+ :order 2}
+---
+
+Here are all the keys Jwno currently supports, and the actual key codes used in the code. See the @link[https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes]{Windows documentation} for more details.
+
+Note that Jwno currently only supports US keyboard layouts. On other layouts, the @code{VK_OEM_*} key codes may map to other characters.
+
+To use a key in a @link[../defining-key-bindings.html]{key spec}, write its name directly. All key names are case-insensitive. For example:
+
+@codeblock[janet]```
+"Win + A"        # Use the `A` key
+"Win + 1"        # Use the `1` key
+"Win + ;"        # Use the VK_OEM_1 key (the `;:` key on US keyboards)
+"Win + Numpad0"  # Use the VK_NUMPAD0 key
+```
+
+### Modifier Keys
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Key Code} @th{Description}
+  }
+  @tr{
+    @td{Win} @td{} @td{Win key (left or right)}
+  }
+  @tr{
+    @td{LWin} @td{VK_LWIN} @td{Win key (left)}
+  }
+  @tr{
+    @td{RWin} @td{VK_RWIN} @td{Win key (right)}
+  }
+  @tr{
+    @td{Alt} @td{} @td{Alt key (left or right)}
+  }
+  @tr{
+    @td{LAlt} @td{VK_LMENU} @td{Alt key (left)}
+  }
+  @tr{
+    @td{RAlt} @td{VK_RMENU} @td{Alt key (right)}
+  }
+  @tr{
+    @td{Ctrl} @td{} @td{Ctrl key (left or right)}
+  }
+  @tr{
+    @td{LCtrl} @td{VK_LCONTROL} @td{Ctrl key (left)}
+  }
+  @tr{
+    @td{RCtrl} @td{VK_RCONTROL} @td{Ctrl key (right)}
+  }
+  @tr{
+    @td{Shift} @td{} @td{Shift key (left or right)}
+  }
+  @tr{
+    @td{LShift} @td{VK_LSHIFT} @td{Shift key (left)}
+  }
+  @tr{
+    @td{RShift} @td{VK_RSHIFT} @td{Shift key (right)}
+  }
+}
+
+### Special Keys
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Key Code} @th{Description}
+  }
+  @tr{
+    @td{Backspace} @td{VK_BACK} @td{}
+  }
+  @tr{
+    @td{Tab} @td{VK_TAB} @td{}
+  }
+  @tr{
+    @td{Enter} @td{VK_RETURN} @td{}
+  }
+  @tr{
+    @td{Pause} @td{VK_PAUSE} @td{}
+  }
+  @tr{
+    @td{CapsLock} @td{VK_CAPITAL} @td{}
+  }
+  @tr{
+    @td{Esc} @td{VK_ESCAPE} @td{}
+  }
+  @tr{
+    @td{Space} @td{VK_SPACE} @td{}
+  }
+  @tr{
+    @td{PageUp} @td{VK_PRIOR} @td{}
+  }
+  @tr{
+    @td{PageDown} @td{VK_NEXT} @td{}
+  }
+  @tr{
+    @td{End} @td{VK_END} @td{}
+  }
+  @tr{
+    @td{Home} @td{VK_HOME} @td{}
+  }
+  @tr{
+    @td{Left} @td{VK_LEFT} @td{Arrow key ←}
+  }
+  @tr{
+    @td{Up} @td{VK_UP} @td{Arrow key ↑}
+  }
+  @tr{
+    @td{Right} @td{VK_RIGHT} @td{Arrow key →}
+  }
+  @tr{
+    @td{Down} @td{VK_DOWN} @td{Arrow key ↓}
+  }
+  @tr{
+    @td{Insert} @td{VK_INSERT} @td{}
+  }
+  @tr{
+    @td{Delete} @td{VK_DELETE} @td{}
+  }
+  @tr{
+    @td{App} @td{VK_APPS} @td{@link[https://en.wikipedia.org/wiki/Menu_key]{Menu key}}
+  }
+  @tr{
+    @td{ScrollLock} @td{VK_SCROLL} @td{}
+  }
+}
+
+### Numpad Keys
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Key Code} @th{Description}
+  }
+  @tr{
+    @td{Numpad0} @td{VK_NUMPAD0} @td{}
+  }
+  @tr{
+    @td{Numpad1} @td{VK_NUMPAD1} @td{}
+  }
+  @tr{
+    @td{Numpad2} @td{VK_NUMPAD2} @td{}
+  }
+  @tr{
+    @td{Numpad3} @td{VK_NUMPAD3} @td{}
+  }
+  @tr{
+    @td{Numpad4} @td{VK_NUMPAD4} @td{}
+  }
+  @tr{
+    @td{Numpad5} @td{VK_NUMPAD5} @td{}
+  }
+  @tr{
+    @td{Numpad6} @td{VK_NUMPAD6} @td{}
+  }
+  @tr{
+    @td{Numpad7} @td{VK_NUMPAD7} @td{}
+  }
+  @tr{
+    @td{Numpad8} @td{VK_NUMPAD8} @td{}
+  }
+  @tr{
+    @td{Numpad9} @td{VK_NUMPAD9} @td{}
+  }
+  @tr{
+    @td{Numpad*} @td{VK_MULTIPLY} @td{}
+  }
+  @tr{
+    @td{Numpad+} @td{VK_ADD} @td{}
+  }
+  @tr{
+    @td{Numpad-} @td{VK_SUBTRACT} @td{}
+  }
+  @tr{
+    @td{Numpad.} @td{VK_DECIMAL} @td{}
+  }
+  @tr{
+    @td{Numpad/} @td{VK_DIVIDE} @td{}
+  }
+}
+
+### Alpha-Numeric Keys
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Key Code} @th{Description}
+  }
+  @tr{
+    @td{A} @td{65} @td{}
+  }
+  @tr{
+    @td{B} @td{66} @td{}
+  }
+  @tr{
+    @td{C} @td{67} @td{}
+  }
+  @tr{
+    @td{D} @td{68} @td{}
+  }
+  @tr{
+    @td{E} @td{69} @td{}
+  }
+  @tr{
+    @td{F} @td{70} @td{}
+  }
+  @tr{
+    @td{G} @td{71} @td{}
+  }
+  @tr{
+    @td{H} @td{72} @td{}
+  }
+  @tr{
+    @td{I} @td{73} @td{}
+  }
+  @tr{
+    @td{J} @td{74} @td{}
+  }
+  @tr{
+    @td{K} @td{75} @td{}
+  }
+  @tr{
+    @td{L} @td{76} @td{}
+  }
+  @tr{
+    @td{M} @td{77} @td{}
+  }
+  @tr{
+    @td{N} @td{78} @td{}
+  }
+  @tr{
+    @td{O} @td{79} @td{}
+  }
+  @tr{
+    @td{P} @td{80} @td{}
+  }
+  @tr{
+    @td{Q} @td{81} @td{}
+  }
+  @tr{
+    @td{R} @td{82} @td{}
+  }
+  @tr{
+    @td{S} @td{83} @td{}
+  }
+  @tr{
+    @td{T} @td{84} @td{}
+  }
+  @tr{
+    @td{U} @td{85} @td{}
+  }
+  @tr{
+    @td{V} @td{86} @td{}
+  }
+  @tr{
+    @td{W} @td{87} @td{}
+  }
+  @tr{
+    @td{X} @td{88} @td{}
+  }
+  @tr{
+    @td{Y} @td{89} @td{}
+  }
+  @tr{
+    @td{Z} @td{90} @td{}
+  }
+  @tr{
+    @td{0} @td{48} @td{}
+  }
+  @tr{
+    @td{1} @td{49} @td{}
+  }
+  @tr{
+    @td{2} @td{50} @td{}
+  }
+  @tr{
+    @td{3} @td{51} @td{}
+  }
+  @tr{
+    @td{4} @td{52} @td{}
+  }
+  @tr{
+    @td{5} @td{53} @td{}
+  }
+  @tr{
+    @td{6} @td{54} @td{}
+  }
+  @tr{
+    @td{7} @td{55} @td{}
+  }
+  @tr{
+    @td{8} @td{56} @td{}
+  }
+  @tr{
+    @td{9} @td{57} @td{}
+  }
+}
+
+### Function Keys
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Key Code} @th{Description}
+  }
+  @tr{
+    @td{F1} @td{VK_F1} @td{}
+  }
+  @tr{
+    @td{F2} @td{VK_F2} @td{}
+  }
+  @tr{
+    @td{F3} @td{VK_F3} @td{}
+  }
+  @tr{
+    @td{F4} @td{VK_F4} @td{}
+  }
+  @tr{
+    @td{F5} @td{VK_F5} @td{}
+  }
+  @tr{
+    @td{F6} @td{VK_F6} @td{}
+  }
+  @tr{
+    @td{F7} @td{VK_F7} @td{}
+  }
+  @tr{
+    @td{F8} @td{VK_F8} @td{}
+  }
+  @tr{
+    @td{F9} @td{VK_F9} @td{}
+  }
+  @tr{
+    @td{F10} @td{VK_F10} @td{}
+  }
+  @tr{
+    @td{F11} @td{VK_F11} @td{}
+  }
+  @tr{
+    @td{F12} @td{VK_F12} @td{}
+  }
+  @tr{
+    @td{F13} @td{VK_F13} @td{}
+  }
+  @tr{
+    @td{F14} @td{VK_F14} @td{}
+  }
+  @tr{
+    @td{F15} @td{VK_F15} @td{}
+  }
+  @tr{
+    @td{F16} @td{VK_F16} @td{}
+  }
+  @tr{
+    @td{F17} @td{VK_F17} @td{}
+  }
+  @tr{
+    @td{F18} @td{VK_F18} @td{}
+  }
+  @tr{
+    @td{F19} @td{VK_F19} @td{}
+  }
+  @tr{
+    @td{F20} @td{VK_F20} @td{}
+  }
+  @tr{
+    @td{F21} @td{VK_F21} @td{}
+  }
+  @tr{
+    @td{F22} @td{VK_F22} @td{}
+  }
+  @tr{
+    @td{F23} @td{VK_F23} @td{}
+  }
+  @tr{
+    @td{F24} @td{VK_F24} @td{}
+  }
+}
+
+### "OEM" Keys
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Key Code} @th{Description}
+  }
+  @tr{
+    @td```,``` @td{VK_OEM_COMMA} @td{@code```,<``` key}
+  }
+  @tr{
+    @td```.``` @td{VK_OEM_PERIOD} @td{@code```.>``` key}
+  }
+  @tr{
+    @td```=``` @td{VK_OEM_PLUS} @td{@code```=+``` key}
+  }
+  @tr{
+    @td```;``` @td{VK_OEM_1} @td{@code```;:``` key}
+  }
+  @tr{
+    @td```/``` @td{VK_OEM_2} @td{@code```/?``` key}
+  }
+  @tr{
+    @td{`} @td{VK_OEM_3} @td{@code{`~} key}
+  }
+  @tr{
+    @td```[``` @td{VK_OEM_4} @td{@code```[{``` key}
+  }
+  @tr{
+    @td```\``` @td{VK_OEM_5} @td{@code```\|``` key}
+  }
+   @td```]``` @td{VK_OEM_6} @td{@code```]}``` key}
+  @tr{
+    @td```'``` @td{VK_OEM_7} @td{@code```'"``` key}
+  }
+}
