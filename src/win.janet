@@ -130,27 +130,26 @@
     (:AddPattern cr UIA_WindowPatternId)
     (:AddProperty cr UIA_WindowWindowVisualStatePropertyId)
 
-    (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
-      (with-uia [win-pat
-                 (try
-                   (:GetCachedPatternAs uia-win UIA_WindowPatternId IUIAutomationWindowPattern)
-                   ((err fib)
-                    (log/warning "failed to get window pattern for %n: %n%s"
-                                 hwnd
-                                 err
-                                 (get-stack-trace fib))
-                    nil))]
-        (if win-pat
-          (let [old-state (:get_CachedWindowVisualState win-pat)]
-            (when (and restore-minimized
-                       (= WindowVisualState_Minimized old-state))
-              (:SetWindowVisualState win-pat WindowVisualState_Normal))
-            (when (and restore-maximized
-                       (= WindowVisualState_Maximized old-state))
-              (:SetWindowVisualState win-pat WindowVisualState_Normal))
-            old-state)
-          # XXX: Default to Normal state when failed to get the window pattern
-          WindowVisualState_Normal)))))
+    (try
+      (with-uia [uia-win (:ElementFromHandleBuildCache uia-com hwnd cr)]
+        (with-uia [win-pat (:GetCachedPatternAs uia-win
+                                                UIA_WindowPatternId
+                                                IUIAutomationWindowPattern)]
+          (def old-state (:get_CachedWindowVisualState win-pat))
+          (when (and restore-minimized
+                     (= WindowVisualState_Minimized old-state))
+            (:SetWindowVisualState win-pat WindowVisualState_Normal))
+          (when (and restore-maximized
+                     (= WindowVisualState_Maximized old-state))
+            (:SetWindowVisualState win-pat WindowVisualState_Normal))
+          old-state))
+
+      ((err fib)
+       (log/error "failed to reset visual state for %n: %n%s"
+                  hwnd
+                  err
+                  (get-stack-trace fib))
+       nil))))
 
 
 (defn get-hwnd-dwm-border-margins [hwnd &opt outer-rect]
@@ -484,6 +483,11 @@
   (with-uia [_uia-win uia-win]
     (def exe-path
       (unless (nil? hwnd)
+        # get-hwnd-path needs PROCESS_QUERY_INFORMATION and PROCESS_VM_READ
+        # access rights, but some processes explicitly deny them (e.g.
+        # KeePassXC, to prevent memory dumps), so exe-path being nil here
+        # may not necessarily mean that the hwnd is invalid. That's why we
+        # don't check for nil exe-path here.
         (get-hwnd-path hwnd)))
     (def desktop-info
       (unless (nil? hwnd)
@@ -496,10 +500,6 @@
 
       (nil? hwnd)
       # normalize-hwnd-and-uia-element failed
-      nil
-
-      (nil? exe-path)
-      # get-hwnd-path failed
       nil
 
       (nil? desktop-info)
@@ -1144,9 +1144,8 @@
       (with-uia [_uia-win (in win-info :uia-element)]
         (def more-indent
           (string indent (buffer/new-filled indent-width indent-char)))
-        (printf "%sWindow (hwnd=%n)"
-                indent
-                (in self :hwnd))
+        (def hwnd (in self :hwnd))
+        (printf "%sWindow (hwnd=%n)" indent hwnd)
         (printf "%sName: %s"
                 more-indent
                 (:get_CachedName (in win-info :uia-element)))
@@ -1161,7 +1160,10 @@
                 ;(unwrap-rect (:get_CachedBoundingRectangle (in win-info :uia-element))))
         (printf "%sExtended Frame Bounds: {l:%d,t:%d,r:%d,b:%d}"
                 more-indent
-                ;(unwrap-rect (DwmGetWindowAttribute (in self :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS)))
+                ;(unwrap-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)))
+        (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
+        (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
+        (printf "%sDPI Awareness: %n" more-indent dpi-awareness)
         (printf "%sVirtual Desktop ID: %s"
                 more-indent
                 (get-in win-info [:virtual-desktop :id])))
@@ -2194,17 +2196,13 @@
     w))
 
 
-(defn wm-filter-hwnd [self hwnd &opt uia-win? exe-path? desktop-info?]
+(defn wm-filter-hwnd [self hwnd &opt uia-win? _exe-path? desktop-info?]
   (def uia-win
     (if uia-win?
       (do
         (:AddRef uia-win?)
         uia-win?)
       (:get-hwnd-uia-element self hwnd (get-in self [:uia-manager :focus-cr]))))
-  (def exe-path
-    (if exe-path?
-      exe-path?
-      (:get-hwnd-path self hwnd)))
   (def desktop-info
     (if desktop-info?
       desktop-info?

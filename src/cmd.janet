@@ -11,6 +11,7 @@
 (use ./win)
 (use ./uia)
 (use ./input)
+(use ./key)
 (use ./resource)
 (use ./util)
 
@@ -491,6 +492,8 @@
                 ((err fib)
                  (log/debug "DwmGetWindowAttribute failed for %n: %n" hwnd err)
                  nil)))
+            (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
+            (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
             (:show-tooltip ui-man
                            :describe-window
                            (string/format (string/join
@@ -503,10 +506,13 @@
                                             "Virtual Desktop ID: %s"
                                             "Rect: %n"
                                             "EFB Rect: %s"
+                                            "DPI Awareness: %n"
                                             "Filter Result: %n"]
                                            "\n")
                                           hwnd
-                                          exe-path
+                                          (if exe-path
+                                            exe-path
+                                            "n/a")
                                           (:get_CachedName uia-win)
                                           (:get_CachedClassName uia-win)
                                           (:get_CachedControlType uia-win)
@@ -518,6 +524,7 @@
                                           (if efb-rect
                                             (string/format "%n" efb-rect)
                                             "n/a")
+                                          dpi-awareness
                                           (:filter-hwnd wm hwnd uia-win exe-path desktop-info))
                            (if efb-rect
                              (in efb-rect :left)
@@ -678,6 +685,37 @@
 
   (log/debug "repl-cli = %n" repl-cli)
   (os/execute repl-cli))
+
+
+(defn cmd-describe-key [context]
+  (def {:key-manager key-man
+        :hook-manager hook-man
+        :ui-manager ui-man}
+    context)
+
+  (:add-oneshot-hook hook-man :key-pressed
+     (fn [key]
+       # Ignore modifier key events, since they're included
+       # in (key :modifiers)
+       (when (in MODIFIER-KEYS (in key :key))
+         (break))
+
+       (:set-key-mode key-man :command)
+
+       (:show-tooltip
+          ui-man
+          :describe-key
+          (string/format (string/join
+                          ["Key Code: %n"
+                           "Key Name: %n"
+                           "Modifiers : %n"]
+                          "\n")
+                         (in key :key)
+                         (in key-code-to-name (in key :key))
+                         (in key :modifiers)))))
+
+  (:set-key-mode key-man :raw)
+  (:show-tooltip ui-man :describe-key "Please press a key." nil nil 0))
 
 
 (defn add-default-commands [command-man context]
@@ -922,7 +960,16 @@
      (:ignore-window)
 
      Removes the current window from the list of managed windows.
-     ```))
+     ```)
+
+  (:add-command command-man :describe-key
+     (fn [] (cmd-describe-key context))
+     ```
+     (:describe-key)
+
+     Interactively reads a key, and shows some info about it.
+     ```)
+  )
 
 
 (defn command-manager-call-command [self cmd & args]

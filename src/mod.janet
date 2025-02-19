@@ -33,6 +33,7 @@
       "jw32/_util"
       "jw32/_winbase"
       "jw32/_winnt"
+      "jw32/_wingdi"
       "jw32/_winuser"])
 
     # Jwno modules
@@ -40,6 +41,7 @@
      cache
      [["./auto-layout" "jwno/auto-layout"]
       ["./indicator" "jwno/indicator"]
+      ["./ui-hint" "jwno/ui-hint"]
       ["./util" "jwno/util"]
       ["./log" "jwno/log"]])
 

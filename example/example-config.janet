@@ -172,8 +172,9 @@
 
 (defn match-exe-name [exe-name]
   (fn [win]
-    (def win-exe (:get-exe-path win))
-    (string/has-suffix? (string "\\" exe-name) win-exe)))
+    (if-let [win-exe (:get-exe-path win)]
+      (string/has-suffix? (string "\\" exe-name) win-exe)
+      false)))
 
 
 #

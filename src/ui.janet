@@ -30,6 +30,9 @@
 (def UPDATE-WORK-AREA-MSG        (+ WM_APP 0x0B))
 (def ADD-CUSTOM-MSG-MSG          (+ WM_APP 0x0C))
 (def REMOVE-CUSTOM-MSG-MSG       (+ WM_APP 0x0D))
+(def SET-KEY-MODE-MSG            (+ WM_APP 0x0E))
+(def SHOW-TOOLTIP-GROUP-MSG      (+ WM_APP 0x0F))
+(def HIDE-TOOLTIP-GROUP-MSG      (+ WM_APP 0x10))
 
 # Where custom messages begin
 (def CUSTOM-MSG (+ WM_APP 0x400))
@@ -169,6 +172,15 @@
   (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
 
 
+(defn- suppress-start-menu [mod-states key-up? extra-info]
+  (when (or (in mod-states :lwin)
+            (in mod-states :rwin))
+    # Send a dummy key event to stop the Start Menu from popping up
+    (send-input (keyboard-input VK_DUMMY
+                                (if key-up? :up :down)
+                                (bor KEI-FLAG-PASSTHROUGH extra-info)))))
+
+
 # msg-wndproc and this keyboard hook both have access to the
 # same keyboard-hook-handler, but since hook events and window
 # messages are serialized on the same UI thread, there won't be
@@ -197,23 +209,31 @@
                                 (bor KEI-FLAG-REMAPPED extra-info)))
     (break 1))
 
+  (def ev-chan (in handler :chan))
   (def mod-states (:get-modifier-states handler hook-struct))
+
+  (def key-mode (:check-key-mode handler hook-struct))
+  (when (= :raw key-mode)
+    (def [pass-through? msg]
+      (:handle-raw-key handler hook-struct mod-states))
+    (when msg
+      (ev/give ev-chan msg))
+    (if pass-through?
+      (break (CallNextHookEx nil code wparam (hook-struct :address)))
+      (do
+        (suppress-start-menu mod-states key-up extra-info)
+        (break 1))))
 
   (if-let [binding (:find-binding handler hook-struct mod-states)]
     (do
-      (when (or (in mod-states :lwin)
-                (in mod-states :rwin))
-        # Send a dummy key event to stop the Start Menu from popping up
-        (send-input(keyboard-input VK_DUMMY
-                                   (if key-up :up :down)
-                                   (bor KEI-FLAG-PASSTHROUGH extra-info))))
+      (suppress-start-menu mod-states key-up extra-info)
       (when-let [msg (:handle-binding handler hook-struct binding)]
-        (ev/give (in handler :chan) msg))
+        (ev/give ev-chan msg))
       1) # !!! IMPORTANT
 
     (do
       (when-let [msg (:handle-unbound handler hook-struct)]
-        (ev/give (in handler :chan) msg))
+        (ev/give ev-chan msg))
       (CallNextHookEx nil code wparam (hook-struct :address)))))
 
 
@@ -274,6 +294,13 @@
 (defn- msg-wnd-handle-set-keymap [_hwnd _msg wparam _lparam hook-handler _state]
   (let [keymap (unmarshal-and-free wparam)]
     (:set-keymap hook-handler keymap))
+  0 # !!! IMPORTANT
+  )
+
+
+(defn- msg-wnd-handle-set-key-mode [_hwnd _msg wparam _lparam hook-handler _state]
+  (let [new-mode (unmarshal-and-free wparam)]
+    (:set-key-mode hook-handler new-mode))
   0 # !!! IMPORTANT
   )
 
@@ -468,90 +495,113 @@
       [(in work-area :left) (in work-area :top)])))
 
 
-(defn- msg-wnd-handle-show-tooltip [hwnd _msg wparam _lparam _hook-handler state]
-  (let [[tt-id text opt-x opt-y opt-timeout opt-anchor] (unmarshal-and-free wparam)]
-    (def tooltip (get-in state [:tooltips tt-id]))
+(defn show-tooltip [state owner-hwnd tt-id text &opt opt-x opt-y opt-timeout opt-anchor opt-work-area]
+  (def tooltip (get-in state [:tooltips tt-id]))
 
-    (def timeout
-      (if opt-timeout
-        opt-timeout
-        (if-let [to (get-in tooltip [:timeout])]
-          to
-          const/DEFAULT-TOOLTIP-TIMEOUT)))
+  (def timeout
+    (if opt-timeout
+      opt-timeout
+      (if-let [to (get-in tooltip [:timeout])]
+        to
+        const/DEFAULT-TOOLTIP-TIMEOUT)))
 
-    (def anchor
-      (if opt-anchor
-        opt-anchor
-        (if-let [ac (get-in tooltip [:anchor])]
-          ac
-          const/DEFAULT-TOOLTIP-ANCHOR)))
+  (def anchor
+    (if opt-anchor
+      opt-anchor
+      (if-let [ac (get-in tooltip [:anchor])]
+        ac
+        const/DEFAULT-TOOLTIP-ANCHOR)))
 
-    (def max-width
-      (if-let [mw (get-in tooltip [:max-width])]
-        mw
-        const/DEFAULT-TOOLTIP-MAX-WIDTH))
+  (def max-width
+    (if-let [mw (get-in tooltip [:max-width])]
+      mw
+      const/DEFAULT-TOOLTIP-MAX-WIDTH))
 
-    (def [x y]
-      (if (or (nil? opt-x) (nil? opt-y))
-        # Default to the current monitor
-        (if-let [wa (get-current-work-area state)]
-          (get-tooltip-default-position wa anchor)
-          # Something went wrong, try our best to return a coordinate....
-          [0 0])
-        [opt-x opt-y]))
+  (def [x y]
+    (if (or (nil? opt-x) (nil? opt-y))
+      # Default to the current monitor
+      (if-let [wa (or opt-work-area
+                      (get-current-work-area state))]
+        (get-tooltip-default-position wa anchor)
+        # Something went wrong, try our best to return a coordinate....
+        [0 0])
+      [opt-x opt-y]))
 
-    (def tt-hwnd? (get-in tooltip [:hwnd]))
-    (def [tt-hwnd tt-info]
-      (if tt-hwnd?
-        [tt-hwnd? (in tooltip :info)]
-        (let [uid (resume (in state :tooltip-uid-generator))
-              created (create-tooltip-window hwnd uid false text max-width)]
-          (if (nil? created)
-            [nil nil]
-            created))))
+  (def tt-hwnd? (get-in tooltip [:hwnd]))
+  (def [tt-hwnd tt-info]
+    (if tt-hwnd?
+      [tt-hwnd? (in tooltip :info)]
+      (let [uid (resume (in state :tooltip-uid-generator))
+            created (create-tooltip-window owner-hwnd uid false text max-width)]
+        (if (nil? created)
+          [nil nil]
+          created))))
 
+  (when tt-hwnd
+    (if tooltip
+      (do
+        (put tooltip :hwnd tt-hwnd)
+        (put tooltip :info tt-info))
+      (put (in state :tooltips)
+           tt-id
+           @{:timeout (get-in tooltip [:timeout])
+             :hwnd tt-hwnd
+             :info tt-info}))
+
+    (def updated-info
+      (TTTOOLINFO :hwnd (in tt-info :hwnd)
+                  :uId (in tt-info :uId)
+                  :lpszText (buffer text "\0")))
+
+    (SendMessage tt-hwnd TTM_UPDATETIPTEXT 0 (in updated-info :address))
+    (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
+    (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in updated-info :address))
+
+    # This must be called after TTM_TRACKACTIVATE, or the tooltip window
+    # geometry it gets will be wrong.
+    (adjust-tooltip-position tt-hwnd anchor x y)
+
+    (def timer-id (tooltip-uid-to-timer-id (in tt-info :uId)))
+    (if (> timeout 0)
+      (when (= (int/u64 0)
+               (SetTimer owner-hwnd timer-id timeout nil))
+        (log/debug "SetTimer failed for tooltip %n(%n): %n"
+                   tt-id (in tt-info :uId) (GetLastError)))
+      (KillTimer owner-hwnd timer-id))))
+
+
+(defn hide-tooltip [state tt-id]
+  (when-let [tooltip (get-in state [:tooltips tt-id])]
+    (def {:hwnd tt-hwnd
+          :info tt-info}
+      tooltip)
     (when tt-hwnd
-      (if tooltip
-        (do
-          (put tooltip :hwnd tt-hwnd)
-          (put tooltip :info tt-info))
-        (put (in state :tooltips)
-             tt-id
-             @{:timeout (get-in tooltip [:timeout])
-               :hwnd tt-hwnd
-               :info tt-info}))
+      (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address)))))
 
-      (def updated-info
-        (TTTOOLINFO :hwnd (in tt-info :hwnd)
-                    :uId (in tt-info :uId)
-                    :lpszText (buffer text "\0")))
 
-      (SendMessage tt-hwnd TTM_UPDATETIPTEXT 0 (in updated-info :address))
-      (SendMessage tt-hwnd TTM_TRACKPOSITION 0 (bor (band x 0xffff) (blshift (band y 0xffff) 16)))
-      (SendMessage tt-hwnd TTM_TRACKACTIVATE 1 (in updated-info :address))
-
-      # This must be called after TTM_TRACKACTIVATE, or the tooltip window
-      # geometry it gets will be wrong.
-      (adjust-tooltip-position tt-hwnd anchor x y)
-
-      (def timer-id (tooltip-uid-to-timer-id (in tt-info :uId)))
-      (if (> timeout 0)
-        (when (= (int/u64 0)
-                 (SetTimer hwnd timer-id timeout nil))
-          (log/debug "SetTimer failed for tooltip %n(%n): %n"
-                     tt-id (in tt-info :uId) (GetLastError)))
-        (KillTimer hwnd timer-id))))
+(defn- msg-wnd-handle-show-tooltip [hwnd _msg wparam _lparam _hook-handler state]
+  (let [[tt-id text opt-x opt-y opt-timeout opt-anchor opt-work-area] (unmarshal-and-free wparam)]
+    (show-tooltip state hwnd tt-id text opt-x opt-y opt-timeout opt-anchor opt-work-area))
   0)
 
 
 (defn- msg-wnd-handle-hide-tooltip [_hwnd _msg wparam _lparam _hook-handler state]
   (let [tt-id (unmarshal-and-free wparam)]
-    (when-let [tooltip (get-in state [:tooltips tt-id])]
-      (def {:hwnd tt-hwnd
-            :info tt-info}
-        tooltip)
-      (when tt-hwnd
-        (SendMessage tt-hwnd TTM_TRACKACTIVATE 0 (in tt-info :address)))))
+    (hide-tooltip state tt-id))
+  0)
+
+
+(defn- msg-wnd-handle-show-tooltip-group [hwnd _msg wparam _lparam _hook-handler state]
+  (let [[tg-list opt-timeout opt-anchor opt-work-area] (unmarshal-and-free wparam)]
+    (each [tt-id text opt-x opt-y] tg-list
+      (show-tooltip state hwnd tt-id text opt-x opt-y opt-timeout opt-anchor opt-work-area)))
+  0)
+
+
+(defn- msg-wnd-handle-hide-tooltip-group [_hwnd _msg wparam _lparam _hook-handler state]
+  (let [tg-list (unmarshal-and-free wparam)]
+    (each tt-id tg-list
+      (hide-tooltip state tt-id)))
   0)
 
 
@@ -744,12 +794,15 @@
 
 (def msg-wnd-handlers
   {SET-KEYMAP-MSG msg-wnd-handle-set-keymap
+   SET-KEY-MODE-MSG msg-wnd-handle-set-key-mode
 
    SET-HOOKS-MSG msg-wnd-handle-set-hooks
    REMOVE-HOOKS-MSG msg-wnd-handle-remove-hooks
 
    SHOW-TOOLTIP-MSG msg-wnd-handle-show-tooltip
    HIDE-TOOLTIP-MSG msg-wnd-handle-hide-tooltip
+   SHOW-TOOLTIP-GROUP-MSG msg-wnd-handle-show-tooltip-group
+   HIDE-TOOLTIP-GROUP-MSG msg-wnd-handle-hide-tooltip-group
    SET-TOOLTIP-TIMEOUTS-MSG msg-wnd-handle-set-tooltip-timeouts
    SET-TOOLTIP-ANCHORS-MSG msg-wnd-handle-set-tooltip-anchors
    SET-TOOLTIP-MAX-WIDTHS-MSG msg-wnd-handle-set-tooltip-max-widths
@@ -911,6 +964,11 @@
   (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
 
 
+(defn ui-manager-set-key-mode [self new-mode]
+  (def buf-ptr (alloc-and-marshal new-mode))
+  (ui-manager-post-message self SET-KEY-MODE-MSG buf-ptr 0))
+
+
 (defn ui-manager-set-hooks [self]
   (ui-manager-post-message self SET-HOOKS-MSG 0 0))
 
@@ -919,15 +977,29 @@
   (ui-manager-post-message self REMOVE-HOOKS-MSG 0 0))
 
 
-(defn ui-manager-show-tooltip [self tt-id text &opt x y timeout anchor]
+(defn ui-manager-show-tooltip [self tt-id text &opt x y timeout anchor work-area]
   (ui-manager-post-message self
                            SHOW-TOOLTIP-MSG
-                           (alloc-and-marshal [tt-id text x y timeout anchor])
+                           (alloc-and-marshal [tt-id text x y timeout anchor work-area])
                            0))
 
 
 (defn ui-manager-hide-tooltip [self tt-id]
   (ui-manager-post-message self HIDE-TOOLTIP-MSG (alloc-and-marshal tt-id) 0))
+
+
+(defn ui-manager-show-tooltip-group [self tg-list &opt timeout anchor work-area]
+  (ui-manager-post-message self
+                           SHOW-TOOLTIP-GROUP-MSG
+                           (alloc-and-marshal [tg-list timeout anchor work-area])
+                           0))
+
+
+(defn ui-manager-hide-tooltip-group [self tg-list]
+  (ui-manager-post-message self
+                           HIDE-TOOLTIP-GROUP-MSG
+                           (alloc-and-marshal tg-list)
+                           0))
 
 
 (defn ui-manager-set-tooltip-timeout [self tt-id timeout]
@@ -986,10 +1058,13 @@
     :post-message ui-manager-post-message
     :send-message ui-manager-send-message
     :set-keymap ui-manager-set-keymap
+    :set-key-mode ui-manager-set-key-mode
     :set-hooks ui-manager-set-hooks
     :remove-hooks ui-manager-remove-hooks
     :show-tooltip ui-manager-show-tooltip
     :hide-tooltip ui-manager-hide-tooltip
+    :show-tooltip-group ui-manager-show-tooltip-group
+    :hide-tooltip-group ui-manager-hide-tooltip-group
     :set-tooltip-timeout ui-manager-set-tooltip-timeout
     :set-tooltip-anchor ui-manager-set-tooltip-anchor
     :set-tooltip-max-width ui-manager-set-tooltip-max-width

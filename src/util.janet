@@ -93,6 +93,10 @@
 
 ################## Calculations ##################
 
+(defmacro rect-center [rect]
+  ~[(math/round (/ (+ (in ,rect :left) (in ,rect :right)) 2))
+    (math/round (/ (+ (in ,rect :top) (in ,rect :bottom)) 2))])
+
 (defmacro rect-width [rect]
   ~(- (in ,rect :right) (in ,rect :left)))
 
