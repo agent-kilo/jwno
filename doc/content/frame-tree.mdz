@@ -178,6 +178,9 @@ Note that certain tag names are used by Jwno to layout the windows, you can set 
   @li{
     @code{:no-resize}: Tell Jwno not to resize a window when taking it under management.
   }
+  @li{
+    @code{:swp-flags}: Tell Jwno to set these flags when calling @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos]{@code{SetWindowPos}}. This is mainly used to specify @code{SWP_NOSENDCHANGING}, to forcibly bypass window size limits when resizing. See the @link[cookbook.html]{Cookbook} for an example and some explanation.
+  }
 }
 
 All these properties, except @code{:frame}, take effect when retiling or transforming a window. For example, you can experiment with the @code{:margin} setting in the REPL, like this:
