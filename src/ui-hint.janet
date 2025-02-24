@@ -337,7 +337,10 @@
     (def refc (:Release e))
     (unless (= refc (int/u64 0))
       (log/warning "bad ref count in ui-hint-clean-up: %n (%n, %n)" refc name control-type)))
-  (:post-message ui-man hide-msg 0 0))
+  (:post-message ui-man hide-msg 0 0)
+
+  (put self :hook-fn nil)
+  (put self :labeled-elems nil))
 
 
 (defn get-click-point [target]
@@ -583,6 +586,12 @@
      [:property UIA_IsInvokePatternAvailablePropertyId true]])
   (default action :invoke)
 
+  (when (in self :hook-fn)
+    # Another :ui-hint command is in progress, early return
+    # See :clean-up method for clearing :hook-fn
+    (log/debug "aborting nested :ui-hint command")
+    (break))
+
   (def {:context context
         :show-msg show-msg}
     self)
@@ -741,12 +750,17 @@
 
   (:remove-command command-man :ui-hint)
 
+  (when (in self :hook-fn)
+    # A :ui-hint command is in progress, abort it
+    (log/debug "ui-hint-disable when :ui-hint command is in progress")
+    (:clean-up self))
+
   (when show-msg
     (:remove-custom-message ui-man show-msg)
     (put self :show-msg nil))
   (when hide-msg
     (:remove-custom-message ui-man hide-msg)
-    (put self :show-msg nil))
+    (put self :hide-msg nil))
   (when colors-msg
     (:remove-custom-message ui-man colors-msg)
     (put self :colors-msg nil))
