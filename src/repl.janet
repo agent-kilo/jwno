@@ -37,9 +37,9 @@
        @{:value context
          :doc "Jwno's main loop context object.\n"})
   (put new-env
-       (global-ns 'config)
-       @{:value (in context :config)
-         :doc "Jwno's config file environment.\n"})
+       (global-ns 'user-config)
+       @{:value (in context :user-config)
+         :doc "Jwno's user config file environment.\n"})
   (put new-env
        (global-ns 'repl-server)
        @{:value self
