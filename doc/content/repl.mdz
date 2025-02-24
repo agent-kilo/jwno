@@ -98,6 +98,9 @@ The REPL environment provides the usual APIs from Janet's @link[https://janet-la
     @code{jwno/context}: The context object containing all the states tracked/used by Jwno's main thread. REPL connections also run in the main thread (but in different @link[https://janet-lang.org/docs/fibers/index.html]{fibers}), so you can access most parts of this object in the REPL directly and safely, without triggering race conditions and the like.
   }
   @li{
+    @code{jwno/user-config}: The environment object that results from evaluating the config file. All top-level bindings in the config file are accessible in this environment. For example, you can access a variable named @code{my-awesome-keymap} like this: @code{(in jwno/user-config 'my-awesome-keymap)}. Alternatively, you can do @code{(import jwno/user-config)} in the REPL, and access @code{user-config/my-awesome-keymap} directly. 
+  }
+  @li{
     @code{jwno/repl-server}: The REPL server we connected to.
   }
   @li{
