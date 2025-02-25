@@ -393,6 +393,7 @@
 (defn uia-manager-destroy [self]
   (def {:com uia-com
         :root root
+        :def-view defview
         :deinit-fns deinit-fns
         :focus-cr focus-cr
         :transform-cr transform-cr
@@ -404,6 +405,7 @@
   (:Release control-view-walker)
   (:Release focus-cr)
   (:Release transform-cr)
+  (:Release defview)
   (:Release root)
   (:Release uia-com))
 
