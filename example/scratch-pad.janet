@@ -19,6 +19,11 @@
   (put (in wm :ignored-hwnds) hwnd nil))
 
 
+(defn trigger-window-opened-event [uia-man hwnd]
+  # Tell the main loop it now has a new window to handle
+  (ev/give (in uia-man :chan) [:uia/window-opened hwnd]))
+
+
 (defn scratch-pad-get-win-list [self]
   (def {:win-list win-list} self)
   (def new-list (filter |(not= FALSE (IsWindow $)) win-list))
@@ -82,7 +87,9 @@
 
 
 (defn scratch-pad-remove-window [self hwnd]
-  (def {:window-manager wm} self)
+  (def {:window-manager wm
+        :uia-manager uia-man}
+    self)
 
   (do-not-ignore wm hwnd)
 
@@ -93,6 +100,7 @@
     (array/remove win-list idx))
 
   (ShowWindow hwnd SW_SHOW)
+  (trigger-window-opened-event uia-man hwnd)
 
   (if visible
     (:show self)
@@ -100,12 +108,18 @@
 
 
 (defn scratch-pad-remove-all-windows [self]
-  (def {:window-manager wm} self)
+  (def {:window-manager wm
+        :uia-manager uia-man}
+    self)
 
   (def win-list (:get-win-list self))
   (each hwnd win-list
     (do-not-ignore wm hwnd)
-    (ShowWindow hwnd SW_SHOW))
+    (def win-visible (not= FALSE (IsWindowVisible hwnd)))
+    (ShowWindow hwnd SW_SHOW)
+    (when win-visible
+      (log/debug "---- scratch pad: trigger-window-opened-event for %n" hwnd)
+      (trigger-window-opened-event uia-man hwnd)))
   (array/clear win-list))
 
 
