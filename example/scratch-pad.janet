@@ -147,9 +147,8 @@
         (log/debug "---- scratch pad: trigger-window-opened-event for %n" hwnd)
         (trigger-window-opened-event uia-man hwnd))
       # else
-      (do
-        (ShowWindow hwnd SW_SHOW)
-        (unset-managed-flag hwnd))))
+      (ShowWindow hwnd SW_SHOW))
+    (unset-managed-flag hwnd))
   (array/clear win-list))
 
 
