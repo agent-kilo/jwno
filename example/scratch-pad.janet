@@ -6,12 +6,29 @@
 #
 
 (use jw32/_winuser)
+(use jw32/_errhandlingapi)
 (use jw32/_util)
 
 (import jwno/util)
 (import jwno/log)
 
 (use jwno/util)
+
+
+(def FLAGS-PROP-NAME "_jwno-scratch-pad-flags_")
+
+(defn set-managed-flag [hwnd]
+  (def ret (SetProp hwnd FLAGS-PROP-NAME 1))
+  (when (= ret FALSE)
+    (log/warning "---- scratch pad: SetProp failed for %n: %n"
+                 hwnd (GetLastError))))
+
+(defn unset-managed-flag [hwnd]
+  # XXX: Should use RemoveProp instead?
+  (def ret (SetProp hwnd FLAGS-PROP-NAME 0))
+  (when (= ret FALSE)
+    (log/warning "---- scratch pad: SetProp failed for %n: %n"
+                 hwnd (GetLastError))))
 
 
 (defn do-not-ignore [wm hwnd]
@@ -68,15 +85,23 @@
         :rect rect}
     self)
 
-  (def vd-info (:get-hwnd-virtual-desktop wm hwnd))
-  (unless (and vd-info
-               (in vd-info :id))
-    (errorf "not manageable %n" hwnd))
+  (with-uia [uia-win (:get-hwnd-uia-element wm hwnd)]
+    (def vd-info (:get-hwnd-virtual-desktop wm hwnd uia-win))
+    (cond
+      (nil? vd-info)
+      (errorf "no virtual desktop info for window %n" hwnd)
+
+      (nil? (in vd-info :id))
+      (errorf "no virtual desktop id for window %n" hwnd)
+
+      (= "ApplicationFrameWindow" (:get_CachedClassName uia-win))
+      (errorf "ApplicationFrameWindow %n not supported" hwnd)))
 
   (def visible (:visible? self))
 
   (def win-list (:get-win-list self))
   (array/push win-list hwnd)
+  (set-managed-flag hwnd)
 
   (:remove-hwnd wm hwnd)
   (:ignore-hwnd wm hwnd)
@@ -100,6 +125,7 @@
     (array/remove win-list idx))
 
   (ShowWindow hwnd SW_SHOW)
+  (unset-managed-flag hwnd)
   (trigger-window-opened-event uia-man hwnd)
 
   (if visible
@@ -116,10 +142,14 @@
   (each hwnd win-list
     (do-not-ignore wm hwnd)
     (def win-visible (not= FALSE (IsWindowVisible hwnd)))
-    (ShowWindow hwnd SW_SHOW)
-    (when win-visible
-      (log/debug "---- scratch pad: trigger-window-opened-event for %n" hwnd)
-      (trigger-window-opened-event uia-man hwnd)))
+    (if win-visible
+      (do
+        (log/debug "---- scratch pad: trigger-window-opened-event for %n" hwnd)
+        (trigger-window-opened-event uia-man hwnd))
+      # else
+      (do
+        (ShowWindow hwnd SW_SHOW)
+        (unset-managed-flag hwnd))))
   (array/clear win-list))
 
 
