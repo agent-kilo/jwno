@@ -11,6 +11,13 @@
 (import jwno/util)
 (import jwno/log)
 
+(use jwno/util)
+
+
+(defn do-not-ignore [wm hwnd]
+  # XXX: Make a window-manager method for this
+  (put (in wm :ignored-hwnds) hwnd nil))
+
 
 (defn scratch-pad-get-win-list [self]
   (def {:win-list win-list} self)
@@ -53,7 +60,6 @@
 
 (defn scratch-pad-add-window [self hwnd]
   (def {:window-manager wm
-        :hidden hidden
         :rect rect}
     self)
 
@@ -62,24 +68,25 @@
                (in vd-info :id))
     (errorf "not manageable %n" hwnd))
 
+  (def visible (:visible? self))
+
   (def win-list (:get-win-list self))
   (array/push win-list hwnd)
 
   (:remove-hwnd wm hwnd)
   (:ignore-hwnd wm hwnd)
 
-  (if hidden
-    (:hide self)
-    (:show self)))
+  (if visible
+    (:show self)
+    (:hide self)))
 
 
 (defn scratch-pad-remove-window [self hwnd]
-  (def {:window-manager wm
-        :hidden hidden}
-    self)
+  (def {:window-manager wm} self)
 
-  # XXX: Make a window-manager method for this
-  (put (in wm :ignored-hwnds) hwnd nil)
+  (do-not-ignore wm hwnd)
+
+  (def visible (:visible? self))
 
   (def win-list (:get-win-list self))
   (when-let [idx (find-index |(= $ hwnd) win-list)]
@@ -87,9 +94,9 @@
 
   (ShowWindow hwnd SW_SHOW)
 
-  (if hidden
-    (:hide self)
-    (:show self)))
+  (if visible
+    (:show self)
+    (:hide self)))
 
 
 (defn scratch-pad-remove-all-windows [self]
@@ -97,16 +104,50 @@
 
   (def win-list (:get-win-list self))
   (each hwnd win-list
-    (put (in wm :ignored-hwnds) hwnd nil)
+    (do-not-ignore wm hwnd)
     (ShowWindow hwnd SW_SHOW))
-  (array/clear win-list)
+  (array/clear win-list))
 
-  (put self :hidden true))
+
+(defn scratch-pad-visible? [self]
+  (def {:window-manager wm} self)
+
+  (def win-list (:get-win-list self))
+  (if-let [cur-hwnd (first win-list)]
+    (with-uia [uia-win (:get-hwnd-uia-element wm cur-hwnd)]
+      (def [_point gcp-ret] (:GetClickablePoint uia-win))
+      (and (not= FALSE gcp-ret)
+           (= FALSE (:get_CurrentIsOffscreen uia-win))
+           (not= FALSE (IsWindowVisible cur-hwnd))
+           (not= FALSE (:IsWindowOnCurrentVirtualDesktop (in wm :vdm-com) cur-hwnd))))
+    # else, there's no window in the list
+    false))
 
 
 (defn scratch-pad-transform [self rect]
   :TODO
   )
+
+
+(defn rotate-win-list [win-list dir]
+  (case dir
+    :next
+    (if-let [first-hwnd (first win-list)]
+      (do
+        (array/remove win-list 0 1)
+        (array/push win-list first-hwnd))
+      # else, empty list
+      win-list)
+
+    :prev
+    (if-let [last-hwnd (last win-list)]
+      (do
+        (array/remove win-list -1 1)
+        (array/insert win-list 0 last-hwnd))
+      # else, empty list
+      win-list)
+
+    (errorf "unknown direction: %n" dir)))
 
 
 (defn scratch-pad-show [self &opt dir]
@@ -115,27 +156,20 @@
         :uia-manager uia-man}
     self)
 
+  (def visible (:visible? self))
+
   (def win-list (:get-win-list self))
   (def new-list
-    (case dir
-      nil
-      win-list
+    (cond
+      dir
+      (rotate-win-list win-list dir)
 
-      :next
-      (if-let [first-hwnd (first win-list)]
-        (do
-          (array/remove win-list 0 1)
-          (array/push win-list first-hwnd))
-        # else, empty list
-        win-list)
+      visible
+      # Switch to the next window when we're already visible
+      (rotate-win-list win-list :next)
 
-      :prev
-      (if-let [last-hwnd (last win-list)]
-        (do
-          (array/remove win-list -1 1)
-          (array/insert win-list 0 last-hwnd))
-        # else, empty list
-        win-list)))
+      true
+      win-list))
 
   (def cur-hwnd (first new-list))
   (when cur-hwnd
@@ -153,14 +187,65 @@
                       (bor SWP_NOACTIVATE SWP_NOZORDER))
         (:set-focus-to-window uia-man cur-hwnd))
       # else
-      (log/debug "---- scratch pad: :show-window-on-current-vd failed"))
-    (put self :hidden false)))
+      (log/debug "---- scratch pad: :show-window-on-current-vd failed"))))
 
 
 (defn scratch-pad-hide [self]
   (each hwnd (:get-win-list self)
-    (ShowWindow hwnd SW_HIDE))
-  (put self :hidden true))
+    (ShowWindow hwnd SW_HIDE)))
+
+
+(defn scratch-pad-enable [self]
+  (:disable self)
+
+  (def {:command-manager command-man} self)
+
+  (def get-focused-hwnd
+    (fn []
+      (with-uia [uia-win (:get-focused-window (in self :uia-manager))]
+        (when uia-win
+          (:get_CachedNativeWindowHandle uia-win)))))
+
+  (:add-command command-man :add-to-scratch-pad
+     (fn []
+       (when-let [hwnd (get-focused-hwnd)]
+         (:add-window self hwnd))))
+
+  (:add-command command-man :remove-from-scratch-pad
+     (fn []
+       (when-let [hwnd (get-focused-hwnd)]
+         (:remove-window self hwnd))))
+
+  (:add-command command-man :show-scratch-pad
+     (fn [&opt dir]
+       (:show self dir)))
+
+  (:add-command command-man :hide-scratch-pad
+     (fn []
+       (:hide self)))
+
+  (:add-command command-man :toggle-scratch-pad
+     (fn []
+       (if (:visible? self)
+         (:hide self)
+         (:show self))))
+
+  (:add-command command-man :remove-all-from-scratch-pad
+     (fn []
+       (:remove-all-windows self))))
+
+
+(defn scratch-pad-disable [self]
+  (def {:command-manager command-man} self)
+
+  (:remove-command command-man :add-to-scratch-pad)
+  (:remove-command command-man :remove-from-scratch-pad)
+  (:remove-command command-man :show-scratch-pad)
+  (:remove-command command-man :hide-scratch-pad)
+  (:remove-command command-man :toggle-scratch-pad)
+  (:remove-command command-man :remove-all-windows-from-scratch-pad)
+
+  (:remove-all-windows self))
 
 
 (def scratch-pad-proto
@@ -171,17 +256,22 @@
     :show scratch-pad-show
     :hide scratch-pad-hide
     :show-window-on-current-vd scratch-pad-show-window-on-current-vd
-    :get-win-list scratch-pad-get-win-list})
+    :get-win-list scratch-pad-get-win-list
+    :visible? scratch-pad-visible?
+    :enable scratch-pad-enable
+    :disable scratch-pad-disable})
 
 
 (defn scratch-pad [context]
   (def {:window-manager wm
-        :uia-manager uia-man}
+        :uia-manager uia-man
+        :command-manager command-man}
     context)
 
   (table/setproto
    @{:window-manager wm
      :uia-manager uia-man
+     :command-manager command-man
      :win-list @[]
      :hidden true
 
