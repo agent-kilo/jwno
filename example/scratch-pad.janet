@@ -212,7 +212,8 @@
 (defn scratch-pad-show [self &opt dir]
   (def {:rect rect
         :window-manager wm
-        :uia-manager uia-man}
+        :uia-manager uia-man
+        :always-on-top always-on-top}
     self)
 
   (def visible (:visible? self))
@@ -238,12 +239,20 @@
     (if sw-res
       (do
         (log/debug "---- scratch pad: moving window: %n" cur-hwnd)
+        (def z-hwnd
+          (if always-on-top
+            HWND_TOPMOST
+            0))
+        (def swp-flags
+          (if always-on-top
+            (bor SWP_NOACTIVATE)
+            (bor SWP_NOACTIVATE SWP_NOZORDER)))
         (SetWindowPos cur-hwnd
-                      0
+                      z-hwnd
                       (in rect :left)
                       (in rect :top)
                       ;(util/rect-size rect)
-                      (bor SWP_NOACTIVATE SWP_NOZORDER))
+                      swp-flags)
         (:set-focus-to-window uia-man cur-hwnd))
       # else
       (log/debug "---- scratch pad: :show-window-on-current-vd failed"))))
@@ -344,11 +353,12 @@
      :uia-manager uia-man
      :command-manager command-man
      :win-list @[]
-     :hidden true
 
      # Default settings
+     :always-on-top true
+     :rect {:left 100 :top 100 :right 600 :bottom 600}
      :show-window-timeout 3 # in seconds
      :show-window-time-incr 0.05
      :show-window-init-wait-time 0.05
-     :rect {:left 100 :top 100 :right 600 :bottom 600}}
+     }
    scratch-pad-proto))
