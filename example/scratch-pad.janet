@@ -50,7 +50,9 @@
    nil
    (fn [hwnd]
      (when (check-managed-flag hwnd)
-       (array/push flagged-list hwnd))))
+       (array/push flagged-list hwnd))
+     1 # !!! IMPORTANT
+     ))
   (log/debug "---- scratch pad: found flagged windows: %n" flagged-list)
   flagged-list)
 
