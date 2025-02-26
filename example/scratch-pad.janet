@@ -242,17 +242,13 @@
         (def z-hwnd
           (if always-on-top
             HWND_TOPMOST
-            0))
-        (def swp-flags
-          (if always-on-top
-            (bor SWP_NOACTIVATE)
-            (bor SWP_NOACTIVATE SWP_NOZORDER)))
+            HWND_NOTOPMOST))
         (SetWindowPos cur-hwnd
                       z-hwnd
                       (in rect :left)
                       (in rect :top)
                       ;(util/rect-size rect)
-                      swp-flags)
+                      SWP_NOACTIVATE)
         (:set-focus-to-window uia-man cur-hwnd))
       # else
       (log/debug "---- scratch pad: :show-window-on-current-vd failed"))))
