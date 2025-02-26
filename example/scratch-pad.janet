@@ -30,6 +30,9 @@
     (log/warning "---- scratch pad: SetProp failed for %n: %n"
                  hwnd (GetLastError))))
 
+(defn check-managed-flag [hwnd]
+  (not= NULL (GetProp hwnd FLAGS-PROP-NAME)))
+
 
 (defn do-not-ignore [wm hwnd]
   # XXX: Make a window-manager method for this
@@ -39,6 +42,17 @@
 (defn trigger-window-opened-event [uia-man hwnd]
   # Tell the main loop it now has a new window to handle
   (ev/give (in uia-man :chan) [:uia/window-opened hwnd]))
+
+
+(defn find-flagged-windows []
+  (def flagged-list @[])
+  (EnumChildWindows
+   nil
+   (fn [hwnd]
+     (when (check-managed-flag hwnd)
+       (array/push flagged-list hwnd))))
+  (log/debug "---- scratch pad: found flagged windows: %n" flagged-list)
+  flagged-list)
 
 
 (defn scratch-pad-get-win-list [self]
@@ -241,7 +255,19 @@
 (defn scratch-pad-enable [self]
   (:disable self)
 
-  (def {:command-manager command-man} self)
+  (def {:command-manager command-man
+        :window-manager wm}
+    self)
+
+  # Check for windows left in hidden state last time we exited
+  (def flagged-list (find-flagged-windows))
+  (def win-list (:get-win-list self))
+  (each hwnd flagged-list
+    (:remove-hwnd wm hwnd)
+    (:ignore-hwnd wm hwnd)
+    (array/push win-list hwnd))
+  # XXX: default to hide all windows
+  (:hide self)
 
   (def get-focused-hwnd
     (fn []
