@@ -286,16 +286,15 @@
     (if sw-res
       (do
         (log/debug "---- scratch pad: moving window: %n" cur-hwnd)
+        (:transform-hwnd wm cur-hwnd rect)
         (def z-hwnd
           (if always-on-top
             HWND_TOPMOST
             HWND_NOTOPMOST))
         (SetWindowPos cur-hwnd
                       z-hwnd
-                      (in rect :left)
-                      (in rect :top)
-                      ;(util/rect-size rect)
-                      SWP_NOACTIVATE)
+                      0 0 0 0
+                      (bor SWP_NOACTIVATE SWP_NOSIZE SWP_NOMOVE))
         (:set-focus-to-window uia-man cur-hwnd))
       # else
       (log/debug "---- scratch pad: :show-window-on-current-vd failed"))))
