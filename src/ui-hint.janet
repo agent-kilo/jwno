@@ -129,7 +129,6 @@
                 (SelectObject hdc (GetStockObject DC_PEN))
 
                 (each [label rect] hint-list
-                  (def [left top right bottom] rect)
                   (draw-label hdc
                               label
                               rect
