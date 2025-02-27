@@ -75,7 +75,6 @@
 
 (defn snap-to-window [scratch-pad hwnd]
   (def efb-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
-  #(log/debug "---- scratch pad: updating scratch pad rect to: %n\n%s" efb-rect (get-stack-trace (fiber/current)))
   (put scratch-pad :rect efb-rect))
 
 
@@ -269,8 +268,21 @@
 
 
 (defn scratch-pad-transform [self rect]
-  :TODO
-  )
+  (def {:rect orig-rect
+        :auto-transform orig-auto-transform}
+    self)
+
+  (defer
+    (put self :auto-transform orig-auto-transform)
+
+    (put self :auto-transform false)
+    (put self :rect rect)
+    (try
+      (:show self)
+      ((err _fib)
+       # XXX: Assuming the rect is invalid, reset it
+       (put self :rect orig-rect)
+       (error err)))))
 
 
 (defn rotate-win-list [win-list dir]
