@@ -18,21 +18,24 @@
 
 (def FLAGS-PROP-NAME "_jwno-scratch-pad-flags_")
 
-(defn set-managed-flag [hwnd]
-  (def ret (SetProp hwnd FLAGS-PROP-NAME 1))
+(defn get-flags-prop-name [sp-name]
+  (string FLAGS-PROP-NAME sp-name))
+
+(defn set-managed-flag [hwnd sp-name]
+  (def ret (SetProp hwnd (get-flags-prop-name sp-name) 1))
   (when (= ret FALSE)
     (log/warning "---- scratch pad: SetProp failed for %n: %n"
                  hwnd (GetLastError))))
 
-(defn unset-managed-flag [hwnd]
+(defn unset-managed-flag [hwnd sp-name]
   # XXX: Should use RemoveProp instead?
-  (def ret (SetProp hwnd FLAGS-PROP-NAME 0))
+  (def ret (SetProp hwnd (get-flags-prop-name sp-name) 0))
   (when (= ret FALSE)
     (log/warning "---- scratch pad: SetProp failed for %n: %n"
                  hwnd (GetLastError))))
 
-(defn check-managed-flag [hwnd]
-  (not= NULL (GetProp hwnd FLAGS-PROP-NAME)))
+(defn check-managed-flag [hwnd sp-name]
+  (not= NULL (GetProp hwnd (get-flags-prop-name sp-name))))
 
 
 (defn do-not-ignore [wm hwnd]
@@ -60,12 +63,12 @@
   (ev/give (in uia-man :chan) [:uia/window-opened hwnd]))
 
 
-(defn find-flagged-windows []
+(defn find-flagged-windows [sp-name]
   (def flagged-list @[])
   (EnumChildWindows
    nil
    (fn [hwnd]
-     (when (check-managed-flag hwnd)
+     (when (check-managed-flag hwnd sp-name)
        (array/push flagged-list hwnd))
      1 # !!! IMPORTANT
      ))
@@ -164,7 +167,8 @@
 
 
 (defn scratch-pad-add-window [self hwnd]
-  (def {:window-manager wm
+  (def {:name name
+        :window-manager wm
         :hook-manager hook-man}
     self)
 
@@ -185,7 +189,7 @@
 
   (def win-list (:get-win-list self))
   (array/insert win-list 0 hwnd)
-  (set-managed-flag hwnd)
+  (set-managed-flag hwnd name)
 
   (:remove-hwnd wm hwnd)
   (:ignore-hwnd wm hwnd)
@@ -202,7 +206,8 @@
 
 
 (defn scratch-pad-remove-window [self hwnd]
-  (def {:window-manager wm
+  (def {:name name
+        :window-manager wm
         :uia-manager uia-man}
     self)
 
@@ -222,7 +227,7 @@
     (break))
 
   (reset-topmost-window hwnd SWP_SHOWWINDOW)
-  (unset-managed-flag hwnd)
+  (unset-managed-flag hwnd name)
   (trigger-window-opened-event uia-man hwnd)
 
   (when visible
@@ -230,7 +235,8 @@
 
 
 (defn scratch-pad-remove-all-windows [self]
-  (def {:window-manager wm
+  (def {:name name
+        :window-manager wm
         :uia-manager uia-man}
     self)
 
@@ -248,7 +254,7 @@
         (trigger-window-opened-event uia-man hwnd))
       # else
       (reset-topmost-window hwnd SWP_SHOWWINDOW))
-    (unset-managed-flag hwnd))
+    (unset-managed-flag hwnd name))
   (array/clear win-list))
 
 
@@ -358,13 +364,14 @@
 
   (:disable self)
 
-  (def {:command-manager command-man
+  (def {:name name
+        :command-manager command-man
         :hook-manager hook-man
         :window-manager wm}
     self)
 
   # Check for windows left in hidden state last time we exited
-  (def flagged-list (find-flagged-windows))
+  (def flagged-list (find-flagged-windows name))
   (def win-list (:get-win-list self))
   (each hwnd flagged-list
     (:remove-hwnd wm hwnd)
