@@ -39,6 +39,21 @@
   (put (in wm :ignored-hwnds) hwnd nil))
 
 
+(defn reset-topmost-window [hwnd &opt extra-flags]
+  (default extra-flags 0)
+
+  (def fg-hwnd (GetForegroundWindow))
+  # If hwnd is not the active window, put it to the bottom
+  # so that it won't obscure the actual active window
+  (def z-hwnd
+    (if (= hwnd fg-hwnd)
+      HWND_NOTOPMOST
+      HWND_BOTTOM))
+  (def flags
+    (bor SWP_NOACTIVATE SWP_NOMOVE SWP_NOSIZE extra-flags))
+  (SetWindowPos hwnd z-hwnd 0 0 0 0 flags))
+
+
 (defn trigger-window-opened-event [uia-man hwnd]
   # Tell the main loop it now has a new window to handle
   (ev/give (in uia-man :chan) [:uia/window-opened hwnd]))
@@ -96,22 +111,47 @@
   (not= FALSE win-vd-stat))
 
 
+(defn scratch-pad-do-default-filter [self hwnd uia-win exe-path vd-info]
+  (def {:ui-manager ui-man} self)
+  (cond
+    (nil? vd-info)
+    (do
+      (:show-tooltip ui-man :scratch-pad
+         (string/format "Failed to get virtual desktop info for window %n"
+                        (:get_CachedName uia-win)))
+      false)
+
+    (nil? (in vd-info :id))
+    (do
+      (:show-tooltip ui-man :scratch-pad
+         (string/format "Failed to get virtual desktop ID for window %n"
+                        (:get_CachedName uia-win)))
+      false)
+
+    (= "ApplicationFrameWindow" (:get_CachedClassName uia-win))
+    (do
+      (:show-tooltip ui-man :scratch-pad
+         "ApplicationFrameWindow class is not supported")
+      false)
+
+    true))
+
+
 (defn scratch-pad-add-window [self hwnd]
   (def {:window-manager wm
+        :hook-manager hook-man
         :rect rect}
     self)
 
-  (with-uia [uia-win (:get-hwnd-uia-element wm hwnd)]
-    (def vd-info (:get-hwnd-virtual-desktop wm hwnd uia-win))
-    (cond
-      (nil? vd-info)
-      (errorf "no virtual desktop info for window %n" hwnd)
+  (def should-manage
+    (with-uia [uia-win (:get-hwnd-uia-element wm hwnd)]
+      (def vd-info (:get-hwnd-virtual-desktop wm hwnd uia-win))
+      (def exe-path (:get-hwnd-path wm hwnd))
+      (:call-filter-hook hook-man :and :filter-scratch-pad-window
+         hwnd uia-win exe-path vd-info)))
 
-      (nil? (in vd-info :id))
-      (errorf "no virtual desktop id for window %n" hwnd)
-
-      (= "ApplicationFrameWindow" (:get_CachedClassName uia-win))
-      (errorf "ApplicationFrameWindow %n not supported" hwnd)))
+  (unless should-manage
+    (break))
 
   (def visible (:visible? self))
 
@@ -137,10 +177,15 @@
   (def visible (:visible? self))
 
   (def win-list (:get-win-list self))
-  (when-let [idx (find-index |(= $ hwnd) win-list)]
-    (array/remove win-list idx))
+  (def removed
+    (when-let [idx (find-index |(= $ hwnd) win-list)]
+      (array/remove win-list idx)
+      true))
 
-  (ShowWindow hwnd SW_SHOW)
+  (unless removed
+    (break))
+
+  (reset-topmost-window hwnd SWP_SHOWWINDOW)
   (unset-managed-flag hwnd)
   (trigger-window-opened-event uia-man hwnd)
 
@@ -154,16 +199,18 @@
         :uia-manager uia-man}
     self)
 
+  (def fg-hwnd (GetForegroundWindow))
   (def win-list (:get-win-list self))
   (each hwnd win-list
     (do-not-ignore wm hwnd)
     (def win-visible (not= FALSE (IsWindowVisible hwnd)))
     (if win-visible
       (do
+        (reset-topmost-window hwnd)
         (log/debug "---- scratch pad: trigger-window-opened-event for %n" hwnd)
         (trigger-window-opened-event uia-man hwnd))
       # else
-      (ShowWindow hwnd SW_SHOW))
+      (reset-topmost-window hwnd SWP_SHOWWINDOW))
     (unset-managed-flag hwnd))
   (array/clear win-list))
 
@@ -263,6 +310,7 @@
   (:disable self)
 
   (def {:command-manager command-man
+        :hook-manager hook-man
         :window-manager wm}
     self)
 
@@ -275,6 +323,11 @@
     (array/push win-list hwnd))
   # XXX: default to hide all windows
   (:hide self)
+
+  (put self :default-filter-hook-fn
+     (:add-hook hook-man :filter-scratch-pad-window
+        (fn [& args]
+          (:do-default-filter self ;args))))
 
   (def get-focused-hwnd
     (fn []
@@ -312,7 +365,16 @@
 
 
 (defn scratch-pad-disable [self]
-  (def {:command-manager command-man} self)
+  (def {:command-manager command-man
+        :hook-manager hook-man
+        :default-filter-hook-fn default-filter-hook-fn}
+    self)
+
+  (when default-filter-hook-fn
+    (:remove-hook hook-man
+                  :filter-scratch-pad-window
+                  default-filter-hook-fn)
+    (put self :default-filter-hook-fn nil))
 
   (:remove-command command-man :add-to-scratch-pad)
   (:remove-command command-man :remove-from-scratch-pad)
@@ -332,6 +394,7 @@
     :show scratch-pad-show
     :hide scratch-pad-hide
     :show-window-on-current-vd scratch-pad-show-window-on-current-vd
+    :do-default-filter scratch-pad-do-default-filter
     :get-win-list scratch-pad-get-win-list
     :visible? scratch-pad-visible?
     :enable scratch-pad-enable
@@ -340,15 +403,21 @@
 
 (defn scratch-pad [context]
   (def {:window-manager wm
+        :ui-manager ui-man
+        :hook-manager hook-man
         :uia-manager uia-man
         :command-manager command-man}
     context)
 
   (table/setproto
    @{:window-manager wm
+     :ui-manager ui-man
+     :hook-manager hook-man
      :uia-manager uia-man
      :command-manager command-man
      :win-list @[]
+     # initialized in scratch-pad-enable
+     :default-filter-hook-fn nil
 
      # Default settings
      :always-on-top true
