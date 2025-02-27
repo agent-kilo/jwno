@@ -353,7 +353,9 @@
     (ShowWindow hwnd SW_HIDE)))
 
 
-(defn scratch-pad-enable [self]
+(defn scratch-pad-enable [self &opt add-commands]
+  (default add-commands true)
+
   (:disable self)
 
   (def {:command-manager command-man
@@ -376,48 +378,49 @@
         (fn [& args]
           (:do-default-filter self ;args))))
 
-  (def get-focused-hwnd
-    (fn []
-      (with-uia [uia-win (:get-focused-window (in self :uia-manager))]
-        (when uia-win
-          (:get_CachedNativeWindowHandle uia-win)))))
+  (when add-commands
+    (def get-focused-hwnd
+      (fn []
+        (with-uia [uia-win (:get-focused-window (in self :uia-manager))]
+          (when uia-win
+            (:get_CachedNativeWindowHandle uia-win)))))
 
-  (:add-command command-man :add-to-scratch-pad
-     (fn []
-       (when-let [hwnd (get-focused-hwnd)]
-         (:add-window self hwnd))))
+    (:add-command command-man :add-to-scratch-pad
+       (fn []
+         (when-let [hwnd (get-focused-hwnd)]
+           (:add-window self hwnd))))
 
-  (:add-command command-man :remove-from-scratch-pad
-     (fn []
-       (when-let [hwnd (get-focused-hwnd)]
-         (:remove-window self hwnd))))
+    (:add-command command-man :remove-from-scratch-pad
+       (fn []
+         (when-let [hwnd (get-focused-hwnd)]
+           (:remove-window self hwnd))))
 
-  (:add-command command-man :show-scratch-pad
-     (fn [&opt dir]
-       (cond
-         dir
-         (:show self dir)
+    (:add-command command-man :show-scratch-pad
+       (fn [&opt dir]
+         (cond
+           dir
+           (:show self dir)
 
-         (:visible? self)
-         # Switch to the next window if scratch pad is already shown
-         (:show self :next)
+           (:visible? self)
+           # Switch to the next window if scratch pad is already shown
+           (:show self :next)
 
-         true
-         (:show self))))
+           true
+           (:show self))))
 
-  (:add-command command-man :hide-scratch-pad
-     (fn []
-       (:hide self)))
+    (:add-command command-man :hide-scratch-pad
+       (fn []
+         (:hide self)))
 
-  (:add-command command-man :toggle-scratch-pad
-     (fn []
-       (if (:visible? self)
-         (:hide self)
-         (:show self))))
+    (:add-command command-man :toggle-scratch-pad
+       (fn []
+         (if (:visible? self)
+           (:hide self)
+           (:show self))))
 
-  (:add-command command-man :remove-all-from-scratch-pad
-     (fn []
-       (:remove-all-windows self))))
+    (:add-command command-man :remove-all-from-scratch-pad
+       (fn []
+         (:remove-all-windows self)))))
 
 
 (defn scratch-pad-disable [self]
