@@ -542,13 +542,7 @@
                (:AddRef child)
                (array/push elem-list child))))
          walker
-         cr)
-
-      (var next-child (:GetFirstChildElementBuildCache walker uia-win cr))
-      (while next-child
-        (with-uia [child next-child]
-          
-          (set next-child (:GetNextSiblingElementBuildCache walker child cr))))))
+         cr)))
 
   elem-list)
 
@@ -568,13 +562,31 @@
       @[uia-win]))
 
   (def elem-list @[])
+  # XXX: FindAll sometimes returns duplicate entries for certain UIs
+  # (e.g. Copilot), so we use this to filter out those duplicates.
+  (def seen-runtime-ids @{})
+
   (with-uia [cond (:create-condition uia-man cond-spec)]
+    # XXX: e is leaking
     (each e init-elems
       (with-uia [elem-arr (if cr
                             (:FindAllBuildCache e TreeScope_Subtree cond cr)
                             (:FindAll e TreeScope_Subtree cond))]
         (for i 0 (:get_Length elem-arr)
-          (array/push elem-list (:GetElement elem-arr i))))))
+          (with-uia [found (:GetElement elem-arr i)]
+            (def runtime-id-arr
+              (if cr
+                (:GetCachedPropertyValue found UIA_RuntimeIdPropertyId)
+                (:GetCurrentPropertyValue found UIA_RuntimeIdPropertyId)))
+            # runtime-id-arr is an array, to use it as a table key,
+            # convert it to a tuple
+            # XXX: Should return a tuple from jw32 directly?
+            (def runtime-id
+              (tuple/slice runtime-id-arr))
+            (unless (has-key? seen-runtime-ids runtime-id)
+              (:AddRef found)
+              (put seen-runtime-ids runtime-id found)
+              (array/push elem-list found)))))))
   elem-list)
 
 
@@ -615,7 +627,8 @@
                                         UIA_BoundingRectanglePropertyId
                                         UIA_IsInvokePatternAvailablePropertyId
                                         UIA_IsOffscreenPropertyId
-                                        UIA_IsEnabledPropertyId]
+                                        UIA_IsEnabledPropertyId
+                                        UIA_RuntimeIdPropertyId]
                                        [UIA_InvokePatternId])]
     (with-uia [uia-win (:get-focused-window uia-man true cr)]
       (when uia-win
