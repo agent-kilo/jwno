@@ -505,7 +505,8 @@
                     cr?)
                   (:create-cache-request uia-man [UIA_ControlTypePropertyId
                                                   UIA_IsOffscreenPropertyId
-                                                  UIA_IsEnabledPropertyId]))]
+                                                  UIA_IsEnabledPropertyId
+                                                  UIA_RuntimeIdPropertyId]))]
     (with-uia [walker (:create-raw-view-walker uia-man)]
       (:enumerate-children
          uia-man
