@@ -306,8 +306,33 @@
   (:get_RawViewWalker (in self :com)))
 
 
-(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr?]
-  (def seen-runtime-ids @{})
+(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr? filter-runtime-ids]
+  (default filter-runtime-ids false)
+
+  (def seen-runtime-ids
+    (when filter-runtime-ids
+      @{}))
+
+  (def visit-unseen
+    (fn [child]
+      (def runtime-id (:GetRuntimeId child))
+      (def seen
+        # XXX: Some elements return empty runtime IDs
+        # Treat all empty runtime IDs as unseen.
+        (and (not (empty? runtime-id))
+             (has-key? seen-runtime-ids runtime-id)))
+      (unless seen
+        (put seen-runtime-ids runtime-id true)
+        (enum-fn child))))
+
+  (def visit-any
+    (fn [child]
+      (enum-fn child)))
+
+  (def visit
+    (if filter-runtime-ids
+      visit-unseen
+      visit-any))
 
   (with-uia [walker (if (nil? walker?)
                       (:create-raw-view-walker self)
@@ -317,14 +342,7 @@
     (var next-child (:GetFirstChildElementBuildCache walker elem cr?))
     (while next-child
       (with-uia [child next-child]
-        (def runtime-id (:GetRuntimeId child))
-        (def seen
-          # XXX: Some elements return empty runtime IDs
-          (and (not (empty? runtime-id))
-               (has-key? seen-runtime-ids runtime-id)))
-        (unless seen
-          (put seen-runtime-ids runtime-id true)
-          (enum-fn child))
+        (visit child)
         (set next-child (:GetNextSiblingElementBuildCache walker child cr?))))))
 
 
