@@ -547,7 +547,55 @@
   elem-list)
 
 
-(defn ui-hint-find-ui-elements [self uia-win cond-spec &opt cr]
+#
+# Some WinUI apps (?) may have top-level elements with identical runtime IDs, for example
+# the Photos app from Win 10. This seems to confuse IUIAutomationElement::FindAll and
+# friends, causing them to only return the first element with the same runtime ID.
+# This function is used to find all top-level elements, whether they have same runtime
+# IDs or not.
+#
+# As stated in Microsoft's docs: "The identifier is only guaranteed to be unique to
+# the UI of the desktop on which it was generated. Identifiers can be reused over
+# time." (https://learn.microsoft.com/en-us/windows/win32/api/uiautomationclient/nf-uiautomationclient-iuiautomationelement-getruntimeid)
+# So the runtime IDs in the same process should all be different from each other, right?
+# Is this a bug in UIAutomation or WinUI?
+#
+(defn find-win-ui-init-elements [uia-win uia-man &opt cr?]
+  (log/debug "find-win-ui-init-elements for window: %n" (:get_CachedName uia-win))
+
+  (def elem-list @[])
+
+  (with-uia [cr (if cr?
+                  (do
+                    (:AddRef cr?)
+                    cr?)
+                  (:create-cache-request uia-man [UIA_IsOffscreenPropertyId
+                                                  UIA_IsEnabledPropertyId]))]
+    (:enumerate-children
+       uia-man
+       uia-win
+       (fn [child]
+         (cond
+           (= FALSE (:get_CachedIsEnabled child))
+           :nop
+
+           (not= FALSE (:get_CachedIsOffscreen child))
+           :nop
+
+           true
+           (do
+             (:AddRef child)
+             (array/push elem-list child))))
+       nil
+       cr))
+
+  (log/debug "find-win-ui-init-elements: found %n children" (length elem-list))
+  elem-list)
+
+
+(defn ui-hint-find-ui-elements [self uia-win cond-spec &opt cr filter-runtime-ids]
+  (default filter-runtime-ids false)
+
   (def {:context context} self)
   (def {:uia-manager uia-man} context)
 
@@ -558,6 +606,9 @@
            (= "MozillaWindowClass" (:get_CachedClassName uia-win)))
       (find-firefox-init-elements uia-win uia-man cr)
 
+      (= "WinUIDesktopWin32WindowClass" (:get_CachedClassName uia-win))
+      (find-win-ui-init-elements uia-win uia-man cr)
+
       true
       (do
         (:AddRef uia-win)
@@ -566,7 +617,32 @@
   (def elem-list @[])
   # XXX: FindAll sometimes returns duplicate entries for certain UIs
   # (e.g. Copilot), so we use this to filter out those duplicates.
-  (def seen-runtime-ids @{})
+  (def seen-runtime-ids
+    (when filter-runtime-ids
+      @{}))
+
+  (def collect-unseen
+    (fn [found]
+      (def runtime-id (:GetRuntimeId found))
+      (def seen
+        # XXX: Some elements return empty runtime IDs.
+        # Treat all empty runtime IDs as unseen.
+        (and (not (empty? runtime-id))
+             (has-key? seen-runtime-ids runtime-id)))
+      (unless seen
+        (:AddRef found)
+        (put seen-runtime-ids runtime-id true)
+        (array/push elem-list found))))
+
+  (def collect-any
+    (fn [found]
+      (:AddRef found)
+      (array/push elem-list found)))
+
+  (def collect
+    (if filter-runtime-ids
+      collect-unseen
+      collect-any))
 
   (with-uia [cond (:create-condition uia-man cond-spec)]
     (for i 0 (length init-elems)
@@ -577,15 +653,7 @@
                                 (:FindAll e TreeScope_Subtree cond))]
             (for i 0 (:get_Length elem-arr)
               (with-uia [found (:GetElement elem-arr i)]
-                (def runtime-id (:GetRuntimeId found))
-                (def seen
-                  # XXX: Some elements return empty runtime IDs
-                  (and (not (empty? runtime-id))
-                       (has-key? seen-runtime-ids runtime-id)))
-                (unless seen
-                  (:AddRef found)
-                  (put seen-runtime-ids runtime-id true)
-                  (array/push elem-list found)))))
+                (collect found))))
           ((err fib)
            (log/debug "Failed to find UI elements: %n\n%s"
                       err
