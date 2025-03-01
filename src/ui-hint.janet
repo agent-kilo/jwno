@@ -512,13 +512,13 @@
          uia-win
          (fn [child]  # Top-level children
            (cond
-             (= FALSE (:GetCachedPropertyValue child UIA_IsEnabledPropertyId))
+             (= FALSE (:get_CachedIsEnabled child))
              :nop
 
-             (not= FALSE (:GetCachedPropertyValue child UIA_IsOffscreenPropertyId))
+             (not= FALSE (:get_CachedIsOffscreen child))
              :nop
 
-             (= UIA_GroupControlTypeId (:GetCachedPropertyValue child UIA_ControlTypePropertyId))
+             (= UIA_GroupControlTypeId (:get_CachedControlType child))
              # For some unknown reason, FindAll* don't work well with
              # [:property UIA_IsControlElementPropertyId false] elements,
              # so we have to walk the tree ourselves.
@@ -528,8 +528,8 @@
                   uia-man
                   child
                   (fn [group-child]  # Children in top-level group controls
-                    (when (and (not= FALSE (:GetCachedPropertyValue group-child UIA_IsEnabledPropertyId))
-                               (= FALSE (:GetCachedPropertyValue group-child UIA_IsOffscreenPropertyId)))
+                    (when (and (not= FALSE (:get_CachedIsEnabled group-child))
+                               (= FALSE (:get_CachedIsOffscreen group-child)))
                       (:AddRef group-child)
                       (array/push group-members group-child)))
                   walker

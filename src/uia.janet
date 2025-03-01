@@ -117,9 +117,9 @@
         (not (nil? hwnd))
         (not (null? hwnd))
         # Is a window control?
-        (= UIA_WindowControlTypeId (:GetCachedPropertyValue cur-elem UIA_ControlTypePropertyId))
+        (= UIA_WindowControlTypeId (:get_CachedControlType cur-elem))
         # Is Visible?
-        (= 0 (:GetCachedPropertyValue cur-elem UIA_IsOffscreenPropertyId))
+        (= FALSE (:get_CachedIsOffscreen cur-elem))
         # Are we looking for a top-level window?
         (if top-level?
           (= (int/u64 0)
