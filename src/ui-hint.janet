@@ -505,8 +505,7 @@
                     cr?)
                   (:create-cache-request uia-man [UIA_ControlTypePropertyId
                                                   UIA_IsOffscreenPropertyId
-                                                  UIA_IsEnabledPropertyId
-                                                  UIA_RuntimeIdPropertyId]))]
+                                                  UIA_IsEnabledPropertyId]))]
     (with-uia [walker (:create-raw-view-walker uia-man)]
       (:enumerate-children
          uia-man
@@ -575,18 +574,14 @@
                             (:FindAll e TreeScope_Subtree cond))]
         (for i 0 (:get_Length elem-arr)
           (with-uia [found (:GetElement elem-arr i)]
-            (def runtime-id-arr
-              (if cr
-                (:GetCachedPropertyValue found UIA_RuntimeIdPropertyId)
-                (:GetCurrentPropertyValue found UIA_RuntimeIdPropertyId)))
-            # runtime-id-arr is an array, to use it as a table key,
-            # convert it to a tuple
-            # XXX: Should return a tuple from jw32 directly?
-            (def runtime-id
-              (tuple/slice runtime-id-arr))
-            (unless (has-key? seen-runtime-ids runtime-id)
+            (def runtime-id (:GetRuntimeId found))
+            (def seen
+              # XXX: Some elements return empty runtime IDs
+              (and (not (empty? runtime-id))
+                   (has-key? seen-runtime-ids runtime-id)))
+            (unless seen
               (:AddRef found)
-              (put seen-runtime-ids runtime-id found)
+              (put seen-runtime-ids runtime-id true)
               (array/push elem-list found)))))))
   elem-list)
 
@@ -628,8 +623,7 @@
                                         UIA_BoundingRectanglePropertyId
                                         UIA_IsInvokePatternAvailablePropertyId
                                         UIA_IsOffscreenPropertyId
-                                        UIA_IsEnabledPropertyId
-                                        UIA_RuntimeIdPropertyId]
+                                        UIA_IsEnabledPropertyId]
                                        [UIA_InvokePatternId])]
     (with-uia [uia-win (:get-focused-window uia-man true cr)]
       (when uia-win

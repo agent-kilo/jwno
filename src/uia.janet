@@ -314,20 +314,18 @@
                       (do
                         (:AddRef walker?)
                         walker?))]
-    (with-uia [cr (if (nil? cr?)
-                    (:create-cache-request self [UIA_RuntimeIdPropertyId])
-                    (do
-                      (:AddRef cr?)
-                      cr?))]
-      (var next-child (:GetFirstChildElementBuildCache walker elem cr))
-      (while next-child
-        (with-uia [child next-child]
-          (def runtime-id
-            (tuple/slice (:GetCachedPropertyValue child UIA_RuntimeIdPropertyId)))
-          (unless (has-key? seen-runtime-ids runtime-id)
-            (put seen-runtime-ids runtime-id true)
-            (enum-fn child))
-          (set next-child (:GetNextSiblingElementBuildCache walker child cr)))))))
+    (var next-child (:GetFirstChildElementBuildCache walker elem cr?))
+    (while next-child
+      (with-uia [child next-child]
+        (def runtime-id (:GetRuntimeId child))
+        (def seen
+          # XXX: Some elements return empty runtime IDs
+          (and (not (empty? runtime-id))
+               (has-key? seen-runtime-ids runtime-id)))
+        (unless seen
+          (put seen-runtime-ids runtime-id true)
+          (enum-fn child))
+        (set next-child (:GetNextSiblingElementBuildCache walker child cr?))))))
 
 
 (defn- init-event-handlers [uia-com element chan]
