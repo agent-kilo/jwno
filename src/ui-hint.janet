@@ -559,7 +559,9 @@
       (find-firefox-init-elements uia-win uia-man cr)
 
       true
-      @[uia-win]))
+      (do
+        (:AddRef uia-win)
+        @[uia-win])))
 
   (def elem-list @[])
   # XXX: FindAll sometimes returns duplicate entries for certain UIs
@@ -567,22 +569,27 @@
   (def seen-runtime-ids @{})
 
   (with-uia [cond (:create-condition uia-man cond-spec)]
-    # XXX: e is leaking
-    (each e init-elems
-      (with-uia [elem-arr (if cr
-                            (:FindAllBuildCache e TreeScope_Subtree cond cr)
-                            (:FindAll e TreeScope_Subtree cond))]
-        (for i 0 (:get_Length elem-arr)
-          (with-uia [found (:GetElement elem-arr i)]
-            (def runtime-id (:GetRuntimeId found))
-            (def seen
-              # XXX: Some elements return empty runtime IDs
-              (and (not (empty? runtime-id))
-                   (has-key? seen-runtime-ids runtime-id)))
-            (unless seen
-              (:AddRef found)
-              (put seen-runtime-ids runtime-id true)
-              (array/push elem-list found)))))))
+    (for i 0 (length init-elems)
+      (with-uia [e (in init-elems i)]
+        (try
+          (with-uia [elem-arr (if cr
+                                (:FindAllBuildCache e TreeScope_Subtree cond cr)
+                                (:FindAll e TreeScope_Subtree cond))]
+            (for i 0 (:get_Length elem-arr)
+              (with-uia [found (:GetElement elem-arr i)]
+                (def runtime-id (:GetRuntimeId found))
+                (def seen
+                  # XXX: Some elements return empty runtime IDs
+                  (and (not (empty? runtime-id))
+                       (has-key? seen-runtime-ids runtime-id)))
+                (unless seen
+                  (:AddRef found)
+                  (put seen-runtime-ids runtime-id true)
+                  (array/push elem-list found)))))
+          ((err fib)
+           (log/debug "Failed to find UI elements: %n\n%s"
+                      err
+                      (get-stack-trace fib)))))))
   elem-list)
 
 
