@@ -384,13 +384,72 @@
   (first (:get-win-list self)))
 
 
+(defn scratch-pad-add-commands [self]
+  (def {:uia-manager uia-man
+        :command-manager command-man}
+    self)
+
+  (def get-focused-hwnd
+    (fn []
+      (with-uia [uia-win (:get-focused-window uia-man)]
+        (when uia-win
+          (:get_CachedNativeWindowHandle uia-win)))))
+
+  (:add-command command-man (:command-name self :add-to)
+                (fn []
+                  (when-let [hwnd (get-focused-hwnd)]
+                    (:add-window self hwnd))))
+
+  (:add-command command-man (:command-name self :remove-from)
+                (fn []
+                  (when-let [cur-hwnd (:get-current-hwnd self)]
+                    (:remove-window self cur-hwnd))))
+
+  (:add-command command-man (:command-name self :show)
+                (fn [&opt dir]
+                  (cond
+                    dir
+                    (:show self dir)
+
+                    (:visible? self)
+                    # Switch to the next window if scratch pad is already shown
+                    (:show self :next)
+
+                    true
+                    (:show self))))
+
+  (:add-command command-man (:command-name self :hide)
+                (fn []
+                  (:hide self)))
+
+  (:add-command command-man (:command-name self :toggle)
+                (fn []
+                  (if (:visible? self)
+                    (:hide self)
+                    (:show self))))
+
+  (:add-command command-man (:command-name self :remove-all-from)
+                (fn []
+                  (:remove-all-windows self))))
+
+
+(defn scratch-pad-remove-commands [self]
+  (def {:command-manager command-man} self)
+
+  (:remove-command command-man (:command-name self :add-to))
+  (:remove-command command-man (:command-name self :remove-from))
+  (:remove-command command-man (:command-name self :show))
+  (:remove-command command-man (:command-name self :hide))
+  (:remove-command command-man (:command-name self :toggle))
+  (:remove-command command-man (:command-name self :remove-all-from)))
+
+
 (defn scratch-pad-enable [self &opt add-commands]
   (default add-commands true)
 
   (:disable self)
 
   (def {:name name
-        :command-manager command-man
         :hook-manager hook-man
         :window-manager wm}
     self)
@@ -411,53 +470,11 @@
           (:do-default-filter self ;args))))
 
   (when add-commands
-    (def get-focused-hwnd
-      (fn []
-        (with-uia [uia-win (:get-focused-window (in self :uia-manager))]
-          (when uia-win
-            (:get_CachedNativeWindowHandle uia-win)))))
-
-    (:add-command command-man (:command-name self :add-to)
-       (fn []
-         (when-let [hwnd (get-focused-hwnd)]
-           (:add-window self hwnd))))
-
-    (:add-command command-man (:command-name self :remove-from)
-       (fn []
-         (when-let [cur-hwnd (:get-current-hwnd self)]
-           (:remove-window self cur-hwnd))))
-
-    (:add-command command-man (:command-name self :show)
-       (fn [&opt dir]
-         (cond
-           dir
-           (:show self dir)
-
-           (:visible? self)
-           # Switch to the next window if scratch pad is already shown
-           (:show self :next)
-
-           true
-           (:show self))))
-
-    (:add-command command-man (:command-name self :hide)
-       (fn []
-         (:hide self)))
-
-    (:add-command command-man (:command-name self :toggle)
-       (fn []
-         (if (:visible? self)
-           (:hide self)
-           (:show self))))
-
-    (:add-command command-man (:command-name self :remove-all-from)
-       (fn []
-         (:remove-all-windows self)))))
+    (:add-commands self)))
 
 
 (defn scratch-pad-disable [self]
-  (def {:command-manager command-man
-        :hook-manager hook-man
+  (def {:hook-manager hook-man
         :default-filter-hook-fn default-filter-hook-fn}
     self)
 
@@ -467,12 +484,7 @@
                   default-filter-hook-fn)
     (put self :default-filter-hook-fn nil))
 
-  (:remove-command command-man (:command-name self :add-to))
-  (:remove-command command-man (:command-name self :remove-from))
-  (:remove-command command-man (:command-name self :show))
-  (:remove-command command-man (:command-name self :hide))
-  (:remove-command command-man (:command-name self :toggle))
-  (:remove-command command-man (:command-name self :remove-all-from))
+  (:remove-commands self)
 
   (:remove-all-windows self))
 
@@ -495,7 +507,9 @@
     :get-current-hwnd scratch-pad-get-current-hwnd
     :enable scratch-pad-enable
     :disable scratch-pad-disable
-    :command-name scratch-pad-command-name})
+    :command-name scratch-pad-command-name
+    :add-commands scratch-pad-add-commands
+    :remove-commands scratch-pad-remove-commands})
 
 
 (defn scratch-pad [context]
