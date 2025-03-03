@@ -85,8 +85,7 @@
   (unless (in scratch-pad :auto-transform)
     (break))
 
-  (def win-list (:get-win-list scratch-pad))
-  (when-let [cur-hwnd (first win-list)]
+  (when-let [cur-hwnd (:get-current-hwnd scratch-pad)]
     (when (= FALSE (IsWindowVisible cur-hwnd))
       (break))
     (snap-to-window scratch-pad cur-hwnd)))
@@ -231,7 +230,9 @@
   (trigger-window-opened-event uia-man hwnd)
 
   (when visible
-    (:show self)))
+    (:show self))
+  (:show-window-on-current-vd self hwnd)
+  (:set-focus-to-window uia-man hwnd))
 
 
 (defn scratch-pad-remove-all-windows [self]
@@ -244,6 +245,8 @@
 
   (def fg-hwnd (GetForegroundWindow))
   (def win-list (:get-win-list self))
+  (def cur-hwnd (first win-list))
+
   (each hwnd win-list
     (do-not-ignore wm hwnd)
     (def win-visible (not= FALSE (IsWindowVisible hwnd)))
@@ -255,14 +258,17 @@
       # else
       (reset-topmost-window hwnd SWP_SHOWWINDOW))
     (unset-managed-flag hwnd name))
-  (array/clear win-list))
+  (array/clear win-list)
+
+  (when cur-hwnd
+    (:show-window-on-current-vd self cur-hwnd)
+    (:set-focus-to-window uia-man cur-hwnd)))
 
 
 (defn scratch-pad-visible? [self]
   (def {:window-manager wm} self)
 
-  (def win-list (:get-win-list self))
-  (if-let [cur-hwnd (first win-list)]
+  (if-let [cur-hwnd (:get-current-hwnd self)]
     (with-uia [uia-win (:get-hwnd-uia-element wm cur-hwnd)]
       (def [_point gcp-ret] (:GetClickablePoint uia-win))
       (and (not= FALSE gcp-ret)
@@ -356,7 +362,26 @@
 (defn scratch-pad-hide [self]
   (update-auto-transform self)
   (each hwnd (:get-win-list self)
-    (ShowWindow hwnd SW_HIDE)))
+    (ShowWindow hwnd SW_HIDE))
+
+  (def {:window-manager wm
+        :uia-manager uia-man}
+    self)
+
+  (when-let [cur-win (:get-current-window (in wm :root))]
+    # XXX: Make a window method for this?
+    (def vd-stat
+      (:IsWindowOnCurrentVirtualDesktop
+         (in wm :vdm-com)
+         (in cur-win :hwnd)))
+    (if (not= FALSE vd-stat)
+      (:set-focus cur-win wm)
+      # Set focus the desktop instead. XXX: Make a uia-manager method for this?
+      (:SetFocus (in uia-man :def-view)))))
+
+
+(defn scratch-pad-get-current-hwnd [self]
+  (first (:get-win-list self)))
 
 
 (defn scratch-pad-enable [self &opt add-commands]
@@ -399,8 +424,8 @@
 
     (:add-command command-man (:command-name self :remove-from)
        (fn []
-         (when-let [hwnd (get-focused-hwnd)]
-           (:remove-window self hwnd))))
+         (when-let [cur-hwnd (:get-current-hwnd self)]
+           (:remove-window self cur-hwnd))))
 
     (:add-command command-man (:command-name self :show)
        (fn [&opt dir]
@@ -467,6 +492,7 @@
     :do-default-filter scratch-pad-do-default-filter
     :get-win-list scratch-pad-get-win-list
     :visible? scratch-pad-visible?
+    :get-current-hwnd scratch-pad-get-current-hwnd
     :enable scratch-pad-enable
     :disable scratch-pad-disable
     :command-name scratch-pad-command-name})
