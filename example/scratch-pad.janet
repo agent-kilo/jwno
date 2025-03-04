@@ -384,6 +384,91 @@
   (first (:get-win-list self)))
 
 
+(defn scratch-pad-add-summon-hook [self match-fn &opt timeout]
+  (def {:hook-manager hook-man
+        :ui-manager ui-man
+        :summon-hook-fns summon-hook-fns}
+    self)
+
+  (def deadline
+    (when timeout
+      (+ timeout (os/clock :monotonic))))
+
+  (var hook-fn nil)
+
+  (def remove-hook-fn
+    (fn []
+      (:remove-hook hook-man :filter-forced-window hook-fn)
+      (when-let [idx (find-index |(= $ hook-fn) summon-hook-fns)]
+        (array/remove summon-hook-fns idx))))
+
+  (set hook-fn
+       # Use :filter-forced-window because it has higher priority
+       (:add-hook hook-man :filter-forced-window
+          (fn [hwnd uia-win exe-path &]
+            (def time (os/clock :monotonic))
+            (when (> time deadline)
+              (:show-tooltip ui-man :scratch-pad "Scratch Pad: Timed out waiting for new window.")
+              (remove-hook-fn)
+              (break))
+            (when (match-fn hwnd uia-win exe-path)
+              (:add-window self hwnd)
+              (remove-hook-fn)
+              (:show self))
+            false)))
+  (array/push summon-hook-fns hook-fn))
+
+
+(defn scratch-pad-summon [self match-fn &opt cli timeout]
+  (default cli [])
+
+  (def {:window-manager wm} self)
+
+  (update-auto-transform self)
+
+  (def win-list (:get-win-list self))
+  (var idx-found nil)
+  (for i 0 (length win-list)
+    (def hwnd (in win-list i))
+    (def exe-path (:get-hwnd-path wm hwnd))
+    (def match-result
+      (with-uia [uia-win (:get-hwnd-uia-element wm hwnd)]
+        (try
+          (match-fn hwnd uia-win exe-path)
+          ((err fib)
+           (log/debug "match-fn failed: %n\n%s"
+                      err
+                      (get-stack-trace fib))
+           false))))
+    (when match-result
+      (set idx-found i)
+      (break)))
+
+  (if idx-found
+    (do
+      (def hwnd-found (in win-list idx-found))
+      (array/insert (array/remove win-list idx-found) 0 hwnd-found)
+      (def orig-auto-transform (in self :auto-transform))
+      (defer
+        (put self :auto-transform orig-auto-transform)
+        (put self :auto-transform false)
+        (:show self)))
+    # else, window not found
+    (if (empty? cli)
+      (:show-tooltip
+         (in self :ui-manager)
+         :scratch-pad
+         "Scratch Pad: Summoning failed. Window not found.")
+      # else, cli not empty
+      (do
+        (:add-summon-hook self match-fn timeout)
+        (:call-command
+           (in self :command-manager)
+           :exec
+           true
+           ;cli)))))
+
+
 (defn scratch-pad-add-commands [self]
   (def {:uia-manager uia-man
         :command-manager command-man}
@@ -430,7 +515,11 @@
 
   (:add-command command-man (:command-name self :remove-all-from)
                 (fn []
-                  (:remove-all-windows self))))
+                  (:remove-all-windows self)))
+
+  (:add-command command-man (:command-name self :summon-to)
+                (fn [match-fn &opt timeout & cli]
+                  (:summon self match-fn cli timeout))))
 
 
 (defn scratch-pad-remove-commands [self]
@@ -475,8 +564,13 @@
 
 (defn scratch-pad-disable [self]
   (def {:hook-manager hook-man
-        :default-filter-hook-fn default-filter-hook-fn}
+        :default-filter-hook-fn default-filter-hook-fn
+        :summon-hook-fns summon-hook-fns}
     self)
+
+  (each hook-fn summon-hook-fns
+    (:remove-hook hook-man :filter-forced-window hook-fn))
+  (array/clear summon-hook-fns)
 
   (when default-filter-hook-fn
     (:remove-hook hook-man
@@ -509,7 +603,9 @@
     :disable scratch-pad-disable
     :command-name scratch-pad-command-name
     :add-commands scratch-pad-add-commands
-    :remove-commands scratch-pad-remove-commands})
+    :remove-commands scratch-pad-remove-commands
+    :summon scratch-pad-summon
+    :add-summon-hook scratch-pad-add-summon-hook})
 
 
 (defn scratch-pad [context]
@@ -529,6 +625,7 @@
      :win-list @[]
      # initialized in scratch-pad-enable
      :default-filter-hook-fn nil
+     :summon-hook-fns @[]
 
      # Default settings
      :name :scratch-pad
