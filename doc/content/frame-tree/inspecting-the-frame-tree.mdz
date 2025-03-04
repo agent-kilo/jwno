@@ -1,0 +1,54 @@
+{:title "Inspecting the Frame Tree"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["The Frame Tree" "index.html"]
+ :order 1}
+---
+
+You can dump the entire frame tree in the REPL:
+
+@codeblock[janet]```
+(:dump-subtree (get-in jwno/context [:window-manager :root]))
+```
+
+And the output would look like this:
+
+@codeblock[text]```
+Root Container
+  Virtual Desktop (name="Desktop 1", id="{D76896BE-1324-C415-9A47-4D3F09DECEF2}")
+    Monitor (primary=true,dir=horizontal,work-area={l:0,t:0,r:1920,b:1080},dpi=(96 96),device="\\\\.\\DISPLAY1")
+      Frame (dir=none,rect={l:10,t:10,r:960,b:1070})
+        Window (hwnd=<pointer 0x0000000705FE>)
+          Name: D:\w\janet_code\jwno\build\jwno.exe
+          Class: ConsoleWindowClass
+          Exe: D:\w\janet_code\jwno\build\jwno.exe
+          Rect: {l:13,t:20,r:957,b:1067}
+          Extended Frame Bounds: {l:20,t:20,r:950,b:1060}
+          Virtual Desktop ID: {D76896BE-1324-C415-9A47-4D3F09DECEF2}
+      Frame (dir=none,rect={l:960,t:10,r:1910,b:1070})
+        Window (hwnd=<pointer 0x00000010084C>)
+          Name: frame-tree.mdz
+          Class: Emacs
+          Exe: D:\pf\emacs\bin\emacs.exe
+          Rect: {l:963,t:20,r:1907,b:1067}
+          Extended Frame Bounds: {l:970,t:20,r:1900,b:1060}
+          Virtual Desktop ID: {D76896BE-1324-C415-9A47-4D3F09DECEF2}
+    Monitor (primary=false,dir=none,work-area={l:-1440,t:0,r:0,b:1080},dpi=(144 144),device="\\\\.\\DISPLAY24")
+      Window (hwnd=<pointer 0x00000008028C>)
+        Name: pwsh.exe
+        Class: CASCADIA_HOSTING_WINDOW_CLASS
+        Exe: C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.21.2911.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe
+        Rect: {l:-1420,t:30,r:-20,b:1060}
+        Extended Frame Bounds: {l:-1410,t:30,r:-30,b:1050}
+        Virtual Desktop ID: {D76896BE-1324-C415-9A47-4D3F09DECEF2}
+  Virtual Desktop (name="Desktop 3", id="{44137DB3-CE47-54F0-B204-5BA4FE6C91F2}")
+    Monitor (primary=true,dir=none,work-area={l:0,t:0,r:1920,b:1080},dpi=(96 96),device="\\\\.\\DISPLAY1")
+    Monitor (primary=false,dir=none,work-area={l:-1440,t:0,r:0,b:1080},dpi=(144 144),device="\\\\.\\DISPLAY24")
+  ...
+```
+
+Here indentations mark different levels in the frame tree where an object comes from. The info presented is a little dense, but most of the field names are self-explanatory. You can just play with the windows/frames, and see how their properties change.
+
+Note that Jwno populates the frame tree @em{lazily}, so your virtual desktops may not show up in the printed info, if you never opened any window in that virtual desktop since Jwno started running.
+
+These printed info is mostly used for troubleshooting. You should traverse the frame tree directly if you want to access its nodes programmatically.

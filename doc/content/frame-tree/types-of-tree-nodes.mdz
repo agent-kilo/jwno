@@ -1,0 +1,47 @@
+{:title "Types of Tree Nodes"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["The Frame Tree" "index.html"]
+ :order 3}
+---
+
+There are currently four types of nodes in the frame tree. You can check the @code{:type} property of a node to determine its type:
+
+@codeblock[janet]```
+(case (in node :type)
+  # A managed window, which has no children
+  :window
+  ...
+
+  # A frame, which contains windows or other frames
+  :frame
+  ...
+
+  # A virtual desktop, which contains top-level frames (monitors)
+  :layout
+  ...
+
+  # The root of the frame tree, which contains layouts (virtual desktops)
+  :virtual-desktop-container
+  ...
+  )
+```
+
+There's no monitor type though. In Jwno, a monitor is just a special @code{:frame}, called a @em{top-level} frame. You can check a frame node's @code{:monitor} property to see if it's a monitor:
+
+@codeblock[janet]```
+(if-let [monitor (in node :monitor)]
+  (do
+    # It's a monitor
+    )
+  (do
+    # It's a normal frame otherwise
+    )
+  )
+```
+
+For all types of tree nodes, their supported methods can be inspected by peeking inside their prototypes:
+
+@codeblock[janet]```
+(keys (table/proto-flatten node))
+```

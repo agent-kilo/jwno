@@ -1,0 +1,44 @@
+{:title "The Frame Tree"
+ :author "Chibidou"
+ :template "main.html"
+ :order 9}
+---
+
+The rectangular screen areas managed by Jwno are called @em{frames}, and they are tidily organized in a tree-like structure, named the @em{frame tree}. Despite the name, that tree also contains window objects, and some stuff representing virtual desktops and monitors etc. - I just couldn't come up with a better name, @em{*sigh*}.
+
+@ul{
+  @li{
+    @link[inspecting-the-frame-tree.html]{Inspecting the Frame Tree}
+  }
+  @li{
+    @link[traversing-the-frame-tree.html]{Traversing the Frame Tree}
+  }
+  @li{
+    @link[types-of-tree-nodes.html]{Types of Tree Nodes}
+  }
+  @li{
+    @link[window-nodes.html]{Window Nodes}
+  }
+  @li{
+    @link[frame-nodes.html]{Frame Nodes ⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️}
+  }
+}
+
+### Next Step
+
+@ul{
+  @li{
+    @link[cookbook.html]{Cookbook}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref/window-manager-object.html]{The Window Manager Object}
+  }
+  @li{
+    @link[ref/tree-node-objects.html]{Tree Node Objects}
+  }
+}

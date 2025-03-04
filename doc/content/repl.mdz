@@ -129,7 +129,7 @@ And of course you can remove exported names:
 
 @ul{
   @li{
-    @link[frame-tree.html]{The Frame Tree}
+    @link[frame-tree/index.html]{The Frame Tree}
   }
 }
 
