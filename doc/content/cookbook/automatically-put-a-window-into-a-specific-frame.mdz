@@ -1,0 +1,16 @@
+{:title "Automatically Put a Window Into a Specific Frame"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 10}
+---
+
+It can be done in the @code{:window-created} hook:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win _uia _exe _desktop]
+     (when (is-my-special-window? win)
+       (def frame (get-my-special-frame))
+       (put (in win :tags) :frame frame))))
+```

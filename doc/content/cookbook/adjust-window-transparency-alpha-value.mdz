@@ -1,0 +1,26 @@
+{:title "Adjust Window Transparency (Alpha Value)"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 6}
+---
+
+Just invoke the @code{:change-window-alpha} command on your window. Pass a negative argument to decrease the alpha value (increase transparency), or a positive argument to increase the alpha value (decrease transparency). This command is bound in a @em{transient} keymap, enabled by @code{Win + A}, in the example config.
+
+To automatically set the alpha value for selected windows:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win uia _exe _desktop]
+     (def class-name (:get_CachedClassName uia))
+     (when (find |(= $ class-name)
+                 ["Emacs"
+                  "ConsoleWindowClass"            # Console windows
+                  "CASCADIA_HOSTING_WINDOW_CLASS" # Windows Terminal windows
+                  ])
+       (:set-alpha win (math/floor (* 256 0.9))))))
+```
+
+It will set the windows with the specified class names to 90% opaqueness \(10% transparency).
+
+Note that not all windows' alpha values can be altered like this.

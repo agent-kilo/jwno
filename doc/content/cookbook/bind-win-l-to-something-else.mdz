@@ -1,0 +1,58 @@
+{:title "Bind Win + L to Something Else"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 12}
+---
+
+To use @code{Win + L} in Jwno, you need to disable the Windows lock screen first.
+
+Create a file named @code{DisableLockWorkstation.reg}:
+
+@codeblock[text]```
+Windows Registry Editor Version 5.00
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System]
+"DisableLockWorkstation"=dword:00000001
+```
+
+And a file named @code{EnableLockWorkstation.reg}:
+
+@codeblock[text]```
+Windows Registry Editor Version 5.00
+[HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\System]
+"DisableLockWorkstation"=-
+```
+
+Then use them in a Powershell script, say @code{lock.ps1}:
+
+@codeblock[text]```
+$EnableReg = Join-Path $PSScriptRoot "EnableLockWorkstation.reg"
+$DisableReg = Join-Path $PSScriptRoot "DisableLockWorkstation.reg"
+
+reg import $EnableReg
+sleep 0.5
+rundll32 user32.dll,LockWorkStation
+sleep 0.5
+reg import $DisableReg
+```
+
+Whenever you want to lock the screen, run @code{lock.ps1} \(as administrator), instead of pressing @code{Win + L}. Now you can bind @code{Win + L} to whatever you like in Jwno.
+
+You can bind the script to some keys in Jwno too:
+
+@codeblock[janet]``````
+(:define-key keymap
+             "Win + Enter L"
+             [:exec
+              true
+              "pwsh.exe"
+              "-WindowStyle"
+              "Hidden"
+              "-Command"
+              ```Start-Process -FilePath "pwsh" -ArgumentList "C:\path\to\lock.ps1" -Verb RunAs -WindowStyle Hidden```]
+             "Lock screen")
+``````
+
+@p{@strong{Caveats:}}
+
+Everything about the lock screen will be disabled, e.g. the screen will never be automatically locked, even after waking up from sleeping. And the UAC window will pop up everytime you run @code{lock.ps1}.

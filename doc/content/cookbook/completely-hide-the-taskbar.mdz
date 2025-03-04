@@ -1,0 +1,28 @@
+{:title "Completely Hide the Taskbar"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 13}
+---
+
+In Settings -> Personalization -> Taskbar, enable @em{Automatically hide the taskbar in desktop mode}, and then:
+
+@codeblock[janet]```
+(use jwno/util)
+(use jw32/_uiautomation)
+(use jw32/_winuser)
+
+(def uia-com (get-in jwno/context [:uia-manager :com]))
+
+(def taskbar-hwnd
+  (with-uia [root (:GetRootElement uia-com)]
+    (with-uia [condition (:CreatePropertyCondition uia-com UIA_NamePropertyId "Taskbar")]
+      (with-uia [elem (:FindFirst root TreeScope_Children condition)]
+        (:get_CurrentNativeWindowHandle elem)))))
+
+# To hide it completely
+(ShowWindow taskbar-hwnd SW_HIDE)
+
+# To show it again
+(ShowWindow taskbar-hwnd SW_SHOW)
+```

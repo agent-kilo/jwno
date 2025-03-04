@@ -1,0 +1,18 @@
+{:title "Ignore Windows"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 2}
+---
+
+Use the @code{:filter-window} hook for this:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :filter-window
+   (fn [_hwnd uia _exe _desktop]
+     (not= "SomeNaughtyWindowClass" (:get_CachedClassName uia))))
+```
+
+This code ignores windows according to their class names. Change @code{(:get_CachedClassName uia)} into @code{(:get_CachedName uia)} if you want to check the windows' title instead.
+
+Please see @link[https://learn.microsoft.com/en-us/windows/win32/api/uiautomationclient/nn-uiautomationclient-iuiautomationelement]{Windows documentation} for other useful properties you can get from the @code{uia} object.

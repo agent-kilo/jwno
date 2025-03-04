@@ -1,0 +1,18 @@
+{:title "Keymap Hint Placement"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 9}
+---
+
+By default, Jwno shows the keymap hints at the top-left corner of your active monitor. You can, for example, change it to the top edge of your monitor:
+
+@codeblock[janet]```
+(:set-tooltip-anchor (in jwno/context :ui-manager) :keymap :top)
+```
+
+Or the bottom-right corner, etc.:
+
+@codeblock[janet]```
+(:set-tooltip-anchor (in jwno/context :ui-manager) :keymap :bottom-right)
+```

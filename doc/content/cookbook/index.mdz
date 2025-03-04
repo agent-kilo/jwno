@@ -1,0 +1,71 @@
+{:title "Cookbook"
+ :author "Chibidou"
+ :template "main.html"
+ :order 10}
+---
+
+This page is a collection of recipes for some @html```<del>&nbsp;funny tricks&nbsp;</del>``` tasks in Jwno. They may need to be modified before getting incorporated into your own config file. You can usually try them out in @link[repl.html]{the REPL} first.
+
+@ul{
+  @li{
+    @link[get-detailed-info-from-a-window.html]{Get Detailed Info From a Window}
+  }
+  @li{
+    @link[ignore-windows.html]{Ignore Windows}
+  }
+  @li{
+    @link[forcibly-manage-windows.html]{Forcibly Manage Windows}
+  }
+  @li{
+    @link[set-uniform-window-gaps.html]{Set Uniform Window Gaps}
+  }
+  @li{
+    @link[adjust-top-level-frames-for-ultrawide-monitors.html]{Adjust Top-Level Frames for Ultrawide Monitors}
+  }
+  @li{
+    @link[adjust-window-transparency-alpha-value.html]{Adjust Window Transparency (Alpha Value)}
+  }
+  @li{
+    @link[dialog-window-placement.html]{Dialog Window Placement}
+  }
+  @li{
+    @link[bypass-window-size-limits.html]{Bypass Window Size Limits}
+  }
+  @li{
+    @link[keymap-hint-placement.html]{Keymap Hint Placement}
+  }
+  @li{
+    @link[automatically-put-a-window-into-a-specific-frame.html]{Automatically Put a Window Into a Specific Frame}
+  }
+  @li{
+    @link[get-notified-when-a-window-s-title-changes.html]{Get Notified When a Window's Title Changes}
+  }
+  @li{
+    @link[bind-win-l-to-something-else.html]{Bind @code{Win + L} to Something Else}
+  }
+  @li{
+    @link[completely-hide-the-taskbar.html]{Completely Hide the Taskbar}
+  }
+  @li{
+    @link[remove-the-title-bar.html]{Remove the Title Bar}
+  }
+  @li{
+    @link[export-a-value-to-the-repl.html]{Export a Value to the REPL}
+  }
+}
+
+### Next Step
+
+@ul{
+  @li{
+    @link[development.html]{Development Guide}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref/index.html]{Reference Index}
+  }
+}

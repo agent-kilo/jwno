@@ -1,0 +1,45 @@
+{:title "Get Notified When a Window's Title Changes"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 11}
+---
+
+A custom UIAutomation event handler can be used for this:
+
+@codeblock[janet]```
+(import jwno/util)
+(import jwno/log)
+(use jw32/_uiautomation)
+
+# The window object we are interested in.
+(def win ...)
+
+# The handler function. We just print some simple log here.
+(defn handler-fn [sender prop-id new-value]
+  (when (= prop-id UIA_NamePropertyId)
+    (log/info "++++ Window title changed to: %n ++++" new-value)))
+
+# To register the handler:
+(def handler
+  (util/with-uia [elem (:get-uia-element win)]
+    (:AddPropertyChangedEventHandler
+       (get-in jwno/context [:uia-manager :com])
+       elem
+       TreeScope_Element
+       nil
+       handler-fn
+       [UIA_NamePropertyId])))
+
+# To remove the handler later:
+(util/with-uia [elem (:get-uia-element win)]
+  (:RemovePropertyChangedEventHandler
+     (get-in jwno/context [:uia-manager :com])
+     elem
+     handler)
+  (:Release handler))
+```
+
+Most of UIAutomation elements' @link[https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-automation-element-propids]{properties} can be "watched" in this way.
+
+But note that the UIAutomation interface is quite low-level, and subject to change. Improper use will result in memory leaks or crashes.

@@ -1,0 +1,22 @@
+{:title "Bypass Window Size Limits"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 8}
+---
+
+Some windows have minimum/maximum size limits, you can try to bypass these limits by setting the @code{:swp-flags} tag:
+
+@codeblock[janet]```
+(use jw32/_winuser) # For the SWP_* constants
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win &]
+     # Here we simply try to get rid of the limits on ALL windows.
+     # You can check the actual window to decide whether or not the
+     # limits should be dropped.
+     (put (in win :tags) :swp-flags SWP_NOSENDCHANGING)))
+```
+
+This works by suppressing @link[https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-windowposchanging]{@code{WM_WINDOWPOSCHANGIN}} and @link[https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-getminmaxinfo]{@code{WM_GETMINMAXINFO}} messages when resizing the target window, so that it won't know if it's too small or too large.
+
+Some programs use other methods to enforce their size limits though, so this trick may not always work. Besides, some windows may get confused when their size goes out of limit.
