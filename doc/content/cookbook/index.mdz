@@ -58,7 +58,7 @@ This page is a collection of recipes for some @html```<del>&nbsp;funny tricks&nb
 
 @ul{
   @li{
-    @link[development.html]{Development Guide}
+    @link[../development.html]{Development Guide}
   }
 }
 
@@ -66,6 +66,6 @@ This page is a collection of recipes for some @html```<del>&nbsp;funny tricks&nb
 
 @ul{
   @li{
-    @link[ref/index.html]{Reference Index}
+    @link[../ref/index.html]{Reference Index}
   }
 }

@@ -85,7 +85,7 @@ For veterans:
 
 @ul{
   @li{
-    🧾 @link[cookbook.html]{Cookbook}
+    🧾 @link[cookbook/index.html]{Cookbook}
   }
   @li{
     📖 @link[ref/index.html]{Reference Index}

@@ -28,7 +28,7 @@ The rectangular screen areas managed by Jwno are called @em{frames}, and they ar
 
 @ul{
   @li{
-    @link[cookbook.html]{Cookbook}
+    @link[../cookbook/index.html]{Cookbook}
   }
 }
 
@@ -36,9 +36,9 @@ The rectangular screen areas managed by Jwno are called @em{frames}, and they ar
 
 @ul{
   @li{
-    @link[ref/window-manager-object.html]{The Window Manager Object}
+    @link[../ref/window-manager-object.html]{The Window Manager Object}
   }
   @li{
-    @link[ref/tree-node-objects.html]{Tree Node Objects}
+    @link[../ref/tree-node-objects.html]{Tree Node Objects}
   }
 }
