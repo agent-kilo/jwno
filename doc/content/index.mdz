@@ -13,7 +13,7 @@
   <div class="eight columns offset-by-two">
     <div class="figure">
       <a href="./img/jwno-emacs-repl.jpg">
-        <img alt="Jwno in Action" src="./img/jwno-emacs-repl.jpg">
+        <img alt="Jwno managing some Emacs frames, and its own REPL window." src="./img/jwno-emacs-repl.jpg">
       </a>
       <p class="caption">Jwno managing some <a href="https://www.gnu.org/software/emacs/">Emacs</a> frames, and its own REPL window.</p>
     </div>

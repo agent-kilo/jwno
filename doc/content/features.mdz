@@ -121,6 +121,43 @@ To run @code{:command1}, one should press @code{Win + Enter}, and then the @code
 </div>
 ```
 
+@html```
+<div class="row feature-list">
+
+<div class="twelve columns">
+```
+
+#### 💡️ Easy interaction with GUIs using your keyboard.
+
+With Jwno's @em{UI hint} feature, you can convert most of your mouse operations to simple keystrokes.
+
+@html```
+<div class="figure">
+  <a href="./img/ui-hint-demo.gif">
+    <img alt="Clicking a link using UI hint." src="./img/ui-hint-demo.gif">
+  </a>
+  <p class="caption">Clicking a link using UI hint.</p>
+</div>
+```
+
+@html```
+</div>
+
+</div>
+```
+
+@html```
+<div class="row feature-list">
+
+<div class="twelve columns">
+```
+
 #### ✨ ...And there are more to come!
 
 Please support Jwno's development by using it and giving some feedback. If you're interested, head over to the @link[installation.html]{installation guide}.
+
+@html```
+</div>
+
+</div>
+```
