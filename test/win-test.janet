@@ -3,6 +3,31 @@
 (import ../src/const)
 
 
+(defn build-dummy-frame-tree [spec &opt monitor]
+  (cond
+    (keyword? spec)
+    (window spec)
+
+    (struct? spec)
+    (let [fr (frame spec)]
+      (put fr :monitor monitor)
+      fr)
+    
+
+    (tuple? spec)
+    (let [rect (first spec)
+          proto (in spec 1)
+          child-specs (slice spec 2)]
+      (def fr (frame rect))
+      (put fr :monitor monitor)
+      (when proto
+        (table/setproto fr proto))
+      (each s child-specs
+        (def child (build-dummy-frame-tree s))
+        (:add-child fr child))
+      fr)))
+
+
 (defn test-frame-constructor []
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (assert (= (get-in dummy-frame [:rect :top]) 10))
@@ -61,9 +86,9 @@
 
 (defn test-frame-split []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
 
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (var dummy-frame (build-dummy-frame-tree rect dummy-monitor))
 
   (try
     (:split dummy-frame :horizontal 1)
@@ -90,8 +115,8 @@
     ((err fib)
      (assert (= err "frame is already split"))))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
   (:split dummy-frame :vertical)
   (assert (= (length (in dummy-frame :children)) 2))
 
@@ -107,8 +132,8 @@
   (assert (= (get-in dummy-frame [:children 1 :rect :right]) 110))
   (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
   (:split dummy-frame :horizontal 3)
   (assert (= (length (in dummy-frame :children)) 3))
 
@@ -130,8 +155,8 @@
   (assert (= (get-in dummy-frame [:children 2 :rect :right]) 110))
   (assert (= (get-in dummy-frame [:children 2 :rect :bottom]) 110))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
   (:split dummy-frame :horizontal 3 [0.5 0.3])
   (assert (= (length (in dummy-frame :children)) 3))
 
@@ -153,8 +178,8 @@
   (assert (= (get-in dummy-frame [:children 2 :rect :right]) 110))
   (assert (= (get-in dummy-frame [:children 2 :rect :bottom]) 110))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
   (:split dummy-frame :horizontal 2 [0.555 0.445])
   (assert (= (length (in dummy-frame :children)) 2))
 
@@ -170,14 +195,15 @@
   (assert (= (get-in dummy-frame [:children 1 :rect :right]) 110))
   (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
-  (def dummy-window1 (window :dummy-hwnd1))
-  (def dummy-window2 (window :dummy-hwnd2))
-  (def dummy-window3 (window :dummy-hwnd3))
-  (:add-child dummy-frame dummy-window1)
-  (:add-child dummy-frame dummy-window2)
-  (:add-child dummy-frame dummy-window3)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         nil
+           :dummy-hwnd1
+           :dummy-hwnd2
+           :dummy-hwnd3]
+        dummy-monitor))
+  (def dummy-window1 (get-in dummy-frame [:children 0]))
   (:activate dummy-window1)
 
   (:split dummy-frame :horizontal)
@@ -192,8 +218,11 @@
 
   (assert (= (length (get-in dummy-frame [:children 1 :children])) 0))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 11 :right 11}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        {:top 10 :left 10 :bottom 11 :right 11}
+        dummy-monitor))
+
   (try
     (:split dummy-frame :horizontal 2 [0.5])
     ((err fib)
@@ -205,8 +234,8 @@
      (assert (= err "cannot create zero-height frames"))))
   (assert (= (length (in dummy-frame :children)) 0))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
   (put (in dummy-frame :tags) :padding 9)
   (:split dummy-frame :horizontal)
   (assert (= 2 (length (in dummy-frame :children))))
@@ -222,8 +251,8 @@
     (assert (= 101 (in rect1 :bottom)))
     (assert (= 101 (in rect1 :right))))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
   (put (in dummy-frame :tags) :paddings {:top 9 :left 8 :bottom 7 :right 6})
   (:split dummy-frame :vertical)
   (assert (= 2 (length (in dummy-frame :children))))
@@ -242,9 +271,9 @@
 
 (defn test-frame-insert-sub-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
 
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (var dummy-frame (build-dummy-frame-tree rect dummy-monitor))
 
   (:insert-sub-frame dummy-frame 0 nil :horizontal)
   (assert (= (length (in dummy-frame :children)) 2))
@@ -308,14 +337,15 @@
   (assert (= (get-in dummy-frame [:children 4 :rect :bottom]) 110))
 
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
-
-  (def dummy-window1 (window :dummy-hwnd1))
-  (def dummy-window2 (window :dummy-hwnd2))
-
-  (:add-child dummy-frame dummy-window1)
-  (:add-child dummy-frame dummy-window2)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         nil
+           :dummy-hwnd1
+           :dummy-hwnd2]
+        dummy-monitor))
+  (def dummy-window1 (get-in dummy-frame [:children 0]))
+  (def dummy-window2 (get-in dummy-frame [:children 1]))
 
   (:insert-sub-frame dummy-frame 0 nil :vertical)
   (assert (empty? (get-in dummy-frame [:children 0 :children])))
@@ -334,22 +364,30 @@
 
 
 (defn test-tree-node-activate []
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 110})
+
   #
   # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
   #              |
   #              +- dummy-sub-frame2 -- dummy-window2
   #
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
-  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd))
-  (var dummy-window2 (window :dummy-hwnd))
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         nil
+           :dummy-hwnd1]
+        [rect2
+         nil
+           :dummy-hwnd2]]))
 
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
-
-  (:add-child dummy-sub-frame1 dummy-window1)
-  (:add-child dummy-sub-frame2 dummy-window2)
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-window1 (get-in dummy-sub-frame1 [:children 0]))
+  (def dummy-window2 (get-in dummy-sub-frame2 [:children 0]))
 
   (:activate dummy-window1)
   (assert (= (in dummy-sub-frame1 :current-child) dummy-window1))
@@ -367,17 +405,19 @@
   #              |
   #              +- dummy-sub-frame2 -- dummy-window2
   #
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
-  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd1))
-  (var dummy-window2 (window :dummy-hwnd2))
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [{:top 10 :left 10 :bottom 110 :right 110}
+      horizontal-frame-proto
+        [{:top 10 :left 10 :bottom 110 :right 60}
+         nil
+           :dummy-hwnd1]
+        [{:top 10 :left 60 :bottom 110 :right 110}
+         nil
+           :dummy-hwnd2]]))
 
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
-
-  (:add-child dummy-sub-frame1 dummy-window1)
-  (:add-child dummy-sub-frame2 dummy-window2)
+  (def dummy-window1 (get-in dummy-frame [:children 0 :children 0]))
+  (var dummy-window2 (get-in dummy-frame [:children 1 :children 0]))
 
   (:activate dummy-window1)
 
@@ -393,53 +433,70 @@
   #              +- dummy-sub-frame2 -- dummy-window2
   #
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
-  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd1))
-  (var dummy-window2 (window :dummy-hwnd2))
-
   (assert (= dummy-frame (:get-current-frame dummy-frame)))
 
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
+  (set dummy-frame
+    (build-dummy-frame-tree
+     [{:top 10 :left 10 :bottom 110 :right 110}
+      horizontal-frame-proto
+        [{:top 10 :left 10 :bottom 110 :right 60}
+         nil
+           :dummy-hwnd1]
+        [{:top 10 :left 60 :bottom 110 :right 110}
+         nil
+           :dummy-hwnd2]]))
 
-  (:add-child dummy-sub-frame1 dummy-window1)
-  (:add-child dummy-sub-frame2 dummy-window2)
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
 
+  (assert (= dummy-sub-frame1 (:get-current-frame dummy-frame)))
+
+  (put dummy-frame :current-child nil)
+  (var error-raised nil)
   (try
     (:get-current-frame dummy-frame)
     ((err fib)
-     (assert (= err "inconsistent states for frame tree"))))
+     (assert (= err "inconsistent states for frame tree"))
+     (set error-raised true)))
+  (assert (= true error-raised))
 
+  (def dummy-window1 (get-in dummy-frame [:children 0 :children 0]))
   (:activate dummy-window1)
   (assert (= dummy-sub-frame1 (:get-current-frame dummy-frame)))
 
+  (def dummy-window2 (get-in dummy-frame [:children 1 :children 0]))
   (:activate dummy-window2)
   (assert (= dummy-sub-frame2 (:get-current-frame dummy-frame))))
 
 
 (defn test-frame-transform []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 110})
+
   #
   # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
   #              |
   #              +- dummy-sub-frame2 -- dummy-window2
   #
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
-  # XXX: wrap this up?
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
-  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-window1 (window :dummy-hwnd1))
-  (var dummy-window2 (window :dummy-hwnd2))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
-  (:add-child dummy-sub-frame1 dummy-window1)
-  (:add-child dummy-sub-frame2 dummy-window2)
+  (var dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           [rect1
+            nil
+              :dummy-hwnd1]
+           [rect2
+            nil
+              :dummy-hwnd2]]
+        dummy-monitor))
+
+  (var dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (var dummy-sub-frame2 (get-in dummy-frame [:children 1]))
 
   (var resized-frames
-    (:transform dummy-frame {:top 10 :left 10 :bottom 110 :right 110} nil @[]))
+    (:transform dummy-frame rect nil @[]))
 
   (assert (empty? resized-frames))
 
@@ -465,14 +522,17 @@
   (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
   (assert (= 100 (get-in dummy-sub-frame2 [:rect :right])))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           {:top 19 :left 19 :bottom 101 :right 60}
+           {:top 19 :left 60 :bottom 101 :right 101}]
+        dummy-monitor))
   (put (in dummy-frame :tags) :padding 9)
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (set dummy-sub-frame1 (frame {:top 19 :left 19 :bottom 101 :right 60}))
-  (set dummy-sub-frame2 (frame {:top 19 :left 60 :bottom 101 :right 101}))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
+
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
 
   (:transform dummy-frame {:top 13 :left 20 :bottom 107 :right 100})
 
@@ -486,14 +546,17 @@
   (assert (= 98 (get-in dummy-sub-frame2 [:rect :bottom])))
   (assert (= 91 (get-in dummy-sub-frame2 [:rect :right])))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         vertical-frame-proto
+           {:top 19 :left 18 :bottom 61 :right 104}
+           {:top 61 :left 18 :bottom 103 :right 104}]
+        dummy-monitor))
   (put (in dummy-frame :tags) :paddings {:top 9 :left 8 :bottom 7 :right 6})
-  (table/setproto dummy-frame vertical-frame-proto)
-  (set dummy-sub-frame1 (frame {:top 19 :left 18 :bottom 61 :right 104}))
-  (set dummy-sub-frame2 (frame {:top 61 :left 18 :bottom 103 :right 104}))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
+
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
 
   (:transform dummy-frame {:top 13 :left 20 :bottom 107 :right 100})
 
@@ -510,18 +573,23 @@
 
 (defn test-frame-balance []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
+
   #
   # dummy-frame -+- dummy-sub-frame1
   #              |
   #              +- dummy-sub-frame2
   #
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (var dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
-  (var dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
+  (var dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           {:top 10 :left 10 :bottom 110 :right 60}
+           {:top 10 :left 60 :bottom 110 :right 110}]
+        dummy-monitor))
+
+  (var dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (var dummy-sub-frame2 (get-in dummy-frame [:children 1]))
 
   (def resized-frames (:balance dummy-frame true @[]))
 
@@ -537,13 +605,16 @@
   (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
   (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
 
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (set dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 50}))
-  (set dummy-sub-frame2 (frame {:top 10 :left 50 :bottom 110 :right 110}))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           {:top 10 :left 10 :bottom 110 :right 50}
+           {:top 10 :left 50 :bottom 110 :right 110}]
+        dummy-monitor))
+
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
 
   (def resized-frames (:balance dummy-frame true @[]))
 
@@ -566,18 +637,21 @@
   #              |                    |
   #              +- dummy-sub-frame2  +- dummy-sub-frame-4
   #
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (set dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 50}))
-  (table/setproto dummy-sub-frame1 horizontal-frame-proto)
-  (set dummy-sub-frame2 (frame {:top 10 :left 50 :bottom 110 :right 110}))
-  (var dummy-sub-frame3 (frame {:top 10 :left 10 :bottom 110 :right 30}))
-  (var dummy-sub-frame4 (frame {:top 10 :left 30 :bottom 110 :right 50}))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
-  (:add-child dummy-sub-frame1 dummy-sub-frame3)
-  (:add-child dummy-sub-frame1 dummy-sub-frame4)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           [{:top 10 :left 10 :bottom 110 :right 50}
+            horizontal-frame-proto
+              {:top 10 :left 10 :bottom 110 :right 30}
+              {:top 10 :left 30 :bottom 110 :right 50}]
+           {:top 10 :left 50 :bottom 110 :right 110}]
+        dummy-monitor))
+
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (var dummy-sub-frame3 (get-in dummy-sub-frame1 [:children 0]))
+  (var dummy-sub-frame4 (get-in dummy-sub-frame1 [:children 1]))
 
   (def resized-frames (:balance dummy-frame true @[]))
 
@@ -606,18 +680,21 @@
   #              |                    |
   #              +- dummy-sub-frame2  +- dummy-sub-frame-4
   #
-  (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
-  (put dummy-frame :monitor dummy-monitor)
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (set dummy-sub-frame1 (frame {:top 10 :left 10 :bottom 110 :right 60}))
-  (table/setproto dummy-sub-frame1 horizontal-frame-proto)
-  (set dummy-sub-frame2 (frame {:top 10 :left 60 :bottom 110 :right 110}))
-  (var dummy-sub-frame3 (frame {:top 10 :left 10 :bottom 110 :right 30}))
-  (var dummy-sub-frame4 (frame {:top 10 :left 30 :bottom 110 :right 60}))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
-  (:add-child dummy-sub-frame1 dummy-sub-frame3)
-  (:add-child dummy-sub-frame1 dummy-sub-frame4)
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           [{:top 10 :left 10 :bottom 110 :right 60}
+            horizontal-frame-proto
+              {:top 10 :left 10 :bottom 110 :right 30}
+              {:top 10 :left 30 :bottom 110 :right 60}]
+           {:top 10 :left 60 :bottom 110 :right 110}]
+        dummy-monitor))
+
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (set dummy-sub-frame3 (get-in dummy-sub-frame1 [:children 0]))
+  (set dummy-sub-frame4 (get-in dummy-sub-frame1 [:children 1]))
 
   (def resized-frames (:balance dummy-frame true @[]))
 
@@ -638,6 +715,11 @@
 
 (defn test-frame-rotate-children []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 130 :right 130})
+  (def rect1 {:top 10 :left 10 :bottom 130 :right 50})
+  (def rect2 {:top 10 :left 50 :bottom 130 :right 90})
+  (def rect3 {:top 10 :left 90 :bottom 130 :right 130})
+
   #
   # dummy-frame -+- dummy-sub-frame1
   #              |
@@ -645,22 +727,18 @@
   #              |
   #              +- dummy-sub-frame3
   #
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 130 :right 130}))
-  (put dummy-frame :monitor dummy-monitor)
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (def rect1 {:top 10 :left 10 :bottom 130 :right 50})
-  (def rect2 {:top 10 :left 50 :bottom 130 :right 90})
-  (def rect3 {:top 10 :left 90 :bottom 130 :right 130})
-  (var dummy-sub-frame1 (frame rect1))
-  (var dummy-sub-frame2 (frame rect2))
-  (var dummy-sub-frame3 (frame rect3))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
-  (:add-child dummy-frame dummy-sub-frame3)
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        rect1
+        rect2
+        rect3]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame3 (get-in dummy-frame [:children 2]))
 
-  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 0])))
-  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1])))
-  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 2])))
   (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
 
   (:rotate-children dummy-frame :forward)
@@ -719,6 +797,11 @@
 
 (defn test-frame-reverse-children []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 130 :right 130})
+  (def rect1 {:top 10 :left 10 :bottom 130 :right 50})
+  (def rect2 {:top 10 :left 50 :bottom 130 :right 90})
+  (def rect3 {:top 10 :left 90 :bottom 130 :right 130})
+
   #
   # dummy-frame -+- dummy-sub-frame1
   #              |
@@ -726,22 +809,18 @@
   #              |
   #              +- dummy-sub-frame3
   #
-  (var dummy-frame (frame {:top 10 :left 10 :bottom 130 :right 130}))
-  (put dummy-frame :monitor dummy-monitor)
-  (table/setproto dummy-frame horizontal-frame-proto)
-  (def rect1 {:top 10 :left 10 :bottom 130 :right 50})
-  (def rect2 {:top 10 :left 50 :bottom 130 :right 90})
-  (def rect3 {:top 10 :left 90 :bottom 130 :right 130})
-  (var dummy-sub-frame1 (frame rect1))
-  (var dummy-sub-frame2 (frame rect2))
-  (var dummy-sub-frame3 (frame rect3))
-  (:add-child dummy-frame dummy-sub-frame1)
-  (:add-child dummy-frame dummy-sub-frame2)
-  (:add-child dummy-frame dummy-sub-frame3)
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        rect1
+        rect2
+        rect3]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame3 (get-in dummy-frame [:children 2]))
 
-  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 0])))
-  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1])))
-  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 2])))
   (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
 
   (:reverse-children dummy-frame)
