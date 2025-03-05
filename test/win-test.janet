@@ -746,7 +746,6 @@
   (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
 
   (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 0])))
-  (printf "-- %n" (in dummy-sub-frame2 :rect))
   (assert (= rect1 (in dummy-sub-frame2 :rect)))
 
   (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 1])))
