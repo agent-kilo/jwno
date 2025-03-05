@@ -636,6 +636,141 @@
   (assert (= 60 (get-in dummy-sub-frame4 [:rect :right]))))
 
 
+(defn test-frame-rotate-children []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  #
+  # dummy-frame -+- dummy-sub-frame1
+  #              |
+  #              +- dummy-sub-frame2
+  #              |
+  #              +- dummy-sub-frame3
+  #
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 130 :right 130}))
+  (put dummy-frame :monitor dummy-monitor)
+  (table/setproto dummy-frame horizontal-frame-proto)
+  (def rect1 {:top 10 :left 10 :bottom 130 :right 50})
+  (def rect2 {:top 10 :left 50 :bottom 130 :right 90})
+  (def rect3 {:top 10 :left 90 :bottom 130 :right 130})
+  (var dummy-sub-frame1 (frame rect1))
+  (var dummy-sub-frame2 (frame rect2))
+  (var dummy-sub-frame3 (frame rect3))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+  (:add-child dummy-frame dummy-sub-frame3)
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 0])))
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1])))
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 2])))
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (:rotate-children dummy-frame :forward)
+
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 0])))
+  (printf "-- %n" (in dummy-sub-frame2 :rect))
+  (assert (= rect1 (in dummy-sub-frame2 :rect)))
+
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 1])))
+  (assert (= rect2 (in dummy-sub-frame3 :rect)))
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 2])))
+  (assert (= rect3 (in dummy-sub-frame1 :rect)))
+
+  (:rotate-children dummy-frame :forward)
+
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 0])))
+  (assert (= rect1 (in dummy-sub-frame3 :rect)))
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 1])))
+  (assert (= rect2 (in dummy-sub-frame1 :rect)))
+
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 2])))
+  (assert (= rect3 (in dummy-sub-frame2 :rect)))
+
+  (:rotate-children dummy-frame :backward)
+
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 0])))
+  (assert (= rect1 (in dummy-sub-frame2 :rect)))
+
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 1])))
+  (assert (= rect2 (in dummy-sub-frame3 :rect)))
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 2])))
+  (assert (= rect3 (in dummy-sub-frame1 :rect)))
+
+  (:rotate-children dummy-frame :backward)
+
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 0])))
+  (assert (= rect1 (in dummy-sub-frame1 :rect)))
+
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1])))
+  (assert (= rect2 (in dummy-sub-frame2 :rect)))
+
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 2])))
+  (assert (= rect3 (in dummy-sub-frame3 :rect))))
+
+
+(defn test-frame-reverse-children []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  #
+  # dummy-frame -+- dummy-sub-frame1
+  #              |
+  #              +- dummy-sub-frame2
+  #              |
+  #              +- dummy-sub-frame3
+  #
+  (var dummy-frame (frame {:top 10 :left 10 :bottom 130 :right 130}))
+  (put dummy-frame :monitor dummy-monitor)
+  (table/setproto dummy-frame horizontal-frame-proto)
+  (def rect1 {:top 10 :left 10 :bottom 130 :right 50})
+  (def rect2 {:top 10 :left 50 :bottom 130 :right 90})
+  (def rect3 {:top 10 :left 90 :bottom 130 :right 130})
+  (var dummy-sub-frame1 (frame rect1))
+  (var dummy-sub-frame2 (frame rect2))
+  (var dummy-sub-frame3 (frame rect3))
+  (:add-child dummy-frame dummy-sub-frame1)
+  (:add-child dummy-frame dummy-sub-frame2)
+  (:add-child dummy-frame dummy-sub-frame3)
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 0])))
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1])))
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 2])))
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (:reverse-children dummy-frame)
+
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 0])))
+  (assert (= rect1 (in dummy-sub-frame3 :rect)))
+
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1])))
+  (assert (= rect2 (in dummy-sub-frame2 :rect)))
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 2])))
+  (assert (= rect3 (in dummy-sub-frame1 :rect)))
+
+  (:reverse-children dummy-frame)
+
+  (assert (= dummy-sub-frame1 (in dummy-frame :current-child)))
+
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 0])))
+  (assert (= rect1 (in dummy-sub-frame1 :rect)))
+
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1])))
+  (assert (= rect2 (in dummy-sub-frame2 :rect)))
+
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 2])))
+  (assert (= rect3 (in dummy-sub-frame3 :rect))))
+
+
 (defn test-layout-get-adjacent-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -689,5 +824,7 @@
   (test-frame-get-current-frame)
   (test-frame-transform)
   (test-frame-balance)
+  (test-frame-rotate-children)
+  (test-frame-reverse-children)
   (test-layout-get-adjacent-frame)
   (test-tree-node-has-child?))

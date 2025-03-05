@@ -1827,6 +1827,66 @@
     true nil))
 
 
+(defn frame-rotate-children [self direction]
+  (def children (in self :children))
+  (def rotate
+    (fn []
+      (case direction
+        :forward
+        (when-let [first-child (first children)]
+          (array/remove children 0)
+          (array/push children first-child))
+
+        :backward
+        (when-let [last-child (last children)]
+          (array/remove children -1)
+          (array/insert children 0 last-child))
+
+        (errorf "unknown direction: %n" direction))))
+
+  (cond
+    (empty? children)
+    :nop
+
+    (>= 1 (length children))
+    :nop
+
+    (= :window (get-in self [:children 0 :type]))
+    # XXX: Currently this has no visible effect
+    (rotate)
+
+    (= :frame (get-in self [:children 0 :type]))
+    (do
+      (rotate)
+      # refresh children's rects
+      (:transform self (in self :rect)))
+
+    (error "inconsistent states for frame tree")))
+
+
+(defn frame-reverse-children [self]
+  (def children (in self :children))
+
+  (cond
+    (empty? children)
+    :nop
+
+    (>= 1 (length children))
+    :nop
+
+    (= :window (get-in self [:children 0 :type]))
+    # XXX: Currently this has no visible effect
+    (reverse! children)
+
+    (= :frame (get-in self [:children 0 :type]))
+    (do
+      (reverse! children)
+      # refresh children's rects
+      (:transform self (in self :rect)))
+
+    (error "inconsistent states for frame tree")))
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
@@ -1839,7 +1899,9 @@
         :sync-current-window frame-sync-current-window
         :get-paddings frame-get-paddings
         :get-padded-rect frame-get-padded-rect
-        :get-direction frame-get-direction}
+        :get-direction frame-get-direction
+        :rotate-children frame-rotate-children
+        :reverse-children frame-reverse-children}
       tree-node-proto))
 
 
