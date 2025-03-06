@@ -6,6 +6,8 @@
 
 The rectangular screen areas managed by Jwno are called @em{frames}, and they are tidily organized in a tree-like structure, named the @em{frame tree}. Despite the name, that tree also contains window objects, and some stuff representing virtual desktops and monitors etc. - I just couldn't come up with a better name, @em{*sigh*}.
 
+### Table of Contents
+
 @ul{
   @li{
     @link[inspecting-the-frame-tree.html]{Inspecting the Frame Tree}
