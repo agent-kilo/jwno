@@ -1,0 +1,31 @@
+{:title "Development Guide"
+ :author "Chibidou"
+ :template "main.html"
+ :order 11}
+---
+
+Congratulations! You endured this boring documentation, and reached the fun part! (Or you skipped it all... a wise choice, I guess?)
+
+Jwno can be extended via pure Janet code, but sometimes that's not enough. Maybe you want to call some native code. Maybe you found a bug in Jwno's core. Or maybe you just want to peek inside. We'll set your dev environment up here, so you can do whatever you want with it.
+
+### Table of Contents
+
+@ul{
+  @li{
+    @link[compiling-jwno-from-source.html]{Compiling Jwno From Source}
+  }
+  @li{
+    @link[compiling-native-modules.html]{Compiling Native Modules}
+  }
+  @li{
+    @link[about-jw32.html]{About Jw32}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref/index.html]{Reference Index}
+  }
+}
