@@ -72,7 +72,7 @@ For new users:
     ✨ @link[features.html]{Features}
   }
   @li{
-    🚀 @link[installation.html]{Installation Guide}
+    🚀 @link[installation/index.html]{Installation Guide}
   }
 }
 
@@ -91,7 +91,7 @@ For veterans:
     📖 @link[ref/index.html]{Reference Index}
   }
   @li{
-    🏗️ @link[development.html]{Development Guide}
+    🏗️ @link[development/index.html]{Development Guide}
   }
 }
 
