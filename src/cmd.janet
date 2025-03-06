@@ -364,6 +364,47 @@
         (:retile wm parent)))))
 
 
+(defn cmd-rotate-sibling-frames [wm hook-man &opt dir steps depth?]
+  (default dir :forward)
+  (default steps 1)
+
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (unless cur-frame
+    (break))
+
+  (def depth
+    (if depth?
+      depth?
+      (:get-depth cur-frame)))
+
+  (var fr cur-frame)
+  (while (and (< depth (:get-depth fr))
+              (in fr :parent)
+              (= :frame (get-in fr [:parent :type])))
+    (set fr (in fr :parent)))
+
+  (def parent (in fr :parent))
+
+  (cond
+    (nil? parent)
+    (break)
+
+    (not= :frame (in parent :type))
+    # TODO: Rotate monitors
+    (break)
+
+    true
+    (do
+      (repeat steps
+        (:rotate-children parent dir))
+      (:retile wm parent)
+      # To update visual indicators, the :frame-resized hook
+      # needs to fire, even though the frame sizes are always
+      # the same after rotation. Maybe rename the hook to
+      # :frame-rect-updated ?
+      (call-frame-resized-hooks hook-man (slice (in parent :children))))))
+
+
 (defn cmd-close-frame [wm hook-man &opt cur-frame]
   (default cur-frame (:get-current-frame (in wm :root)))
 
@@ -857,6 +898,26 @@
      have the same size. When recursive? is true (the default), resizes
      all frames in the current monitor. Otherwise, only resizes the
      siblings of the current frame.
+     ```)
+  (:add-command command-man :rotate-sibling-frames
+     (fn [&opt dir steps depth] (cmd-rotate-sibling-frames wm hook-man dir steps depth))
+     ```
+     (:rotate-sibling-frames &opt dir steps depth)
+
+     Rotate sibling frames.
+
+     When dir is :forward, the first frame will be moved to the end
+     of the frame list. When dir is :backward, the last frame will be
+     moved to the beginning of the frame list instead. Defaults to
+     :forward.
+
+     Steps specifies how many times the frame list should be rotated.
+     Defaults to 1.
+
+     Depth specifies which level of frames should be rotated. 0 means
+     to rotate top-level frames, 1 means to rotate children of top-level
+     frames, etc. Defaults to the level of the current active leaf
+     frame.
      ```)
   (:add-command command-man :zoom-in
      (fn [ratio] (cmd-zoom-in wm hook-man ratio))
