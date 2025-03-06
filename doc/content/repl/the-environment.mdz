@@ -1,0 +1,40 @@
+{:title "The Environment"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["The REPL" "index.html"]
+ :order 4}
+---
+
+The REPL environment provides the usual APIs from Janet's @link[https://janet-lang.org/api/index.html]{core library}, plus some global variables exported by Jwno (they all have the @code{jwno/} prefix):
+
+@ul{
+  @li{
+    @code{jwno/context}: The context object containing all the states tracked/used by Jwno's main thread. REPL connections also run in the main thread (but in different @link[https://janet-lang.org/docs/fibers/index.html]{fibers}), so you can access most parts of this object in the REPL directly and safely, without triggering race conditions and the like.
+  }
+  @li{
+    @code{jwno/user-config}: The environment object that results from evaluating the config file. All top-level bindings in the config file are accessible in this environment. For example, you can access a variable named @code{my-awesome-keymap} like this: @code{(in jwno/user-config 'my-awesome-keymap)}. Alternatively, you can do @code{(import jwno/user-config)} in the REPL, and access @code{user-config/my-awesome-keymap} directly. 
+  }
+  @li{
+    @code{jwno/repl-server}: The REPL server we connected to.
+  }
+  @li{
+    @code{jwno/client-name}: The name for the current REPL client, as shown in the REPL prompt.
+  }
+  @li{
+    @code{jwno/client-stream}: The socket stream for the current REPL client.
+  }
+}
+
+Every REPL connection has its own environment. Everything referenced in an REPL session will be cleared when it's closed. And if you defined a variable in one REPL session, it will @em{not} be accessible in other REPL sessions. To make something persist, and be accessible to all REPL sessions, you can @em{export} it:
+
+@codeblock[janet]```
+(import jwno/util)
+(def the-answer 42)
+(util/export-to-repl jwno/repl-server the-answer)
+```
+
+And of course you can remove exported names:
+
+@codeblock[janet]```
+(util/unset-from-repl jwno/repl-server the-answer)
+```

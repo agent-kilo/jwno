@@ -1,0 +1,35 @@
+{:title "Launching the REPL"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["The REPL" "index.html"]
+ :order 2}
+---
+
+There are multiple ways to launch the REPL:
+
+@ul{
+  @li{
+    Right-click on the notification area (system tray) icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="../img/jwno.png">``` shown on the taskbar, then select @em{Launch REPL}. This command will try to connect to an existing REPL server, and automatically start one if none is running.
+  }
+  @li{
+    Bind a key to call the @code{:repl} command. You can specify in the command's arguments whether a server should be automatically started or not:
+@codeblock[janet]```
+ # The `true` argument tells the command to
+ # automatically start an REPL server
+(:define-key keymap "Win + Enter" [:repl true])
+```
+  }
+  @li{
+    Pass the @code{--client} and @code{--repl} options when starting Jwno from the command line. This will @em{not} start an REPL server automatically, and Jwno will show a network error when no server is running:
+@codeblock[text]```
+jwno.exe --client --repl 127.0.0.1:9999
+```
+  }
+}
+
+When the REPL connected successfully, a console window will pop up, showing a simple prompt:
+
+@codeblock[text]```
+Welcome to Jwno REPL!
+[127.0.0.1:9999]:1: _
+```
