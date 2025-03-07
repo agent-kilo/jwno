@@ -849,6 +849,173 @@
   (assert (= rect3 (in dummy-sub-frame3 :rect))))
 
 
+(defn test-frame-set-direction []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 110})
+
+  #
+  # dummy-frame -+- dummy-sub-frame1
+  #              |
+  #              +- dummy-sub-frame2
+  #
+  (var dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        rect1
+        rect2]
+     dummy-monitor))
+  (var dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (var dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+
+  (var error-raised nil)
+  (try
+    (:set-direction dummy-frame :north-west)
+    ((err _fib)
+     (assert (= err "can not change direction from :horizontal to :north-west"))
+     (set error-raised true)))
+  (assert (= true error-raised))
+  
+  (set error-raised nil)
+  (try
+    (:set-direction dummy-sub-frame1 :vertical)
+    ((err _fib)
+     (assert (= err "can not change direction from nil to :vertical"))
+     (set error-raised true)))
+  (assert (= true error-raised))
+
+  (:set-direction dummy-frame :vertical)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= (in dummy-sub-frame1 :rect)
+             {:top 10 :left 10 :bottom 60 :right 110}))
+  (assert (= (in dummy-sub-frame2 :rect)
+             {:top 60 :left 10 :bottom 110 :right 110}))
+
+  (:set-direction dummy-frame :horizontal)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= rect1 (in dummy-sub-frame1 :rect)))
+  (assert (= rect2 (in dummy-sub-frame2 :rect)))
+
+  (def rect3 {:top 10 :left 10 :bottom 60 :right 60})
+  (def rect4 {:top 30 :left 10 :bottom 110 :right 60})
+
+  #
+  # dummy-frame --+- dummy-sub-frame1 --+- dummy-sub-frame3
+  #               |                     |
+  #               +- dummy-sub-frame2   +- dummy-sub-frame4
+  #
+  (set dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         vertical-frame-proto
+           rect3
+           rect4]
+        rect2]
+     dummy-monitor))
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (var dummy-sub-frame3 (get-in dummy-sub-frame1 [:children 0]))
+  (var dummy-sub-frame4 (get-in dummy-sub-frame1 [:children 1]))
+
+  (:set-direction dummy-frame :vertical true)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= (in dummy-sub-frame1 :rect)
+             {:top 10 :left 10 :bottom 60 :right 110}))
+  (assert (= (in dummy-sub-frame2 :rect)
+             {:top 60 :left 10 :bottom 110 :right 110}))
+  (assert (= (in dummy-sub-frame3 :rect)
+             {:top 10 :left 10 :bottom 35 :right 110}))
+  (assert (= (in dummy-sub-frame4 :rect)
+             {:top 35 :left 10 :bottom 60 :right 110}))
+
+  (:set-direction dummy-frame :horizontal true)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= rect1 (in dummy-sub-frame1 :rect)))
+  (assert (= rect2 (in dummy-sub-frame2 :rect)))
+  (assert (= (in dummy-sub-frame3 :rect)
+             {:top 10 :left 10 :bottom 110 :right 35}))
+  (assert (= (in dummy-sub-frame4 :rect)
+             {:top 10 :left 35 :bottom 110 :right 60})))
+
+
+(defn test-frame-toggle-direction []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 110})
+  (def rect3 {:top 10 :left 10 :bottom 60 :right 60})
+  (def rect4 {:top 60 :left 10 :bottom 110 :right 60})
+
+  #
+  # (horizontal)       (vertical)
+  # dummy-frame --+- dummy-sub-frame1 --+- dummy-sub-frame3
+  #               |                     |
+  #               +- dummy-sub-frame2   +- dummy-sub-frame4
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         vertical-frame-proto
+           rect3
+           rect4]
+        rect2]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame3 (get-in dummy-sub-frame1 [:children 0]))
+  (def dummy-sub-frame4 (get-in dummy-sub-frame1 [:children 1]))
+
+  (:toggle-direction dummy-frame)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= (in dummy-sub-frame1 :rect)
+             {:top 10 :left 10 :bottom 60 :right 110}))
+  (assert (= (in dummy-sub-frame2 :rect)
+             {:top 60 :left 10 :bottom 110 :right 110}))
+  (assert (= (in dummy-sub-frame3 :rect)
+             {:top 10 :left 10 :bottom 35 :right 110}))
+  (assert (= (in dummy-sub-frame4 :rect)
+             {:top 35 :left 10 :bottom 60 :right 110}))
+
+  (:toggle-direction dummy-frame)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= rect1 (in dummy-sub-frame1 :rect)))
+  (assert (= rect2 (in dummy-sub-frame2 :rect)))
+  (assert (= rect3 (in dummy-sub-frame3 :rect)))
+  (assert (= rect4 (in dummy-sub-frame4 :rect)))
+
+  (:toggle-direction dummy-frame true)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= (in dummy-sub-frame1 :rect)
+             {:top 10 :left 10 :bottom 60 :right 110}))
+  (assert (= (in dummy-sub-frame2 :rect)
+             {:top 60 :left 10 :bottom 110 :right 110}))
+  (assert (= (in dummy-sub-frame3 :rect)
+             {:top 10 :left 10 :bottom 60 :right 60}))
+  (assert (= (in dummy-sub-frame4 :rect)
+             {:top 10 :left 60 :bottom 60 :right 110}))
+
+  (:toggle-direction dummy-frame true)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= rect1 (in dummy-sub-frame1 :rect)))
+  (assert (= rect2 (in dummy-sub-frame2 :rect)))
+  (assert (= rect3 (in dummy-sub-frame3 :rect)))
+  (assert (= rect4 (in dummy-sub-frame4 :rect))))
+
+
 (defn test-layout-get-adjacent-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -904,5 +1071,7 @@
   (test-frame-balance)
   (test-frame-rotate-children)
   (test-frame-reverse-children)
+  (test-frame-set-direction)
+  (test-frame-toggle-direction)
   (test-layout-get-adjacent-frame)
   (test-tree-node-has-child?))
