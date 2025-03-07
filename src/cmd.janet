@@ -19,6 +19,24 @@
 (import ./log)
 
 
+(defn get-current-frame-of-depth [wm &opt depth?]
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (unless cur-frame
+    (break nil))
+
+  (def depth
+    (if depth?
+      depth?
+      (:get-depth cur-frame)))
+
+  (var fr cur-frame)
+  (while (and (< depth (:get-depth fr))
+              (in fr :parent)
+              (= :frame (get-in fr [:parent :type])))
+    (set fr (in fr :parent)))
+  fr)
+
+
 (defn cmd-nop [])
 
 
@@ -368,20 +386,9 @@
   (default dir :forward)
   (default steps 1)
 
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (unless cur-frame
+  (def fr (get-current-frame-of-depth wm depth?))
+  (unless fr
     (break))
-
-  (def depth
-    (if depth?
-      depth?
-      (:get-depth cur-frame)))
-
-  (var fr cur-frame)
-  (while (and (< depth (:get-depth fr))
-              (in fr :parent)
-              (= :frame (get-in fr [:parent :type])))
-    (set fr (in fr :parent)))
 
   (def parent (in fr :parent))
 
@@ -406,20 +413,9 @@
 
 
 (defn cmd-reverse-sibling-frames [wm hook-man &opt depth?]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (unless cur-frame
+  (def fr (get-current-frame-of-depth wm depth?))
+  (unless fr
     (break))
-
-  (def depth
-    (if depth?
-      depth?
-      (:get-depth cur-frame)))
-
-  (var fr cur-frame)
-  (while (and (< depth (:get-depth fr))
-              (in fr :parent)
-              (= :frame (get-in fr [:parent :type])))
-    (set fr (in fr :parent)))
 
   (def parent (in fr :parent))
 
@@ -438,6 +434,27 @@
       # To update visual indicators, the :frame-resized hook
       # needs to fire, even though the frame sizes are always
       # the same after reversing.
+      (call-frame-resized-hooks hook-man (slice (in parent :children))))))
+
+
+(defn cmd-toggle-parent-direction [wm hook-man &opt recursive depth?]
+  (def fr (get-current-frame-of-depth wm depth?))
+  (unless fr
+    (break))
+
+  (def parent (in fr :parent))
+
+  (cond
+    (nil? parent)
+    (break)
+
+    (not= :frame (in parent :type))
+    (break)
+
+    true
+    (do
+      (:toggle-direction parent recursive)
+      (:retile wm parent)
       (call-frame-resized-hooks hook-man (slice (in parent :children))))))
 
 
@@ -940,7 +957,7 @@
      ```
      (:rotate-sibling-frames &opt dir steps depth)
 
-     Rotate sibling frames.
+     Rotates sibling frames.
 
      When dir is :forward, the first frame will be moved to the end
      of the frame list. When dir is :backward, the last frame will be
@@ -960,12 +977,25 @@
      ```
      (:reverse-sibling-frames &opt depth)
 
-     Reverse the order of sibling frames.
+     Reverses the order of sibling frames.
 
      Depth specifies which level of frames should be reversed. 0 means
-     to reverse top-level frames, 1 means to rotate children of top-level
+     to reverse top-level frames, 1 means to reverse children of top-level
      frames, etc. Defaults to the level of the current active leaf
      frame.
+     ```)
+  (:add-command command-man :toggle-parent-direction
+     (fn [&opt recursive depth] (cmd-toggle-parent-direction wm hook-man recursive depth))
+     ```
+     (:toggle-parent-direction &opt recursive depth)
+
+     Changes the direction of the parent frame. If the direction was
+     :horizontal, it becomes :vertical, and vice versa.
+
+     Depth specifies which level of frame's direction should be toggled.
+     1 means to toggle top-level frames, 2 means to toggle children of
+     top-level frames, etc. Defaults to the parent of the current active
+     leaf frame.
      ```)
   (:add-command command-man :zoom-in
      (fn [ratio] (cmd-zoom-in wm hook-man ratio))
