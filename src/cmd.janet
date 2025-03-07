@@ -396,11 +396,8 @@
     (nil? parent)
     (break)
 
-    (not= :frame (in parent :type))
-    # TODO: Rotate monitors
-    (break)
-
-    true
+    (or (= :frame (in parent :type))
+        (= :layout (in parent :type)))
     (do
       (repeat steps
         (:rotate-children parent dir))
@@ -423,11 +420,8 @@
     (nil? parent)
     (break)
 
-    (not= :frame (in parent :type))
-    # TODO: Reverse monitor layout?
-    (break)
-
-    true
+    (or (= :frame (in parent :type))
+        (= :layout (in parent :type)))
     (do
       (:reverse-children parent)
       (:retile wm parent)

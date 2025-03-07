@@ -27,6 +27,21 @@
 
 ######### Helpers #########
 
+(defn rotate-array! [arr direction]
+  (case direction
+    :forward
+    (when-let [first-elem (first arr)]
+      (array/remove arr 0)
+      (array/push arr first-elem))
+
+    :backward
+    (when-let [last-elem (last arr)]
+      (array/remove arr -1)
+      (array/insert arr 0 last-elem))
+
+    (errorf "unknown direction: %n" direction)))
+
+
 (defn calc-win-coords-in-frame [win-rect fr-rect fit anchor win-scale fr-scale]
   (def [fr-width fr-height] (rect-size fr-rect))
   (def [win-width win-height] (rect-size win-rect))
@@ -1924,20 +1939,6 @@
 
 (defn frame-rotate-children [self direction]
   (def children (in self :children))
-  (def rotate
-    (fn []
-      (case direction
-        :forward
-        (when-let [first-child (first children)]
-          (array/remove children 0)
-          (array/push children first-child))
-
-        :backward
-        (when-let [last-child (last children)]
-          (array/remove children -1)
-          (array/insert children 0 last-child))
-
-        (errorf "unknown direction: %n" direction))))
 
   (cond
     (empty? children)
@@ -1948,11 +1949,11 @@
 
     (= :window (get-in self [:children 0 :type]))
     # XXX: Currently this has no visible effect
-    (rotate)
+    (rotate-array! children direction)
 
     (= :frame (get-in self [:children 0 :type]))
     (do
-      (rotate)
+      (rotate-array! children direction)
       # refresh children's rects
       (:transform self (in self :rect)))
 
@@ -2160,9 +2161,25 @@
         (:call-hook hook-man :monitor-updated fr)))))
 
 
+(defn layout-rotate-children [self direction]
+  (def children (in self :children))
+  (def monitors (map |(in $ :monitor) children))
+  (rotate-array! children direction)
+  (:update-work-areas self monitors))
+
+
+(defn layout-reverse-children [self]
+  (def children (in self :children))
+  (def monitors (map |(in $ :monitor) children))
+  (reverse! children)
+  (:update-work-areas self monitors))
+
+
 (def- layout-proto
   (table/setproto
-   @{:update-work-areas layout-update-work-areas}
+   @{:update-work-areas layout-update-work-areas
+     :rotate-children layout-rotate-children
+     :reverse-children layout-reverse-children}
    tree-node-proto))
 
 
