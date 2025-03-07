@@ -1820,11 +1820,106 @@
 
 
 (defn frame-get-direction [self]
+  (def proto (table/getproto self))
   (cond
-    (= vertical-frame-proto (table/getproto self)) :vertical
-    (= horizontal-frame-proto (table/getproto self)) :horizontal
+    (= proto vertical-frame-proto) :vertical
+    (= proto horizontal-frame-proto) :horizontal
     # The frame is not split
-    true nil))
+    (= proto frame-proto) nil
+    true (errorf "unknown frame proto: %n" proto)))
+
+
+(defn frame-set-direction [self dir &opt recursive]
+  (default recursive false)
+
+  (def cur-dir (:get-direction self))
+  (def children (in self :children))
+
+  (def update-child-rect
+    (fn [c r]
+      (cond
+        (not recursive)
+        (:transform c r)
+
+        (nil? (:get-direction c))
+        # This child is not split, update the rect only
+        (put c :rect r)
+
+        true
+        (do
+          (:transform c r)
+          (:set-direction c dir recursive)))))
+
+  #
+  # The code below asusmes that, there must be more than one
+  # child when cur-dir is not nil.
+  #
+  (cond
+    (= dir cur-dir)
+    (when recursive
+      # Children's rects are not updated, but we reuse
+      # update-child-rect to descent recursively
+      (def old-rects (map |(in $ :rect) children))
+      (map update-child-rect children old-rects))
+
+    (and (= cur-dir :vertical)
+         (= dir :horizontal))
+    # :vertical -> :horizontal
+    (do
+      (def padded-rect (:get-padded-rect self))
+      (def [width height] (rect-size (in self :rect)))
+      (def ratios (map |(/ (rect-height (in $ :rect)) height) children))
+      (table/setproto self horizontal-frame-proto)
+      (def new-rects
+        (:calculate-sub-rects
+           self
+           (fn [_ i]
+             (math/floor (* width (in ratios i))))))
+      (map update-child-rect children new-rects))
+
+    (and (= cur-dir :horizontal)
+         (= dir :vertical))
+    # :horizontal -> :vertical
+    (do
+      (def padded-rect (:get-padded-rect self))
+      (def [width height] (rect-size (in self :rect)))
+      (def ratios (map |(/ (rect-width (in $ :rect)) width) children))
+      (table/setproto self vertical-frame-proto)
+      (def new-rects
+        (:calculate-sub-rects
+           self
+           (fn [_ i]
+             (math/floor (* height (in ratios i))))))
+      (map update-child-rect children new-rects))
+
+    true
+    (errorf "can not change direction from %n to %n" cur-dir dir)))
+
+
+(defn frame-toggle-direction [self &opt recursive]
+  (default recursive false)
+
+  (def cur-dir (:get-direction self))
+
+  (def set-dir
+    (fn [dir]
+      (:set-direction self dir)
+      (when recursive
+        (each c (in self :children)
+          (when (:get-direction c)
+            (:toggle-direction c recursive))))))
+
+  (case cur-dir
+    nil
+    (error "leaf frames have no direction")
+
+    :horizontal
+    (set-dir :vertical)
+
+    :vertical
+    (set-dir :horizontal)
+
+    (errorf "unknown direction: %n" cur-dir)))
 
 
 (defn frame-rotate-children [self direction]
@@ -1900,6 +1995,8 @@
         :get-paddings frame-get-paddings
         :get-padded-rect frame-get-padded-rect
         :get-direction frame-get-direction
+        :set-direction frame-set-direction
+        :toggle-direction frame-toggle-direction
         :rotate-children frame-rotate-children
         :reverse-children frame-reverse-children}
       tree-node-proto))
