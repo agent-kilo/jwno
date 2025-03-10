@@ -83,12 +83,26 @@
 #     (:disable bsp-layout)
 #
 
-(defn bsp-on-window-created [self win uia-win _exe-path desktop-info]
-  # Don't create new frames for these windows
+(defn bsp-do-default-filter [self win uia-win exe-path desktop-info]
   (cond
-    (or (= "#32770" (:get_CachedClassName uia-win))
-        (not= 0 (:GetCurrentPropertyValue uia-win UIA_IsDialogPropertyId)))
-    # Dialog windows
+    (= "#32770" (:get_CachedClassName uia-win))
+    false
+
+    (not= 0 (:GetCurrentPropertyValue uia-win UIA_IsDialogPropertyId))
+    false
+
+    true))
+
+
+(defn bsp-on-window-created [self win uia-win exe-path desktop-info]
+  (def filter-result
+    (:call-filter-hook
+       (in self :hook-manager)
+       :and
+       :filter-bsp-window
+       win uia-win exe-path desktop-info))
+
+  (unless filter-result
     (break))
 
   (def {:window-manager window-man} self)
@@ -109,18 +123,33 @@
 
 (defn bsp-enable [self]
   (:disable self) # To prevent multiple hook entries
-  (def hook-fn
-    (:add-hook (in self :hook-manager) :window-created
-       (fn [& args]
-         (:on-window-created self ;args))))
-  (put self :hook-fn hook-fn))
+
+  (def hook-man (in self :hook-manager))
+
+  (put self :default-filter-hook-fn
+     (:add-hook hook-man :filter-bsp-window
+        (fn [& args]
+          (:do-default-filter self ;args))))
+
+  (put self :hook-fn
+     (:add-hook hook-man :window-created
+        (fn [& args]
+          (:on-window-created self ;args)))))
 
 
 (defn bsp-disable [self]
-  (def hook-fn (in self :hook-fn))
+  (def {:hook-manager hook-man
+        :hook-fn hook-fn
+        :default-filter-hook-fn default-filter-hook-fn}
+    self)
+
   (when hook-fn
     (put self :hook-fn nil)
-    (:remove-hook (in self :hook-manager) :window-created hook-fn)))
+    (:remove-hook hook-man :window-created hook-fn))
+
+  (when default-filter-hook-fn
+    (put self :default-filter-hook-fn nil)
+    (:remove-hook hook-man :filter-bsp-window)))
 
 
 (defn bsp-refresh [self]
@@ -157,7 +186,8 @@
 
 
 (def bsp-proto
-  @{:on-window-created bsp-on-window-created
+  @{:do-default-filter bsp-do-default-filter
+    :on-window-created bsp-on-window-created
     :enable bsp-enable
     :disable bsp-disable
     :refresh bsp-refresh})
