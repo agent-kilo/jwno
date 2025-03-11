@@ -1,5 +1,4 @@
 {:title "Your First Config File"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Installation Guide" "index.html"]
  :order 2}

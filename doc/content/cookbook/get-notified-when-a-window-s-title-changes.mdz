@@ -1,5 +1,4 @@
 {:title "Get Notified When a Window's Title Changes"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 11}

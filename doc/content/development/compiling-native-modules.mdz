@@ -1,5 +1,4 @@
 {:title "Compiling Native Modules"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Development Guide" "index.html"]
  :order 2}

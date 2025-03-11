@@ -1,5 +1,4 @@
 {:title "Command Line Options"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Reference Index" "index.html"]
  :order 1}

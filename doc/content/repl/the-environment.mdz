@@ -1,5 +1,4 @@
 {:title "The Environment"
- :author "Chibidou"
  :template "main.html"
  :back-to ["The REPL" "index.html"]
  :order 4}

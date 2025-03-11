@@ -1,5 +1,4 @@
 {:title "Actually Defining a Key Binding"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Defining Key Bindings" "index.html"]
  :order 3}

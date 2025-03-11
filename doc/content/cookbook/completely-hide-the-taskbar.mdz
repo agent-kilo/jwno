@@ -1,5 +1,4 @@
 {:title "Completely Hide the Taskbar"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 13}

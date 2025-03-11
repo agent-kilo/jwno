@@ -1,5 +1,4 @@
 {:title "The Notification (System Tray) Icon Menu"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Installation Guide" "index.html"]
  :order 4}

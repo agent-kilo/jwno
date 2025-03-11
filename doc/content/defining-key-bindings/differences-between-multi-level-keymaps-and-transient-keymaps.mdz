@@ -1,5 +1,4 @@
 {:title "Differences Between Multi-Level Keymaps and Transient Keymaps"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Defining Key Bindings" "index.html"]
  :order 5}

@@ -1,5 +1,4 @@
 {:title "Using Hooks"
- :author "Chibidou"
  :template "main.html"
  :order 6}
 ---

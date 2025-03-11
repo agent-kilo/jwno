@@ -1,5 +1,4 @@
 {:title "Features"
- :author "Chibidou"
  :template "main.html"
  :order 2}
 ---

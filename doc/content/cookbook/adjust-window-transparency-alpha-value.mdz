@@ -1,5 +1,4 @@
 {:title "Adjust Window Transparency (Alpha Value)"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 6}

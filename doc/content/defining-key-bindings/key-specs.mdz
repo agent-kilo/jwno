@@ -1,5 +1,4 @@
 {:title "Key Specs"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Defining Key Bindings" "index.html"]
  :order 1}

@@ -1,5 +1,4 @@
 {:title "Forcibly Manage Windows"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 3}

@@ -1,5 +1,4 @@
 {:title "About Jw32"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Development Guide" "index.html"]
  :order 3}

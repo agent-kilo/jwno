@@ -1,5 +1,4 @@
 {:title "Frame Nodes"
- :author "Chibidou"
  :template "main.html"
  :back-to ["The Frame Tree" "index.html"]
  :order 5}

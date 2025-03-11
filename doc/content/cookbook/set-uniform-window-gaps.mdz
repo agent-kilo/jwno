@@ -1,5 +1,4 @@
 {:title "Set Uniform Window Gaps"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 4}

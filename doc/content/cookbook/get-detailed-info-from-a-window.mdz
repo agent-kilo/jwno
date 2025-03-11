@@ -1,5 +1,4 @@
 {:title "Get Detailed Info From a Window"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 1}

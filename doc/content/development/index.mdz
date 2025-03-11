@@ -1,5 +1,4 @@
 {:title "Development Guide"
- :author "Chibidou"
  :template "main.html"
  :order 11}
 ---

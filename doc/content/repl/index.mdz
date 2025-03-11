@@ -1,5 +1,4 @@
 {:title "The REPL"
- :author "Chibidou"
  :template "main.html"
  :order 8}
 ---

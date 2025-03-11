@@ -1,5 +1,4 @@
 {:title "Export a Value to the REPL"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 15}

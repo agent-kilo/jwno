@@ -1,5 +1,4 @@
 {:title "Automatically Put a Window Into a Specific Frame"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 10}

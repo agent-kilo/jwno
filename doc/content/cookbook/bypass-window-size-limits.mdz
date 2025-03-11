@@ -1,5 +1,4 @@
 {:title "Bypass Window Size Limits"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 8}

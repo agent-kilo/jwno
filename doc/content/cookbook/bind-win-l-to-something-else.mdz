@@ -1,5 +1,4 @@
 {:title "Bind Win + L to Something Else"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 12}

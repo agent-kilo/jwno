@@ -1,5 +1,4 @@
 {:title "Using Commands"
- :author "Chibidou"
  :template "main.html"
  :order 5}
 ---

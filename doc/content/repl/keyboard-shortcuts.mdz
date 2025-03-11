@@ -1,5 +1,4 @@
 {:title "Keyboard Shortcuts"
- :author "Chibidou"
  :template "main.html"
  :back-to ["The REPL" "index.html"]
  :order 3}

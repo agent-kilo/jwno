@@ -1,5 +1,4 @@
 {:title "Cookbook"
- :author "Chibidou"
  :template "main.html"
  :order 10}
 ---

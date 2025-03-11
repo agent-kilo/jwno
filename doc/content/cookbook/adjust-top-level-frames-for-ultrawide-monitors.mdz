@@ -1,5 +1,4 @@
 {:title "Adjust Top-Level Frames for Ultrawide Monitors"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Cookbook" "index.html"]
  :order 5}

@@ -1,5 +1,4 @@
 {:title "Installation Guide"
- :author "Chibidou"
  :template "main.html"
  :order 3}
 ---
