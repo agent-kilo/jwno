@@ -2107,8 +2107,6 @@
   (def fr-count (length top-frames))
   (def mon-count (length monitors))
 
-  (def hook-man (in wm :hook-manager))
-
   (cond
     (= fr-count mon-count)
     # Only the resolutions or monitor configurations are changed
@@ -2116,7 +2114,7 @@
            (unless (= mon (in fr :monitor))
              (:transform fr (in mon :work-area) (in mon :dpi))
              (put fr :monitor mon)
-             (:call-hook hook-man :monitor-updated fr)))
+             (:monitor-updated wm fr)))
          top-frames
          monitors)
 
@@ -2130,7 +2128,7 @@
              (unless (= mon (in fr :monitor))
                (:transform fr (in mon :work-area) (in mon :dpi))
                (put fr :monitor mon)
-               (:call-hook hook-man :monitor-updated fr))
+               (:monitor-updated wm fr))
              # Find the frame closest to the origin
              (def wa (in mon :work-area))
              (when (< (+ (math/abs (in wa :top))
@@ -2162,12 +2160,12 @@
              (unless (= mon (in fr :monitor))
                (:transform fr (in mon :work-area) (in mon :dpi))
                (put fr :monitor mon)
-               (:call-hook hook-man :monitor-updated fr)))
+               (:monitor-updated wm fr)))
            top-frames
            old-mons)
       (each fr new-frames
         (:add-child self fr)
-        (:call-hook hook-man :monitor-updated fr)))))
+        (:monitor-updated wm fr)))))
 
 
 (defn layout-rotate-children [self direction]
@@ -2232,9 +2230,7 @@
                  monitors)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
-  (:call-hook (in self :hook-manager) :layout-created new-layout)
-  (each fr (in new-layout :children)
-    (:call-hook (in self :hook-manager) :monitor-updated fr))
+  (:layout-created wm new-layout)
   new-layout)
 
 
@@ -2257,11 +2253,10 @@
    tree-node-proto))
 
 
-(defn virtual-desktop-container [wm hook-man &opt children]
+(defn virtual-desktop-container [wm &opt children]
   (default children @[])
   (def vdc-obj (tree-node :virtual-desktop-container nil children
-                          :window-manager wm
-                          :hook-manager hook-man))
+                          :window-manager wm))
   (table/setproto vdc-obj virtual-desktop-container-proto))
 
 
@@ -2642,6 +2637,17 @@
       (:frames-resized self (in fr :children)))))
 
 
+(defn wm-monitor-updated [self top-frame]
+  (:call-hook (in self :hook-manager) :monitor-updated top-frame))
+
+
+(defn wm-layout-created [self new-layout]
+  (def hook-man (in self :hook-manager))
+  (:call-hook hook-man :layout-created new-layout)
+  (each fr (in new-layout :children)
+    (:monitor-updated self fr)))
+
+
 (defn wm-set-focus [self node]
   (def uia-man (in self :uia-manager))
   (def defview (in uia-man :def-view))
@@ -2755,6 +2761,8 @@
     :window-opened wm-window-opened
     :desktop-name-changed wm-desktop-name-changed
     :frames-resized wm-frames-resized
+    :monitor-updated wm-monitor-updated
+    :layout-created wm-layout-created
 
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
@@ -2802,7 +2810,7 @@
        :ignored-hwnds @{}
        :last-vd-name (:get_CurrentName (in uia-man :root))}
      window-manager-proto))
-  (put wm-obj :root (virtual-desktop-container wm-obj hook-man))
+  (put wm-obj :root (virtual-desktop-container wm-obj))
 
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path desktop-info]
