@@ -74,6 +74,9 @@ For new users:
   @li{
     🚀 @link[installation/index.html]{Installation Guide}
   }
+  @li{
+    🔰 @link[https://github.com/agent-kilo/jwno/blob/master/example/tutorial.janet]{Interactive Tutorial}
+  }
 }
 
 @html```
