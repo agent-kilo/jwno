@@ -1045,7 +1045,7 @@
              dummy-frame)))
 
 
-(defn test-tree-node-has-child? []
+(defn test-tree-node-attached? []
   (def dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (assert (= false (:attached? dummy-frame)))
 
@@ -1053,7 +1053,7 @@
   (assert (= false (:attached? dummy-layout)))
   (assert (= false (:attached? dummy-frame)))
 
-  (def dummy-vdc (virtual-desktop-container :dummy-wm :dummy-hm [dummy-layout]))
+  (def dummy-vdc (virtual-desktop-container :dummy-wm [dummy-layout]))
   (assert (= true (:attached? dummy-vdc)))
   (assert (= true (:attached? dummy-layout)))
   (assert (= true (:attached? dummy-frame))))
@@ -1074,4 +1074,4 @@
   (test-frame-set-direction)
   (test-frame-toggle-direction)
   (test-layout-get-adjacent-frame)
-  (test-tree-node-has-child?))
+  (test-tree-node-attached?))
