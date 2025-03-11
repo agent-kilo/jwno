@@ -1,0 +1,16 @@
+{:title "Actually Defining a Key Binding"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Defining Key Bindings" "index.html"]
+ :order 3}
+---
+
+To associate a key spec with a command to execute, call the @code{:define-key} method from a keymap object, and you can optionally write some description:
+
+@codeblock[janet]```
+(def keymap (:new-keymap (in jwno/context :key-manager)))  # Create a new keymap
+(:define-key keymap "Win + Shift + Q" :quit
+             "Tell Jwno to exit")
+(:define-key keymap "Win + W  D" :describe-window
+             "Show some info about the current window")
+```

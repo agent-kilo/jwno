@@ -40,7 +40,7 @@ To fully leverage the power of Jwno, you need to know some Janet. Don't worry, i
 
 @ul{
   @li{
-    @link[../defining-key-bindings.html]{Defining Key Bindings}
+    @link[../defining-key-bindings/index.html]{Defining Key Bindings}
   }
 }
 

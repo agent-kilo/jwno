@@ -1,0 +1,14 @@
+{:title "Multi-Level Keymaps"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Defining Key Bindings" "index.html"]
+ :order 2}
+---
+
+One of the most powerful features from Jwno's key binding system is that, you can specify multiple key combos in a sequence, and it will automatically define @em{multi-level} keymaps for you (akin to @link[https://www.gnu.org/software/emacs/manual/html_node/elisp/Changing-Key-Bindings.html]{Emacs key bindings}):
+
+@codeblock[janet]```
+"Win + Enter  A  B"
+```
+
+This means @em{press and release @code{Win + Enter} first, then the @code{A} key, and finally the @code{B} key}. You can use multi-level keymaps to group similar commands together, and give them the same "prefix". For example, in the @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{example config}, all the infrequently used window commands begin with @code{Win + W}.

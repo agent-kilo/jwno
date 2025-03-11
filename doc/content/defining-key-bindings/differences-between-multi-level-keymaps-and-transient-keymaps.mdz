@@ -1,0 +1,10 @@
+{:title "Differences Between Multi-Level Keymaps and Transient Keymaps"
+ :author "Chibidou"
+ :template "main.html"
+ :back-to ["Defining Key Bindings" "index.html"]
+ :order 5}
+---
+
+Well, they both look like some "namespacing" mechanism, in that you can enable the next level of key bindings by pressing a certain key combo. But multi-level keymaps will always @em{reset to the root keymap immediately} after a command is triggered or an undefined key is pressed, while transient keymaps will @em{stick around} until you pop it from the stack.
+
+Yeah, seriously, transient keymaps stick around. You should know by now how bad I am at naming things.
