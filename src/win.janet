@@ -1256,6 +1256,14 @@
        (= FALSE (IsIconic (in self :hwnd)))))
 
 
+(defn window-on-current-virtual-desktop? [self &opt wm]
+  (default wm (:get-window-manager self))
+  (not= FALSE
+        (:IsWindowOnCurrentVirtualDesktop
+           (in wm :vdm-com)
+           (in self :hwnd))))
+
+
 (defn window-transform [self rect &opt tags wm]
   (default tags @{})
   (default wm (:get-window-manager self))
@@ -1344,6 +1352,7 @@
    @{:close window-close
      :alive? window-alive?
      :visible? window-visible?
+     :on-current-virtual-desktop? window-on-current-virtual-desktop?
      :transform window-transform
      :reset-visual-state window-reset-visual-state
      :get-alpha window-get-alpha
@@ -2471,6 +2480,10 @@
   (put (in self :ignored-hwnds) hwnd true))
 
 
+(defn wm-do-not-ignore-hwnd [self hwnd]
+  (put (in self :ignored-hwnds) hwnd nil))
+
+
 (defn wm-clean-up-hwnds [self]
   (def {:hook-manager hook-man} self)
 
@@ -2742,6 +2755,7 @@
     :remove-hwnd wm-remove-hwnd
     :filter-hwnd wm-filter-hwnd
     :ignore-hwnd wm-ignore-hwnd
+    :do-not-ignore-hwnd wm-do-not-ignore-hwnd
     :clean-up-hwnds wm-clean-up-hwnds
 
     :close-hwnd wm-close-hwnd

@@ -222,6 +222,12 @@
       (:SetFocus uia-win))))
 
 
+(defn uia-manager-set-focus-to-desktop [self]
+  (def defview (in self :def-view))
+  (when defview
+    (:SetFocus defview)))
+
+
 (defn uia-manager-create-condition [self spec]
   (def com (in self :com))
   (match spec
@@ -444,6 +450,7 @@
     :get-window-info uia-manager-get-window-info
     :get-window-bounding-rect uia-manager-get-window-bounding-rect
     :set-focus-to-window uia-manager-set-focus-to-window
+    :set-focus-to-desktop uia-manager-set-focus-to-desktop
     :create-condition uia-manager-create-condition
     :create-cache-request uia-manager-create-cache-request
     :create-tree-walker uia-manager-create-tree-walker
