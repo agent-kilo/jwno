@@ -2625,6 +2625,23 @@
         (:set-focus self lo)))))
 
 
+(defn wm-frames-resized [self frame-list]
+  (def hook-man (in self :hook-manager))
+  (each fr frame-list
+    (def children (in fr :children))
+
+    # Only call hooks on leaf frames
+    (cond
+      (empty? children)
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :window (get-in fr [:children 0 :type]))
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :frame (get-in fr [:children 0 :type]))
+      (:frames-resized self (in fr :children)))))
+
+
 (defn wm-set-focus [self node]
   (def uia-man (in self :uia-manager))
   (def defview (in uia-man :def-view))
@@ -2737,6 +2754,7 @@
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
     :desktop-name-changed wm-desktop-name-changed
+    :frames-resized wm-frames-resized
 
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
