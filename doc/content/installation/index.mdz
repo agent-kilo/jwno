@@ -5,7 +5,7 @@
 
 You only need a portable @code{exe} file to run Jwno, so there isn't really any "installation". These are just recommended steps to get it up and running, plus some things you should know before using it.
 
-Currently Jwno only runs on Windows 10/11 (x64) systems.
+@p{@strong{Currently Jwno only runs on Windows 10/11 (x64) systems.}}
 
 ### Table of Contents
 
