@@ -8,8 +8,44 @@ To associate a key spec with a command to execute, call the @code{:define-key} m
 
 @codeblock[janet]```
 (def keymap (:new-keymap (in jwno/context :key-manager)))  # Create a new keymap
+
+#
+# "Win + Shift + Q" is the key spec,
+# :quit is the command,
+# and the last string argument is the description for this key binding.
+#
 (:define-key keymap "Win + Shift + Q" :quit
              "Tell Jwno to exit")
+
+#
+# Again, here we have
+# Key spec:    "Win + W  D"
+# Command:     :describe-window
+# Description: "Show some info..."
+#
 (:define-key keymap "Win + W  D" :describe-window
              "Show some info about the current window")
+```
+
+Some commands can accept arguments. To pass arguments to a command in a key binding, put the command's name and its arguments in a @link[https://janet-lang.org/docs/data_structures/tuples.html]{tuple}, and pass it to @code{:define-key}:
+
+@codeblock[janet]```
+#
+# We are instructing Jwno to call the :split-frame command when
+# we press Win + , (the comma key).
+#
+# :horizontal and 2 are the command's arguments, telling the
+# command we want to split the frame into 2 sub-frames,
+# horizontally.
+#
+(:define-key keymap "Win + ," [:split-frame :horizontal 2]
+             "Split current frame horizontally")
+
+#
+# Now Win + . (the period key) is bound to call the same command,
+# but with different arguments. It will split the frame vertically
+# instead.
+#
+(:define-key keymap "Win + ." [:split-frame :vertical 2]
+             "Split current frame vertically")
 ```
