@@ -61,7 +61,7 @@ It's designed to work with native Windows @link[https://support.microsoft.com/en
 
 #### 👾 Hackable REPL.
 
-Like most Lisp systems, Jwno has REPL support. You can hack it while it's still running 🤘.
+Like most Lisp systems, Jwno has @link[repl/index.html]{REPL support}. You can hack it while it's still running 🤘.
 
 @html```
 </div>
@@ -91,6 +91,8 @@ You can implement custom commands and hooks to trigger. It's even possible to ca
        true)))
 ```
 
+If you are feeling extra curious, check out the @link[https://agentkilo.itch.io/jwno/devlog]{Devlog}, the @link[cookbook/index.html]{Cookbook}, or the @link[https://github.com/agent-kilo/jwno/tree/master/example]{examples directory}, to see some of the possibilities.
+
 @html```
 </div>
 
@@ -105,7 +107,7 @@ You can implement custom commands and hooks to trigger. It's even possible to ca
 
 #### ⌨️ Powerful key binding system.
 
-It supports @em{multi-level} and @em{transient} keymaps. For example, this defines a multi-level keymap:
+It supports @link[defining-key-bindings/multi-level-keymaps.html]{multi-level} and @link[defining-key-bindings/transient-keymaps.html]{transient} keymaps. For example, this defines a multi-level keymap  (akin to @link[https://www.gnu.org/software/emacs/manual/html_node/elisp/Changing-Key-Bindings.html]{Emacs key bindings}):
 
 @codeblock[janet]```
 (:define-key keymap "Win + Enter  A" :command1)
