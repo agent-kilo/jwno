@@ -14,3 +14,23 @@ To directly call a command in your Janet code, use the @code{:call-command} meth
 ```
 
 Comparing to @link[binding-a-command-to-a-key-spec.html]{specifying a command in a @code{:define-key} call}, notice the square brackets around the command name and its arguments are gone. @smaller{This is designed to relieve parenthesis/bracket allergy symptoms for certain users.}
+
+### Special Commands
+
+Currently all keymap-related commands are @em{special}, in that you cannot use @code{:call-command} to call them, since they work exclusively in another thread that handles keyboard events. These commands include:
+
+@ul{
+  @li{
+    @code{:push-keymap}
+  }
+  @li{
+    @code{:pop-keymap}
+  }
+}
+
+For example, doing this will raise an @code{unknown command} error in your Janet code:
+
+@codeblock[janet]```
+(:call-command (in jwno/context :command-manager)
+               :push-keymap some-keymap)
+```
