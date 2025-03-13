@@ -510,6 +510,7 @@
       (:enumerate-children
          uia-man
          uia-win
+
          (fn [child]  # Top-level children
            (cond
              (= FALSE (:get_CachedIsEnabled child))
@@ -527,11 +528,14 @@
                (:enumerate-children
                   uia-man
                   child
+
                   (fn [group-child]  # Children in top-level group controls
                     (when (and (not= FALSE (:get_CachedIsEnabled group-child))
                                (= FALSE (:get_CachedIsOffscreen group-child)))
                       (:AddRef group-child)
-                      (array/push group-members group-child)))
+                      (array/push group-members group-child))
+                    true)
+
                   walker
                   cr)
                (log/debug "found %n on-screen group members" (length group-members))
@@ -540,7 +544,9 @@
              true
              (do
                (:AddRef child)
-               (array/push elem-list child))))
+               (array/push elem-list child)))
+           true)
+
          walker
          cr)))
 
@@ -585,7 +591,8 @@
            true
            (do
              (:AddRef child)
-             (array/push elem-list child))))
+             (array/push elem-list child)))
+         true)
        nil
        cr))
 

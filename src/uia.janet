@@ -89,22 +89,52 @@
     (:AddRef cached)
     (break cached))
 
-  (def defview
-    (with-uia [walker (:create-tree-walker
-                         self
-                         [:property UIA_ClassNamePropertyId "SHELLDLL_DefView"])]
-      (with-uia [cr (:create-cache-request self
-                                           [UIA_NativeWindowHandlePropertyId])]
-        (with-uia [dve (:GetFirstChildElementBuildCache walker root cr)]
-          (let [dv-hwnd (:get_CachedNativeWindowHandle dve)
-                dv-path (get-hwnd-path dv-hwnd)]
-            # XXX: More strict checks?
-            (if (and dv-path
-                     (string/has-suffix? "\\explorer.exe" dv-path))
-              (do
-                (:AddRef dve)
-                dve)
-              (error "failed to get SHELLDLL_DefView window")))))))
+  (var defview nil)
+
+  (with-uia [walker (:create-raw-view-walker self)]
+    (with-uia [cr (:create-cache-request self
+                                         [UIA_NativeWindowHandlePropertyId
+                                          UIA_ClassNamePropertyId])]
+      (:enumerate-children
+         self
+         root
+         (fn [elem]
+           (def hwnd (:get_CachedNativeWindowHandle elem))
+           (def path (get-hwnd-path hwnd))
+           (def class-name (:get_CachedClassName elem))
+           (cond
+             (nil? path)
+             true # continue
+
+             (not (string/has-suffix? "\\explorer.exe" path))
+             true
+
+             (and (not= class-name "WorkerW")
+                  (not= class-name "Progman"))
+             true
+
+             true
+             (do
+               (:enumerate-children
+                  self
+                  elem
+                  (fn [elem-child]
+                    (def class-name (:get_CachedClassName elem-child))
+                    (if (= class-name "SHELLDLL_DefView")
+                      (do
+                        (:AddRef elem-child)
+                        (set defview elem-child)
+                        false)
+                      # else
+                      true))
+                  walker
+                  cr)
+               (not defview))))
+         walker
+         cr)))
+
+  (when (nil? defview)
+    (error "failed to get SHELLDLL_DefView window"))
 
   (when cached
     (:Release cached))
@@ -363,9 +393,12 @@
         # Treat all empty runtime IDs as unseen.
         (and (not (empty? runtime-id))
              (has-key? seen-runtime-ids runtime-id)))
-      (unless seen
-        (put seen-runtime-ids runtime-id true)
-        (enum-fn child))))
+      (if seen
+        true # continue enumeration
+        # else
+        (do
+          (put seen-runtime-ids runtime-id true)
+          (enum-fn child)))))
 
   (def visit-any
     (fn [child]
@@ -384,8 +417,10 @@
     (var next-child (:GetFirstChildElementBuildCache walker elem cr?))
     (while next-child
       (with-uia [child next-child]
-        (visit child)
-        (set next-child (:GetNextSiblingElementBuildCache walker child cr?))))))
+        (def continue? (visit child))
+        (set next-child
+          (when continue?
+            (:GetNextSiblingElementBuildCache walker child cr?)))))))
 
 
 (defn- init-event-handlers [uia-com element chan]
