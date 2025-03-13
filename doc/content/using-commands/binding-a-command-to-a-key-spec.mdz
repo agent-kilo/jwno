@@ -25,3 +25,35 @@ The code above is equivalent to:
 (:define-key keymap "Win + Shift + Q" [:quit]
              "Tell Jwno to exit")
 ```
+
+### About Function Arguments Passed to a Command
+
+Some commands can accept @link[https://janet-lang.org/docs/functions.html]{function} arguments, to carry out complex user-defined operations. But due to some limitations of Jwno's current threading model, functions passed to a command @em{should not} access mutable states outside of its own scope.
+
+For example, this won't work as expected:
+
+@codeblock[janet]```
+(var my-flag false)
+
+(defn my-fn [& args]
+  (if my-flag
+    :do-this
+    # else
+    :do-that))
+
+(:define-key my-keymap "Win + ," [:split-frame :horizontal 2 nil my-fn]
+             "Split current frame horizontally, then call my-fn.")
+
+(:set-keymap (in jwno/context :key-manager) my-keymap)
+
+...
+
+# Try to set my-flag to change my-fn's behavior at some point
+(set my-flag true)
+```
+
+One would expect that the @code{:do-this} branch will get executed after setting @code{my-flag}, but the code will keep running @code{:do-that} instead, since the mutable state of @code{my-flag} will be lost after the @code{:set-keymap} call.
+
+To preserve your sanity, the simplest rule is, @strong{in functions passed to commands, only access their arguments, and nothing else}. In the example above, you can safely access the @code{args} argument variable in @code{my-fn}, and things will work as expected.
+
+If you're curious about the lower-level details, here's a hint: Jwno is completely lock-free despite being multi-threaded, and to achieve that, it will "freeze" all mutable states and @link[https://janet-lang.org/api/index.html#marshal]{marshal} them, before sending them between threads.
