@@ -1,0 +1,24 @@
+{:title "Defining a Command"
+ :template "main.html"
+ :back-to ["Using Commands" "index.html"]
+ :order 3}
+---
+
+A custom command can be added like this:
+
+@codeblock[janet]```
+(:add-command (in jwno/context :command-manager) :brew-coffee
+   (fn [strength extraction amount]
+     # Do the actual brewing here
+     ))
+```
+
+Here @code{:brew-coffee} is the name of our new command. @code{strength}, @code{extraction} and @code{amount} are the parameters our command can accept. This will overwrite the command registered under the same name, if there's any.
+
+When the command is not needed anymore, you can remove it by passing its name to the @code{:remove-command} method from the command manager object:
+
+@codeblock[janet]```
+(:remove-command (in jwno/context :command-manager) :brew-coffee)
+```
+
+@p{@em{Disclaimer}: Jwno can @em{not} brew your coffee yet. @smaller{Maybe we can have that in a future version.}}

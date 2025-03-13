@@ -1,0 +1,27 @@
+{:title "Binding a Command to a Key Spec"
+ :template "main.html"
+ :back-to ["Using Commands" "index.html"]
+ :order 1}
+---
+
+Just call the @code{:define-key} method from a keymap object, and pass the command's name with its arguments in a @link[https://janet-lang.org/docs/data_structures/tuples.html]{tuple}:
+
+@codeblock[janet]```
+(def keymap (:new-keymap (in jwno/context :key-manager)))  # Create a new keymap
+(:define-key keymap "Win + ," [:split-frame :horizontal 2]
+             "Split current frame horizontally")
+```
+
+Here @code{:split-frame} is the name of our command. @code{:horizontal} and @code{2} are its arguments. If a command takes no argument, you can pass only the name, without putting it in a tuple:
+
+@codeblock[janet]```
+(:define-key keymap "Win + Shift + Q" :quit
+             "Tell Jwno to exit")
+```
+
+The code above is equivalent to:
+
+@codeblock[janet]```
+(:define-key keymap "Win + Shift + Q" [:quit]
+             "Tell Jwno to exit")
+```

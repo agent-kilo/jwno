@@ -1,0 +1,44 @@
+{:title "Using Commands"
+ :template "main.html"
+ :order 5}
+---
+
+Jwno commands are code actions associated with a name (usually a Janet keyword). They can be bound to a certain key spec, and will be triggered when the corresponding keys are pressed. You can also call them directly in your config file or in the REPL.
+
+Some Commands can accept arguments, but the syntaxes to pass arguments to them differ, depending on how the commands are called.
+
+### Table of Contents
+
+@ul{
+  @li{
+    @link[binding-a-command-to-a-key-spec.html]{Binding a Command to a Key Spec}
+  }
+  @li{
+    @link[calling-a-command-directly.html]{Calling a Command Directly}
+  }
+  @li{
+    @link[defining-a-command.html]{Defining a Command}
+  }
+}
+
+### Next Step
+
+@ul{
+  @li{
+    @link[../using-hooks.html]{Using Hooks}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[ref/command-manager-object.html]{The Command Manager Object}
+  }
+  @li{
+    @link[ref/keymap-objects.html]{Keymap Objects}
+  }
+  @li{
+    @link[ref/built-in-commands.html]{Built-In Commands}
+  }
+}
