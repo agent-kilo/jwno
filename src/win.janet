@@ -2650,12 +2650,10 @@
 
 (defn wm-set-focus [self node]
   (def uia-man (in self :uia-manager))
-  (def defview (in uia-man :def-view))
-  (def defview-hwnd (:get_CachedNativeWindowHandle defview))
 
   (cond
     (nil? node)
-    (:set-focus-to-window uia-man defview-hwnd)
+    (:set-focus-to-desktop uia-man)
 
     (= :window (in node :type))
     (:set-focus node self)
@@ -2666,7 +2664,7 @@
       (:set-focus cur-win self)
       (do
         (:activate node)
-        (:set-focus-to-window uia-man defview-hwnd)))))
+        (:set-focus-to-desktop uia-man)))))
 
 
 (defn wm-retile [self &opt fr]
