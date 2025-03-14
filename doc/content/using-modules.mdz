@@ -11,7 +11,7 @@ Jwno can utilize @link[https://janet-lang.org/docs/modules.html]{Janet modules} 
 (import awesome-module)
 ```
 
-Jwno will search in the directory @code```C:\path\to\```, for a file named @code{awesome-module.janet}. Compiled @code{.jimage} and @code{.dll} files can be loaded too, but see the @link[development/index.html]{development guide} for caveats.
+Jwno will search in the directory @code```C:\path\to\```, for a file named @code{awesome-module.janet}. Compiled @code{.jimage} and @code{.dll} files can be loaded too, but see @link[development/compiling-native-modules.html]{this section} in the Development Guide for caveats.
 
 Besides the default location, you can specify extra paths for Jwno to search modules from. Just use the @code{--mod-path} (or simply @code{-m}) command line option when launching @code{jwno.exe}:
 
