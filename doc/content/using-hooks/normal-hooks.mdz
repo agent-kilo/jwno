@@ -1,0 +1,15 @@
+{:title "Normal Hooks"
+ :template "main.html"
+ :back-to ["Using Hooks" "index.html"]
+ :order 2}
+---
+
+Most built-in hooks in Jwno are normal hooks. They are used solely for their side effects, and their return values are ignored. The @code{:window-created} hook we saw above is a normal hook.
+
+You can define and call a custom normal hook like this:
+
+@codeblock[janet]```
+(:call-hook (in jwno/context :hook-manager) :world-dominated galaxy system planet)
+```
+
+So here we have a custom hook called @code{:world-dominated}, and its registered functions should accept three arguments, @code{galaxy}, @code{system} and @code{planet}, pointing out the specific planet we just conquered.

@@ -25,7 +25,7 @@ Some Commands can accept arguments, but the syntaxes to pass arguments to them d
 
 @ul{
   @li{
-    @link[../using-hooks.html]{Using Hooks}
+    @link[../using-hooks/index.html]{Using Hooks}
   }
 }
 
