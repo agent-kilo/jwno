@@ -378,7 +378,7 @@
   (:get_RawViewWalker (in self :com)))
 
 
-(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr? filter-runtime-ids]
+(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr filter-runtime-ids]
   (default filter-runtime-ids false)
 
   (def seen-runtime-ids
@@ -414,13 +414,18 @@
                       (do
                         (:AddRef walker?)
                         walker?))]
-    (var next-child (:GetFirstChildElementBuildCache walker elem cr?))
+    (var next-child
+      (if (nil? cr)
+        (:GetFirstChildElement walker elem)
+        (:GetFirstChildElementBuildCache walker elem cr)))
     (while next-child
       (with-uia [child next-child]
         (def continue? (visit child))
         (set next-child
           (when continue?
-            (:GetNextSiblingElementBuildCache walker child cr?)))))))
+            (if (nil? cr)
+              (:GetNextSiblingElement walker child)
+              (:GetNextSiblingElementBuildCache walker child cr))))))))
 
 
 (defn- init-event-handlers [uia-com element chan]
