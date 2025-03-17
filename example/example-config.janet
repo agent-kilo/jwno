@@ -1,4 +1,24 @@
 #
+# example-config.janet
+#
+# This is an example config file for Jwno (https://github.com/agent-kilo/jwno).
+# The features introduced here are quite exhaustive, you may
+# want to customize/simplify it a bit before adopting it for
+# daily use. It's heavily commented, you can skim through the
+# comments and then focus on the parts you're interested in.
+#
+# To try it out, download this file, then drag-n-drop it to
+# jwno.exe.
+#
+
+
+#===========#
+#           #
+#  Imports  #
+#           #
+#===========#
+
+#
 # Jwno has a bunch of built-in modules:
 #   jwno/* modules are high-level APIs provided by Jwno, and
 #   jw32/* modules are low-level APIs from the Jw32 package.
