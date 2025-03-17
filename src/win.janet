@@ -2823,5 +2823,13 @@
   (:add-hook hook-man :frame-activated
      (fn [fr]
        (:update-work-area ui-man (in (:get-top-frame fr) :rect))))
+  # This hook is needed for commands like :rotate-sibling-frames,
+  # when rotating top-level frames, to update the current active
+  # work area, since the activation hooks won't fire in that case.
+  (:add-hook hook-man :frame-resized
+     (fn [fr]
+       (def cur-fr (:get-current-frame (in wm-obj :root)))
+       (when (= fr cur-fr)
+         (:update-work-area ui-man (in (:get-top-frame fr) :rect)))))
 
   wm-obj)
