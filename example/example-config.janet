@@ -519,10 +519,10 @@
     # we simply :click on it instead of invoking its default action.
     #
     (k "RAlt  C"    [:ui-hint hint-key-list nil :click]
-       "Show all interactive elements, and click on the selected one")
+       "Show all interactable elements, and click on the selected one")
 
     (k "RAlt  D"    [:ui-hint hint-key-list nil :double-click]
-       "Show all interactive elements, and double-click on the selected one")
+       "Show all interactable elements, and double-click on the selected one")
 
     #
     # More complex property-matching
