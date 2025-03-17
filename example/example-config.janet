@@ -7,9 +7,19 @@
 #
 (import jwno/auto-layout)
 (import jwno/indicator)
+(import jwno/ui-hint)
+(import jwno/scratch-pad)
 (import jwno/util)
 (import jwno/log)
 
+(use jw32/_uiautomation) # For UIA_* constants
+
+
+#==========#
+#          #
+#  Basics  #
+#          #
+#==========#
 
 #
 # One may call (log/<level> "format string" arg0 arg1 ...) to generate logs.
@@ -20,6 +30,12 @@
 (log/info "++++++++ HELLO THERE ++++++++")
 
 
+#======================#
+#                      #
+#  Global Definitions  #
+#                      #
+#======================#
+
 #
 # A convenience provided by this config to set the navigation keys
 # according to the keyboard layout. You can copy this config file,
@@ -28,38 +44,45 @@
 #
 (def keyboard-layout :qwerty)
 
-
 (def dir-keys
   (case keyboard-layout
     :qwerty
-    # Sorry, no HJKL for QWERTY, since Win+L means "Lock the Screen", and it
-    # cannot be overridden. You can use HJKL if a modifier key other
-    # than the Win key is used, though.
-    {:left "y"
-     :down "u"
-     :up "i"
-     :right "o"}
+    # Sorry, no HJKL for QWERTY, since `Win + L` means "Lock the Screen", and it
+    # cannot be overridden. If you really want to use `Win + L`, check out
+    # https://agent-kilo.github.io/jwno/cookbook/bind-win-l-to-something-else.html
+    {:left  "Y"
+     :down  "U"
+     :up    "I"
+     :right "O"}
 
     :colemak
-    {:left "h"
-     :down "n"
-     :up "e"
-     :right "i"}
+    {:left  "H"
+     :down  "N"
+     :up    "E"
+     :right "I"}
 
     :colemak-dh
-    {:left "m"
-     :down "n"
-     :up "e"
-     :right "i"}
+    {:left  "M"
+     :down  "N"
+     :up    "E"
+     :right "I"}
 
     :dvorak
-    {:left "d"
-     :down "h"
-     :up "t"
-     :right "n"}
+    {:left  "D"
+     :down  "H"
+     :up    "T"
+     :right "N"}
 
     (errorf "unsupported layout: %n" keyboard-layout)))
 
+(def hint-key-list
+  (case keyboard-layout
+    :qwerty     "fjdksleiwocmxz"
+    :colemak    "tnserifuwyvmcx"
+    :colemak-dh "tnserifuwydhcx"
+    :dvorak     "uhetoncrjmqvdi"
+    # default
+    (errorf "unsupported layout: %n" keyboard-layout)))
 
 #
 # Most of Jwno's APIs are exported as methods in these "manager" objects.
@@ -76,18 +99,6 @@
       :repl-manager repl-man}
   jwno/context)
 
-
-#
-# When you want something available in an REPL, export it like this:
-#
-# 1. Retrieve the REPL server you want to modify.
-(def repl-server
-  (or (:get-default-server repl-man)
-      (:start-server repl-man)))
-# 2. Do the export for that server.
-(util/export-to-repl repl-server window-man)
-
-
 #
 # A macro to simplify key map definitions. Of course you can call
 # :define-key method from the keymap object directly instead.
@@ -96,199 +107,11 @@
   ~(:define-key keymap ,key-seq ,cmd ,doc))
 
 
-#
-# A transient key map for resizing frames, so that we don't have
-# to hold the modifier keys all the time.
-# Transient key maps are activated by :push-keymap commands, and
-# deactivated by :pop-keymap commands. See the definition for
-# Win+S key combo below.
-#
-(def resize-mode-keymap
-  (let [keymap (:new-keymap key-man)]
-    (k (in dir-keys :down) [:resize-frame 0 -100])
-    (k (in dir-keys :up) [:resize-frame 0 100])
-    (k (in dir-keys :left) [:resize-frame -100 0])
-    (k (in dir-keys :right) [:resize-frame 100 0])
-    (k "=" :balance-frames)
-    (k ";" [:zoom-in 0.7])
-    (k "shift + ;" [:zoom-in 0.3])
-    #
-    # In a transient key map, make sure a :pop-keymap binding is defined,
-    # or there will be no way to deactivate this key map.
-    #
-    (k "enter" :pop-keymap)
-    (k "esc" :pop-keymap)
-    keymap))
-
-
-#
-# A transient key map for moving windows around.
-# See the definition for Win+K key combo below.
-#
-(def yank-mode-keymap
-  (let [keymap (:new-keymap key-man)]
-    (each dir [:down :up :left :right]
-      (k (in dir-keys dir) [:move-window dir]))
-    (k "enter" :pop-keymap)
-    (k "esc" :pop-keymap)
-    keymap))
-
-
-#
-# A transient key map for adjusting transparency for the
-# current window. See the definition for Win+A key combo
-# below.
-#
-(def alpha-mode-keymap
-  (let [keymap (:new-keymap key-man)]
-    (k (in dir-keys :down) [:change-window-alpha -25])
-    (k (in dir-keys :up) [:change-window-alpha 25])
-    (k "enter" :pop-keymap)
-    (k "esc" :pop-keymap)
-    keymap))
-
-
-#
-# Jwno commands can accept closures/functions as arguments.
-# For example, the :split-frame command accepts a function
-# to adjust windows/frames after the splitting is done. Below
-# is such a function to move the activated window into the
-# new empty frame, and activate (move focus to) that frame.
-# See the definitions for Win+, and Win+. key combos below.
-#
-# But please note, due to the limitation of Jwno's threading
-# model and keymap handling logic, these functions cannot make
-# reference to mutable states outside of their body scopes,
-# or those mutable states will not get updated properly.
-#
-(defn move-window-after-split [frame]
-  (def all-sub-frames (in frame :children))
-  (def all-wins (in (first all-sub-frames) :children))
-  (def move-to-frame (in all-sub-frames 1))
-  (when (>= (length all-wins) 2)
-    (:add-child move-to-frame (:get-current-window frame)))
-  (:activate move-to-frame))
-
-
-(defn match-exe-name [exe-name]
-  (fn [win]
-    (if-let [win-exe (:get-exe-path win)]
-      (string/has-suffix? (string "\\" exe-name) win-exe)
-      false)))
-
-
-#
-# We build our main key map below. Make sure to call the :set-keymap
-# method from the key-manager object with the new key map, or Jwno
-# will not respond to any key events at all.
-#
-# The most straightforward way to understand Jwno commands is to
-# simply try out the bindings below. Some commands need more than
-# one window or frame to have any effect, though.
-#
-(defn build-keymap [key-man]
-  (let [keymap (:new-keymap key-man)]
-
-    (k "win + shift + /" :show-root-keymap)
-    (k "win + shift + q" :quit)
-    (k "win + r" :retile)
-
-    #
-    # When a series of keys are specified, sub-keymaps are automatically
-    # defined. They can be used as multi-level menus. Press the first
-    # key combo, and the keys defined in the next level will be shown in
-    # the top-left corner of your current monitor by default.
-    #
-    (k "win + enter  esc" :nop
-       "Cancel")
-    (k "win + enter  enter" :nop
-       "Cancel")
-    (k "win + enter  t" [:summon
-                         (match-exe-name "WindowsTerminal.exe")
-                         true
-                         "wt.exe"]
-       "Summon Terminal")
-    # Some programs (such as Emacs here) would keep the input/output
-    # pipes open, blocking Jwno when it exits. Use powershell or cmd
-    # to launch the program indirectly in this case.
-    (k "win + enter  e" [:summon
-                         (match-exe-name "emacs.exe")
-                         true
-                         "pwsh.exe"
-                         "-Command"
-                         "Start-Process runemacs.exe"]
-       "Summon Emacs")
-    (k "win + enter  f" [:summon (match-exe-name "firefox.exe")]
-       "Summon Firefox")
-    (k "win + enter  d" [:exec
-                         true
-                         "wt.exe"
-                         "pwsh.exe"
-                         "-NoExit"
-                         "-Command"
-                         "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"]
-       "Launch VS Dev Shell")
-    (k "win + enter  r" [:repl true "127.0.0.1" 9999]
-       "Launch Jwno REPL")
-
-    (let [win-enter-key (first (:parse-key keymap "win + enter"))
-          win-enter-map (:get-key-binding keymap win-enter-key)]
-      (:define-key win-enter-map
-                   "up up down down left right left right b a"
-                   :grant-lives))
-
-    (k "win + shift + c" :close-window-or-frame)
-    (k "win + shift + f" :close-frame)
-    (k "win + ctrl + f" :flatten-parent)
-
-    (k "win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split]
-       "Split current frame horizontally")
-    (k "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split]
-       "Split current frame vertically")
-    (k "win + =" :balance-frames)
-    (k "win + ;" [:zoom-in 0.7])
-    (k "win + shift + ;" [:zoom-in 0.3])
-    (k "win + f" :fill-monitor)
-
-    (k "win + p" :cascade-windows-in-frame)
-
-    (k (string "win + " (in dir-keys :down)) [:enum-frame :next])
-    (k (string "win + " (in dir-keys :up)) [:enum-frame :prev])
-    (k (string "win + " (in dir-keys :left)) [:enum-window-in-frame :prev])
-    (k (string "win + " (in dir-keys :right)) [:enum-window-in-frame :next])
-
-    (each dir [:down :up :left :right]
-      (k (string "win + ctrl + " (in dir-keys dir)) [:adjacent-frame dir])
-      (k (string "win + shift + " (in dir-keys dir)) [:move-window dir]))
-
-    (k "win + s" [:push-keymap resize-mode-keymap]
-       "Resize mode")
-    (k "win + k" [:push-keymap yank-mode-keymap]
-       "Yank mode")
-
-    (k "win + shift + s" :frame-to-window-size)
-
-    (k "win + a" [:push-keymap alpha-mode-keymap]
-       "Alpha mode")
-
-    (k "win + w esc" :nop "Cancel")
-    (k "win + w enter" :nop "Cancel")
-    (k "win + w d" :describe-window)
-    (k "win + w m" :manage-window)
-    (k "win + w i" :ignore-window)
-
-    # XXX: If a remapped key is used to trigger keymap switching, and
-    # the switched keymap doesn't have the same remap, the translated key
-    # will be stuck down.
-    #(k "ralt" [:map-to (:get-key-code key-man "rwin")])
-
-    (log/debug "keymap = %n" keymap)
-    keymap))
-
-
-(def root-keymap (build-keymap key-man))
-(:set-keymap key-man root-keymap)
-
+#==============================#
+#                              #
+#  Enabling Optional Features  #
+#                              #
+#==============================#
 
 #
 # The auto-layout module has some code to help you manage the frame
@@ -306,6 +129,8 @@
 #
 (def current-frame-area
   (indicator/current-frame-area jwno/context))
+# The margin area reserved around the rectangle. Should match your
+# window margin settings.
 (put current-frame-area :margin 10)
 (:enable current-frame-area)
 
@@ -317,6 +142,414 @@
 #  (indicator/current-frame-tooltip jwno/context))
 #(:enable current-frame-tooltip)
 
+#
+# The ui-hint module provides support for the :ui-hint command, which
+# is a powerful way to interact with GUIs using your keyboard. See
+# the UI Hint Keys section in Key Bindings below.
+#
+(def ui-hint (ui-hint/ui-hint jwno/context))
+(:enable ui-hint)
+
+#
+# The scratch-pad module implements a simple cache where we can hide
+# our windows, and summon them later as needed. See the Scratch Pad Keys
+# section in Key Bindings below.
+#
+(def scratch-pad (scratch-pad/scratch-pad jwno/context))
+(:enable scratch-pad)
+
+
+#==========================#
+#                          #
+#  Key Bindings (Keymaps)  #
+#                          #
+#==========================#
+
+#
+# A transient keymap for resizing frames, so that we don't have
+# to hold the modifier keys all the time.
+#
+# Transient keymaps are activated by :push-keymap commands, and
+# deactivated by :pop-keymap commands. See the definition for
+# `Win + S` key binding below.
+#
+(def resize-mode-keymap
+  (let [keymap (:new-keymap key-man)]
+    (k (in dir-keys :down)  [:resize-frame 0 -100])
+    (k (in dir-keys :up)    [:resize-frame 0 100])
+    (k (in dir-keys :left)  [:resize-frame -100 0])
+    (k (in dir-keys :right) [:resize-frame 100 0])
+
+    (k "="         :balance-frames)
+    (k ";"         [:zoom-in 0.7])
+    (k "Shift + ;" [:zoom-in 0.3])
+    #
+    # In a transient keymap, make sure a :pop-keymap binding is defined,
+    # or there will be no way to deactivate this keymap.
+    #
+    (k "Enter" :pop-keymap)
+    (k "Esc"   :pop-keymap)
+
+    keymap))
+
+#
+# A transient keymap for moving windows around. See the
+# definition for `Win + K` key binding below.
+#
+(def yank-mode-keymap
+  (let [keymap (:new-keymap key-man)]
+    (each dir [:down :up :left :right]
+      (k (in dir-keys dir) [:move-window dir]))
+
+    (k "Enter" :pop-keymap)
+    (k "Esc"   :pop-keymap)
+
+    keymap))
+
+#
+# A transient keymap for adjusting transparency for the
+# current window. See the definition for Win+A key combo
+# below.
+#
+(def alpha-mode-keymap
+  (let [keymap (:new-keymap key-man)]
+    (k (in dir-keys :down) [:change-window-alpha -25])
+    (k (in dir-keys :up)   [:change-window-alpha 25])
+
+    (k "Enter" :pop-keymap)
+    (k "Esc"   :pop-keymap)
+
+    keymap))
+
+#
+# Jwno commands can accept closures/functions as arguments.
+# For example, the :split-frame command accepts a function
+# to adjust windows/frames after the splitting is done. Below
+# is such a function to move the activated window into the
+# new empty frame, and activate (move focus to) that frame.
+# See the definitions for `Win + ,` and `Win + .` key bindings
+# below.
+#
+# But please note, due to the limitation of Jwno's threading
+# model and keymap handling logic, these functions cannot make
+# reference to mutable states outside of their body scopes,
+# or those mutable states will not get updated properly.
+#
+(defn move-window-after-split [frame]
+  (def all-sub-frames (in frame :children))
+  (def all-wins (in (first all-sub-frames) :children))
+  (def move-to-frame (in all-sub-frames 1))
+  (when (>= (length all-wins) 2)
+    (:add-child move-to-frame (:get-current-window frame)))
+  (:activate move-to-frame))
+
+#
+# Used in the :summon command to match a window by its
+# executable (.exe) file name.
+#
+(defn match-exe-name [exe-name]
+  (fn [win]
+    (if-let [win-exe (:get-exe-path win)]
+      (string/has-suffix? (string "\\" exe-name) win-exe)
+      false)))
+
+#
+# We build our root keymap below. Make sure to call the :set-keymap
+# method from the key-manager object with the new keymap, or Jwno
+# will not respond to any key events at all.
+#
+# The most straightforward way to understand Jwno commands is to
+# simply try out the bindings below. Some commands need more than
+# one window or frame to have any effect, though.
+#
+(defn build-keymap [key-man]
+  (let [keymap (:new-keymap key-man)]
+
+    #-----------------#
+    #  Basic Commands #
+    #-----------------#
+
+    (k "Win + Shift + /" :show-root-keymap)
+    (k "Win + Shift + Q" :quit)
+    (k "Win + R"         :retile)
+
+    #-------------------------------#
+    #  Window And Frame Operations  #
+    #-------------------------------#
+
+    (k "Win + Shift + C" :close-window-or-frame)
+    (k "Win + Shift + F" :close-frame)
+
+    (k "Win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split]
+       "Split current frame horizontally")
+    (k "Win + ." [:split-frame :vertical   2 [0.5] move-window-after-split]
+       "Split current frame vertically")
+    (k "Win + =" :balance-frames)
+    (k "Win + ;"         [:zoom-in 0.7])
+    (k "Win + Shift + ;" [:zoom-in 0.3])
+    (k "Win + F" :fill-monitor)
+
+    (k "Win + P" :cascade-windows-in-frame)
+
+    (k (string "Win + " (in dir-keys :down))  [:enum-frame :next])
+    (k (string "Win + " (in dir-keys :up))    [:enum-frame :prev])
+    (k (string "Win + " (in dir-keys :left))  [:enum-window-in-frame :prev])
+    (k (string "Win + " (in dir-keys :right)) [:enum-window-in-frame :next])
+
+    (each dir [:down :up :left :right]
+      (k (string "Win + Ctrl + "  (in dir-keys dir)) [:adjacent-frame dir])
+      (k (string "Win + Shift + " (in dir-keys dir)) [:move-window dir]))
+
+    (k "Win + S" [:push-keymap resize-mode-keymap]
+       "Resize mode")
+    (k "Win + K" [:push-keymap yank-mode-keymap]
+       "Yank mode")
+
+    (k "Win + Shift + S" :frame-to-window-size)
+
+    (k "Win + A" [:push-keymap alpha-mode-keymap]
+       "Alpha mode")
+
+    (k "Win + W  Esc"   :nop "Cancel")
+    (k "Win + W  Enter" :nop "Cancel")
+    (k "Win + W  D" :describe-window)
+    (k "Win + W  M" :manage-window)
+    (k "Win + W  I" :ignore-window)
+
+    (k "Win + Q  C" :close-frame)
+    (k "Win + Q  F" :flatten-parent)
+    (k "Win + Q  R"         :rotate-sibling-frames
+       "Rotate sibling frames")
+    (k "Win + Q  Shift + R" [:rotate-sibling-frames nil nil 0]
+       "Rotate monitors")
+    (k "Win + Q  V"         :reverse-sibling-frames
+       "Reverse sibling frames")
+    (k "Win + Q  Shift + V" [:reverse-sibling-frames 0]
+       "Reverse monitors")
+    (k "Win + Q  D"         :toggle-parent-direction
+       "Toggle parent direction")
+    (k "Win + Q  Shift + D" [:toggle-parent-direction true 1]
+       "Toggle monitor direction (flip layout)")
+
+    #----------------------------#
+    #  Launching External Tools  #
+    #----------------------------#
+
+    #
+    # When a series of keys are specified, sub-keymaps are automatically
+    # defined. They can be used as multi-level menus. Press the first
+    # key combo, and the keys defined in the next level will be shown in
+    # the top-left corner of your current monitor by default.
+    #
+    # Here we're using `Win + Enter` as a "launcher prefix", to group all
+    # our tool-launching key bindings together.
+    #
+
+    #
+    # The :nop command does... nothing. It's usually used to cancel a
+    # multi-level keymap.
+    #
+    (k "Win + Enter  Esc" :nop
+       "Cancel")
+    (k "Win + Enter  Enter" :nop
+       "Cancel")
+
+    #
+    # The :summon command first searches for an existing window that
+    # matches the rules we specified. It launches a program by running
+    # the provided command line if no matching window can be found.
+    #
+    (k "Win + Enter  T" [:summon
+                         (match-exe-name "WindowsTerminal.exe")
+                         true
+                         "wt.exe"]
+       "Summon Terminal")
+
+    #
+    # Some programs (such as Emacs here) would keep the input/output
+    # pipes open, blocking Jwno when it exits. Use powershell or cmd
+    # to launch the program indirectly in this case.
+    #
+    (def emacs-cmd
+      ["pwsh.exe" "-Command" "Start-Process runemacs.exe"])
+    (k "Win + Enter  E" [:summon
+                         (match-exe-name "emacs.exe")
+                         true
+                         ;emacs-cmd]
+       "Summon Emacs")
+
+    #
+    # When no command line is provided, :summon only searches for the
+    # window, and shows a message if no matching window can be found.
+    #
+    (k "Win + Enter  F" [:summon (match-exe-name "firefox.exe")]
+       "Summon Firefox")
+
+    #
+    # The :exec command always runs the provided command line.
+    #
+    (def dev-shell-cmd
+      ["wt.exe" "pwsh.exe" "-NoExit" "-Command" "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"])
+    (k "Win + Enter  D" [:exec
+                         true
+                         ;dev-shell-cmd]
+       "Launch VS Dev Shell")
+
+    (k "Win + Enter  R" [:repl true "127.0.0.1" 9999]
+       "Launch Jwno REPL")
+
+    #
+    # Ahem, nothing interesting here. Move on.
+    #
+    (let [win-enter-key (first (:parse-key keymap "Win + Enter"))
+          win-enter-map (:get-key-binding keymap win-enter-key)]
+      (:define-key win-enter-map
+                   "Up Up Down Down Left Right Left Right B A"
+                   :grant-lives))
+
+    #--------------------#
+    #  Scratch Pad Keys  #
+    #--------------------#
+
+    #
+    # The scratch pad's :summon-to command works like the :summon
+    # command above, but it puts the summoned window into the scratch
+    # pad.
+    #
+    # There can be multiple instances of scratch pads, so we use the
+    # scratch pad's :command-name method here to get the unique command
+    # for manipulating this specific scratch pad instance.
+    #
+    (k "Win + Enter  N" [(:command-name scratch-pad :summon-to)
+                         (fn [_hwnd _uia exe]
+                           (string/has-suffix? "\\notepad.exe" exe))
+                         10
+                         "notepad.exe"]
+       "Summon Notepad to scratch pad")
+
+    #
+    # Here's a more complex example. Edge web app windows show different
+    # titles before and after the page is fully loaded, so we need slightly
+    # more complex matching rules.
+    #
+    (def google-translate-match-fn
+      (fn [_hwnd uia exe]
+        (def name (:get_CachedName uia))
+        (and
+          (or
+            (string/has-prefix? "translate.google.com" name)
+            (= name "Google Translate"))
+          (string/has-suffix? "\\msedge.exe" exe))))
+    (def google-translate-cmd
+      ["C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe" "--app=https://translate.google.com"])
+    (k "Win + Enter  G" [(:command-name scratch-pad :summon-to)
+                         google-translate-match-fn
+                         10
+                         ;google-translate-cmd]
+       "Summon Google Translate to scratch pad")
+
+    #
+    # More key bindings for scratch-pad
+    #
+    (k "Win + Enter  H"    (:command-name scratch-pad :hide)
+       "Hide scratch pad")
+    (k "Win + Enter  S  S" (:command-name scratch-pad :show)
+       "Show scratch pad")
+    (k "Win + Enter  S  N" [(:command-name scratch-pad :show) :next]
+       "Next window in scratch pad")
+    (k "Win + Enter  S  P" [(:command-name scratch-pad :show) :prev]
+       "Previous window in scratch pad")
+    (k "Win + Enter  S  H" (:command-name scratch-pad :hide)
+       "Hide scratch pad")
+    (k "Win + Enter  S  T" (:command-name scratch-pad :toggle)
+       "Toggle scratch pad")
+    (k "Win + Enter  S  A" (:command-name scratch-pad :add-to)
+       "Add current window to scratch pad")
+    (k "Win + Enter  S  R" (:command-name scratch-pad :remove-from)
+       "Remove the first window from scratch pad")
+    (k "Win + Enter  S  Shift + R" (:command-name scratch-pad :remove-all-from)
+       "Remove all windows from scratch pad")
+
+    #----------------#
+    #  UI Hint Keys  #
+    #----------------#
+
+    #
+    # The default :ui-hint command shows all interactable UI elements
+    #
+    (k "RAlt  RAlt" [:ui-hint hint-key-list]
+       "Show all interactable elements")
+
+    #
+    # You can pass simple rules to match properties
+    # (https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-automation-element-propids),
+    # or any nested :and, :or, :not combinations of them.
+    #
+    # Here we check the control type (UIA_ControlTypePropertyId), and we
+    # want only Button (UIA_ButtonControlTypeId) and CheckBox (UIA_CheckBoxControlTypeId)
+    # elements.
+    #
+    (k "RAlt  B"    [:ui-hint hint-key-list [:or
+                                             [:property UIA_ControlTypePropertyId UIA_ButtonControlTypeId]
+                                             [:property UIA_ControlTypePropertyId UIA_CheckBoxControlTypeId]]]
+       "Show all buttons")
+
+    #
+    # You can also choose what to do with the selected element. Here
+    # we simply :click on it instead of invoking its default action.
+    #
+    (k "RAlt  C"    [:ui-hint hint-key-list nil :click]
+       "Show all interactive elements, and click on the selected one")
+
+    (k "RAlt  D"    [:ui-hint hint-key-list nil :double-click]
+       "Show all interactive elements, and double-click on the selected one")
+
+    #
+    # More complex property-matching
+    #
+    (k "RAlt  E"    [:ui-hint hint-key-list [:and
+                                             [:or
+                                              [:property UIA_ControlTypePropertyId UIA_EditControlTypeId]
+                                              [:property UIA_ControlTypePropertyId UIA_ComboBoxControlTypeId]]
+                                             [:property UIA_IsKeyboardFocusablePropertyId true]]]
+       "Show all editable fields")
+
+    (k "RAlt  F"    [:ui-hint hint-key-list [:property UIA_IsKeyboardFocusablePropertyId true] :focus]
+       "Show all focusable elements, and set input focus to the selected one")
+
+    (k "RAlt  I"    [:ui-hint hint-key-list [:property UIA_ControlTypePropertyId UIA_ListItemControlTypeId]]
+       "Show all list item elements")
+
+    (k "RAlt  L"    [:ui-hint hint-key-list [:property UIA_ControlTypePropertyId UIA_HyperlinkControlTypeId]]
+       "Show all hyperlinks")
+
+    (k "RAlt  M"    [:ui-hint hint-key-list nil :middle-click]
+       "Show all interactable elements, and middle-click on the selected one")
+
+    (k "RAlt  Shift + M" [:ui-hint hint-key-list nil :move-cursor]
+       "Show all interactable elements, and move cursor to the selected one")
+
+    (k "RAlt  R"    [:ui-hint hint-key-list nil :right-click]
+       "Show all interactable elements, and right-click on the selected one")
+
+    (k "RAlt  T"    [:ui-hint hint-key-list [:property UIA_ControlTypePropertyId UIA_TreeItemControlTypeId]]
+       "Show all tree item elements")
+
+    (k "RAlt  Esc"   :nop "Cancel")
+    (k "RAlt  Enter" :nop "Cancel")
+
+    keymap))
+
+
+(def root-keymap (build-keymap key-man))
+(:set-keymap key-man root-keymap)
+
+
+#===============#
+#               #
+#  Using Hooks  #
+#               #
+#===============#
 
 #
 # Some windows declare their abilities incorrectly, and Jwno will not
@@ -346,6 +579,9 @@
 
      # Excluded windows
      (not (or
+            # This means ALL windows on (virtual) Desktop 2 will be ignored,
+            # essentially creating a "floating desktop" that Jwno will NOT
+            # manage.
             (= "Desktop 2" desktop-name)
             # Add your own rules here
             ))))
@@ -364,7 +600,8 @@
        # Here we make some windows transparent, filtering by their
        # class names. You can see a window's class name using the
        # `Win + W  D` key binding (if you are using this example
-       # config, see build-keymap function above).
+       # config, see the key binding for :describe-window command
+       # above).
        #
        (find |(= $ class-name)
              [# The OS that lacks a decent text editor
@@ -399,18 +636,25 @@
      (put (in frame :tags) :padding 10)))
 
 
+#===================#
+#                   #
+#  Custom Commands  #
+#                   #
+#===================#
+
 #
-# You can easily define your own command. When defining key maps,
+# You can easily define your own commands. When defining key maps,
 # use `[:command-name arg0 arg1 ...]` to invoke commands that
 # require arguments, or simply `:command-name` for commands without
 # any argument.
 #
 # Command documentation can be found by evaluating
 #
-#   (:print-doc command-manager :command-name)
+#   (:print-doc (in jwno/context :command-manager) :command-name)
 #
 # in the REPL.
 #
+
 (:add-command command-man :fill-monitor
    (fn []
      (def cur-win (:get-current-window (in window-man :root)))
