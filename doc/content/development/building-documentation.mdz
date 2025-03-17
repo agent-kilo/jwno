@@ -1,0 +1,42 @@
+{:title "Building Documentation"
+ :template "main.html"
+ :back-to ["Development Guide" "index.html"]
+ :order 4}
+---
+
+Jwno's documentation can be found in the @code{doc} directory in its source tree. It's written in @link[https://bakpakin.github.io/mendoza/]{Mendoza} markup language. You can read the documentation online @link[https://agent-kilo.github.io/jwno/]{here}, or render and deploy it locally.
+
+@p{@strong{Note: The documentation is work-in-progress. Some pages are missing, because I have not finished writing them yet 😅. The released documentation deployed to Github Pages is always for the latest Jwno release.}}
+
+To deploy the docs locally, you need these:
+
+@ul{
+  @li{
+    Visurl Studio 2022 (The Community version will do.)
+  }
+  @li{
+    Janet (Preferably the latest release version.)
+  }
+  @li{
+    @link[https://github.com/janet-lang/jpm]{JPM}
+  }
+}
+
+Then, follow these steps:
+
+@ol{
+  @li{
+    Start an @code{x64 Native Tools Command Prompt for VS 2022}.
+  }
+  @li{
+    Run @code{jpm -l install mendoza} in @em{Jwno} source directory.
+  }
+  @li{
+    Run @code{..\\jpm_tree\bin\mdz.bat} in @code{doc} directory.
+  }
+  @li{
+    Check out the built HTML pages in @code{doc\\site} directory.
+  }
+}
+
+When the documentation source is updated, you only need to repeat step 3 to update the rendered HTML pages.
