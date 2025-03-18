@@ -42,15 +42,13 @@
      [["./auto-layout" "jwno/auto-layout"]
       ["./indicator" "jwno/indicator"]
       ["./ui-hint" "jwno/ui-hint"]
+      ["./scratch-pad" "jwno/scratch-pad"]
       ["./util" "jwno/util"]
       ["./log" "jwno/log"]])
 
+    # See main/late-init for jwno/user-config
+
     cache))
-
-
-(defn- check-module-in-cache [name]
-  (if (has-key? BUILT-IN-MODULE-CACHE name)
-    name))
 
 
 (defn- check-module-not-relative [name]
@@ -61,18 +59,19 @@
     name))
 
 
-(defn- load-built-in-module [name args]
-  (log/debug "Loading built-in module: %n, args = %n" name args)
-  (in BUILT-IN-MODULE-CACHE name))
-
-
 (defn module-manager-register-loader [self & paths]
   # To ensure we have no more than one entry in module/paths
   (:unregister-loader self)
 
-  (put module/loaders :jwno-built-in-module load-built-in-module)
+  (put module/loaders
+       :jwno-cached-module
+       (fn [name args]
+         (:load-cached-module self name args)))
 
-  (array/insert module/paths 0 [check-module-in-cache :jwno-built-in-module])
+  (array/insert module/paths
+                0
+                [(fn [name] (:check-module-in-cache self name))
+                 :jwno-cached-module])
 
   (def to-insert
     (if-let [idx (find-index |(= :preload (in $ 1)) module/paths)]
@@ -108,21 +107,47 @@
   (while (< i (length module/paths))
     (def entry (in module/paths i))
     # See module-manager-register-loader for the entry structures
-    (if (or (= entry
-               [check-module-in-cache :jwno-built-in-module])
-            (and (= 3 (length entry))
-                 (= check-module-not-relative (in entry 2))))
+    (match entry
+      [_ :jwno-cached-module]
       (array/remove module/paths i)
+
+      [_ _ (@ check-module-not-relative)]
+      (array/remove module/paths i)
+
+      _
       (++ i)))
-  (put module/loaders :jwno-built-in-module nil))
+  (put module/loaders :jwno-cached-module nil))
+
+
+(defn module-manager-add-cached-module [self name mod-env]
+  (put (in self :cache) name mod-env))
+
+
+(defn module-manager-remove-cached-module [self name]
+  (put (in self :cache) name nil))
+
+
+(defn module-manager-check-module-in-cache [self name]
+  (when (has-key? (in self :cache) name)
+    name))
+
+
+(defn module-manager-load-cached-module [self name _args]
+  (log/debug "Loading cached module: %n, args = %n" name _args)
+  (get-in self [:cache name]))
 
 
 (def- module-manager-proto
   @{:register-loader module-manager-register-loader
-    :unregister-loader module-manager-unregister-loader})
+    :unregister-loader module-manager-unregister-loader
+    :add-cached-module module-manager-add-cached-module
+    :remove-cached-module module-manager-remove-cached-module
+    :check-module-in-cache module-manager-check-module-in-cache
+    :load-cached-module module-manager-load-cached-module})
 
 
 (defn module-manager []
+  (def cache (table/setproto @{} BUILT-IN-MODULE-CACHE))
   (table/setproto
-   @{:cache BUILT-IN-MODULE-CACHE}
+   @{:cache cache}
    module-manager-proto))

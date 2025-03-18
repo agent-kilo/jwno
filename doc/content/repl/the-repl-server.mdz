@@ -1,0 +1,7 @@
+{:title "The REPL Server"
+ :template "main.html"
+ :back-to ["The REPL" "index.html"]
+ :order 1}
+---
+
+Jwno's REPL works in a client-server style, communicating via a TCP socket bound on localhost. A server has to be started before the REPL client can connect to it. You can tell Jwno to automatically start a server in some situations, and the server would bind to @code{127.0.0.1:9999} by default. If the server failed to start automatically, check whether that address is occupied by other programs.

@@ -1,0 +1,21 @@
+{:title "Set Uniform Window Gaps"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 4}
+---
+
+Window "gaps" are implemented by @em{window margins} and @em{frame paddings} in Jwno. To get uniform (evenly-sized) gaps between windows, and between windows and screen edges, you do it in two steps:
+
+@codeblock[janet]```
+# First set margin values for all windows
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win _uia _exe _desktop]
+     (put (in win :tags) :margin 10)))
+
+# Then set padding values for top-level frames
+(:add-hook (in jwno/context :hook-manager) :monitor-updated
+   (fn [frame]
+     (put (in frame :tags) :padding 10)))
+```
+
+The code above will create gaps with a size of @em{20 virtual pixels} \(the gaps will scale with monitor DPI settings).

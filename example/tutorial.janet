@@ -1,3 +1,21 @@
+#
+# tutorial.janet
+#
+# This is an interactive tutorial for Jwno (https://github.com/agent-kilo/jwno),
+# that covers basic concepts and window management operations.
+#
+# To run the tutorial, follow these steps:
+#
+#   1. Download this file (tutorial.janet);
+#   2. Download jwno.exe (https://github.com/agent-kilo/jwno/releases);
+#   3. Drag-n-drop tutorial.janet to jwno.exe;
+#   4. Follow the on-screen prompts.
+#
+# For more advanced usage and features not covered in the tutorial, please see
+# the full docs (https://agent-kilo.github.io/jwno/)
+#
+
+
 (use jw32/_winuser)
 (use jw32/_uiautomation)
 (use jw32/_dwmapi)

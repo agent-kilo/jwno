@@ -1,0 +1,52 @@
+{:title "Keyboard Shortcuts"
+ :template "main.html"
+ :back-to ["The REPL" "index.html"]
+ :order 3}
+---
+
+The REPL console provides some of the keyboard shortcuts often seen in programs using the Readline library:
+
+@tag[table]{
+  @tr{
+    @th{Shortcut} @th{Description}
+  }
+  @tr{
+    @td{@code{Tab}} @td{Auto-complete current word.}
+  }
+  @tr{
+    @td{@code{↑} \(Up arrow key)} @td{Previous line in history.}
+  }
+  @tr{
+    @td{@code{↓} \(Down arrow key)} @td{Next line in history.}
+  }
+  @tr{
+    @td{@code{Ctrl + G}} @td{Show documentation for the identifier before the cursor.}
+  }
+  @tr{
+    @td{@code{Ctrl + A}} @td{Move the cursor to the beginning of current line.}
+  }
+  @tr{
+    @td{@code{Ctrl + E}} @td{Move the cursor to the end of current line.}
+  }
+  @tr{
+    @td{@code{Ctrl + F}} @td{Move the cursor one character forward.}
+  }
+  @tr{
+    @td{@code{Ctrl + B}} @td{Move the cursor one character backward.}
+  }
+  @tr{
+    @td{@code{Alt + F}} @td{Move the cursor one word forward.}
+  }
+  @tr{
+    @td{@code{Alt + B}} @td{Move the cursor one word backward.}
+  }
+  @tr{
+    @td{@code{Ctrl + D}} @td{Delete one character at the cursor, or send EOF (exit the REPL) when current line is empty.}
+  }
+  @tr{
+    @td{@code{Ctrl + H}} @td{Delete one character before the cursor.}
+  }
+  @tr{
+    @td{@code{Ctrl + L}} @td{Clear screen.}
+  }
+}

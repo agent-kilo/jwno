@@ -1,0 +1,19 @@
+{:title "Export a Value to the REPL"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 15}
+---
+
+The whole config file environment can now be accessed via the @code{jwno/user-config} variable in the REPL. Alternatively, you can do @code{(import jwno/user-config)} to import your config file as a module.
+
+But if you want to export something defined in your config file @em{explicitly} to the REPL, you can do it in you config:
+
+@codeblock[janet]```
+(import jwno/util)
+(def repl-server
+  (or (:get-default-server (in jwno/context :repl-manager))
+      (:start-server (in jwno/context :repl-manager))))
+(util/export-to-repl repl-server my-awesome-stuff)
+```
+
+This will automatically start an REPL server if no server is already running, and export the value @code{my-awesome-stuff}.

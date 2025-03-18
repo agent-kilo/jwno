@@ -1,0 +1,39 @@
+{:title "About Jw32"
+ :template "main.html"
+ :back-to ["Development Guide" "index.html"]
+ :order 3}
+---
+
+Jw32 is @em{the} support library for Jwno, which wraps low-level Win32 APIs, so that we can use them in Janet code. Despite its name, Jw32 only works on x64 systems.
+
+All names in Jw32 correnspond 1:1 to official Win32 names, e.g. @code{UNDER_SCORES_IN_CONSTANT_NAMES} and @code{CapitalCaseInFunctionNames} are preserved, so you can easily search in the official Win32 documentation with the names appearing in Jwno code.
+
+In most cases, @code{NULL} pointers are mapped to @code{nil} in Janet code, Win32 handles are mapped to the @code{pointer} type, and numbers are mapped to Janet numbers or @code{int/s64}/@code{int/u64} types. You can check @link[https://github.com/agent-kilo/jw32/blob/master/types.h]{@code{types.h}} in Jw32 source to see how most of other Win32 types are mapped to Janet types.
+
+All strings accepted or returned by Jw32 functions are encoded in UTF-8.
+
+All Win32 COM instances in Jw32 are represented as Janet tables, and the table prototypes contain their methods. You can check out the implemented methods of a COM object by inspecting its prototype:
+
+@codeblock[janet]```
+(keys (table/proto-flatten com-obj))
+```
+
+Again, the method names map 1:1 to the names in Win32 documentation \(sans the colon character @code{:} from Janet keywords, of course).
+
+Note that Jw32 COM objects will not get garbage collected automatically, you need to call their @code{:Release} method to free them:
+
+@codeblock[janet]```
+(:Release com-obj)
+```
+
+Or use the @code{with-uia} macro:
+
+@codeblock[janet]```
+(import jwno/util)
+(util/with-uia [com-obj (construct-com-obj ...)]
+  # Do stuff with `com-obj` here. Its `:Release` method will
+  # be called automatically when leaving this scope.
+  )
+```
+
+And lastly, given the vastness of Win32 APIs, Jw32 will not and can not wrap up all of them. If something you need is missing, please file an issue in the @link[https://github.com/agent-kilo/jw32/issues]{Jw32 repo}, and see whether I want to add it or not 🤪. As last resorts, you can always use the @link[https://janet-lang.org/docs/ffi.html]{FFI APIs} or build your own native modules. 

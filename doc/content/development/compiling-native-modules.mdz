@@ -1,0 +1,16 @@
+{:title "Compiling Native Modules"
+ :template "main.html"
+ :back-to ["Development Guide" "index.html"]
+ :order 2}
+---
+
+When dealing with native modules (i.e. DLL files), Jwno is @em{source-compatible} with Janet. That means if a native module works with @code{janet.exe}, it can also work with @code{jwno.exe}, but you need to @em{recompile it specifically for Jwno}.
+
+For example, if you have the @link[https://github.com/janet-lang/spork]{Spork} library installed for Janet, you can import its pure Janet modules in Jwno \(e.g. @code{spork/infix}), but can not load the modules written in C directly \(e.g. @code{spork/zip}). To use Spork native modules in Jwno, recompile Spork and tell @code{jpm} to link it with @code{jwno.lib}:
+
+@codeblock[text]```
+# Run in Spork source directory
+jpm -l build --janet-importlib=C:\path\to\jwno.lib
+```
+
+You can get @code{jwno.exp} and @code{jwno.lib} for a specific version separately from @link[https://github.com/agent-kilo/jwno/releases]{Github releases}, and they can be placed anywhere in your disks, not necessarily in the same place as @code{jwno.exe}.

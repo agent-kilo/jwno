@@ -1,5 +1,4 @@
 {:title "Your Friendly Neighborhood Window Manager"
- :author "Chibidou"
  :template "main.html"
  :order 1}
 ---
@@ -12,10 +11,10 @@
 <div class="row">
   <div class="eight columns offset-by-two">
     <div class="figure">
-      <a href="./img/jwno-notepad-demo.gif">
-        <img alt="Jwno in Action" src="./img/jwno-notepad-demo.gif">
+      <a href="./img/jwno-emacs-repl.jpg">
+        <img alt="Jwno managing some Emacs frames, and its own REPL window." src="./img/jwno-emacs-repl.jpg">
       </a>
-      <p class="caption">Jwno in Action</p>
+      <p class="caption">Jwno managing some <a href="https://www.gnu.org/software/emacs/">Emacs</a> frames, and its own REPL window.</p>
     </div>
   </div>
 </div>
@@ -30,19 +29,19 @@
 
 <div class="four columns">
 <div class="figure">
-  <a href="./img/jwno-emacs-repl.jpg">
-    <img alt="Jwno managing some Emacs frames, and its own REPL window." src="./img/jwno-emacs-repl.jpg">
+  <a href="./img/jwno-sonic-pi.jpg">
+    <img alt="Jwno managing Sonic Pi." src="./img/jwno-sonic-pi.jpg">
   </a>
-  <p class="caption">Jwno managing some <a href="https://www.gnu.org/software/emacs/">Emacs</a> frames, and its own REPL window.</p>
+  <p class="caption">Jwno managing <a href="https://sonic-pi.net/">Sonic Pi</a>.</p>
 </div>
 </div>
 
 <div class="four columns">
 <div class="figure">
-  <a href="./img/jwno-sonic-pi.jpg">
-    <img alt="Jwno managing Sonic Pi." src="./img/jwno-sonic-pi.jpg">
+  <a href="./img/jwno-win10-settings-ui-hint.jpg">
+    <img alt="Using Jwno's UI hint feature to interact with UI elements." src="./img/jwno-win10-settings-ui-hint.jpg">
   </a>
-  <p class="caption">Jwno managing <a href="https://sonic-pi.net/">Sonic Pi</a>.</p>
+  <p class="caption">Using Jwno's UI hint feature to interact with UI elements.</p>
 </div>
 </div>
 
@@ -72,7 +71,10 @@ For new users:
     ✨ @link[features.html]{Features}
   }
   @li{
-    🚀 @link[installation.html]{Installation Guide}
+    🚀 @link[installation/index.html]{Installation Guide}
+  }
+  @li{
+    🎓 @link[https://github.com/agent-kilo/jwno/blob/master/example/tutorial.janet]{Interactive Tutorial}
   }
 }
 
@@ -85,13 +87,13 @@ For veterans:
 
 @ul{
   @li{
-    🧾 @link[cookbook.html]{Cookbook}
+    🧾 @link[cookbook/index.html]{Cookbook}
   }
   @li{
     📖 @link[ref/index.html]{Reference Index}
   }
   @li{
-    🏗️ @link[development.html]{Development Guide}
+    🏗️ @link[development/index.html]{Development Guide}
   }
 }
 

@@ -1,0 +1,36 @@
+{:title "Calling a Command Directly"
+ :template "main.html"
+ :back-to ["Using Commands" "index.html"]
+ :order 2}
+---
+
+Note that there's no way to call a Jwno command in the system command line (@code{cmd.exe} or PowerShell) at the moment. This page is about calling a command in your Janet code, or the REPL.
+
+To directly call a command in your Janet code, use the @code{:call-command} method from the command manager object, and pass the command's name and its arguments @em{separately}. Take the @code{:split-frame} command from the previous section as an example again:
+
+@codeblock[janet]```
+(:call-command (in jwno/context :command-manager)
+               :split-frame :horizontal 2)
+```
+
+Comparing to @link[binding-a-command-to-a-key-spec.html]{specifying a command in a @code{:define-key} call}, notice the square brackets around the command name and its arguments are gone. @smaller{This is designed to relieve parenthesis/bracket allergy symptoms for certain users.}
+
+### Special Commands
+
+Currently all keymap-related commands are @em{special}, in that you cannot use @code{:call-command} to call them, since they work exclusively in another thread that handles keyboard events. These commands include:
+
+@ul{
+  @li{
+    @code{:push-keymap}
+  }
+  @li{
+    @code{:pop-keymap}
+  }
+}
+
+For example, doing this will raise an @code{unknown command} error in your Janet code:
+
+@codeblock[janet]```
+(:call-command (in jwno/context :command-manager)
+               :push-keymap some-keymap)
+```

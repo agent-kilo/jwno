@@ -1,5 +1,4 @@
 {:title "Features"
- :author "Chibidou"
  :template "main.html"
  :order 2}
 ---
@@ -62,7 +61,7 @@ It's designed to work with native Windows @link[https://support.microsoft.com/en
 
 #### 👾 Hackable REPL.
 
-Like most Lisp systems, Jwno has REPL support. You can hack it while it's still running 🤘.
+Like most Lisp systems, Jwno has @link[repl/index.html]{REPL support}. You can hack it while it's still running 🤘.
 
 @html```
 </div>
@@ -92,6 +91,8 @@ You can implement custom commands and hooks to trigger. It's even possible to ca
        true)))
 ```
 
+If you are feeling extra curious, check out the @link[https://agentkilo.itch.io/jwno/devlog]{Devlog}, the @link[cookbook/index.html]{Cookbook}, or the @link[https://github.com/agent-kilo/jwno/tree/master/example]{examples directory}, to see some of the possibilities.
+
 @html```
 </div>
 
@@ -106,7 +107,7 @@ You can implement custom commands and hooks to trigger. It's even possible to ca
 
 #### ⌨️ Powerful key binding system.
 
-It supports @em{multi-level} and @em{transient} keymaps. For example, this defines a multi-level keymap:
+It supports @link[defining-key-bindings/multi-level-keymaps.html]{multi-level} and @link[defining-key-bindings/transient-keymaps.html]{transient} keymaps. For example, this defines a multi-level keymap  (akin to @link[https://www.gnu.org/software/emacs/manual/html_node/elisp/Changing-Key-Bindings.html]{Emacs key bindings}):
 
 @codeblock[janet]```
 (:define-key keymap "Win + Enter  A" :command1)
@@ -121,6 +122,59 @@ To run @code{:command1}, one should press @code{Win + Enter}, and then the @code
 </div>
 ```
 
+@html```
+<div class="row feature-list">
+
+<div class="twelve columns">
+```
+
+#### 💡️ Easy interaction with GUIs using your keyboard.
+
+With Jwno's @em{UI hint} feature, you can convert most of your mouse operations to simple keystrokes.
+
+@html```
+<div class="figure">
+  <a href="./img/ui-hint-demo.gif">
+    <img alt="Clicking a link using UI hint." src="./img/ui-hint-demo.gif">
+  </a>
+  <p class="caption">Clicking a link using UI hint.</p>
+</div>
+```
+
+@html```
+</div>
+
+</div>
+```
+
+@html```
+<div class="row feature-list">
+
+<div class="twelve columns">
+```
+
+#### 🤩 Loads of parentheses.
+
+Yes! This is a @em{feature}! Hands down!
+
+@html```
+</div>
+
+</div>
+```
+
+@html```
+<div class="row feature-list">
+
+<div class="twelve columns">
+```
+
 #### ✨ ...And there are more to come!
 
-Please support Jwno's development by using it and giving some feedback. If you're interested, head over to the @link[installation.html]{installation guide}.
+Please support Jwno's development by using it and giving some feedback. If you're interested, head over to the @link[installation/index.html]{installation guide}.
+
+@html```
+</div>
+
+</div>
+```

@@ -27,6 +27,21 @@
 
 ######### Helpers #########
 
+(defn rotate-array! [arr direction]
+  (case direction
+    :forward
+    (when-let [first-elem (first arr)]
+      (array/remove arr 0)
+      (array/push arr first-elem))
+
+    :backward
+    (when-let [last-elem (last arr)]
+      (array/remove arr -1)
+      (array/insert arr 0 last-elem))
+
+    (errorf "unknown direction: %n" direction)))
+
+
 (defn calc-win-coords-in-frame [win-rect fr-rect fit anchor win-scale fr-scale]
   (def [fr-width fr-height] (rect-size fr-rect))
   (def [win-width win-height] (rect-size win-rect))
@@ -180,13 +195,13 @@
        :right v})))
 
 
-(defn- set-window-pos [hwnd x y w h &opt scaled]
-  (default scaled false)
-
+(defn- set-window-pos [hwnd x y w h scaled extra-flags]
+  (def common-flags
+    (bor SWP_NOZORDER SWP_NOACTIVATE extra-flags))
   (def flags
     (if (or (<= w 0) (<= h 0))
-      (bor SWP_NOZORDER SWP_NOACTIVATE SWP_NOSIZE)
-      (bor SWP_NOZORDER SWP_NOACTIVATE)))
+      (bor common-flags SWP_NOSIZE)
+      common-flags))
   (when (= FALSE (SetWindowPos hwnd nil x y w h flags))
     (errorf "SetWindowPos failed for window %n: %n" hwnd (GetLastError)))
   # XXX: I couldn't work out why SetWindowPos sometimes wouldn't respect
@@ -260,6 +275,7 @@
             (def no-expand (in tags :no-expand))
             (def anchor (in tags :anchor :top-left))
             (def forced (in tags :forced))
+            (def swp-flags (in tags :swp-flags 0))
 
             # XXX: When dealing with QT windows, the bounding rectangle returned by
             # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
@@ -297,11 +313,11 @@
                 (or (not can-resize)
                     no-resize)
                 (let [[x y _w _h] (calc-win-coords-in-frame win-rect rect false anchor cur-scale scale)]
-                  (set-window-pos hwnd x y 0 0 scaled))
+                  (set-window-pos hwnd x y 0 0 scaled swp-flags))
 
                 no-expand
                 (let [[x y w h] (calc-win-coords-in-frame win-rect rect true anchor cur-scale scale)]
-                  (set-window-pos hwnd x y w h scaled))
+                  (set-window-pos hwnd x y w h scaled swp-flags))
 
                 true
                 (let [x (in rect :left)
@@ -325,7 +341,7 @@
                   # monitor B, it will re-calculate (?) its own geometries and use those.
                   # To remedy this issue, margins or paddings should be added around DPI-unaware
                   # windows, to keep their invisible borders clear from the edges of monitors.
-                  (set-window-pos hwnd x y w h scaled))))))))
+                  (set-window-pos hwnd x y w h scaled swp-flags))))))))
 
     ((err fib)
      # XXX: Don't manage a window which cannot be transformed?
@@ -1240,6 +1256,14 @@
        (= FALSE (IsIconic (in self :hwnd)))))
 
 
+(defn window-on-current-virtual-desktop? [self &opt wm]
+  (default wm (:get-window-manager self))
+  (not= FALSE
+        (:IsWindowOnCurrentVirtualDesktop
+           (in wm :vdm-com)
+           (in self :hwnd))))
+
+
 (defn window-transform [self rect &opt tags wm]
   (default tags @{})
   (default wm (:get-window-manager self))
@@ -1328,6 +1352,7 @@
    @{:close window-close
      :alive? window-alive?
      :visible? window-visible?
+     :on-current-virtual-desktop? window-on-current-virtual-desktop?
      :transform window-transform
      :reset-visual-state window-reset-visual-state
      :get-alpha window-get-alpha
@@ -1690,7 +1715,9 @@
         (= :window (in (first children) :type)))
     (let [all-siblings (in parent :children)
           [width height] (rect-size (in self :rect))
-          [parent-width parent-height] (rect-size (:get-padded-rect parent))]
+          [parent-width parent-height] (rect-size (:get-padded-rect parent))
+          cur-win (:get-current-window self)
+          is-active? (= self (in parent :current-child))]
       (if (> (length all-siblings) 2)
         (do
           (:remove-child parent self)
@@ -1769,7 +1796,13 @@
               (map (fn [sib-fr rect]
                      (:transform sib-fr rect))
                    (in parent :children)
-                   new-rects))))))
+                   new-rects)))))
+
+      # If the closed frame was active, activate its current window,
+      # to sync with actual focus state.
+      (when (and cur-win
+                 is-active?)
+        (:activate cur-win)))
 
     (= :frame (in (first children) :type))
     (error "cannot close frames containing sub-frames")))
@@ -1819,11 +1852,152 @@
 
 
 (defn frame-get-direction [self]
+  (def proto (table/getproto self))
   (cond
-    (= vertical-frame-proto (table/getproto self)) :vertical
-    (= horizontal-frame-proto (table/getproto self)) :horizontal
+    (= proto vertical-frame-proto) :vertical
+    (= proto horizontal-frame-proto) :horizontal
     # The frame is not split
-    true nil))
+    (= proto frame-proto) nil
+    true (errorf "unknown frame proto: %n" proto)))
+
+
+(defn frame-set-direction [self dir &opt recursive]
+  (default recursive false)
+
+  (def cur-dir (:get-direction self))
+  (def children (in self :children))
+
+  (def update-child-rect
+    (fn [c r]
+      (cond
+        (not recursive)
+        (:transform c r)
+
+        (nil? (:get-direction c))
+        # This child is not split, update the rect only
+        (put c :rect r)
+
+        true
+        (do
+          (:transform c r)
+          (:set-direction c dir recursive)))))
+
+  #
+  # The code below asusmes that, there must be more than one
+  # child when cur-dir is not nil.
+  #
+  (cond
+    (= dir cur-dir)
+    (when recursive
+      # Children's rects are not updated, but we reuse
+      # update-child-rect to descent recursively
+      (def old-rects (map |(in $ :rect) children))
+      (map update-child-rect children old-rects))
+
+    (and (= cur-dir :vertical)
+         (= dir :horizontal))
+    # :vertical -> :horizontal
+    (do
+      (def padded-rect (:get-padded-rect self))
+      (def [width height] (rect-size (in self :rect)))
+      (def ratios (map |(/ (rect-height (in $ :rect)) height) children))
+      (table/setproto self horizontal-frame-proto)
+      (def new-rects
+        (:calculate-sub-rects
+           self
+           (fn [_ i]
+             (math/floor (* width (in ratios i))))))
+      (map update-child-rect children new-rects))
+
+    (and (= cur-dir :horizontal)
+         (= dir :vertical))
+    # :horizontal -> :vertical
+    (do
+      (def padded-rect (:get-padded-rect self))
+      (def [width height] (rect-size (in self :rect)))
+      (def ratios (map |(/ (rect-width (in $ :rect)) width) children))
+      (table/setproto self vertical-frame-proto)
+      (def new-rects
+        (:calculate-sub-rects
+           self
+           (fn [_ i]
+             (math/floor (* height (in ratios i))))))
+      (map update-child-rect children new-rects))
+
+    true
+    (errorf "can not change direction from %n to %n" cur-dir dir)))
+
+
+(defn frame-toggle-direction [self &opt recursive]
+  (default recursive false)
+
+  (def cur-dir (:get-direction self))
+
+  (def set-dir
+    (fn [dir]
+      (:set-direction self dir)
+      (when recursive
+        (each c (in self :children)
+          (when (:get-direction c)
+            (:toggle-direction c recursive))))))
+
+  (case cur-dir
+    nil
+    (error "leaf frames have no direction")
+
+    :horizontal
+    (set-dir :vertical)
+
+    :vertical
+    (set-dir :horizontal)
+
+    (errorf "unknown direction: %n" cur-dir)))
+
+
+(defn frame-rotate-children [self direction]
+  (def children (in self :children))
+
+  (cond
+    (empty? children)
+    :nop
+
+    (>= 1 (length children))
+    :nop
+
+    (= :window (get-in self [:children 0 :type]))
+    # XXX: Currently this has no visible effect
+    (rotate-array! children direction)
+
+    (= :frame (get-in self [:children 0 :type]))
+    (do
+      (rotate-array! children direction)
+      # refresh children's rects
+      (:transform self (in self :rect)))
+
+    (error "inconsistent states for frame tree")))
+
+
+(defn frame-reverse-children [self]
+  (def children (in self :children))
+
+  (cond
+    (empty? children)
+    :nop
+
+    (>= 1 (length children))
+    :nop
+
+    (= :window (get-in self [:children 0 :type]))
+    # XXX: Currently this has no visible effect
+    (reverse! children)
+
+    (= :frame (get-in self [:children 0 :type]))
+    (do
+      (reverse! children)
+      # refresh children's rects
+      (:transform self (in self :rect)))
+
+    (error "inconsistent states for frame tree")))
 
 
 (set frame-proto
@@ -1838,7 +2012,11 @@
         :sync-current-window frame-sync-current-window
         :get-paddings frame-get-paddings
         :get-padded-rect frame-get-padded-rect
-        :get-direction frame-get-direction}
+        :get-direction frame-get-direction
+        :set-direction frame-set-direction
+        :toggle-direction frame-toggle-direction
+        :rotate-children frame-rotate-children
+        :reverse-children frame-reverse-children}
       tree-node-proto))
 
 
@@ -1937,8 +2115,6 @@
   (def fr-count (length top-frames))
   (def mon-count (length monitors))
 
-  (def hook-man (in wm :hook-manager))
-
   (cond
     (= fr-count mon-count)
     # Only the resolutions or monitor configurations are changed
@@ -1946,7 +2122,7 @@
            (unless (= mon (in fr :monitor))
              (:transform fr (in mon :work-area) (in mon :dpi))
              (put fr :monitor mon)
-             (:call-hook hook-man :monitor-updated fr)))
+             (:monitor-updated wm fr)))
          top-frames
          monitors)
 
@@ -1960,7 +2136,7 @@
              (unless (= mon (in fr :monitor))
                (:transform fr (in mon :work-area) (in mon :dpi))
                (put fr :monitor mon)
-               (:call-hook hook-man :monitor-updated fr))
+               (:monitor-updated wm fr))
              # Find the frame closest to the origin
              (def wa (in mon :work-area))
              (when (< (+ (math/abs (in wa :top))
@@ -1992,17 +2168,33 @@
              (unless (= mon (in fr :monitor))
                (:transform fr (in mon :work-area) (in mon :dpi))
                (put fr :monitor mon)
-               (:call-hook hook-man :monitor-updated fr)))
+               (:monitor-updated wm fr)))
            top-frames
            old-mons)
       (each fr new-frames
         (:add-child self fr)
-        (:call-hook hook-man :monitor-updated fr)))))
+        (:monitor-updated wm fr)))))
+
+
+(defn layout-rotate-children [self direction]
+  (def children (in self :children))
+  (def monitors (map |(in $ :monitor) children))
+  (rotate-array! children direction)
+  (:update-work-areas self monitors))
+
+
+(defn layout-reverse-children [self]
+  (def children (in self :children))
+  (def monitors (map |(in $ :monitor) children))
+  (reverse! children)
+  (:update-work-areas self monitors))
 
 
 (def- layout-proto
   (table/setproto
-   @{:update-work-areas layout-update-work-areas}
+   @{:update-work-areas layout-update-work-areas
+     :rotate-children layout-rotate-children
+     :reverse-children layout-reverse-children}
    tree-node-proto))
 
 
@@ -2046,9 +2238,7 @@
                  monitors)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
-  (:call-hook (in self :hook-manager) :layout-created new-layout)
-  (each fr (in new-layout :children)
-    (:call-hook (in self :hook-manager) :monitor-updated fr))
+  (:layout-created wm new-layout)
   new-layout)
 
 
@@ -2071,11 +2261,10 @@
    tree-node-proto))
 
 
-(defn virtual-desktop-container [wm hook-man &opt children]
+(defn virtual-desktop-container [wm &opt children]
   (default children @[])
   (def vdc-obj (tree-node :virtual-desktop-container nil children
-                          :window-manager wm
-                          :hook-manager hook-man))
+                          :window-manager wm))
   (table/setproto vdc-obj virtual-desktop-container-proto))
 
 
@@ -2294,6 +2483,10 @@
   (put (in self :ignored-hwnds) hwnd true))
 
 
+(defn wm-do-not-ignore-hwnd [self hwnd]
+  (put (in self :ignored-hwnds) hwnd nil))
+
+
 (defn wm-clean-up-hwnds [self]
   (def {:hook-manager hook-man} self)
 
@@ -2435,14 +2628,40 @@
         (:set-focus self lo)))))
 
 
+(defn wm-frames-resized [self frame-list]
+  (def hook-man (in self :hook-manager))
+  (each fr frame-list
+    (def children (in fr :children))
+
+    # Only call hooks on leaf frames
+    (cond
+      (empty? children)
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :window (get-in fr [:children 0 :type]))
+      (:call-hook hook-man :frame-resized fr)
+
+      (= :frame (get-in fr [:children 0 :type]))
+      (:frames-resized self (in fr :children)))))
+
+
+(defn wm-monitor-updated [self top-frame]
+  (:call-hook (in self :hook-manager) :monitor-updated top-frame))
+
+
+(defn wm-layout-created [self new-layout]
+  (def hook-man (in self :hook-manager))
+  (:call-hook hook-man :layout-created new-layout)
+  (each fr (in new-layout :children)
+    (:monitor-updated self fr)))
+
+
 (defn wm-set-focus [self node]
   (def uia-man (in self :uia-manager))
-  (def defview (in uia-man :def-view))
-  (def defview-hwnd (:get_CachedNativeWindowHandle defview))
 
   (cond
     (nil? node)
-    (:set-focus-to-window uia-man defview-hwnd)
+    (:set-focus-to-desktop uia-man)
 
     (= :window (in node :type))
     (:set-focus node self)
@@ -2453,7 +2672,7 @@
       (:set-focus cur-win self)
       (do
         (:activate node)
-        (:set-focus-to-window uia-man defview-hwnd)))))
+        (:set-focus-to-desktop uia-man)))))
 
 
 (defn wm-retile [self &opt fr]
@@ -2547,6 +2766,9 @@
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
     :desktop-name-changed wm-desktop-name-changed
+    :frames-resized wm-frames-resized
+    :monitor-updated wm-monitor-updated
+    :layout-created wm-layout-created
 
     :transform-hwnd wm-transform-hwnd
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
@@ -2565,6 +2787,7 @@
     :remove-hwnd wm-remove-hwnd
     :filter-hwnd wm-filter-hwnd
     :ignore-hwnd wm-ignore-hwnd
+    :do-not-ignore-hwnd wm-do-not-ignore-hwnd
     :clean-up-hwnds wm-clean-up-hwnds
 
     :close-hwnd wm-close-hwnd
@@ -2593,7 +2816,7 @@
        :ignored-hwnds @{}
        :last-vd-name (:get_CurrentName (in uia-man :root))}
      window-manager-proto))
-  (put wm-obj :root (virtual-desktop-container wm-obj hook-man))
+  (put wm-obj :root (virtual-desktop-container wm-obj))
 
   (:add-hook hook-man :filter-window
      (fn [hwnd uia-win exe-path desktop-info]
@@ -2608,5 +2831,13 @@
   (:add-hook hook-man :frame-activated
      (fn [fr]
        (:update-work-area ui-man (in (:get-top-frame fr) :rect))))
+  # This hook is needed for commands like :rotate-sibling-frames,
+  # when rotating top-level frames, to update the current active
+  # work area, since the activation hooks won't fire in that case.
+  (:add-hook hook-man :frame-resized
+     (fn [fr]
+       (def cur-fr (:get-current-frame (in wm-obj :root)))
+       (when (= fr cur-fr)
+         (:update-work-area ui-man (in (:get-top-frame fr) :rect)))))
 
   wm-obj)

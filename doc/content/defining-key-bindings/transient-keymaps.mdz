@@ -1,0 +1,29 @@
+{:title "Transient Keymaps"
+ :template "main.html"
+ :back-to ["Defining Key Bindings" "index.html"]
+ :order 4}
+---
+
+Another most powerful thing about Jwno's key binding system is that, it has an internal @em{stack} for keymaps. Only the top keymap in the stack takes effect, and we call it the @em{transient keymap}. You can use the @em{special commands} @code{:push-keymap} and @code{:pop-keymap} to manipulate the stack. The commands are special because they operate directly in the UI thread, and you can't use the @code{:call-command} method from the command manager to call them.
+
+For example, we can define a simple transient keymap only for moving windows around:
+
+@codeblock[janet]```
+(def yank-mode-keymap
+  (let [keymap (:new-keymap (in jwno/context :key-manager))]
+    (:define-key keymap "Down"  [:move-window :down])
+    (:define-key keymap "Up"    [:move-window :up])
+    (:define-key keymap "Left"  [:move-window :left])
+    (:define-key keymap "Right" [:move-window :right])
+    (:define-key keymap "Esc"   :pop-keymap)
+    keymap))
+```
+
+And then enable it when we press @code{Win + K}:
+
+@codeblock[janet]```
+(:define-key root-keymap "Win + K" [:push-keymap yank-mode-keymap]
+             "Yank mode")
+```
+
+When @code{yank-mode-keymap} is in effect, you can use the arrow keys without any modifier keys to move your windows. The keymap @em{will remain in effect} until you press the @code{Esc} key, which calls the @code{:pop-keymap} command.

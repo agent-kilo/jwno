@@ -1,0 +1,52 @@
+{:title "Installation Guide"
+ :template "main.html"
+ :order 3}
+---
+
+You only need a portable @code{exe} file to run Jwno, so there isn't really any "installation". These are just recommended steps to get it up and running, plus some things you should know before using it.
+
+@p{@strong{Currently Jwno only runs on Windows 10/11 (x64) systems.}}
+
+### Table of Contents
+
+@ul{
+  @li{
+    @link[downloading.html]{Downloading}
+  }
+  @li{
+    @link[your-first-config-file.html]{Your First Config File}
+  }
+  @li{
+    @link[check-if-jwno-is-alive.html]{Check if Jwno Is Alive}
+  }
+  @li{
+    @link[the-notification-system-tray-icon-menu.html]{The Notification (System Tray) Icon Menu}
+  }
+  @li{
+    @link[automatically-start-jwno-when-you-log-in.html]{Automatically Start Jwno When You Log In}
+  }
+}
+
+### Problems?
+
+If you encountered any problem, please open an issue @link[https://github.com/agent-kilo/jwno/issues]{here}.
+
+### About Janet
+
+To fully leverage the power of Jwno, you need to know some Janet. Don't worry, it's a simple programming language. The @link[https://janet-lang.org/docs/syntax.html]{official documentation} is a good starting point, and there's a whole fantastic @link[https://janet.guide/]{@em{real book}} that can also teach you about it. Some Janet gurus hang out on the @link[https://janet.zulipchat.com]{Janet Zulip server}, you can seek help there too.
+
+### Next Step
+
+@ul{
+  @li{
+    @link[../defining-key-bindings/index.html]{Defining Key Bindings}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[../ref/command-line-options.html]{Command Line Options}
+  }
+}

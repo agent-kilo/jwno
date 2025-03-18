@@ -1,0 +1,20 @@
+{:title "Dialog Window Placement"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 7}
+---
+
+Most dialog windows show little info, and don't need to expand to cover the whole frames, if their parent frames take up big portions of the screen. You can tell Jwno not to enlarge them:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win uia _exe _desktop]
+     (def class-name (:get_CachedClassName uia))
+     (when (= "#32770" class-name) # Dialog window class
+       # Place the window at the :center. You can also
+       # use :left, :bottom-right etc.
+       (put (in win :tags) :anchor :center)
+       # Change :no-expand to :no-resize, if you don't
+       # want no resizing at all.
+       (put (in win :tags) :no-expand true))))
+```

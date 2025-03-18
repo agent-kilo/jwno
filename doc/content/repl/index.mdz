@@ -1,0 +1,50 @@
+{:title "The REPL"
+ :template "main.html"
+ :order 8}
+---
+
+The term @em{REPL} stands for @em{Read-Eval-Print Loop}. Even the C language has REPL implementations these days, but the first REPL was a Lisp invention. Jwno inherited the tradition of providing this great @html```<del>&nbsp;toy&nbsp;</del>``` tool.
+
+Jwno's REPL have a coding environment that's almost identical to the one you get in the config file, so you can run your experiments in the REPL, then incorporate them into your config file, and your code would have pretty much the same behavior.
+
+### Table of Contents
+
+@ul{
+  @li{
+    @link[the-repl-server.html]{The REPL Server}
+  }
+  @li{
+    @link[launching-the-repl.html]{Launching the REPL}
+  }
+  @li{
+    @link[keyboard-shortcuts.html]{Keyboard Shortcuts}
+  }
+  @li{
+    @link[the-environment.html]{The Environment}
+  }
+}
+
+### Next Step
+
+@ul{
+  @li{
+    @link[../frame-tree/index.html]{The Frame Tree}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[../ref/command-line-options.html]{Command Line Options}
+  }
+  @li{
+    @link[../ref/context-object.html]{The Context Object}
+  }
+  @li{
+    @link[../ref/repl-manager-object.html]{The REPL Manager Object}
+  }
+  @li{
+    @link[../ref/repl-server-objects.html]{REPL Server Objects}
+  }
+}

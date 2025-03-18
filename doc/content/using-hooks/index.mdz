@@ -1,0 +1,39 @@
+{:title "Using Hooks"
+ :template "main.html"
+ :order 6}
+---
+
+Hooks are certain points in Jwno's code paths, where you can inject your own code actions.
+
+### Table of Contents
+
+@ul{
+  @li{
+    @link[registering-a-function-to-a-hook.html]{Registering a Function to a Hook}
+  }
+  @li{
+    @link[normal-hooks.html]{Normal Hooks}
+  }
+  @li{
+    @link[filter-hooks.html]{Filter Hooks}
+  }
+}
+
+### Next Step
+
+@ul{
+  @li{
+    @link[../using-modules.html]{Using Modules}
+  }
+}
+
+### See Also
+
+@ul{
+  @li{
+    @link[../ref/hook-manager-object.html]{The Hook Manager Object}
+  }
+  @li{
+    @link[../ref/built-in-hooks.html]{Built-In Hooks}
+  }
+}

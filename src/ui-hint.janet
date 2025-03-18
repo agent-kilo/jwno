@@ -129,7 +129,6 @@
                 (SelectObject hdc (GetStockObject DC_PEN))
 
                 (each [label rect] hint-list
-                  (def [left top right bottom] rect)
                   (draw-label hdc
                               label
                               rect
@@ -337,7 +336,10 @@
     (def refc (:Release e))
     (unless (= refc (int/u64 0))
       (log/warning "bad ref count in ui-hint-clean-up: %n (%n, %n)" refc name control-type)))
-  (:post-message ui-man hide-msg 0 0))
+  (:post-message ui-man hide-msg 0 0)
+
+  (put self :hook-fn nil)
+  (put self :labeled-elems nil))
 
 
 (defn get-click-point [target]
@@ -508,15 +510,16 @@
       (:enumerate-children
          uia-man
          uia-win
+
          (fn [child]  # Top-level children
            (cond
-             (= FALSE (:GetCachedPropertyValue child UIA_IsEnabledPropertyId))
+             (= FALSE (:get_CachedIsEnabled child))
              :nop
 
-             (not= FALSE (:GetCachedPropertyValue child UIA_IsOffscreenPropertyId))
+             (not= FALSE (:get_CachedIsOffscreen child))
              :nop
 
-             (= UIA_GroupControlTypeId (:GetCachedPropertyValue child UIA_ControlTypePropertyId))
+             (= UIA_GroupControlTypeId (:get_CachedControlType child))
              # For some unknown reason, FindAll* don't work well with
              # [:property UIA_IsControlElementPropertyId false] elements,
              # so we have to walk the tree ourselves.
@@ -525,11 +528,14 @@
                (:enumerate-children
                   uia-man
                   child
+
                   (fn [group-child]  # Children in top-level group controls
-                    (when (and (not= FALSE (:GetCachedPropertyValue group-child UIA_IsEnabledPropertyId))
-                               (= FALSE (:GetCachedPropertyValue group-child UIA_IsOffscreenPropertyId)))
+                    (when (and (not= FALSE (:get_CachedIsEnabled group-child))
+                               (= FALSE (:get_CachedIsOffscreen group-child)))
                       (:AddRef group-child)
-                      (array/push group-members group-child)))
+                      (array/push group-members group-child))
+                    true)
+
                   walker
                   cr)
                (log/debug "found %n on-screen group members" (length group-members))
@@ -538,20 +544,65 @@
              true
              (do
                (:AddRef child)
-               (array/push elem-list child))))
-         walker
-         cr)
+               (array/push elem-list child)))
+           true)
 
-      (var next-child (:GetFirstChildElementBuildCache walker uia-win cr))
-      (while next-child
-        (with-uia [child next-child]
-          
-          (set next-child (:GetNextSiblingElementBuildCache walker child cr))))))
+         walker
+         cr)))
 
   elem-list)
 
 
-(defn ui-hint-find-ui-elements [self uia-win cond-spec &opt cr]
+#
+# Some WinUI apps (?) may have top-level elements with identical runtime IDs, for example
+# the Photos app from Win 10. This seems to confuse IUIAutomationElement::FindAll and
+# friends, causing them to only return the first element with the same runtime ID.
+# This function is used to find all top-level elements, whether they have same runtime
+# IDs or not.
+#
+# As stated in Microsoft's docs: "The identifier is only guaranteed to be unique to
+# the UI of the desktop on which it was generated. Identifiers can be reused over
+# time." (https://learn.microsoft.com/en-us/windows/win32/api/uiautomationclient/nf-uiautomationclient-iuiautomationelement-getruntimeid)
+# So the runtime IDs in the same process should all be different from each other, right?
+# Is this a bug in UIAutomation or WinUI?
+#
+(defn find-win-ui-init-elements [uia-win uia-man &opt cr?]
+  (log/debug "find-win-ui-init-elements for window: %n" (:get_CachedName uia-win))
+
+  (def elem-list @[])
+
+  (with-uia [cr (if cr?
+                  (do
+                    (:AddRef cr?)
+                    cr?)
+                  (:create-cache-request uia-man [UIA_IsOffscreenPropertyId
+                                                  UIA_IsEnabledPropertyId]))]
+    (:enumerate-children
+       uia-man
+       uia-win
+       (fn [child]
+         (cond
+           (= FALSE (:get_CachedIsEnabled child))
+           :nop
+
+           (not= FALSE (:get_CachedIsOffscreen child))
+           :nop
+
+           true
+           (do
+             (:AddRef child)
+             (array/push elem-list child)))
+         true)
+       nil
+       cr))
+
+  (log/debug "find-win-ui-init-elements: found %n children" (length elem-list))
+  elem-list)
+
+
+(defn ui-hint-find-ui-elements [self uia-win cond-spec &opt cr filter-runtime-ids]
+  (default filter-runtime-ids false)
+
   (def {:context context} self)
   (def {:uia-manager uia-man} context)
 
@@ -562,17 +613,58 @@
            (= "MozillaWindowClass" (:get_CachedClassName uia-win)))
       (find-firefox-init-elements uia-win uia-man cr)
 
+      (= "WinUIDesktopWin32WindowClass" (:get_CachedClassName uia-win))
+      (find-win-ui-init-elements uia-win uia-man cr)
+
       true
-      @[uia-win]))
+      (do
+        (:AddRef uia-win)
+        @[uia-win])))
 
   (def elem-list @[])
+  # XXX: FindAll sometimes returns duplicate entries for certain UIs
+  # (e.g. Copilot), so we use this to filter out those duplicates.
+  (def seen-runtime-ids
+    (when filter-runtime-ids
+      @{}))
+
+  (def collect-unseen
+    (fn [found]
+      (def runtime-id (:GetRuntimeId found))
+      (def seen
+        # XXX: Some elements return empty runtime IDs.
+        # Treat all empty runtime IDs as unseen.
+        (and (not (empty? runtime-id))
+             (has-key? seen-runtime-ids runtime-id)))
+      (unless seen
+        (:AddRef found)
+        (put seen-runtime-ids runtime-id true)
+        (array/push elem-list found))))
+
+  (def collect-any
+    (fn [found]
+      (:AddRef found)
+      (array/push elem-list found)))
+
+  (def collect
+    (if filter-runtime-ids
+      collect-unseen
+      collect-any))
+
   (with-uia [cond (:create-condition uia-man cond-spec)]
-    (each e init-elems
-      (with-uia [elem-arr (if cr
-                            (:FindAllBuildCache e TreeScope_Subtree cond cr)
-                            (:FindAll e TreeScope_Subtree cond))]
-        (for i 0 (:get_Length elem-arr)
-          (array/push elem-list (:GetElement elem-arr i))))))
+    (for i 0 (length init-elems)
+      (with-uia [e (in init-elems i)]
+        (try
+          (with-uia [elem-arr (if cr
+                                (:FindAllBuildCache e TreeScope_Subtree cond cr)
+                                (:FindAll e TreeScope_Subtree cond))]
+            (for i 0 (:get_Length elem-arr)
+              (with-uia [found (:GetElement elem-arr i)]
+                (collect found))))
+          ((err fib)
+           (log/debug "Failed to find UI elements: %n\n%s"
+                      err
+                      (get-stack-trace fib)))))))
   elem-list)
 
 
@@ -582,6 +674,12 @@
      [:property UIA_IsKeyboardFocusablePropertyId true]
      [:property UIA_IsInvokePatternAvailablePropertyId true]])
   (default action :invoke)
+
+  (when (in self :hook-fn)
+    # Another :ui-hint command is in progress, early return
+    # See :clean-up method for clearing :hook-fn
+    (log/debug "aborting nested :ui-hint command")
+    (break))
 
   (def {:context context
         :show-msg show-msg}
@@ -741,12 +839,17 @@
 
   (:remove-command command-man :ui-hint)
 
+  (when (in self :hook-fn)
+    # A :ui-hint command is in progress, abort it
+    (log/debug "ui-hint-disable when :ui-hint command is in progress")
+    (:clean-up self))
+
   (when show-msg
     (:remove-custom-message ui-man show-msg)
     (put self :show-msg nil))
   (when hide-msg
     (:remove-custom-message ui-man hide-msg)
-    (put self :show-msg nil))
+    (put self :hide-msg nil))
   (when colors-msg
     (:remove-custom-message ui-man colors-msg)
     (put self :colors-msg nil))

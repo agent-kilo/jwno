@@ -1,0 +1,19 @@
+{:title "Automatically Start Jwno When You Log In"
+ :template "main.html"
+ :back-to ["Installation Guide" "index.html"]
+ :order 5}
+---
+
+A shortcut can be created in the @code{shell:startup} directory to achieve this.
+
+@ol{
+  @li{
+    Press @code{Win + X} then @code{R} on your keyboard. The @em{Run} dialog should pop up.
+  }
+  @li{
+    Put @code{shell:startup} in the @em{Open:} input box, and press @code{Enter} to confirm.
+  }
+  @li{
+    A File Explorer window will open. In that directory, Create a shortcut which points to @code{jwno.exe}.
+  }
+}

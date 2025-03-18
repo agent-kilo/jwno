@@ -1,0 +1,32 @@
+{:title "Key Specs"
+ :template "main.html"
+ :back-to ["Defining Key Bindings" "index.html"]
+ :order 1}
+---
+
+Jwno has its own mini-language to specify key sequences, called @em{key sepcs} \(yeah I know, how creative). They're written as strings enclosed by quotes. The most basic key spec specifies a single key:
+
+@codeblock[janet]```
+"Enter"
+```
+
+Which means @em{press and then release the @code{Enter} key on your keyboard}. From that, you can add modifier keys:
+
+@codeblock[janet]```
+"Win + Shift + Enter"
+```
+
+It means @em{hold the @code{Win} key and the @code{Shift} key, then press and release the @code{Enter} key}. @code{Ctrl} and @code{Alt} modifier keys work too, and you can use @code{-} to separate key names instead of @code{+}. For example:
+
+@codeblock[janet]```
+"Ctrl - Alt - Enter"
+```
+
+Similarly, this means @em{hold @code{Ctrl} and @code{Alt}, then press and release @code{Enter}}. All white-space characters are optional when specifying a single key combo, i.e. the keys you press at the same time. Take these key specs as an example:
+
+@codeblock[janet]```
+"Win+Shift+Enter"
+"Ctrl-Alt-Enter"
+```
+
+They are equivalent to the two key specs with white-spaces we've seen above.

@@ -30,11 +30,16 @@
 
 (defn repl-server-make-env [self client-name client-stream]
   (def new-env (make-env (in self :env)))
+  (def context (in self :context))
 
   (put new-env
        (global-ns 'context)
-       @{:value (in self :context)
-         :doc "The Jwno main loop context object.\n"})
+       @{:value context
+         :doc "Jwno's main loop context object.\n"})
+  (put new-env
+       (global-ns 'user-config)
+       @{:value (in context :user-config)
+         :doc "Jwno's user config file environment.\n"})
   (put new-env
        (global-ns 'repl-server)
        @{:value self

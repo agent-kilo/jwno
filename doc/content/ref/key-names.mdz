@@ -1,5 +1,4 @@
 {:title "List of Key Names"
- :author "Chibidou"
  :template "main.html"
  :back-to ["Reference Index" "index.html"]
  :order 2}
@@ -9,7 +8,7 @@ Here are all the keys Jwno currently supports, and the actual key codes used in 
 
 Note that Jwno currently only supports US keyboard layouts. On other layouts, the @code{VK_OEM_*} key codes may map to other characters.
 
-To use a key in a @link[../defining-key-bindings.html]{key spec}, write its name directly. All key names are case-insensitive. For example:
+To use a key in a @link[../defining-key-bindings/key-specs.html]{key spec}, write its name directly. All key names are case-insensitive. For example:
 
 @codeblock[janet]```
 "Win + A"        # Use the `A` key

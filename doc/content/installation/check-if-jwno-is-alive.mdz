@@ -1,0 +1,7 @@
+{:title "Check if Jwno Is Alive"
+ :template "main.html"
+ :back-to ["Installation Guide" "index.html"]
+ :order 3}
+---
+
+Once launched, Jwno will start to tile new windows. Existing windows will get tiled @em{when they get focus}. An icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="../img/jwno.png">``` will be shown in the notification area (a.k.a. system tray) on the taskbar when Jwno is running. If you're using @code{example-config.janet} mentioned above, you can also press @code{Win + Shift + /} \(the slash key) to show all key bindings defined in Jwno.

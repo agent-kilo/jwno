@@ -1,0 +1,19 @@
+{:title "Forcibly Manage Windows"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 3}
+---
+
+Use the @code{:filter-forced-window} hook for this:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :filter-forced-window
+   (fn [_hwnd _uia exe _desktop]
+     (string/has-suffix? "\\SomeNaughtyExecutable.exe" exe)))
+```
+
+Here we are checking a window's exe file path, to see if we should force it.
+
+To determine if a window is suitable for forced management, you can invoke the @code{:manage-window} command on it, and see how it reacts. This command is bound to @code{Win + W  M} in the example config.
+
+The @code{:filter-forced-window} hook will override the @code{:filter-window} hook.

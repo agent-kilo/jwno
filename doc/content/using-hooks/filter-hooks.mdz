@@ -1,0 +1,31 @@
+{:title "Filter Hooks"
+ :template "main.html"
+ :back-to ["Using Hooks" "index.html"]
+ :order 3}
+---
+
+In contrast to normal hooks, filter hooks are used mainly for getting their return values, i.e. the filter results, which are usually @code{true} or @code{false}. You may also utilize side effects in functions registered under filter hooks, but that's not always reliable, since filter hooks can get @em{short circuited}, and some of its functions may not always get executed.
+
+There are again two types of filter hooks: the @em{and} hooks and the @em{or} hooks. Just as their names suggest, they work like @code{and} and @code{or} functions respectively.
+
+@p{@em{And} hooks call their registered functions consecutively, until one of them returns @code{false}, or until all the functions are called.}
+
+To define and call a custom @em{and} filter hook:
+
+@codeblock[janet]```
+(def result
+  (:call-filter-hook (in self :hook-manager) :and :filter-habitable-planet
+                     galaxy system planet))
+```
+
+We have @code{:filter-habitable-planet} as the name of our new hook, and @code{galaxy}, @code{system}, @code{planet} will be passed to its registered functions as arguments.
+
+Similarly, @em{or} hooks call their registered functions consecutively, until one of them returns @code{true}, or until all the functions are called.
+
+To define and call a custom @em{or} filter hook:
+
+@codeblock[janet]```
+(def result
+  (:call-filter-hook (in self :hook-manager) :or :filter-forbidden-planet
+                     galaxy system planet))
+```

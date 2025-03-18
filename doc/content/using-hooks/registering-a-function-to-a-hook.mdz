@@ -1,0 +1,25 @@
+{:title "Registering a Function to a Hook"
+ :template "main.html"
+ :back-to ["Using Hooks" "index.html"]
+ :order 1}
+---
+
+For example, if you want to do something when a window is created, register some code to the @code{:window-created} hook:
+
+@codeblock[janet]```
+(import jwno/log)
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win uia exe desktop]
+     (log/info "New window %n from %n created on desktop %n"
+               (in win :hwnd)
+               exe
+               (in desktop :name))
+     # And maybe carry out your plan for world domination here
+     ))
+```
+
+\(Note that, to make the info log actually show up in a console, Jwno needs to be started with the @code{--log-level info} command line option.)
+
+Every hook passes its own set of arguments, which are deemed important in context, to functions registered under it. Here in the @code{:window-created} hook, we have the newly created @code{win}, the @link[https://learn.microsoft.com/en-us/windows/win32/api/uiautomationclient/nn-uiautomationclient-iuiautomationelement]{UIAutomation element} @code{uia}, the path to the @code{exe} file that created the window, and some info about the virtual @code{desktop} where our window is created.
+
+Jwno currently provides two types of hooks. The actual type will be specified when a hook is mentioned in this documentation. According to their types, you may also define and call your custom hooks in your own code, in different ways.

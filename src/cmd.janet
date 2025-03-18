@@ -19,6 +19,24 @@
 (import ./log)
 
 
+(defn get-current-frame-of-depth [wm &opt depth?]
+  (def cur-frame (:get-current-frame (in wm :root)))
+  (unless cur-frame
+    (break nil))
+
+  (def depth
+    (if depth?
+      depth?
+      (:get-depth cur-frame)))
+
+  (var fr cur-frame)
+  (while (and (< depth (:get-depth fr))
+              (in fr :parent)
+              (= :frame (get-in fr [:parent :type])))
+    (set fr (in fr :parent)))
+  fr)
+
+
 (defn cmd-nop [])
 
 
@@ -86,23 +104,7 @@
     (:set-focus wm cur-frame)))
 
 
-(defn- call-frame-resized-hooks [hook-man frame-list]
-  (each fr frame-list
-    (def children (in fr :children))
-
-    # Only call hooks on leaf frames
-    (cond
-      (empty? children)
-      (:call-hook hook-man :frame-resized fr)
-
-      (= :window (get-in fr [:children 0 :type]))
-      (:call-hook hook-man :frame-resized fr)
-
-      (= :frame (get-in fr [:children 0 :type]))
-      (call-frame-resized-hooks hook-man (in fr :children)))))
-
-
-(defn- check-for-frame-resized-hooks [hook-man frame old-rect]
+(defn- check-for-frame-resized-hooks [wm frame old-rect]
   (def new-rect (in frame :rect))
   (def [new-width new-height] (rect-size new-rect))
   (def [old-width old-height] (rect-size old-rect))
@@ -110,7 +112,7 @@
   (cond
     (and (not= new-width old-width)
          (not= new-height old-height))
-    (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children]))
+    (:frames-resized wm (get-in frame [:parent :parent :children]))
 
     (and (= new-width old-width)
          (= new-height old-height))
@@ -119,21 +121,21 @@
     (not= new-width old-width)
     (case (:get-direction (in frame :parent))
       :horizontal
-      (call-frame-resized-hooks hook-man (get-in frame [:parent :children]))
+      (:frames-resized wm (get-in frame [:parent :children]))
 
       :vertical
-      (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children])))
+      (:frames-resized wm (get-in frame [:parent :parent :children])))
 
     (not= new-height old-height)
     (case (:get-direction (in frame :parent))
       :horizontal
-      (call-frame-resized-hooks hook-man (get-in frame [:parent :parent :children]))
+      (:frames-resized wm (get-in frame [:parent :parent :children]))
 
       :vertical
-      (call-frame-resized-hooks hook-man (get-in frame [:parent :children])))))
+      (:frames-resized wm (get-in frame [:parent :children])))))
 
 
-(defn cmd-insert-frame [wm hook-man location &opt after-insertion-fn]
+(defn cmd-insert-frame [wm location &opt after-insertion-fn]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when (or (nil? cur-frame)
             (in cur-frame :monitor)
@@ -153,7 +155,7 @@
 
     (def new-frame (get-in parent [:children insert-idx]))
     (def siblings (filter |(not= $ new-frame) (in parent :children)))
-    (call-frame-resized-hooks hook-man siblings)
+    (:frames-resized wm siblings)
 
     (when after-insertion-fn
       (after-insertion-fn new-frame))
@@ -258,7 +260,7 @@
       (:activate cur-win))))
 
 
-(defn cmd-resize-frame [wm hook-man dw dh]
+(defn cmd-resize-frame [wm dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
   (when (or (nil? cur-frame)
             # Skip top-level frames
@@ -271,11 +273,11 @@
             :top (in rect :top)
             :right (+ dw (in rect :right))
             :bottom (+ dh (in rect :bottom))})
-  (check-for-frame-resized-hooks hook-man cur-frame rect)
+  (check-for-frame-resized-hooks wm cur-frame rect)
   (:retile wm (:get-top-frame cur-frame)))
 
 
-(defn cmd-zoom-in [wm hook-man ratio]
+(defn cmd-zoom-in [wm ratio]
   (def cur-frame (:get-current-frame (in wm :root)))
   (unless cur-frame
     (break))
@@ -340,11 +342,11 @@
               :top 0
               :right new-width
               :bottom new-height})
-    (check-for-frame-resized-hooks hook-man cur-frame old-rect)
+    (check-for-frame-resized-hooks wm cur-frame old-rect)
     (:retile wm (:get-top-frame cur-frame))))
 
 
-(defn cmd-balance-frames [wm hook-man &opt recursive?]
+(defn cmd-balance-frames [wm &opt recursive?]
   (default recursive? true)
 
   (def cur-frame (:get-current-frame (in wm :root)))
@@ -354,17 +356,87 @@
   (if recursive?
     (let [top-fr (:get-top-frame cur-frame)]
       (def resized (:balance top-fr recursive? @[]))
-      (call-frame-resized-hooks hook-man resized)
+      (:frames-resized wm resized)
       (:retile wm top-fr))
     (let [parent (in cur-frame :parent)]
       (when (and parent
                  (= :frame (in parent :type)))
         (def resized (:balance parent recursive? @[]))
-        (call-frame-resized-hooks hook-man resized)
+        (:frames-resized wm resized)
         (:retile wm parent)))))
 
 
-(defn cmd-close-frame [wm hook-man &opt cur-frame]
+(defn cmd-rotate-sibling-frames [wm &opt dir steps depth?]
+  (default dir :forward)
+  (default steps 1)
+
+  (def fr (get-current-frame-of-depth wm depth?))
+  (unless fr
+    (break))
+
+  (def parent (in fr :parent))
+
+  (cond
+    (nil? parent)
+    (break)
+
+    (or (= :frame (in parent :type))
+        (= :layout (in parent :type)))
+    (do
+      (repeat steps
+        (:rotate-children parent dir))
+      (:retile wm parent)
+      # To update visual indicators, the :frame-resized hook
+      # needs to fire, even though the frame sizes are always
+      # the same after rotation. Maybe rename the hook to
+      # :frame-rect-updated ?
+      (:frames-resized wm (slice (in parent :children))))))
+
+
+(defn cmd-reverse-sibling-frames [wm &opt depth?]
+  (def fr (get-current-frame-of-depth wm depth?))
+  (unless fr
+    (break))
+
+  (def parent (in fr :parent))
+
+  (cond
+    (nil? parent)
+    (break)
+
+    (or (= :frame (in parent :type))
+        (= :layout (in parent :type)))
+    (do
+      (:reverse-children parent)
+      (:retile wm parent)
+      # To update visual indicators, the :frame-resized hook
+      # needs to fire, even though the frame sizes are always
+      # the same after reversing.
+      (:frames-resized wm (slice (in parent :children))))))
+
+
+(defn cmd-toggle-parent-direction [wm &opt recursive depth?]
+  (def fr (get-current-frame-of-depth wm depth?))
+  (unless fr
+    (break))
+
+  (def parent (in fr :parent))
+
+  (cond
+    (nil? parent)
+    (break)
+
+    (not= :frame (in parent :type))
+    (break)
+
+    true
+    (do
+      (:toggle-direction parent recursive)
+      (:retile wm parent)
+      (:frames-resized wm (slice (in parent :children))))))
+
+
+(defn cmd-close-frame [wm &opt cur-frame]
   (default cur-frame (:get-current-frame (in wm :root)))
 
   (when (or (nil? cur-frame)
@@ -383,7 +455,7 @@
       :nop
 
       (= :frame (get-in parent-cur-children [0 :type]))
-      (call-frame-resized-hooks hook-man parent-cur-children)
+      (:frames-resized wm parent-cur-children)
 
       # :nop when the parent's current children are windows, since
       # in that case all sibling frames are closed too.
@@ -395,7 +467,7 @@
       (:set-focus wm (:get-current-window (in wm :root))))))
 
 
-(defn cmd-frame-to-window-size [wm hook-man]
+(defn cmd-frame-to-window-size [wm]
   (when-let [cur-frame (:get-current-frame (in wm :root))
              cur-win (:get-current-window cur-frame)]
     (def win-rect
@@ -407,7 +479,7 @@
 
     (def old-rect (in cur-frame :rect))
     (:resize cur-frame (expand-rect win-rect border-space))
-    (check-for-frame-resized-hooks hook-man cur-frame old-rect)
+    (check-for-frame-resized-hooks wm cur-frame old-rect)
     (:retile wm (:get-top-frame cur-frame))))
 
 
@@ -433,7 +505,7 @@
       (:show-tooltip ui-man :close-window "No focused window."))))
 
 
-(defn cmd-close-window-or-frame [wm ui-man hook-man]
+(defn cmd-close-window-or-frame [wm ui-man]
   # This will be nil when SHELLDLL_DefView (the desktop) is focused
   (def win-pat
     (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
@@ -455,7 +527,7 @@
             # The current window lost focus, do nothing
             (:show-tooltip ui-man :close-window "No focused window.")))
         # The frame is empty, assume that we want to close it
-        (cmd-close-frame wm hook-man cur-frame)))))
+        (cmd-close-frame wm cur-frame)))))
 
 
 (defn cmd-change-window-alpha [wm delta]
@@ -693,26 +765,30 @@
         :ui-manager ui-man}
     context)
 
-  (:add-oneshot-hook hook-man :key-pressed
-     (fn [key]
-       # Ignore modifier key events, since they're included
-       # in (key :modifiers)
-       (when (in MODIFIER-KEYS (in key :key))
-         (break))
+  (var saved-hook-fn nil)
+  (set saved-hook-fn 
+       (:add-hook hook-man :key-pressed
+          (fn [key]
+            # Ignore modifier key events, since they're included
+            # in (key :modifiers)
+            (when (in MODIFIER-KEYS (in key :key))
+              (break))
 
-       (:set-key-mode key-man :command)
+            (log/debug "removing :key-pressed hook for :describe-key")
+            (:remove-hook hook-man :key-pressed saved-hook-fn)
+            (:set-key-mode key-man :command)
 
-       (:show-tooltip
-          ui-man
-          :describe-key
-          (string/format (string/join
-                          ["Key Code: %n"
-                           "Key Name: %n"
-                           "Modifiers : %n"]
-                          "\n")
-                         (in key :key)
-                         (in key-code-to-name (in key :key))
-                         (in key :modifiers)))))
+            (:show-tooltip
+               ui-man
+               :describe-key
+               (string/format (string/join
+                               ["Key Code: %n"
+                                "Key Name: %n"
+                                "Modifiers : %n"]
+                               "\n")
+                              (in key :key)
+                              (in key-code-to-name (in key :key))
+                              (in key :modifiers))))))
 
   (:set-key-mode key-man :raw)
   (:show-tooltip ui-man :describe-key "Please press a key." nil nil 0))
@@ -723,7 +799,6 @@
         :uia-manager uia-man
         :key-manager key-man
         :window-manager wm
-        :hook-manager hook-man
         :repl repl}
     context)
 
@@ -802,7 +877,7 @@
      ```)
   (:add-command command-man :insert-frame
      (fn [location &opt after-insertion-fn]
-       (cmd-insert-frame wm hook-man location after-insertion-fn))
+       (cmd-insert-frame wm location after-insertion-fn))
      ```
      (:insert-frame location &opt after-insertion-fn)
 
@@ -822,7 +897,7 @@
      ```)
 
   (:add-command command-man :resize-frame
-     (fn [dw dh] (cmd-resize-frame wm hook-man dw dh))
+     (fn [dw dh] (cmd-resize-frame wm dw dh))
      ```
      (:resize-frame dw dh)
 
@@ -830,14 +905,14 @@
      height, respectively. Both of them are in physical pixels.
      ```)
   (:add-command command-man :close-frame
-     (fn [] (cmd-close-frame wm hook-man))
+     (fn [] (cmd-close-frame wm))
      ```
      (:close-frame)
 
      Closes the current frame.
      ```)
   (:add-command command-man :frame-to-window-size
-     (fn [] (cmd-frame-to-window-size wm hook-man))
+     (fn [] (cmd-frame-to-window-size wm))
      ```
      (:frame-to-window-size)
 
@@ -845,7 +920,7 @@
      current active window. Constraints from the parent frame apply.
      ```)
   (:add-command command-man :balance-frames
-     (fn [&opt recursive?] (cmd-balance-frames wm hook-man recursive?))
+     (fn [&opt recursive?] (cmd-balance-frames wm recursive?))
      ```
      (:balance-frames &opt recursive?)
 
@@ -854,8 +929,53 @@
      all frames in the current monitor. Otherwise, only resizes the
      siblings of the current frame.
      ```)
+  (:add-command command-man :rotate-sibling-frames
+     (fn [&opt dir steps depth] (cmd-rotate-sibling-frames wm dir steps depth))
+     ```
+     (:rotate-sibling-frames &opt dir steps depth)
+
+     Rotates sibling frames.
+
+     When dir is :forward, the first frame will be moved to the end
+     of the frame list. When dir is :backward, the last frame will be
+     moved to the beginning of the frame list instead. Defaults to
+     :forward.
+
+     Steps specifies how many times the frame list should be rotated.
+     Defaults to 1.
+
+     Depth specifies which level of frames should be rotated. 0 means
+     to rotate top-level frames, 1 means to rotate children of top-level
+     frames, etc. Defaults to the level of the current active leaf
+     frame.
+     ```)
+  (:add-command command-man :reverse-sibling-frames
+     (fn [&opt depth] (cmd-reverse-sibling-frames wm depth))
+     ```
+     (:reverse-sibling-frames &opt depth)
+
+     Reverses the order of sibling frames.
+
+     Depth specifies which level of frames should be reversed. 0 means
+     to reverse top-level frames, 1 means to reverse children of top-level
+     frames, etc. Defaults to the level of the current active leaf
+     frame.
+     ```)
+  (:add-command command-man :toggle-parent-direction
+     (fn [&opt recursive depth] (cmd-toggle-parent-direction wm recursive depth))
+     ```
+     (:toggle-parent-direction &opt recursive depth)
+
+     Changes the direction of the parent frame. If the direction was
+     :horizontal, it becomes :vertical, and vice versa.
+
+     Depth specifies which level of frame's direction should be toggled.
+     1 means to toggle top-level frames, 2 means to toggle children of
+     top-level frames, etc. Defaults to the parent of the current active
+     leaf frame.
+     ```)
   (:add-command command-man :zoom-in
-     (fn [ratio] (cmd-zoom-in wm hook-man ratio))
+     (fn [ratio] (cmd-zoom-in wm ratio))
      ```
      (:zoom-in ratio)
 
@@ -930,7 +1050,7 @@
      ```)
 
   (:add-command command-man :close-window-or-frame
-     (fn [] (cmd-close-window-or-frame wm ui-man hook-man))
+     (fn [] (cmd-close-window-or-frame wm ui-man))
      ```
      (:close-window-or-frame)
 

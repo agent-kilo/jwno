@@ -96,6 +96,9 @@ code {
     border-left: 1px solid var(--color-selection);
 }
 
+#toc-toggle{
+    background-color: var(--color-background);
+}
 .toc {
     background-color: var(--color-black);
 }

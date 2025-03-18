@@ -1,0 +1,32 @@
+{:title "Your First Config File"
+ :template "main.html"
+ :back-to ["Installation Guide" "index.html"]
+ :order 2}
+---
+
+Jwno needs a config file to work. It's a text file containing some @link[https://janet-lang.org/]{Janet} code, which gets evaluated when you launch Jwno. There are multiple ways to specify a config file:
+
+@ul{
+  @li{
+    By default, Jwno looks for a file named @code{jwno-config.janet} in the same directory where @code{jwno.exe} resides.
+  }
+  @li{
+    You can drag-n-drop a config file from anywhere to @code{jwno.exe}.
+  }
+  @li{
+    When running Jwno from the command line or a shortcut, pass a path to @code{jwno.exe}: @code```jwno.exe path\to\your\config.janet```
+  }
+}
+
+Here are some examples:
+
+@ul{
+  @li{
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/tutorial.janet]{Tutorial.janet} is an interactive tutorial implemented as a single config file. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/tutorial.janet]{Download})
+  }
+  @li{
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{Example-config.janet} contains some practical config suitable for daily use. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/example-config.janet]{Download})
+  }
+}
+
+To try out either of them, just download the file, then drag-n-drop it to @code{jwno.exe}. I recommend going through the tutorial first, before trying out @code{example-config.janet}. You can build your own config based on @code{example-config.janet} afterwards.

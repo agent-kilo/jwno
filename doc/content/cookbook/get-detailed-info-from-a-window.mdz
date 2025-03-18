@@ -1,0 +1,11 @@
+{:title "Get Detailed Info From a Window"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 1}
+---
+
+The details include window title, window class, exe file path, etc. Just bind the @code{:describe-window} command to some keys and invoke it. It's @code{Win + W  D} in the example config.
+
+@codeblock[janet]```
+(:define-key keymap "Win + W  D" :describe-window)
+```

@@ -1,0 +1,17 @@
+{:title "Downloading"
+ :template "main.html"
+ :back-to ["Installation Guide" "index.html"]
+ :order 1}
+---
+
+You can download Jwno executable files from @link[https://github.com/agent-kilo/jwno/releases]{Github}, or purchase it from @link[https://agentkilo.itch.io/jwno]{itch.io}. You get the exact same executable files either way.
+
+Just grab @code{jwno.exe} and you are good to go. It can be saved to anywhere in your disks. @code{Jwno.exp} and @code{jwno.lib} are for developing native modules, we don't need them just yet.
+
+You may optionally check the checksum of @code{jwno.exe}. For example, calculate it in Powershell:
+
+@codeblock[text]```
+$(CertUtil -hashfile path\to\jwno.exe SHA256)[1]
+```
+
+And then compare it with the value stored in @code{jwno.exe.sha256}.

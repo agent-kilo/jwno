@@ -1,0 +1,88 @@
+{:title "Window Nodes"
+ :template "main.html"
+ :back-to ["The Frame Tree" "index.html"]
+ :order 4}
+---
+
+Only @em{managed} windows have corresponding window nodes. Besides the generic tree node properties (i.e. @code{:type}, @code{:parent} and @code{:children}), a window object currently only have two extra properties: @code{:hwnd} and @code{:tags}.
+
+### @code{:hwnd} property
+
+The @code{:hwnd} property is the window's native Win32 @link[https://learn.microsoft.com/en-us/windows/win32/winmsg/about-windows#window-handle]{window handle}, which can be passed to low-level Win32 functions. For example, we can call @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow]{@code{ShowWindow}} to hide/show a window in the REPL:
+
+@codeblock[janet]```
+Welcome to Jwno REPL!
+[127.0.0.1:9999]:1: (use jw32/_winuser)
+
+# Put this line (without the prompt, of course) into the REPL,
+# and switch to the managed window you want to manipulate while
+# the REPL is sleeping
+[127.0.0.1:9999]:2: (ev/sleep 3) (def win (:get-current-window (get-in jwno/context [:window-manager :root])))
+
+# Be careful when doing this, you may lose track of the hidden
+# window. Use some window you can throw away, e.g. an empty
+# Notepad window. It's a fun trick to play with though 😜
+[127.0.0.1:9999]:3: (ShowWindow (in win :hwnd) SW_HIDE)
+
+# Do this to get your window back
+[127.0.0.1:9999]:4: (ShowWindow (in win :hwnd) SW_SHOW)
+```
+
+The @code{ev/sleep} trick is something I use when debugging Jwno itself. Given the power of the REPL, you can certainly find other ways to retrieve a window node.
+
+### @code{:tags} property
+
+The next window property we'll talk about is @code{:tags}. It's a Janet @link[https://janet-lang.org/docs/data_structures/tables.html]{table} that stores any user-defined properties for that window. For example, you can mark your favorite windows when they're created:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :window-created
+   (fn [win _uia _exe _desktop]
+     (when (is-my-favorite-window? win)
+       (put (in win :tags) :favorite true))))
+```
+
+And then pull them up by checking their @code{:tags} when using the @code{:summon} command:
+
+@codeblock[janet]```
+(:call-command (in jwno/context :command-manager)
+               :summon
+               (fn [win]
+                 (def tags (in win :tags))
+                 (= true (in tags :favorite))))
+```
+
+Note that certain tag names are used by Jwno to layout the windows, you can set them to the values you prefer, but cannot use these names for other purposes:
+
+@tag[table]{
+  @tr{
+    @th{Tag Name} @th{Description}
+  }
+  @tr{
+    @td{@code{:anchor}} @td{Used to determine where the window should be placed when it does not fill the whole frame. Can be one of @code{:center}, @code{:top-left}, @code{:top}, @code{:top-right}, @code{:left}, @code{:right}, @code{:bottom-left}, @code{:bottom}, @code{:bottom-right}. It's only meaningful when @code{:no-expand} or @code{:no-resize} is specified, or when the window can not be resized.}
+  }
+  @tr{
+    @td{@code{:forced}} @td{Whether this window is managed forcibly.}
+  }
+  @tr{
+    @td{@code{:frame}} @td{A specific frame to put this window into. This overrides the default window placement rules, and can only be set in the @code{:window-created} hook.}
+  }
+  @tr{
+    @td{@code{:margin} and @code{:margins}} @td{Used to specify margins (gaps) around the window, when fitting it into a frame. You can specify non-uniform margins in @code{:margins} like this: @code```(put tags :margins {:left 10 :top 20 :right 30 :bottom 40})```, and they will override the value in @code{:margin}.}
+  }
+  @tr{
+    @td{@code{:no-expand}} @td{Tell Jwno not to enlarge a window when putting it into a frame (but shrinking can still happen). Can be used when dealing with modal dialog boxes, so that they fit nicely inside the frame, without covering their owner windows.}
+  }
+  @tr{
+    @td{@code{:no-resize}} @td{Tell Jwno not to resize a window when taking it under management.}
+  }
+  @tr{
+    @td{@code{:swp-flags}} @td{Tell Jwno to set these flags when calling @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos]{@code{SetWindowPos}}. This is mainly used to specify @code{SWP_NOSENDCHANGING}, to forcibly bypass window size limits when resizing. See @link[../cookbook/bypass-window-size-limits.html]{the relevant section in Cookbook} for an example and some explanation.}
+  }
+}
+
+All these tags, except @code{:frame}, take effect when retiling or transforming a window. For example, you can experiment with the @code{:margin} setting in the REPL, like this:
+
+@codeblock[janet]```
+(put (in win :tags) :margin 100) # Or any other value you prefer
+(:call-command (in jwno/context :command-manager) :retile)
+```

@@ -12,12 +12,13 @@ Jwno is a tiling window manager for Windows 10/11, built with [Janet](https://ja
 
 ## Quick Links ##
 
-* [Documentation (🚧WIP🚧)](https://agent-kilo.github.io/jwno/)
-* [Features](https://agent-kilo.github.io/jwno/features.html)
-* [Installation Guide](https://agent-kilo.github.io/jwno/installation.html)
-* [Download Links](https://github.com/agent-kilo/jwno/releases)
-* [Development Guide](https://agent-kilo.github.io/jwno/development.html)
-* [Issue Tracker](https://github.com/agent-kilo/jwno/issues)
+* 📖 [Documentation (🚧WIP🚧)](https://agent-kilo.github.io/jwno/)
+* ✨ [Features](https://agent-kilo.github.io/jwno/features.html)
+* 🚀 [Installation Guide](https://agent-kilo.github.io/jwno/installation.html)
+* 🎓 [Interactive Tutorial](https://github.com/agent-kilo/jwno/blob/master/example/tutorial.janet)
+* 📥 [Download Links](https://github.com/agent-kilo/jwno/releases)
+* 🏗️ [Development Guide](https://agent-kilo.github.io/jwno/development.html)
+* 🐞 [Issue Tracker](https://github.com/agent-kilo/jwno/issues)
 
 <p>
   <a href="https://agentkilo.itch.io/jwno">

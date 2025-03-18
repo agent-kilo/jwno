@@ -80,6 +80,7 @@
   (def wrapper
     (fn [& args]
       (def ret (hook-fn ;args))
+      (log/debug "removing oneshot hook %n from %n" saved-hook-fn hook-name)
       (:remove-hook self hook-name saved-hook-fn)
       ret))
   (set saved-hook-fn (:add-hook self hook-name wrapper))

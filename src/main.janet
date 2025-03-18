@@ -64,6 +64,8 @@
                              (get-stack-trace fib)))
            nil)))
       (when config-env
+        (put context :user-config config-env)
+        (:add-cached-module (in context :module-manager) "jwno/user-config" config-env)
         # Only proceed after the config file is successfully loaded
         (:init-event-handlers (in context :uia-manager))))
 
@@ -305,6 +307,9 @@
   (put context :window-manager window-man)
   (put context :module-manager module-man)
   (put context :repl-manager repl-man)
+  # The config file environment, initialized in late-init,
+  # after loading the config file
+  (put context :user-config nil)
 
   (add-default-commands command-man context)
 

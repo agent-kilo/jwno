@@ -1,0 +1,18 @@
+{:title "Traversing the Frame Tree"
+ :template "main.html"
+ :back-to ["The Frame Tree" "index.html"]
+ :order 2}
+---
+
+Each node in the frame tree is a @em{tree node} object (yeah, really). All internal tree nodes have a @code{:parent} property and a @code{:children} property. As an example, we can inspect the root node in the REPL:
+
+@codeblock[janet]```
+(def node (get-in jwno/context [:window-manager :root]))
+(def parent (in node :parent))
+(def children (in node :children))
+(printf "Parent: %n, number of children: %n" parent (length children))
+```
+
+Since it's the root node, its @code{:parent} is @code{nil}. And the @code{:children} property is a simple @link[https://janet-lang.org/docs/data_structures/arrays.html]{array}, where you can have access to all its child nodes.
+
+The @code{tree-node-dump-subtree} function in @link[https://github.com/agent-kilo/jwno/blob/master/src/win.janet]{@code{win.janet}} is a good reference for traversing the frame tree recursively \(It's the implementation of the @code{:dump-subtree} method we used to print the frame tree in @link[inspecting-the-frame-tree.html]{Inspecting the Frame Tree}).

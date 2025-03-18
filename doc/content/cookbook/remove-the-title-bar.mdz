@@ -1,0 +1,52 @@
+{:title "Remove the Title Bar"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 14}
+---
+
+Define these functions, and call them on the window object you want the title bar removed:
+
+@codeblock[janet]```
+(use jw32/_winuser)
+(use jw32/_util)
+
+(defn remove-window-title [win]
+  (def hwnd (in win :hwnd))
+  (def st (int/u64 (signed-to-unsigned-32 (GetWindowLong hwnd GWL_STYLE))))
+  (def new-st
+    (if (= WS_CAPTION (band st WS_CAPTION))
+      # Doc from MS states that WS_CAPTION includes WS_BORDER. We
+      # Clear the tile bar but keep the border
+      (-> st
+          (band (bnot WS_CAPTION))
+          (bor WS_BORDER))
+      # else
+      st))
+  (unless (= st new-st)
+    (SetWindowLong hwnd GWL_STYLE (int/to-number new-st))
+    (SetWindowPos hwnd nil 0 0 0 0 (bor SWP_FRAMECHANGED
+                                        SWP_NOSIZE
+                                        SWP_NOMOVE
+                                        SWP_NOZORDER
+                                        SWP_NOOWNERZORDER
+                                        SWP_NOACTIVATE))))
+
+(defn restore-window-title [win]
+  (def hwnd (in win :hwnd))
+  (def st (int/u64 (signed-to-unsigned-32 (GetWindowLong hwnd GWL_STYLE))))
+  (def new-st
+    (if (not= WS_CAPTION (band st WS_CAPTION))
+      (bor st WS_CAPTION)
+      # else
+      st))
+  (unless (= st new-st)
+    (SetWindowLong hwnd GWL_STYLE (int/to-number new-st))
+    (SetWindowPos hwnd nil 0 0 0 0 (bor SWP_FRAMECHANGED
+                                        SWP_NOSIZE
+                                        SWP_NOMOVE
+                                        SWP_NOZORDER
+                                        SWP_NOOWNERZORDER
+                                        SWP_NOACTIVATE))))
+```
+
+Note that some windows may get confused when their title bars are removed, and will have weird behavior.

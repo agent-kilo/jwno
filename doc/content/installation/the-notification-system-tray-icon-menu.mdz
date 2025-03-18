@@ -1,0 +1,28 @@
+{:title "The Notification (System Tray) Icon Menu"
+ :template "main.html"
+ :back-to ["Installation Guide" "index.html"]
+ :order 4}
+---
+
+Right-clicking on the notification area icon @html```<img style="height: 1em; width: 1em;" alt="Jwno Logo" src="../img/jwno.png">``` will bring up a menu with several commands:
+
+@tag[table]{
+  @tr{
+    @th{Item} @th{Description}
+  }
+  @tr{
+    @td{@em{Jwno <version>}} @td{Shows the versions of Janet and Jwno itself.}
+  }
+  @tr{
+    @td{@em{Launch REPL}} @td{Opens the REPL window.}
+  }
+  @tr{
+    @td{@em{Update Monitor Layout}} @td{Normally Jwno will adjust to monitor layout changes automatically, but you can use this command to do that manually. It will also retile all managed windows.}
+  }
+  @tr{
+    @td{@em{Reset Keyboard Hooks}} @td{Sometimes Jwno's keyboard hooks (which are needed for global key bindings to work) may get overridden by other programs, and this command is to fix that.}
+  }
+  @tr{
+    @td{@em{Exit}} @td{Tells Jwno to quit.}
+  }
+}

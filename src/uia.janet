@@ -77,6 +77,73 @@
       nil)))
 
 
+(defn uia-manager-get-defview-window [self &opt refresh]
+  (default refresh false)
+
+  (def {:root root
+        :def-view cached}
+    self)
+
+  (when (and (not refresh)
+             cached)
+    (:AddRef cached)
+    (break cached))
+
+  (var defview nil)
+
+  (with-uia [walker (:create-raw-view-walker self)]
+    (with-uia [cr (:create-cache-request self
+                                         [UIA_NativeWindowHandlePropertyId
+                                          UIA_ClassNamePropertyId])]
+      (:enumerate-children
+         self
+         root
+         (fn [elem]
+           (def hwnd (:get_CachedNativeWindowHandle elem))
+           (def path (get-hwnd-path hwnd))
+           (def class-name (:get_CachedClassName elem))
+           (cond
+             (nil? path)
+             true # continue
+
+             (not (string/has-suffix? "\\explorer.exe" path))
+             true
+
+             (and (not= class-name "WorkerW")
+                  (not= class-name "Progman"))
+             true
+
+             true
+             (do
+               (:enumerate-children
+                  self
+                  elem
+                  (fn [elem-child]
+                    (def class-name (:get_CachedClassName elem-child))
+                    (if (= class-name "SHELLDLL_DefView")
+                      (do
+                        (:AddRef elem-child)
+                        (set defview elem-child)
+                        false)
+                      # else
+                      true))
+                  walker
+                  cr)
+               (not defview))))
+         walker
+         cr)))
+
+  (when (nil? defview)
+    (error "failed to get SHELLDLL_DefView window"))
+
+  (when cached
+    (:Release cached))
+  (put self :def-view defview)
+
+  (:AddRef defview)
+  defview)
+
+
 (defn- get-uia-direct-parent [elem walker cr]
   (try
     (:GetParentElementBuildCache walker elem cr)
@@ -117,9 +184,9 @@
         (not (nil? hwnd))
         (not (null? hwnd))
         # Is a window control?
-        (= UIA_WindowControlTypeId (:GetCachedPropertyValue cur-elem UIA_ControlTypePropertyId))
+        (= UIA_WindowControlTypeId (:get_CachedControlType cur-elem))
         # Is Visible?
-        (= 0 (:GetCachedPropertyValue cur-elem UIA_IsOffscreenPropertyId))
+        (= FALSE (:get_CachedIsOffscreen cur-elem))
         # Are we looking for a top-level window?
         (if top-level?
           (= (int/u64 0)
@@ -222,6 +289,11 @@
       (:SetFocus uia-win))))
 
 
+(defn uia-manager-set-focus-to-desktop [self]
+  (with-uia [defview (:get-defview-window self)]
+    (:SetFocus defview)))
+
+
 (defn uia-manager-create-condition [self spec]
   (def com (in self :com))
   (match spec
@@ -306,17 +378,54 @@
   (:get_RawViewWalker (in self :com)))
 
 
-(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr?]
+(defn uia-manager-enumerate-children [self elem enum-fn &opt walker? cr filter-runtime-ids]
+  (default filter-runtime-ids false)
+
+  (def seen-runtime-ids
+    (when filter-runtime-ids
+      @{}))
+
+  (def visit-unseen
+    (fn [child]
+      (def runtime-id (:GetRuntimeId child))
+      (def seen
+        # XXX: Some elements return empty runtime IDs
+        # Treat all empty runtime IDs as unseen.
+        (and (not (empty? runtime-id))
+             (has-key? seen-runtime-ids runtime-id)))
+      (if seen
+        true # continue enumeration
+        # else
+        (do
+          (put seen-runtime-ids runtime-id true)
+          (enum-fn child)))))
+
+  (def visit-any
+    (fn [child]
+      (enum-fn child)))
+
+  (def visit
+    (if filter-runtime-ids
+      visit-unseen
+      visit-any))
+
   (with-uia [walker (if (nil? walker?)
                       (:create-raw-view-walker self)
                       (do
                         (:AddRef walker?)
                         walker?))]
-    (var next-child (:GetFirstChildElementBuildCache walker elem cr?))
+    (var next-child
+      (if (nil? cr)
+        (:GetFirstChildElement walker elem)
+        (:GetFirstChildElementBuildCache walker elem cr)))
     (while next-child
       (with-uia [child next-child]
-        (enum-fn child)
-        (set next-child (:GetNextSiblingElementBuildCache walker child cr?))))))
+        (def continue? (visit child))
+        (set next-child
+          (when continue?
+            (if (nil? cr)
+              (:GetNextSiblingElement walker child)
+              (:GetNextSiblingElementBuildCache walker child cr))))))))
 
 
 (defn- init-event-handlers [uia-com element chan]
@@ -393,6 +502,7 @@
 (defn uia-manager-destroy [self]
   (def {:com uia-com
         :root root
+        :def-view defview
         :deinit-fns deinit-fns
         :focus-cr focus-cr
         :transform-cr transform-cr
@@ -404,17 +514,21 @@
   (:Release control-view-walker)
   (:Release focus-cr)
   (:Release transform-cr)
+  (when defview
+    (:Release defview))
   (:Release root)
   (:Release uia-com))
 
 
 (def- uia-manager-proto
   @{:get-root uia-manager-get-root
+    :get-defview-window uia-manager-get-defview-window
     :get-parent-window uia-manager-get-parent-window
     :get-focused-window uia-manager-get-focused-window
     :get-window-info uia-manager-get-window-info
     :get-window-bounding-rect uia-manager-get-window-bounding-rect
     :set-focus-to-window uia-manager-set-focus-to-window
+    :set-focus-to-desktop uia-manager-set-focus-to-desktop
     :create-condition uia-manager-create-condition
     :create-cache-request uia-manager-create-cache-request
     :create-tree-walker uia-manager-create-tree-walker
@@ -437,22 +551,6 @@
     (with-uia [cr (:CreateCacheRequest uia-com)]
       (:AddProperty cr UIA_NativeWindowHandlePropertyId)
       (:GetRootElementBuildCache uia-com cr)))
-
-  (def defview
-    (with-uia [con (:CreatePropertyCondition uia-com UIA_ClassNamePropertyId "SHELLDLL_DefView")]
-      (with-uia [walker (:CreateTreeWalker uia-com con)]
-        (with-uia [cr (:CreateCacheRequest uia-com)]
-          (:AddProperty cr UIA_NativeWindowHandlePropertyId)
-          (with-uia [dve (:GetFirstChildElementBuildCache walker root cr)]
-            (let [dv-hwnd (:get_CachedNativeWindowHandle dve)
-                  dv-path (get-hwnd-path dv-hwnd)]
-              # XXX: More strict checks?
-              (if (and dv-path
-                       (string/has-suffix? "\\explorer.exe" dv-path))
-                (do
-                  (:AddRef dve)
-                  dve)
-                (error "failed to get SHELLDLL_DefView window"))))))))
 
   (def focus-cr
     (let [cr (:CreateCacheRequest uia-com)]
@@ -483,7 +581,7 @@
   (table/setproto
    @{:com uia-com
      :root root
-     :def-view defview
+     :def-view nil # Initialized in uia-manager-get-defview-window
      :deinit-fns nil # Initialized in uia-manager-init-event-handlers
      :focus-cr focus-cr
      :transform-cr transform-cr
