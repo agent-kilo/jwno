@@ -269,6 +269,123 @@
     (assert (= 104 (in rect1 :right)))))
 
 
+(defn test-frame-close []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
+  (def rect {:top 10 :left 10 :bottom 130 :right 130})
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 70})
+  (def rect2 {:top 10 :left 70 :bottom 110 :right 130})
+
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         nil
+           :dummy-hwnd1]
+        [rect2
+         nil
+           :dummy-hwnd2]]
+     dummy-monitor))
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-window1 (get-in dummy-sub-frame1 [:children 0]))
+  (def dummy-window2 (get-in dummy-sub-frame2 [:children 0]))
+
+  (:activate dummy-window1)
+  (:close dummy-sub-frame1)
+
+  (def all-children (tuple/slice (in dummy-frame :children)))
+  (assert (= 2 (length all-children)))
+  (assert (or (= all-children [dummy-window1 dummy-window2])
+              (= all-children [dummy-window2 dummy-window1])))
+  (assert (= dummy-window1 (in dummy-frame :current-child)))
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 70})
+  (def rect2 {:top 10 :left 70 :bottom 110 :right 130})
+
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         nil
+           :dummy-hwnd1]
+        [rect2
+         nil
+           :dummy-hwnd2]]
+     dummy-monitor))
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-window1 (get-in dummy-sub-frame1 [:children 0]))
+  (def dummy-window2 (get-in dummy-sub-frame2 [:children 0]))
+
+  (:activate dummy-window1)
+  (:close dummy-sub-frame2)
+
+  (def all-children (tuple/slice (in dummy-frame :children)))
+  (assert (= 2 (length all-children)))
+  (assert (or (= all-children [dummy-window1 dummy-window2])
+              (= all-children [dummy-window2 dummy-window1])))
+  (assert (= dummy-window1 (in dummy-frame :current-child)))
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #              |
+  #              +- dummy-sub-frame3 -- dummy-window3
+  #
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 50})
+  (def rect2 {:top 10 :left 50 :bottom 110 :right 90})
+  (def rect3 {:top 10 :left 90 :bottom 110 :right 130})
+
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         nil
+           :dummy-hwnd1]
+        [rect2
+         nil
+           :dummy-hwnd2]
+        [rect3
+         nil
+           :dummy-hwnd3]]
+     dummy-monitor))
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame3 (get-in dummy-frame [:children 2]))
+  (def dummy-window1 (get-in dummy-sub-frame1 [:children 0]))
+  (def dummy-window2 (get-in dummy-sub-frame2 [:children 0]))
+  (def dummy-window3 (get-in dummy-sub-frame3 [:children 0]))
+
+  (:activate dummy-window2)
+  (:close dummy-sub-frame2)
+
+  (def all-children (tuple/slice (in dummy-sub-frame3 :children)))
+  (assert (= 2 (length all-children)))
+  (assert (or (= all-children [dummy-window2 dummy-window3])
+              (= all-children [dummy-window3 dummy-window2])))
+  (assert (= dummy-sub-frame3 (in dummy-frame :current-child)))
+  (assert (= dummy-window2 (:get-current-window dummy-frame))))
+
+
 (defn test-frame-insert-sub-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (def rect {:top 10 :left 10 :bottom 110 :right 110})
@@ -1064,6 +1181,7 @@
   (test-frame-constructor)
   (test-frame-add-child)
   (test-frame-split)
+  (test-frame-close)
   (test-frame-insert-sub-frame)
   (test-frame-find-hwnd)
   (test-frame-get-current-frame)

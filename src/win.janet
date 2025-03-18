@@ -1715,7 +1715,9 @@
         (= :window (in (first children) :type)))
     (let [all-siblings (in parent :children)
           [width height] (rect-size (in self :rect))
-          [parent-width parent-height] (rect-size (:get-padded-rect parent))]
+          [parent-width parent-height] (rect-size (:get-padded-rect parent))
+          cur-win (:get-current-window self)
+          is-active? (= self (in parent :current-child))]
       (if (> (length all-siblings) 2)
         (do
           (:remove-child parent self)
@@ -1794,7 +1796,13 @@
               (map (fn [sib-fr rect]
                      (:transform sib-fr rect))
                    (in parent :children)
-                   new-rects))))))
+                   new-rects)))))
+
+      # If the closed frame was active, activate its current window,
+      # to sync with actual focus state.
+      (when (and cur-win
+                 is-active?)
+        (:activate cur-win)))
 
     (= :frame (in (first children) :type))
     (error "cannot close frames containing sub-frames")))
