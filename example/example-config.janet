@@ -336,8 +336,10 @@
     (k "Win + W  M" :manage-window)
     (k "Win + W  I" :ignore-window)
 
-    (k "Win + Q  C" :close-frame)
-    (k "Win + Q  F" :flatten-parent)
+    (k "Win + Q  Esc"   :nop "Cancel")
+    (k "Win + Q  Enter" :nop "Cancel")
+    (k "Win + Q  C"     :close-frame)
+    (k "Win + Q  F"     :flatten-parent)
     (k "Win + Q  R"         :rotate-sibling-frames
        "Rotate sibling frames")
     (k "Win + Q  Shift + R" [:rotate-sibling-frames nil nil 0]
