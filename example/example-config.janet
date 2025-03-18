@@ -228,8 +228,8 @@
 
 #
 # A transient keymap for adjusting transparency for the
-# current window. See the definition for Win+A key combo
-# below.
+# current window. See the definition for `Win + A` key
+# binding below.
 #
 (def alpha-mode-keymap
   (let [keymap (:new-keymap key-man)]
@@ -262,6 +262,22 @@
   (when (>= (length all-wins) 2)
     (:add-child move-to-frame (:get-current-window frame)))
   (:activate move-to-frame))
+
+#
+# Here's another function to automatically move the focused
+# window to a new frame, after :insert-frame command. See the
+# definitions for `Win + Q  I` and `Win + Q  Shift + I` key
+# bindings below.
+#
+(defn move-window-after-insert [dir frame]
+  (def sibling
+    (case dir
+      :before (:get-next-sibling frame)
+      :after  (:get-prev-sibling frame)))
+  (def all-wins (in sibling :children))
+  (when (>= (length all-wins) 2)
+    (:add-child frame (:get-current-window sibling)))
+  (:activate frame))
 
 #
 # Used in the :summon command to match a window by its
@@ -330,16 +346,28 @@
     (k "Win + A" [:push-keymap alpha-mode-keymap]
        "Alpha mode")
 
+    #
+    # Below are less frequently used commands, grouped by prefix keys
+    #
+    # Window-specific commands start with `Win + W`
+    #
     (k "Win + W  Esc"   :nop "Cancel")
     (k "Win + W  Enter" :nop "Cancel")
     (k "Win + W  D" :describe-window)
     (k "Win + W  M" :manage-window)
     (k "Win + W  I" :ignore-window)
 
+    #
+    # Frame-specific commands start with `Win + Q`
+    #
     (k "Win + Q  Esc"   :nop "Cancel")
     (k "Win + Q  Enter" :nop "Cancel")
     (k "Win + Q  C"     :close-frame)
     (k "Win + Q  F"     :flatten-parent)
+    (k "Win + Q  I"         [:insert-frame :after  (fn [fr] (move-window-after-insert :after fr))]
+       "Insert a new frame after the current frame")
+    (k "Win + Q  Shift + I" [:insert-frame :before (fn [fr] (move-window-after-insert :before fr))]
+       "Insert a new frame before the current frame")
     (k "Win + Q  R"         :rotate-sibling-frames
        "Rotate sibling frames")
     (k "Win + Q  Shift + R" [:rotate-sibling-frames nil nil 0]
