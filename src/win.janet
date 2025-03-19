@@ -675,6 +675,37 @@
       arr)))
 
 
+(defn tree-node-get-all-leaf-frames [self &opt arr]
+  (default arr @[])
+
+  (def children (in self :children))
+  (cond
+    (= :window (in self :type))
+    arr
+
+    (not= :frame (in self :type)) # it's another container type
+    (do
+      (each c children
+        (:get-all-leaf-frames c arr))
+      arr)
+
+    (empty? children)
+    (do
+      (array/push arr self)
+      arr)
+
+    (= :window (in (first children) :type))
+    (do
+      (array/push arr self)
+      arr)
+
+    true # children are other frames
+    (do
+      (each c children
+        (:get-all-leaf-frames c arr))
+      arr)))
+
+
 (defn tree-node-get-top-window [self]
   (def win-set @{})
   (each w (:get-all-windows self)
@@ -1204,6 +1235,7 @@
     :add-child tree-node-add-child
     :remove-child tree-node-remove-child
     :get-all-windows tree-node-get-all-windows
+    :get-all-leaf-frames tree-node-get-all-leaf-frames
     :get-top-window tree-node-get-top-window
     :get-window-stack tree-node-get-window-stack
     :get-current-window tree-node-get-current-window
