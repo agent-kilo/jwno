@@ -801,10 +801,10 @@
 
   (def show-msg (:add-custom-message ui-man handle-show-hint-area))
   (when (< show-msg (int/s64 0))
-    (error "failed to register show-frame-area message"))
+    (error "failed to register show-hint-area message"))
   (def hide-msg (:add-custom-message ui-man handle-hide-hint-area))
   (when (< hide-msg (int/s64 0))
-    (error "failed to register hide-frame-area message"))
+    (error "failed to register hide-hint-area message"))
   (def colors-msg (:add-custom-message ui-man handle-set-hint-colors))
   (when (< colors-msg (int/s64 0))
     (error "failed to register set-hint-colors message"))
