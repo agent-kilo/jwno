@@ -691,8 +691,6 @@
      :uia-manager uia-man}
     context)
 
-  (def uia-com (in uia-man :com))
-
   (var elem-list @[])
   (var win-rect nil)
 
