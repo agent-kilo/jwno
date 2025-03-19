@@ -414,13 +414,10 @@
 
 
 (defn ui-hint-process-filter-result [self filtered]
-  (def {:context context
-        :current-keys current-keys
+  (def {:current-keys current-keys
         :action action
         :action-handlers action-handlers}
     self)
-  (def {:ui-manager ui-man}
-    context)
 
   (case (length filtered)
     1
@@ -758,14 +755,10 @@
 
 
 (defn ui-hint-on-key-pressed [self key]
-  (def {:context context
-        :key-list key-list
+  (def {:key-list key-list
         :current-keys current-keys
-        :labeled-elems labeled-elems
-        :win-rect win-rect
-        :hook-fn hook-fn}
+        :labeled-elems labeled-elems}
     self)
-  (def {:ui-manager ui-man} context)
   (def key-code (in key :key))
   # TOOD: Modifiers?
 
