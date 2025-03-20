@@ -414,8 +414,7 @@
 
 
 (defn ui-hint-process-filter-result [self filtered]
-  (def {:current-keys current-keys
-        :action action
+  (def {:action action
         :action-handlers action-handlers}
     self)
 
