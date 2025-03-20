@@ -1834,7 +1834,9 @@
       # to sync with actual focus state.
       (when (and cur-win
                  is-active?)
-        (:activate cur-win)))
+        # Don't use :activate method, since we don't want the
+        # activation state propagate to ancestors.
+        (put (in cur-win :parent) :current-child cur-win)))
 
     (= :frame (in (first children) :type))
     (error "cannot close frames containing sub-frames")))
