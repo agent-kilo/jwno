@@ -414,13 +414,9 @@
 
 
 (defn ui-hint-process-filter-result [self filtered]
-  (def {:context context
-        :current-keys current-keys
-        :action action
+  (def {:action action
         :action-handlers action-handlers}
     self)
-  (def {:ui-manager ui-man}
-    context)
 
   (case (length filtered)
     1
@@ -691,8 +687,6 @@
      :uia-manager uia-man}
     context)
 
-  (def uia-com (in uia-man :com))
-
   (var elem-list @[])
   (var win-rect nil)
 
@@ -760,14 +754,10 @@
 
 
 (defn ui-hint-on-key-pressed [self key]
-  (def {:context context
-        :key-list key-list
+  (def {:key-list key-list
         :current-keys current-keys
-        :labeled-elems labeled-elems
-        :win-rect win-rect
-        :hook-fn hook-fn}
+        :labeled-elems labeled-elems}
     self)
-  (def {:ui-manager ui-man} context)
   (def key-code (in key :key))
   # TOOD: Modifiers?
 
@@ -801,10 +791,10 @@
 
   (def show-msg (:add-custom-message ui-man handle-show-hint-area))
   (when (< show-msg (int/s64 0))
-    (error "failed to register show-frame-area message"))
+    (error "failed to register show-hint-area message"))
   (def hide-msg (:add-custom-message ui-man handle-hide-hint-area))
   (when (< hide-msg (int/s64 0))
-    (error "failed to register hide-frame-area message"))
+    (error "failed to register hide-hint-area message"))
   (def colors-msg (:add-custom-message ui-man handle-set-hint-colors))
   (when (< colors-msg (int/s64 0))
     (error "failed to register set-hint-colors message"))
