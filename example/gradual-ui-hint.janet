@@ -1,8 +1,40 @@
+#
+# gradual-ui-hint.janet (WIP)
+#
+# An experimental alternative to the :ui-hint command. The :gradual-ui-hint
+# command draws a box around the currently selected UI element, and show only
+# hint labels for it's direct children. When you select a child by typing its
+# label, labels for the children of that selected child will be shown, etc.
+#
+# The color of the selection box represents the action that will be applied
+# to the selected UI element, when you press `Enter`:
+#
+#   Orange: No action
+#   Blue:   Set input focus
+#   Green:  Invoke default action (e.g. click a button)
+#
+# The :gradual-ui-hint command is generally more responsive than :ui-hint,
+# since it limits its scope when searching for UI elements, but you usually
+# need to type more keys to get to your target element.
+#
+# To try it out:
+#
+#   (import gradual-ui-hint)
+#   (def guh (gradual-ui-hint/gradual-ui-hint jwno/context))
+#   (:enable guh)
+#
+# Then bind the command, for example:
+#
+#   (:define-key my-keymap "RAlt  G" [:gradual-ui-hint "fjdksleiwocmxz"])
+#   (:set-keymap (in jwno/context :key-manager) my-keymap)
+#
+
 (use jw32/_winuser)
 (use jw32/_wingdi)
 (use jw32/_libloaderapi)
 (use jw32/_errhandlingapi)
 (use jw32/_uiautomation)
+(use jw32/_dwmapi)
 (use jw32/_util)
 
 (use jwno/util)
@@ -16,12 +48,12 @@
 (var global-hint-state nil)
 
 
-(defn draw-elem-rect [hdc rect border-color scale-x scale-y]
+(defn draw-elem-rect [hdc rect border-color shadow-color scale-x scale-y]
   (def orig-pen (SelectObject hdc (GetStockObject NULL_PEN)))
-  (SetDCBrushColor hdc border-color)
 
-  (def line-width 4)
+  (def line-width (math/floor (* 4 scale-x)))
   (def half-line-width (brshift line-width 1))
+  (def shadow-offset (math/floor (* 2 scale-x)))
 
   (def [left top right bottom] rect)
 
@@ -29,26 +61,51 @@
     (SelectObject hdc orig-pen)
 
     (do
+      # Shadow
+      (SetDCBrushColor hdc shadow-color)
       (Rectangle hdc
-                 (- left half-line-width)
-                 (- top half-line-width)
-                 (+ left half-line-width)
-                 (+ bottom half-line-width))
+                 left
+                 top
+                 (+ left line-width shadow-offset)
+                 bottom)
       (Rectangle hdc
-                 (- left half-line-width)
-                 (- top half-line-width)
-                 (+ right half-line-width)
-                 (+ top half-line-width))
+                 left
+                 top
+                 right
+                 (+ top line-width shadow-offset))
       (Rectangle hdc
-                 (- right half-line-width)
-                 (- top half-line-width)
-                 (+ right half-line-width)
-                 (+ bottom half-line-width))
+                 (- right line-width shadow-offset)
+                 top
+                 right
+                 bottom)
       (Rectangle hdc
-                 (- left half-line-width)
-                 (- bottom half-line-width)
-                 (+ right half-line-width)
-                 (+ bottom half-line-width)))))
+                 left
+                 (- bottom line-width shadow-offset)
+                 right
+                 bottom)
+
+      # Box
+      (SetDCBrushColor hdc border-color)
+      (Rectangle hdc
+                 left
+                 top
+                 (+ left line-width)
+                 bottom)
+      (Rectangle hdc
+                 left
+                 top
+                 right
+                 (+ top line-width))
+      (Rectangle hdc
+                 (- right line-width)
+                 top
+                 right
+                 bottom)
+      (Rectangle hdc
+                 left
+                 (- bottom line-width)
+                 right
+                 bottom))))
 
 
 (defn draw-label [hdc label rect text-color bg-color border-color shadow-color scale-x scale-y]
@@ -107,7 +164,7 @@
   (when (= FALSE spi-ret)
     (errorf "SystemParametersInfo failed: 0x%x" (GetLastError)))
   (def cap-font (in spi-ncm :lfCaptionFont))
-  (def hfont (CreateFont (math/floor (* scale (in cap-font :lfHeight)))
+  (def hfont (CreateFont (math/floor (* 1 scale (in cap-font :lfHeight)))
                          0  # Font width matches device aspect ratio
                          (in cap-font :lfEscapement)
                          (in cap-font :lfOrientation)
@@ -138,17 +195,22 @@
         (defer
           (EndPaint hwnd ps)
           (when global-hint-state
-            (log/debug "global-hint-state = %n" global-hint-state)
+            (log/debug "---- global-hint-state = %n" global-hint-state)
             (def {:area-rect client-rect
                   :elem-rect elem-rect
+                  :elem-cap elem-cap
                   :hint-list hint-list}
               global-hint-state)
+            (log/debug "---- elem-cap = %n" elem-cap)
 
             (def colors (in global-hint-state :colors @{}))
             (def text-color (in colors :text 0x505050))
             (def bg-color (in colors :background 0xf5f5f5))
             (def border-color (in colors :border 0x828282))
             (def shadow-color (in colors :shadow 0x828282))
+            (def selection-color (in colors :selection 0x00a1ff))
+            (def focusable-color (in colors :focusable 0xffbf66))
+            (def invokable-color (in colors :invokable 0x30e400))
 
             (def [scale-x scale-y] (calc-pixel-scale client-rect))
             (def font (create-font scale-y))
@@ -165,12 +227,23 @@
                 (SelectObject hdc (GetStockObject DC_BRUSH))
                 (SelectObject hdc (GetStockObject DC_PEN))
 
+                (def box-color
+                  (cond
+                    (find |(= $ :invokable) elem-cap)
+                    invokable-color
+
+                    (find |(= $ :focusable) elem-cap)
+                    focusable-color
+
+                    true
+                    selection-color))
                 (draw-elem-rect hdc
                                 [(- (in elem-rect :left) offset-x)
                                  (- (in elem-rect :top) offset-y)
                                  (- (in elem-rect :right) offset-x)
                                  (- (in elem-rect :bottom) offset-y)]
-                                border-color
+                                box-color
+                                shadow-color
                                 scale-x
                                 scale-y)
 
@@ -232,7 +305,7 @@
 
 
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
-  (def [root-rect elem-rect hint-list] (unmarshal-and-free wparam))
+  (def [root-rect elem-rect elem-cap hint-list] (unmarshal-and-free wparam))
   (def hint-state (in state :gradual-hint-state @{}))
 
   (def hint-hwnd
@@ -249,6 +322,7 @@
 
   (put hint-state :area-rect root-rect)
   (put hint-state :elem-rect elem-rect)
+  (put hint-state :elem-cap elem-cap)
   (put hint-state :hint-list hint-list)
   (put state :gradual-hint-state hint-state)
   (set global-hint-state hint-state)
@@ -306,7 +380,7 @@
   (def control-type (:get_CachedControlType elem))
   (def refc (:Release elem))
   (unless (= refc (int/u64 0))
-    (log/warning "bad ref count: %n (%n, %n)\n%s"
+    (log/warning "---- bad ref count: %n (%n, %n)\n%s"
                  refc
                  name
                  control-type
@@ -328,10 +402,20 @@
   (def res @[])
   (for i 0 (:get_Length child-arr)
     (with-uia [e (:GetElement child-arr i)]
-      (when (and (not= FALSE (:get_CachedIsEnabled e))
-                 (= FALSE (:get_CachedIsOffscreen e)))
-        (:AddRef e)
-        (array/push res e))))
+      (cond
+        (= FALSE (:get_CachedIsEnabled e))
+        :nop
+
+        (not= FALSE (:get_CachedIsOffscreen e))
+        :nop
+
+        (= "ApplicationFrameInputSinkWindow" (:get_CachedClassName e))
+        :nop
+
+        true
+        (do
+          (:AddRef e)
+          (array/push res e)))))
   res)
 
 
@@ -347,8 +431,11 @@
       (with-uia [child-arr (:FindAllBuildCache cur-elem TreeScope_Children c cr)]
         (set cur-children (filter-valid-children child-arr))
         (cond
-          #(not= FALSE (:GetCachedPropertyValue cur-elem UIA_IsInvokePatternAvailablePropertyId))
-          #(set stop true)
+          (not= FALSE (:GetCachedPropertyValue cur-elem UIA_IsInvokePatternAvailablePropertyId))
+          (set stop true)
+
+          (not= FALSE (:get_CachedIsKeyboardFocusable cur-elem))
+          (set stop true)
 
           (= 0 (length cur-children))
           (set stop true)
@@ -504,8 +591,18 @@
       (empty? current-keys)
       (< 1 (length filtered-labels)))
     (do
-      (def root-rect (:get_CachedBoundingRectangle root-elem))
+      (def root-rect
+        (if-let [root-hwnd (:get_CachedNativeWindowHandle root-elem)]
+          (DwmGetWindowAttribute root-hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+          (:get_CachedBoundingRectangle root-elem)))
       (def elem-rect (clip-rect (:get_CachedBoundingRectangle elem) root-rect))
+
+      (def elem-cap @[])
+      (when (not= FALSE (:GetCachedPropertyValue elem UIA_IsInvokePatternAvailablePropertyId))
+        (array/push elem-cap :invokable))
+      (when (not= FALSE (:get_CachedIsKeyboardFocusable elem))
+        (array/push elem-cap :focusable))
+
       (def to-show @[])
       (eachp [l i] filtered-labels
         (def child (in children i))
@@ -521,7 +618,7 @@
         (array/push to-show labeled-rect))
       (:post-message ui-man
                      (in self :show-msg)
-                     (alloc-and-marshal [root-rect elem-rect to-show])
+                     (alloc-and-marshal [root-rect elem-rect elem-cap to-show])
                      0))
 
     (= 1 (length filtered-labels))
@@ -529,30 +626,20 @@
       (def target-idx (in filtered-labels (first (keys filtered-labels))))
       (def child (in children target-idx))
       (def [stripped grand-children] (strip-nested-elements child uia-man (in self :uia-cr)))
-      (if (empty? grand-children)
-        (do
-          (:clean-up self)
-          # TODO
-          (try
-            (:SetFocus stripped)
-            ((err fib)
-             (log/debug "---- SetFocus failed: %n\n%s"
-                        err
-                        (get-stack-trace fib)))))
-        # else
-        (do
-          (array/push stack
-                      [stripped
-                       grand-children
-                       (generate-labels (seq [i :range [0 (length grand-children)]] i)
-                                        (in self :key-list))])
-          (buffer/clear current-keys)
-          (:update-hints self))))
+      (array/push stack
+                  [stripped
+                   grand-children
+                   (generate-labels (seq [i :range [0 (length grand-children)]] i)
+                                    (in self :key-list))])
+      (buffer/clear current-keys)
+      (:update-hints self))
 
     (= 0 (length filtered-labels))
     # go back to the upper level
     (if (pop-stack stack)
-      (:update-hints self)
+      (do
+        (buffer/clear current-keys)
+        (:update-hints self))
       (if (= 1 (length stack))
         # We reached the top of the stack, cancel everything
         (:clean-up self)))))
@@ -584,9 +671,32 @@
         (buffer/popn current-keys 1)
         (:update-hints self)))
 
-    (or (= key-code VK_ESCAPE)
-        (= key-code VK_RETURN))
-    (:clean-up self)))
+    (= key-code VK_ESCAPE)
+    (:clean-up self)
+
+    (= key-code VK_RETURN)
+    (do
+      (def [elem _children _labels] (last stack))
+      (:AddRef elem)
+      (:clean-up self)
+      # TODO
+      (try
+        (:SetFocus elem)
+        ((err fib)
+         (log/debug "---- SetFocus failed: %n\n%s"
+                    err
+                    (get-stack-trace fib))))
+      (when (not= FALSE (:GetCachedPropertyValue elem UIA_IsInvokePatternAvailablePropertyId))
+        (try
+          (with-uia [invoke-pat (:GetCachedPatternAs elem
+                                                     UIA_InvokePatternId
+                                                     IUIAutomationInvokePattern)]
+            (:Invoke invoke-pat))
+          ((err fib)
+           (log/debug "---- Invoke failed: %n\n%s"
+                      err
+                      (get-stack-trace fib)))))
+      (release elem))))
 
 
 (defn gradual-ui-hint-clean-up [self]
@@ -634,9 +744,11 @@
        (:create-cache-request uia-man
                               [UIA_NativeWindowHandlePropertyId
                                UIA_NamePropertyId
+                               UIA_ClassNamePropertyId
                                UIA_ControlTypePropertyId
                                UIA_BoundingRectanglePropertyId
                                UIA_IsInvokePatternAvailablePropertyId
+                               UIA_IsKeyboardFocusablePropertyId
                                UIA_IsOffscreenPropertyId
                                UIA_IsEnabledPropertyId]
                               [UIA_InvokePatternId]))
