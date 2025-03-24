@@ -152,21 +152,26 @@
        [:uia/desktop-name-changed vd-name]
        (:desktop-name-changed (in context :window-manager) vd-name)
 
-       [:key/command cmd-info]
-       (let [{:cmd cmd} cmd-info]
+       [:key/command cmd-info-ptr]
+       (let [cmd-info (:unmarshal-keymap (in context :key-manager) cmd-info-ptr)
+             {:cmd cmd} cmd-info]
          (:dispatch-command (in context :command-manager) cmd))
 
-       [:key/switch-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-switched cur-keymap)
+       [:key/switch-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-switched cur-keymap))
 
-       [:key/reset-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-reset cur-keymap)
+       [:key/reset-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-reset cur-keymap))
 
-       [:key/push-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-pushed cur-keymap)
+       [:key/push-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-pushed cur-keymap))
 
-       [:key/pop-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-popped cur-keymap)
+       [:key/pop-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-popped cur-keymap))
 
        [:key/raw raw-key]
        (:call-hook (in context :hook-manager) :key-pressed raw-key)

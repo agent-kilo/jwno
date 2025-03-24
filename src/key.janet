@@ -1,4 +1,5 @@
 (use jw32/_winuser)
+(use jw32/_util)
 
 (use ./input)
 
@@ -334,11 +335,43 @@
   (string/join cmd-desc "\n"))
 
 
+(defn prepare-for-marshalling [x &opt fn-reverse-lookup seen]
+  (default fn-reverse-lookup @{})
+  (default seen @{})
+
+  (cond
+    (or (function? x)
+        (cfunction? x))
+    (unless (has-key? fn-reverse-lookup x)
+      (put fn-reverse-lookup x (gensym)))
+
+    (and (indexed? x)
+         (not (has-key? seen x)))
+    (do
+      (put seen x true)
+      (each xx x
+        (prepare-for-marshalling xx fn-reverse-lookup seen)))
+
+    (and (or (struct? x)
+             (table? x))
+         (not (has-key? seen x)))
+    (eachp [k v] x
+      (prepare-for-marshalling k fn-reverse-lookup seen)
+      (prepare-for-marshalling v fn-reverse-lookup seen)))
+
+  fn-reverse-lookup)
+
+
+(defn keymap-prepare-for-marshalling [self &opt fn-reverse-lookup]
+  (prepare-for-marshalling self))
+
+
 (def- keymap-proto
   @{:define-key keymap-define-key
     :parse-key keymap-parse-key
     :get-key-binding keymap-get-key-binding
-    :format keymap-format})
+    :format keymap-format
+    :prepare-for-marshalling keymap-prepare-for-marshalling})
 
 
 (varfn define-keymap [&opt proto]
@@ -356,8 +389,20 @@
 
 
 (defn key-manager-set-keymap [self keymap]
+  (def fn-reverse-lookup (:prepare-for-marshalling keymap))
+  (def fn-lookup (invert fn-reverse-lookup))
+
+  (put self :keymap-fn-reverse-lookup fn-reverse-lookup)
+  (put self :keymap-fn-lookup fn-lookup)
+
+  (def sym-lookup @{})
+  (each k (keys fn-lookup)
+    (put sym-lookup k k))
+
   (put keymap :bottom-of-stack true)
-  (:set-keymap (in self :ui-manager) keymap))
+  (def keymap-ptr (alloc-and-marshal keymap fn-reverse-lookup))
+  (def buf-ptr (alloc-and-marshal [keymap-ptr sym-lookup]))
+  (:set-keymap (in self :ui-manager) buf-ptr))
 
 
 (defn key-manager-get-key-code [self key-name]
@@ -370,11 +415,17 @@
   (:set-key-mode (in self :ui-manager) new-mode))
 
 
+(defn key-manager-unmarshal-keymap [self buf-ptr]
+  (def fn-lookup (in self :keymap-fn-lookup))
+  (unmarshal-and-free buf-ptr fn-lookup))
+
+
 (def- key-manager-proto
   @{:new-keymap key-manager-new-keymap
     :set-keymap key-manager-set-keymap
     :set-key-mode key-manager-set-key-mode
-    :get-key-code key-manager-get-key-code})
+    :get-key-code key-manager-get-key-code
+    :unmarshal-keymap key-manager-unmarshal-keymap})
 
 
 (defn key-manager [ui-man hook-man]
@@ -403,11 +454,16 @@
   key-man-obj)
 
 
-(defn keyboard-hook-handler-set-keymap [self keymap]
-  (def to-set 
+(defn keyboard-hook-handler-set-keymap [self buf-ptr]
+  (def [keymap-ptr sym-lookup] (unmarshal-and-free buf-ptr))
+  (def keymap (unmarshal-and-free keymap-ptr sym-lookup))
+
+  (def to-set
     (if (nil? keymap)
       (define-keymap)
       keymap))
+
+  (put self :keymap-sym-lookup sym-lookup)
   (put self :current-keymap @[to-set])
   (put self :keymap-stack @[]))
 
@@ -503,6 +559,11 @@
   (not= root-keymap cur-keymap))
 
 
+(defn keyboard-hook-handler-marshal-keymap [self data]
+  (def sym-lookup (in self :keymap-sym-lookup))
+  (alloc-and-marshal data sym-lookup))
+
+
 (defn keyboard-hook-handler-handle-binding [self hook-struct binding]
   (def key-up (hook-struct :flags.up))
 
@@ -511,7 +572,7 @@
     (if key-up
       (do
         (array/push (in self :current-keymap) binding)
-        (break [:key/switch-keymap binding]))
+        (break [:key/switch-keymap (:marshal-keymap self binding)]))
       (break nil)))
 
   (def {:cmd cmd} binding)
@@ -520,20 +581,20 @@
     [:push-keymap keymap]
     (when key-up
       (keyboard-hook-handler-push-keymap self keymap)
-      [:key/push-keymap (last (in self :current-keymap))])
+      [:key/push-keymap (:marshal-keymap self (last (in self :current-keymap)))])
 
     :pop-keymap
     (when key-up
       (keyboard-hook-handler-pop-keymap self)
-      [:key/pop-keymap (last (in self :current-keymap))])
+      [:key/pop-keymap (:marshal-keymap self (last (in self :current-keymap)))])
 
     _
     # It's a normal command, only fire on key-down, and
     # try to reset to root keymap when key-up
     (if key-up
       (when (keyboard-hook-handler-reset-keymap self)
-        [:key/reset-keymap (last (in self :current-keymap))])
-      [:key/command binding])))
+        [:key/reset-keymap (:marshal-keymap self (last (in self :current-keymap)))])
+      [:key/command (:marshal-keymap self binding)])))
 
 
 (defn keyboard-hook-handler-handle-unbound [self hook-struct]
@@ -544,7 +605,7 @@
   (when (and key-up
              (not (in MODIFIER-KEYS (in hook-struct :vkCode))))
     (when (keyboard-hook-handler-reset-keymap self)
-      [:key/reset-keymap (last (in self :current-keymap))])))
+      [:key/reset-keymap (:marshal-keymap self (last (in self :current-keymap)))])))
 
 
 (defn keyboard-hook-handler-set-key-mode [self new-mode]
@@ -592,6 +653,7 @@
     :find-binding keyboard-hook-handler-find-binding
     :get-modifier-states keyboard-hook-handler-get-modifier-states
     :reset-keymap keyboard-hook-handler-reset-keymap
+    :marshal-keymap keyboard-hook-handler-marshal-keymap
     :handle-binding keyboard-hook-handler-handle-binding
     :handle-unbound keyboard-hook-handler-handle-unbound
     :set-key-mode keyboard-hook-handler-set-key-mode
