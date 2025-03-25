@@ -292,8 +292,7 @@
 
 
 (defn- msg-wnd-handle-set-keymap [_hwnd _msg wparam _lparam hook-handler _state]
-  (let [keymap (unmarshal-and-free wparam)]
-    (:set-keymap hook-handler keymap))
+  (:set-keymap hook-handler wparam)
   0 # !!! IMPORTANT
   )
 
@@ -967,8 +966,7 @@
     (error "ui thread is not initialized")))
 
 
-(defn ui-manager-set-keymap [self keymap]
-  (def buf-ptr (alloc-and-marshal keymap))
+(defn ui-manager-set-keymap [self buf-ptr]
   (ui-manager-post-message self SET-KEYMAP-MSG buf-ptr 0))
 
 
