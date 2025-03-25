@@ -1,4 +1,5 @@
 (use jw32/_winuser)
+(use jw32/_util)
 (use ../src/key)
 
 
@@ -238,6 +239,76 @@
   )
 
 
+(defn test-key-manager-set-keymap []
+  (var keymap-buf-ptr nil)
+
+  (def dummy-ui-man
+    @{:set-keymap (fn [self ptr] (set keymap-buf-ptr ptr))})
+  (def dummy-hook-man
+    @{:add-hook (fn [self name hook-fn] :nop)})
+  (def key-man (key-manager dummy-ui-man dummy-hook-man))
+
+  (def keymap (:new-keymap key-man))
+  (def dummy-fn  (fn [] :fn))
+  (def dummy-fn2 (fn [] :fn2))
+  (def dummy-fn3 (fn [] :fn3))
+  (def trans-keymap (:new-keymap key-man))
+
+  (:define-key keymap "A"       [:dummy-command dummy-fn])
+  (:define-key keymap "B Enter" [:dummy-command2 dummy-fn2])
+  (:define-key keymap "C"       [:push-keymap trans-keymap])
+  (:define-key trans-keymap "D" [:dummy-command3 dummy-fn3])
+
+  # main thread -> ui thread
+  (:set-keymap key-man keymap)
+
+  (def reverse-lookup (in key-man :keymap-fn-reverse-lookup))
+  (assert (= 3 (length reverse-lookup)))
+
+  (def fn-sym  (in reverse-lookup dummy-fn))
+  (def fn-sym2 (in reverse-lookup dummy-fn2))
+  (def fn-sym3 (in reverse-lookup dummy-fn3))
+
+  (assert (= 3 (length reverse-lookup)))
+  (assert (not (nil? fn-sym)))
+  (assert (not (nil? fn-sym2)))
+  (assert (not (nil? fn-sym3)))
+  (assert (not= fn-sym fn-sym2))
+  (assert (not= fn-sym fn-sym3))
+  (assert (not= fn-sym2 fn-sym3))
+
+  (def hook-handler (keyboard-hook-handler nil))
+  (:set-keymap hook-handler keymap-buf-ptr)
+
+  (assert (= (length reverse-lookup) (length (in hook-handler :keymap-sym-lookup))))
+  (def handler-keymap (get-in hook-handler [:current-keymap 0]))
+  (assert (deep= (sort (keys keymap)) (sort (keys handler-keymap))))
+
+  (eachp [k v] handler-keymap
+    (when (and (struct? k) (table? v))
+      (def cmd (in v :cmd))
+      (if (keymap? cmd)
+        (assert (= [:dummy-command2 fn-sym2]
+                   (get-in cmd [(first (keys cmd)) :cmd])))
+        # else
+        (match cmd
+          [:dummy-command dfn]
+          (do
+            (assert (= dfn fn-sym)))
+
+          [:push-keymap tkm]
+          (assert (= [:dummy-command3 fn-sym3]
+                     (get-in tkm [(first (keys tkm)) :cmd])))))))
+
+  # ui thread -> main thread
+  (set keymap-buf-ptr
+       (:marshal-keymap hook-handler
+                        (get-in hook-handler [:current-keymap 0])))
+  (def unmarshaled-keymap (:unmarshal-keymap key-man keymap-buf-ptr))
+  (assert (deep= keymap unmarshaled-keymap)))
+
+
 (defn main [&]
   (test-find-binding)
-  (test-keymap-parse-key))
+  (test-keymap-parse-key)
+  (test-key-manager-set-keymap))
