@@ -6,7 +6,7 @@
 
 Only @em{managed} windows have corresponding window nodes. Besides the generic tree node properties (i.e. @code{:type}, @code{:parent} and @code{:children}), a window object currently only have two extra properties: @code{:hwnd} and @code{:tags}.
 
-### @code{:hwnd} property
+### @code{:hwnd} Property
 
 The @code{:hwnd} property is the window's native Win32 @link[https://learn.microsoft.com/en-us/windows/win32/winmsg/about-windows#window-handle]{window handle}, which can be passed to low-level Win32 functions. For example, we can call @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow]{@code{ShowWindow}} to hide/show a window in the REPL:
 
@@ -30,7 +30,7 @@ Welcome to Jwno REPL!
 
 The @code{ev/sleep} trick is something I use when debugging Jwno itself. Given the power of the REPL, you can certainly find other ways to retrieve a window node.
 
-### @code{:tags} property
+### @code{:tags} Property
 
 The next window property we'll talk about is @code{:tags}. It's a Janet @link[https://janet-lang.org/docs/data_structures/tables.html]{table} that stores any user-defined properties for that window. For example, you can mark your favorite windows when they're created:
 
@@ -67,7 +67,7 @@ Note that certain tag names are used by Jwno to layout the windows, you can set 
     @td{@code{:frame}} @td{A specific frame to put this window into. This overrides the default window placement rules, and can only be set in the @code{:window-created} hook.}
   }
   @tr{
-    @td{@code{:margin} and @code{:margins}} @td{Used to specify margins (gaps) around the window, when fitting it into a frame. You can specify non-uniform margins in @code{:margins} like this: @code```(put tags :margins {:left 10 :top 20 :right 30 :bottom 40})```, and they will override the value in @code{:margin}.}
+    @td{@code{:margin} and @code{:margins}} @td{Used to specify margins (gaps) around the window, when fitting it into a frame. You can specify non-uniform margins in @code{:margins} like this: @code```(put (in frame :tags) :margins {:left 10 :top 20 :right 30 :bottom 40})```, and they will override the value in @code{:margin}.}
   }
   @tr{
     @td{@code{:no-expand}} @td{Tell Jwno not to enlarge a window when putting it into a frame (but shrinking can still happen). Can be used when dealing with modal dialog boxes, so that they fit nicely inside the frame, without covering their owner windows.}
