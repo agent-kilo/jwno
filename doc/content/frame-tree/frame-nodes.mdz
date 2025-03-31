@@ -4,11 +4,11 @@
  :order 5}
 ---
 
-Frame nodes are container nodes that accommodate window nodes or other frame nodes. There are currently three frame-specific properties, and one container-specific property, in a frame object.
+Frame nodes are container nodes that accommodate either window nodes or other frame nodes (not both). There are currently three frame-specific properties, and one container-specific property, in a frame object.
 
-Frame-specific properties: @code{:monitor}, @code{:rect} and @code{:tags}
+Frame-specific properties: @code{:monitor}, @code{:rect} and @code{:tags}.
 
-Container-specific property: @code{:current-child}
+Container-specific property: @code{:current-child}.
 
 
 ### @code{:monitor} Property
@@ -117,5 +117,3 @@ To determin the current input focus, Jwno walks from the the top of the tree (@c
 Then if we call the @code{:activate} method on @code{frame-2}, @code{frame-2} will become @code{top-frame}'s @code{:current-child}, and subsequent @code{:get-current-frame} calls on @code{top-frame} will return @code{frame-22} instead.
 
 (@code{:get-current-frame} always returns a leaf frame. @smaller{Maybe it should be named @code{:get-current-leaf-frame} instead.})
-
-Alright, now take a deep breath, and go touch some grass, if you're feeling dizzy.
