@@ -108,6 +108,9 @@ code {
 .toc span:hover {
     background-color: var(--color-selection);
 }
+.toc ul li.caret > span::before {
+    border-color: var(--color-comment);
+}
 
 hr {
     border-color: var(--color-comment);

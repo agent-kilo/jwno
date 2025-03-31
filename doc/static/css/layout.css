@@ -71,10 +71,33 @@
 }
 .toc ul li {
     padding: 2px;
+    margin-bottom: 0;
+    position: relative;
+}
+.toc li ul {
+    display: none;
+}
+.toc .selected + ul, .toc li ul:has(span.selected) {
+    display: block;
 }
 .toc span {
-    padding: 10px;
+    padding: 0.5em 1em 0.5em 1.5em;
     border-radius: 5px;
+    display: inline-block;
+}
+.toc ul li.caret > span::before {
+    content: "";
+    position: absolute;
+    border-style: solid;
+    border-width: 0.2em 0.2em 0 0;
+    height: 0.35em;
+    width: 0.35em;
+    top: 1.1em;
+    left: 0.5em;
+    transform: rotate(45deg);
+}
+.toc ul li.caret:has(span.selected) > span::before {
+    transform: rotate(135deg);
 }
 
 #main-banner {
