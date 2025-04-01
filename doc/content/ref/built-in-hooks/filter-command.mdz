@@ -1,8 +1,19 @@
 {:title ":filter-command"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 3}
+ :order 3
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/filter-hooks.html]{Filter} \(and)}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn cmd args)
+```
 
 ### Description
 

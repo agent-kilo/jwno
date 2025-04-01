@@ -1,8 +1,19 @@
 {:title ":frame-activated"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 8}
+ :order 8
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn new-frame)
+```
 
 ### Description
 

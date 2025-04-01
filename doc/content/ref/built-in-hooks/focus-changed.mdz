@@ -1,8 +1,19 @@
 {:title ":focus-changed"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 7}
+ :order 7
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn hwnd)
+```
 
 ### Description
 

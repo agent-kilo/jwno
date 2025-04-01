@@ -1,8 +1,19 @@
 {:title ":filter-bsp-window"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 2}
+ :order 2
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/filter-hooks.html]{Filter} \(and)}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn win uia-win exe-path desktop-info)
+```
 
 ### Description
 

@@ -1,8 +1,19 @@
 {:title ":keymap-switched"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 14}
+ :order 14
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn cur-keymap)
+```
 
 ### Description
 

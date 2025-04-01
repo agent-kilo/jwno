@@ -1,8 +1,19 @@
 {:title ":filter-scratch-pad-window"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 5}
+ :order 5
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/filter-hooks.html]{Filter} \(and)}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn hwnd uia-win exe-path vd-info)
+```
 
 ### Description
 

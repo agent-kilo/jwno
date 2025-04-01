@@ -1,8 +1,19 @@
 {:title ":virtual-desktop-changed"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 17}
+ :order 17
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn vd-name lo)
+```
 
 ### Description
 

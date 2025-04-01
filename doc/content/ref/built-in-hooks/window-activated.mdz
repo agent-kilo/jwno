@@ -1,8 +1,19 @@
 {:title ":window-activated"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 18}
+ :order 18
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn new-win)
+```
 
 ### Description
 

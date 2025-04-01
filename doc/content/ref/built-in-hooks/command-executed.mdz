@@ -1,9 +1,20 @@
 {:title ":command-executed"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 1}
+ :order 1
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn cmd args)
+```
 
 ### Description
 
-Some Content!
+TODO

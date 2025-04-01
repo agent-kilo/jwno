@@ -1,8 +1,19 @@
 {:title ":key-pressed"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 10}
+ :order 10
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn raw-key)
+```
 
 ### Description
 

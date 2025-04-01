@@ -1,8 +1,19 @@
 {:title ":frame-resized"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 9}
+ :order 9
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn fr)
+```
 
 ### Description
 

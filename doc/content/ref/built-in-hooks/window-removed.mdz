@@ -1,8 +1,19 @@
 {:title ":window-removed"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 20}
+ :order 20
+ :generated true}
 ---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn dw)
+```
 
 ### Description
 
