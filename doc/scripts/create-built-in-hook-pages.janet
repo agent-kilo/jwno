@@ -26,11 +26,16 @@
       # (:call-hook ...)
       (and (= :call-hook (first expr))
            (= :keyword (type (in expr 2))))
-      (put hook-names (in expr 2) true)
+      (do
+        (def args (slice expr 3))
+        (put hook-names (in expr 2) [:normal args]))
 
+      # (:call-filter-hook ...)
       (and (= :call-filter-hook (first expr))
            (= :keyword (type (in expr 3))))
-      (put hook-names (in expr 3) true)
+      (do
+        (def args (slice expr 4))
+        (put hook-names (in expr 3) [[:filter (in expr 2)] args]))
 
       true
       (each e expr
@@ -47,6 +52,7 @@
 
 (def hooks @{})
 (walk-dir src-dir (fn [f] (find-hook-names f hooks)))
+#(printf "-- %n" hooks)
 
 (def hook-list (sort (keys hooks)))
 (printf "-- Found %n hooks" (length hook-list))
@@ -55,36 +61,76 @@
 
 (eachp [idx hook-name] hook-list
   (def out-file (string out-path hook-name ".mdz"))
-  (def description
+  (def default-content "TODO\n")     
+  (var gen-state-str nil)
+  (def content
     (if (os/stat out-file)
       (do
-        (def orig-content (slurp out-file))
-        (def desc-header "### Description\n\n")
-        (def desc-idx (string/find desc-header orig-content))
-        (string/slice orig-content (+ desc-idx (length desc-header))))
-      "TODO\n"))
+        (set gen-state-str ":partial")
+        (def orig-text (slurp out-file))
+        (def content-sep "### Description\n\n")
+        (def sep-idx (string/find content-sep orig-text))
+        (string/slice orig-text (+ sep-idx (length content-sep)))
+        )
+      (do
+        (set gen-state-str "true")
+        default-content)))
+
+  (def hook-info (in hooks hook-name))
+  (def type-str
+    (match (first hook-info)
+      :normal
+      "@p{@link[../../using-hooks/normal-hooks.html]{Normal}}"
+
+      [:filter filter-type]
+      (string/format "@p{@link[../../using-hooks/filter-hooks.html]{Filter} \\(%s)}" filter-type)
+
+      _
+      (errorf "unknown hook type: %n" (first hook-info))))
+  (def sig-str
+    (let [args (last hook-info)]
+      (if (empty? args)
+        "(hook-fn)"
+        (string "(hook-fn " (string/join args " ") ")"))))
 
   (def page-template
 ````
 {:title "%n"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order %d}
+ :order %d
+ :generated %s}
 ---
+
+### Type
+
+%s
+
+### Function Signature
+
+@codeblock[janet]```
+%s
+```
 
 ### Description
 
 %s
 ````)
 
-  (def content (string/format page-template hook-name (+ 1 idx) description))
-  (spit out-file content)
+  (def text
+    (string/format page-template
+                   hook-name
+                   (+ 1 idx)
+                   gen-state-str
+                   type-str
+                   sig-str
+                   content))
+  (spit out-file text)
   (printf "-- Created %n" out-file)
 
   (def li-template "@li{@link[%s.html]{%n}}")
   (array/push built-in-hooks-toc
-              (string/format li-template hook-name hook-name))
-  )
+              (string/format li-template hook-name hook-name)))
 
 
 (def built-in-hooks-page-template
