@@ -98,7 +98,7 @@
     cursor: pointer;
     pointer-events: all;
 }
-.toc ul li.caret:has(ul.sub-toc.shown) > span::before
+.toc ul li.caret:has(> ul.sub-toc.shown) > span::before
 {
     transform: rotate(135deg);
 }
