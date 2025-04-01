@@ -15,7 +15,7 @@
     @link[key-names.html]{List of Key Names}
   }
   @li{
-    @link[built-in-commands.html]{Built-In Commands}
+    @link[built-in-commands/index.html]{Built-In Commands}
   }
   @li{
     @link[built-in-hooks.html]{Built-In Hooks}

@@ -1,0 +1,15 @@
+{:title ":nop"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 1}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+:nop
+```
+
+### Description
+
+The @code{:nop} command does nothing. It's usually used in a "Cancel" key binding in multi-level keymaps, for returning to the root keymap.
