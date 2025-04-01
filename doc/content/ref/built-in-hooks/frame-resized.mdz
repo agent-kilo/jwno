@@ -1,0 +1,9 @@
+{:title ":frame-resized"
+ :template "main.html"
+ :back-to ["Built-In Hooks" "index.html"]
+ :order 9}
+---
+
+### Description
+
+TODO

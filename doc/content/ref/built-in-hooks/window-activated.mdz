@@ -1,0 +1,9 @@
+{:title ":window-activated"
+ :template "main.html"
+ :back-to ["Built-In Hooks" "index.html"]
+ :order 18}
+---
+
+### Description
+
+TODO
