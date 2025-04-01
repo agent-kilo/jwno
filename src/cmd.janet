@@ -796,10 +796,7 @@
 
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
-        :uia-manager uia-man
-        :key-manager key-man
-        :window-manager wm
-        :repl repl}
+        :window-manager wm}
     context)
 
   (:add-command command-man :nop cmd-nop
