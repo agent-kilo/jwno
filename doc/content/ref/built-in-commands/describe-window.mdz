@@ -1,0 +1,16 @@
+{:title ":describe-window"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 9
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:describe-window)
+```
+
+### Description
+
+Shows basic info about a window.

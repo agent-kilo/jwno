@@ -1,0 +1,16 @@
+{:title ":retile"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 23
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:retile)
+```
+
+### Description
+
+Fits all managed windows to their frames.

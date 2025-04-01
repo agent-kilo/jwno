@@ -1,0 +1,17 @@
+{:title ":enum-window-in-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 11
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:enum-window-in-frame dir)
+```
+
+### Description
+
+Brings focus to another window in the current frame, in the
+specified direction. Dir can be :next or :prev.

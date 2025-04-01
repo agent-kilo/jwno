@@ -1,0 +1,19 @@
+{:title ":repl"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 21
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:repl &opt start? host port)
+```
+
+### Description
+
+Opens an REPL window for the current Jwno process. If start? is
+truthy, and no REPL server is available, a new server will be
+started. Host and port specify the address to connect, and they
+default to "127.0.0.1" and 9999.

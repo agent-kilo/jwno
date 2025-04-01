@@ -1,0 +1,16 @@
+{:title ":describe-key"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 8
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:describe-key)
+```
+
+### Description
+
+Interactively reads a key, and shows some info about it.

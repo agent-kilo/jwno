@@ -1,0 +1,16 @@
+{:title ":manage-window"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 17
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:manage-window)
+```
+
+### Description
+
+Forcibly adds the current window to the list of managed windows.

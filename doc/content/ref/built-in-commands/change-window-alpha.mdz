@@ -1,0 +1,19 @@
+{:title ":change-window-alpha"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 4
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:change-window-alpha delta)
+```
+
+### Description
+
+Changes the focused window's alpha value, making it partially
+transparent. Delta, which can be negative, is the increment to
+apply to the alpha value. A window's alpha value is in the
+range [0, 255]. Some window's alpha cannot be changed.

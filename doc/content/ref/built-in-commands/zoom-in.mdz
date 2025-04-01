@@ -1,0 +1,20 @@
+{:title ":zoom-in"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 29
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:zoom-in ratio)
+```
+
+### Description
+
+Resizes the current frame, so that its size is proportional to
+its ancestors', according to ratio.
+
+For example, (:zoom-in 0.7) makes a frame to have 0.7 of both
+its ancestors' width and height.

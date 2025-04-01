@@ -1,0 +1,17 @@
+{:title ":frame-to-window-size"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 14
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:frame-to-window-size)
+```
+
+### Description
+
+Resizes the current frame, so that it's the same size as its
+current active window. Constraints from the parent frame apply.

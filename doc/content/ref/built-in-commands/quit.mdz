@@ -1,0 +1,16 @@
+{:title ":quit"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 20
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:quit)
+```
+
+### Description
+
+Tells Jwno to stop running.

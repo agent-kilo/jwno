@@ -1,0 +1,17 @@
+{:title ":move-window"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 18
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:move-window dir)
+```
+
+### Description
+
+Moves a window in the specified direction. Dir can be :left,
+:right, :up or :down.

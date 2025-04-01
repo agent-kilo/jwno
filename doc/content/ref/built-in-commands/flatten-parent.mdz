@@ -1,0 +1,17 @@
+{:title ":flatten-parent"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 13
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:flatten-parent)
+```
+
+### Description
+
+Flattens the parent frame, by closing the current frame and all
+its siblings.

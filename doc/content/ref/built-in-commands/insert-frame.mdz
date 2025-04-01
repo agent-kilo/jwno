@@ -1,0 +1,20 @@
+{:title ":insert-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 16
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:insert-frame location &opt after-insertion-fn)
+```
+
+### Description
+
+Inserts a new frame and adjusts its sibling frames' sizes as needed.
+Location is relative to the current frame, can be :before or :after.
+After-insertion-fn is a function accepting the new inserted frame
+object as its sole argument, and it will be called after the insertion.
+If the current frame is a top-level frame, this command does nothing.

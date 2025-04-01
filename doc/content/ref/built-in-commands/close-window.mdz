@@ -1,0 +1,18 @@
+{:title ":close-window"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 6
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:close-window)
+```
+
+### Description
+
+Tries to close the focused window. This command works by
+sending a message to the target window, instead of forcibly
+killing the window's process.
