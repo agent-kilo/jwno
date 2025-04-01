@@ -26,6 +26,7 @@
               :content {:tag "a" "href" (relative-url url) :content (or (node :nav-title) (node :title))}}
              (if-let [pages (node :pages)]
                {:tag "ul"
+                "class" "sub-toc"
                 :content (map render-toc pages)})]})
 
 
