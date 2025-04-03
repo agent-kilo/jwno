@@ -630,6 +630,20 @@
           (:add-hwnd wm info :forced))))))
 
 
+(var wm-pause-hook-fn nil)
+
+(defn cmd-toggle-window-management [hook-man ui-man]
+  (if wm-pause-hook-fn
+    (do
+      (:remove-hook hook-man :filter-window wm-pause-hook-fn)
+      (set wm-pause-hook-fn nil)
+      (:show-tooltip ui-man :toggle-window-management "Window management enabled."))
+    # else
+    (do
+      (set wm-pause-hook-fn (:add-hook hook-man :filter-window (fn [&] false)))
+      (:show-tooltip ui-man :toggle-window-management "Window management disabled."))))
+
+
 (defn cmd-ignore-window [wm ui-man]
   (with-uia [uia-win (:get-focused-window (in wm :uia-manager) true)]
     (unless uia-win
@@ -796,6 +810,7 @@
 
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
+        :hook-manager hook-man
         :window-manager wm}
     context)
 
@@ -1070,6 +1085,15 @@
 
      Forcibly adds the current window to the list of managed windows.
      ```)
+
+  (:add-command command-man :toggle-window-management
+     (fn [] (cmd-toggle-window-management hook-man ui-man))
+     ```
+     (:toggle-window-management)
+
+     Pauses/unpauses window management. Will not affect windows that
+     are already managed.
+     ``` )
 
   (:add-command command-man :ignore-window
      (fn [] (cmd-ignore-window wm ui-man))
