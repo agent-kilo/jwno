@@ -1,0 +1,34 @@
+{:title "Pause Key Binding Handling"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 16}
+---
+
+Every key that's not defined in a keymap gets passed through verbatim, so you can use an empty @link[../defining-key-bindings/transient-keymaps.html]{transient keymap} to implement a "passthrough" mode:
+
+@codeblock[janet]```
+(def passthrough-mode-keymap (:new-keymap (in jwno/context :key-manager)))
+(:define-key passthrough-mode-keymap
+             "Win + Ctrl + Alt + P"
+             :pop-keymap
+             "Exit passthrough mode")
+
+(:define-key root-keymap
+             "Win + Ctrl + Alt + P"
+             [:push-keymap passthrough-mode-keymap]
+             "Passthrough mode")
+(:set-keymap (in jwno/context :key-manager) root-keymap)
+```
+
+While this passthrough mode is active, every key except @code{Win + Ctrl + Alt + P} gets passed through, until you press @code{Win + Ctrl + Alt + P} again.
+
+Or, if you only need a @em{one-shot} passthrough key, use an empty @link[../defining-key-bindings/multi-level-keymaps.html]{mulpi-level keymap} instead:
+
+@codeblock[janet]```
+(:define-key root-keymap
+             "Win + Ctrl + Shift + P  Enter"
+             :nop
+             "Cancel")
+```
+
+Any key following @code{Win + Ctrl + Shift + P}, except @code{Enter}, gets passed through, then Jwno automatically resets itself to the root keymap. You can press @code{Enter} midway to cancel this "one-shot passthrough " operation.
