@@ -1,8 +1,8 @@
-{:title ":keymap-switched"
+{:title ":shutting-down"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 14
- :generated :partial}
+ :order 17
+ :generated true}
 ---
 
 ### Type
@@ -12,7 +12,7 @@
 ### Function Signature
 
 @codeblock[janet]```
-(hook-fn cur-keymap)
+(hook-fn)
 ```
 
 ### Description

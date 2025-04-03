@@ -1,8 +1,8 @@
 {:title ":window-removed"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 20
- :generated true}
+ :order 21
+ :generated :partial}
 ---
 
 ### Type

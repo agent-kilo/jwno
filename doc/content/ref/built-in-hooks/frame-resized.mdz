@@ -2,7 +2,7 @@
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
  :order 9
- :generated true}
+ :generated :partial}
 ---
 
 ### Type

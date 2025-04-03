@@ -355,6 +355,8 @@
      unknown-ev
      (log/warning "Unknown event from main loop supervisor: %n" unknown-ev)))
 
+  (:call-hook hook-man :shutting-down)
+
   (:stop-all-servers repl-man)
   (:unregister-loader module-man)
   (:destroy window-man)

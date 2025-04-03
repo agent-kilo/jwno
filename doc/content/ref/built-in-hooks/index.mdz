@@ -28,6 +28,7 @@ These are the hooks available in Jwno by default.
 @li{@link[keymap-switched.html]{:keymap-switched}}
 @li{@link[layout-created.html]{:layout-created}}
 @li{@link[monitor-updated.html]{:monitor-updated}}
+@li{@link[shutting-down.html]{:shutting-down}}
 @li{@link[virtual-desktop-changed.html]{:virtual-desktop-changed}}
 @li{@link[window-activated.html]{:window-activated}}
 @li{@link[window-created.html]{:window-created}}
