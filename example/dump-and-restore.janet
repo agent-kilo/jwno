@@ -149,7 +149,26 @@
              (pointer-to-number (in win :hwnd)))
     (error "tree dump data mismatch"))
   (eachp [k v] tags
-    (put (in win :tags) k v)))
+    (put (in win :tags) k v))
+
+  # Return an empty table, to make it consistent with other
+  # restore-* functions
+  @{})
+
+
+(defn win-list-to-map [win-list]
+  (cond
+    (table? win-list)
+    win-list
+
+    (indexed? win-list)
+    (let [win-map @{}]
+      (each w win-list
+        (put win-map (pointer-to-number (in w :hwnd)) w))
+      win-map)
+
+    true
+    (errorf "unsupported window list: %n" win-list)))
 
 
 (defn calc-split-params [children]
@@ -215,17 +234,15 @@
   [direction ratios])
 
 
-(defn restore-frame [fr dumped &opt win-map?]
+(defn restore-frame [fr dumped &opt win-list]
   (def [dump-type rect tags children] dumped)
+  (unless (= :frame dump-type)
+    (errorf "can not restore dump type to a frame: %n" dump-type))
 
-  (def win-map
-    (if win-map?
-      win-map?
-      (let [all-windows (:get-all-windows fr)
-            new-map @{}]
-        (each w all-windows
-          (put new-map (pointer-to-number (in w :hwnd)) w))
-        new-map)))
+  # XXX: win-list is also re-used in recursion to pass down win-map,
+  # so it can be a table, instead of a list/array.
+  (default win-list (:get-all-windows fr))
+  (def win-map (win-list-to-map win-list))
 
   (array/clear (in fr :children))
   (put fr :current-child nil)
@@ -245,14 +262,31 @@
       (each c children
         (def [_ hwnd-num _] c)
         (when-let [win (in win-map hwnd-num)]
+          (put win-map hwnd-num nil)
           (restore-window win c)
           (:add-child fr win)))))
 
   (eachp [k v] tags
-    (put (in fr :tags) k v)))
+    (put (in fr :tags) k v))
+
+  win-map)
 
 
-(defn restore-node [node dumped]
+(defn restore-layout [lo dumped &opt win-list]
+  (def [dump-type lo-id lo-name children] dumped)
+  (unless (= :layout dump-type)
+    (errorf "can not restore dump type to a layout: %n" dump-type))
+
+  # XXX: win-list is also re-used in recursion to pass down win-map,
+  # so it can be a table, instead of a list/array.
+  (default win-list (:get-all-windows lo))
+  (def win-map (win-list-to-map win-list))
+
+  # TODO
+  )
+
+
+(defn restore-node [node dumped &opt win-list]
   (when (not (tuple? dumped))
     (errorf "invalid tree dump: %n" dumped))
 
@@ -261,6 +295,9 @@
     (restore-window node dumped)
 
     :frame
-    (restore-frame node dumped)
+    (restore-frame node dumped win-list)
+
+    :layout
+    (restore-layout node dumped win-list)
     )
   )
