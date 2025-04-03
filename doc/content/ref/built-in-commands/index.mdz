@@ -40,6 +40,7 @@ These are the commands available in Jwno by default.
 @li{@link[split-frame.html]{:split-frame}}
 @li{@link[summon.html]{:summon}}
 @li{@link[toggle-parent-direction.html]{:toggle-parent-direction}}
+@li{@link[toggle-window-management.html]{:toggle-window-management}}
 @li{@link[zoom-in.html]{:zoom-in}}
 
 }
