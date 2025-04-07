@@ -288,18 +288,87 @@
   win-map)
 
 
+(defn find-closest-top-frame [rect all-top-frames]
+  (def [center-x center-y] (util/rect-center rect))
+  (var min-dist math/int-max)
+  (var found nil)
+  (var found-idx nil)
+  (eachp [idx fr] all-top-frames
+    (def mon-rect (get-in fr [:monitor :work-area]))
+    (def [mon-center-x mon-center-y] (util/rect-center mon-rect))
+    (def dx (- center-x mon-center-x))
+    (def dy (- center-y mon-center-y))
+    (def dist (+ (* dx dx) (* dy dy)))
+    (when (< dist min-dist)
+      (set found fr)
+      (set found-idx idx)
+      (set min-dist dist)))
+  [found found-idx min-dist])
+
+
 (defn restore-layout [lo dumped &opt win-list]
   (def [dump-type lo-id lo-name children] dumped)
   (unless (= :layout dump-type)
     (errorf "can not restore dump type to a layout: %n" dump-type))
 
-  # XXX: win-list is also re-used in recursion to pass down win-map,
-  # so it can be a table, instead of a list/array.
   (default win-list (:get-all-windows lo))
   (def win-map (win-list-to-map win-list))
 
-  # TODO
-  )
+  (def all-top-frames (array/slice (in lo :children)))
+
+  (each c children
+    (def [_ rect _ _] c)
+    (def [found-fr found-idx dist]
+      (find-closest-top-frame rect all-top-frames))
+    (if found-fr
+      (do
+        (log/debug "found top frame to restore, rect = %n, frame rect = %n, dist = %n"
+                   rect (in found-fr :rect) dist)
+        (array/remove all-top-frames found-idx)
+        (restore-frame found-fr c win-map))
+      # else
+      (log/debug "top frame for dump data not found, rect = %n" rect)))
+
+  (log/debug "top frames not restored: %n" (map |(in $ :rect) all-top-frames))
+
+  win-map)
+
+
+(defn find-layout [id all-layouts]
+  (var found nil)
+  (var found-idx nil)
+  (eachp [idx lo] all-layouts
+    (when (= id (in lo :id))
+      (set found lo)
+      (set found-idx idx)
+      (break)))
+  [found found-idx])
+
+
+(defn restore-virtual-desktop-container [vdc dumped &opt win-list]
+  (def [dump-type children] dumped)
+  (unless (= :vdc dump-type)
+    (errorf "can not restore dump type to a virtual desktop container: %n" dump-type))
+
+  (default win-list (:get-all-windows vdc))
+  (def win-map (win-list-to-map win-list))
+
+  (def all-layouts (array/slice (in vdc :children)))
+
+  (each c children
+    (def [_ lo-id _ _] c)
+    (def [found-lo found-idx] (find-layout lo-id all-layouts))
+    (if found-lo
+      (do
+        (log/debug "found layout to restore, id = %n" lo-id)
+        (array/remove all-layouts found-idx)
+        (restore-layout found-lo c win-map))
+      # else
+      (log/debug "layout for dump data not found, lo-id = %n" lo-id)))
+
+  (log/debug "layouts not restored: %n" (map |(in $ :id) all-layouts))
+
+  win-map)
 
 
 (defn restore-node [node dumped &opt win-list]
@@ -315,5 +384,6 @@
 
     :layout
     (restore-layout node dumped win-list)
-    )
-  )
+
+    :virtual-desktop-container
+    (restore-virtual-desktop-container node dumped win-list)))
