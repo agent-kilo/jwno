@@ -18,7 +18,7 @@
     @link[built-in-commands/index.html]{Built-In Commands}
   }
   @li{
-    @link[built-in-hooks.html]{Built-In Hooks}
+    @link[built-in-hooks/index.html]{Built-In Hooks}
   }
   @li{
     @link[built-in-modules.html]{Built-In Modules}
