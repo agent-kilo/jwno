@@ -147,7 +147,7 @@
     (errorf "can not restore dump type to a window: %n" dump-type))
   (unless (= hwnd-num
              (pointer-to-number (in win :hwnd)))
-    (error "tree dump data mismatch"))
+    (log/debug "restoring dump data for 0x%x to %n" hwnd-num (in win :hwnd)))
   (eachp [k v] tags
     (put (in win :tags) k v))
 
