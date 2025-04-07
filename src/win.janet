@@ -1141,7 +1141,7 @@
    (in rect :bottom)])
 
 
-(defn tree-node-dump-subtree [self &opt level indent-width indent-char wm]
+(defn tree-node-print-subtree [self &opt level indent-width indent-char wm]
   (default level 0)
   (default indent-width const/DEFAULT-FRAME-TREE-DUMP-INDENT-WIDTH)
   (default indent-char const/DEFAULT-FRAME-TREE-DUMP-INDENT-CHAR)
@@ -1221,7 +1221,7 @@
 
   (when-let [children (in self :children)]
     (each child children
-      (:dump-subtree child (+ 1 level) indent-width indent-char wm))))
+      (:print-subtree child (+ 1 level) indent-width indent-char wm))))
 
 
 (def- tree-node-proto
@@ -1252,7 +1252,7 @@
     :get-window-manager tree-node-get-window-manager
     :get-top-frame tree-node-get-top-frame
     :get-depth tree-node-get-depth
-    :dump-subtree tree-node-dump-subtree})
+    :print-subtree tree-node-print-subtree})
 
 
 (defn tree-node [node-type &opt parent children &keys extra-fields]

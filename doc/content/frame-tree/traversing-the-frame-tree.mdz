@@ -15,4 +15,4 @@ Each node in the frame tree is a @em{tree node} object (yeah, really). All inter
 
 Since it's the root node, its @code{:parent} is @code{nil}. And the @code{:children} property is a simple @link[https://janet-lang.org/docs/data_structures/arrays.html]{array}, where you can have access to all its child nodes.
 
-The @code{tree-node-dump-subtree} function in @link[https://github.com/agent-kilo/jwno/blob/master/src/win.janet]{@code{win.janet}} is a good reference for traversing the frame tree recursively \(It's the implementation of the @code{:dump-subtree} method we used to print the frame tree in @link[inspecting-the-frame-tree.html]{Inspecting the Frame Tree}).
+The @code{tree-node-print-subtree} function in @link[https://github.com/agent-kilo/jwno/blob/master/src/win.janet]{@code{win.janet}} is a good reference for traversing the frame tree recursively \(It's the implementation of the @code{:print-subtree} method we used to print the frame tree in @link[inspecting-the-frame-tree.html]{Inspecting the Frame Tree}).
