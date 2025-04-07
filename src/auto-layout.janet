@@ -70,6 +70,21 @@
    close-empty-frame-proto))
 
 
+# ================== Common Code for Auto Layouts ==================
+
+(var auto-layout-default-filter-hook-fn nil)
+
+(defn auto-layout-default-filter [win uia-win exe-path desktop-info]
+  (cond
+    (= "#32770" (:get_CachedClassName uia-win))
+    false
+
+    (not= 0 (:GetCurrentPropertyValue uia-win UIA_IsDialogPropertyId))
+    false
+
+    true))
+
+
 # ================== BSP Layout ==================
 #
 # Automatically split and arrange frames in the good old BSP fasion.
@@ -83,23 +98,13 @@
 #     (:disable bsp-layout)
 #
 
-(defn bsp-do-default-filter [self win uia-win exe-path desktop-info]
-  (cond
-    (= "#32770" (:get_CachedClassName uia-win))
-    false
-
-    (not= 0 (:GetCurrentPropertyValue uia-win UIA_IsDialogPropertyId))
-    false
-
-    true))
-
 
 (defn bsp-on-window-created [self win uia-win exe-path desktop-info]
   (def filter-result
     (:call-filter-hook
        (in self :hook-manager)
        :and
-       :filter-bsp-window
+       :filter-auto-layout-window
        win uia-win exe-path desktop-info))
 
   (unless filter-result
@@ -126,10 +131,10 @@
 
   (def hook-man (in self :hook-manager))
 
-  (put self :default-filter-hook-fn
-     (:add-hook hook-man :filter-bsp-window
-        (fn [& args]
-          (:do-default-filter self ;args))))
+  (unless auto-layout-default-filter-hook-fn
+    (set auto-layout-default-filter-hook-fn
+         (:add-hook hook-man :filter-auto-layout-window
+            auto-layout-default-filter)))
 
   (put self :hook-fn
      (:add-hook hook-man :window-created
@@ -139,17 +144,12 @@
 
 (defn bsp-disable [self]
   (def {:hook-manager hook-man
-        :hook-fn hook-fn
-        :default-filter-hook-fn default-filter-hook-fn}
+        :hook-fn hook-fn}
     self)
 
   (when hook-fn
     (put self :hook-fn nil)
-    (:remove-hook hook-man :window-created hook-fn))
-
-  (when default-filter-hook-fn
-    (put self :default-filter-hook-fn nil)
-    (:remove-hook hook-man :filter-bsp-window)))
+    (:remove-hook hook-man :window-created hook-fn)))
 
 
 (defn bsp-refresh [self]
@@ -186,8 +186,7 @@
 
 
 (def bsp-proto
-  @{:do-default-filter bsp-do-default-filter
-    :on-window-created bsp-on-window-created
+  @{:on-window-created bsp-on-window-created
     :enable bsp-enable
     :disable bsp-disable
     :refresh bsp-refresh})

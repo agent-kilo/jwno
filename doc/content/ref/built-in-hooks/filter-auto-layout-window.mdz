@@ -1,8 +1,8 @@
-{:title ":filter-bsp-window"
+{:title ":filter-auto-layout-window"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
  :order 2
- :generated :partial}
+ :generated true}
 ---
 
 ### Type

@@ -13,7 +13,7 @@ These are the hooks available in Jwno by default.
 @ul{
 
 @li{@link[command-executed.html]{:command-executed}}
-@li{@link[filter-bsp-window.html]{:filter-bsp-window}}
+@li{@link[filter-auto-layout-window.html]{:filter-auto-layout-window}}
 @li{@link[filter-command.html]{:filter-command}}
 @li{@link[filter-forced-window.html]{:filter-forced-window}}
 @li{@link[filter-scratch-pad-window.html]{:filter-scratch-pad-window}}
