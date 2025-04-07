@@ -34,12 +34,12 @@
     paths))
 
 
-(defn get-mod-paths [cli-args config-file-path]
+(defn get-mod-paths [cli-args data-dir]
   (def ret
     (if-let [paths (in cli-args "mod-path")]
       paths
       @[]))
-  (array/push ret (path/dirname config-file-path))
+  (array/push ret (path/dirname data-dir))
   ret)
 
 
@@ -49,8 +49,10 @@
 
   (if config-found
     (do
+      (def data-dir (path/dirname config-found))
+
       (:register-loader (in context :module-manager)
-                        ;(get-mod-paths cli-args config-found))
+                        ;(get-mod-paths cli-args data-dir))
 
       (def config-env
         (try
@@ -64,6 +66,8 @@
                              (get-stack-trace fib)))
            nil)))
       (when config-env
+        (put context :data-dir data-dir)
+        (put context :user-config-file config-found)
         (put context :user-config config-env)
         (:add-cached-module (in context :module-manager) "jwno/user-config" config-env)
         # Only proceed after the config file is successfully loaded
@@ -315,6 +319,11 @@
   # The config file environment, initialized in late-init,
   # after loading the config file
   (put context :user-config nil)
+  # The file path of the current config, initialized in late-init
+  (put context :user-config-file nil)
+  # The path of the data directory (where the config file resides),
+  # initialized in late-init
+  (put context :data-dir nil)
 
   (add-default-commands command-man context)
 
