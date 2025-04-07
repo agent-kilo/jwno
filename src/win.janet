@@ -1224,6 +1224,15 @@
       (:print-subtree child (+ 1 level) indent-width indent-char wm))))
 
 
+(defn tree-node-clear-children [self]
+  (when-let [child-arr (in self :children)]
+    (def children (slice child-arr))
+    (array/clear child-arr)
+    (put self :current-child nil)
+    (each c children
+      (put c :parent nil))))
+
+
 (def- tree-node-proto
   @{:activate tree-node-activate
     :attached? tree-node-attached?
@@ -1234,6 +1243,7 @@
     :get-prev-sibling tree-node-get-prev-sibling
     :add-child tree-node-add-child
     :remove-child tree-node-remove-child
+    :clear-children tree-node-clear-children
     :get-all-windows tree-node-get-all-windows
     :get-all-leaf-frames tree-node-get-all-leaf-frames
     :get-top-window tree-node-get-top-window
