@@ -259,12 +259,28 @@
     # else
     (unless (empty? children)
       # The frame is not empty, and the children are windows
+      (def lo (:get-layout fr))
+      (def wm (when lo (:get-window-manager lo)))
+      
+      (def maybe-restore
+        (if lo
+          # attached frame, need to check its virtual desktop
+          (fn [hwnd-num win c]
+            (when-let [vd-info (:get-hwnd-virtual-desktop wm (in win :hwnd))]
+              (when (= (in lo :id) (in vd-info :id))
+                (put win-map hwnd-num nil)
+                (restore-window win c)
+                (:add-child fr win))))
+          # else, detached frame
+          (fn [hwnd-num win c]
+            (put win-map hwnd-num nil)
+            (restore-window win c)
+            (:add-child fr win))))
+
       (each c children
         (def [_ hwnd-num _] c)
         (when-let [win (in win-map hwnd-num)]
-          (put win-map hwnd-num nil)
-          (restore-window win c)
-          (:add-child fr win)))))
+          (maybe-restore hwnd-num win c)))))
 
   (eachp [k v] tags
     (put (in fr :tags) k v))
