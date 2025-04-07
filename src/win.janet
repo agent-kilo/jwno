@@ -541,6 +541,180 @@
             (get-hwnd-virtual-desktop-id hwnd (in wm :vdm-com)))))
 
 
+(defn dump-tag-value [x]
+  (def x-type (type x))
+  (cond
+    (or (= x-type :array)
+        (= x-type :tuple))
+    (tuple/slice (map |(dump-tag-value $) x))
+
+    (or (= x-type :table)
+        (= x-type :struct))
+    (do
+      (def new-tab @{})
+      (eachp [k v] x
+             (def new-k (dump-tag-value k))
+             (def new-v (dump-tag-value v))
+             (put new-tab new-k new-v))
+      (table/to-struct new-tab))
+
+    (or (= x-type :core/s64)
+        (= x-type :core/u64))
+    (int/to-number x) # XXX: type conversion
+
+    (abstract? x)
+    (errorf "non-trivial type: %n" x)
+
+    (or (= x-type :function)
+        (= x-type :cfunction)
+        (= x-type :fiber))
+    (errorf "non-trivial type: %n" x)
+
+    (= x-type :pointer)
+    (errorf "non-trivial type: %n" x)
+
+    true
+    x))
+
+
+(defn dump-tags [orig-tags]
+  (def tags @{})
+  (each k (keys orig-tags)
+    (if (or (keyword? k)
+            (symbol? k))
+      (do
+        (def v
+          (try
+            (dump-tag-value (in orig-tags k))
+            ((err fib)
+             (if (and (string? err)
+                      (string/has-prefix? "non-trivial type:" err))
+               (do
+                 (log/warning "non-trivial value in tag %n: %n\n%s"
+                              k
+                              (in orig-tags k)
+                              (get-stack-trace fib))
+                 nil)
+               # else
+               (do
+                 (log/error "failed to dump tag value: %n\n%s"
+                            err
+                            (get-stack-trace fib))
+                 (error err))))))
+        (put tags k v))
+
+      # else
+      (log/warning "ignoring tag: %n" k)))
+  (table/to-struct tags))
+
+
+(defn hwnd-list-to-map [hwnd-list]
+  (cond
+    (table? hwnd-list)
+    hwnd-list
+
+    (indexed? hwnd-list)
+    (let [hwnd-map @{}]
+      (each hwnd hwnd-list
+        (put hwnd-map (pointer-to-number hwnd) hwnd))
+      hwnd-map)
+
+    true
+    (errorf "unsupported hwnd list: %n" hwnd-list)))
+
+
+(defn enum-all-hwnds []
+  (def hwnd-list @[])
+  (EnumChildWindows
+   nil
+   (fn [hwnd]
+     (array/push hwnd-list hwnd)
+     1 # !!! IMPORTANT
+     ))
+  hwnd-list)
+
+
+(defn calc-loading-split-params [dumped-children]
+  (var direction nil)
+  (var last-rect nil)
+  (var total-width 0)
+  (var total-height 0)
+
+  (def child-widths @[])
+  (def child-heights @[])
+
+  # First pass: Calculate total-width, total-height and direction
+  (each c dumped-children
+    (def child-type (first c))
+
+    (case child-type
+      :window
+      (do
+        (set direction nil)
+        # out of each loop
+        (break))
+
+      :frame
+      (do
+        (def [_ rect _tags] c)
+        (def [width height] (rect-size rect))
+        (array/push child-widths width)
+        (array/push child-heights height)
+        (if last-rect
+          (cond
+            (= (in rect :top)
+               (in last-rect :top))
+            (do
+              (set direction :horizontal)
+              (+= total-width width))
+
+            (= (in rect :left)
+               (in last-rect :left))
+            (do
+              (set direction :vertical)
+              (+= total-height height)))
+          # else
+          (do
+            (set total-width width)
+            (set total-height height)))
+        (set last-rect rect))
+
+      (errorf "unknown child node type: %n" child-type)))
+
+  (unless direction
+    # early return
+    (break nil))
+
+  # Second pass: Calculate actual ratios
+  (def ratios
+    (case direction
+      :horizontal
+       (map |(/ $ total-width) child-widths)
+
+       :vertical
+       (map |(/ $ total-height) child-heights)))
+
+  [direction ratios])
+
+
+(defn find-closest-frame [rect all-frames]
+  (def [center-x center-y] (rect-center rect))
+  (var min-dist math/int-max)
+  (var found nil)
+  (var found-idx nil)
+  (eachp [idx fr] all-frames
+    (def fr-rect (in fr :rect))
+    (def [fr-center-x fr-center-y] (rect-center fr-rect))
+    (def dx (- center-x fr-center-x))
+    (def dy (- center-y fr-center-y))
+    (def dist (+ (* dx dx) (* dy dy)))
+    (when (< dist min-dist)
+      (set found fr)
+      (set found-idx idx)
+      (set min-dist dist)))
+  [found found-idx min-dist])
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -1389,6 +1563,29 @@
   (:set-focus-to-window uia-man (in self :hwnd)))
 
 
+(defn window-dump [self]
+  [:window
+   (pointer-to-number (in self :hwnd))
+   (dump-tags (in self :tags))])
+
+
+(defn window-load [self dumped]
+  (def [dump-type hwnd-num tags] dumped)
+
+  (unless (= :window dump-type)
+    (errorf "can not restore dump type to a window: %n" dump-type))
+  (unless (= hwnd-num
+             (pointer-to-number (in self :hwnd)))
+    (log/debug "restoring dump data for 0x%x to %n" hwnd-num (in self :hwnd)))
+
+  (eachp [k v] tags
+    (put (in self :tags) k v))
+
+  # Return an empty table, to make it consistent with other
+  # restore-* functions
+  @{})
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
@@ -1406,7 +1603,9 @@
      :get-info window-get-info
      :get-margins window-get-margins
      :get-dwm-border-margins window-get-dwm-border-margins
-     :set-focus window-set-focus}
+     :set-focus window-set-focus
+     :dump window-dump
+     :load window-load}
    tree-node-proto))
 
 
@@ -2044,6 +2243,68 @@
     (error "inconsistent states for frame tree")))
 
 
+(defn frame-dump [self]
+  [:frame
+   (in self :rect)
+   (dump-tags (in self :tags))
+   (tuple/slice (map |(:dump $) (in self :children)))])
+
+
+(defn frame-load [self dumped &opt hwnd-list]
+  (def [dump-type rect tags children] dumped)
+  (unless (= :frame dump-type)
+    (errorf "can not restore dump type to a frame: %n" dump-type))
+
+  # XXX: hwnd-list is also re-used in recursion to pass down hwnd-map,
+  # so it can be a table, instead of a list/array.
+  (default hwnd-list (enum-all-hwnds))
+  (def hwnd-map (hwnd-list-to-map hwnd-list))
+
+  (:clear-children self)
+
+  (if-let [split-params (calc-loading-split-params children)]
+    (do
+      # The frame is not empty, and the children are sub-frames
+      (def [direction ratios] split-params)
+      (:split self direction (length children) ratios)
+      (map (fn [sub-fr d]
+             (:load sub-fr d hwnd-map))
+           (in self :children)
+           children))
+    # else
+    (unless (empty? children)
+      # The frame is not empty, and the children are windows
+      (def lo (:get-layout self))
+      (def wm (when lo (:get-window-manager lo)))
+
+      (def maybe-restore
+        (if lo
+          # attached frame, need to check its virtual desktop
+          (fn [hwnd-num hwnd c]
+            (when-let [vd-info (:get-hwnd-virtual-desktop wm hwnd)]
+              (when (= (in lo :id) (in vd-info :id))
+                (put hwnd-map hwnd-num nil)
+                (def win (window hwnd))
+                (:load win c)
+                (:add-child self win))))
+          # else, detached frame
+          (fn [hwnd-num hwnd c]
+            (put hwnd-map hwnd-num nil)
+            (def win (window hwnd))
+            (:load win c)
+            (:add-child self win))))
+
+      (each c children
+        (def [_ hwnd-num _] c)
+        (when-let [hwnd (in hwnd-map hwnd-num)]
+          (maybe-restore hwnd-num hwnd c)))))
+
+  (eachp [k v] tags
+         (put (in self :tags) k v))
+
+  hwnd-map)
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
@@ -2060,7 +2321,9 @@
         :set-direction frame-set-direction
         :toggle-direction frame-toggle-direction
         :rotate-children frame-rotate-children
-        :reverse-children frame-reverse-children}
+        :reverse-children frame-reverse-children
+        :dump frame-dump
+        :load frame-load}
       tree-node-proto))
 
 
@@ -2234,11 +2497,48 @@
   (:update-work-areas self monitors))
 
 
+(defn layout-dump [self]
+  [:layout
+   (in self :id)
+   (in self :name)
+   (tuple/slice (map |(:dump $) (in self :children)))])
+
+
+(defn layout-load [self dumped &opt hwnd-list]
+  (def [dump-type lo-id lo-name children] dumped)
+  (unless (= :layout dump-type)
+    (errorf "can not restore dump type to a layout: %n" dump-type))
+
+  (default hwnd-list (enum-all-hwnds))
+  (def hwnd-map (hwnd-list-to-map hwnd-list))
+
+  (def all-top-frames (array/slice (in self :children)))
+
+  (each c children
+    (def [_ rect _ _] c)
+    (def [found-fr found-idx dist]
+      (find-closest-frame rect all-top-frames))
+    (if found-fr
+      (do
+        (log/debug "found top frame to restore, rect = %n, frame rect = %n, dist = %n"
+                   rect (in found-fr :rect) dist)
+        (array/remove all-top-frames found-idx)
+        (:load found-fr c hwnd-map))
+      # else
+      (log/debug "top frame for dump data not found, rect = %n" rect)))
+
+  (log/debug "top frames not restored: %n" (map |(in $ :rect) all-top-frames))
+
+  hwnd-map)
+
+
 (def- layout-proto
   (table/setproto
    @{:update-work-areas layout-update-work-areas
      :rotate-children layout-rotate-children
-     :reverse-children layout-reverse-children}
+     :reverse-children layout-reverse-children
+     :dump layout-dump
+     :load layout-load}
    tree-node-proto))
 
 
@@ -2297,11 +2597,39 @@
   dead-arr)
 
 
+(defn vdc-dump [self]
+  [:vdc
+   (tuple/slice (map |(:dump $) (in self :children)))])
+
+
+(defn vdc-load [self dumped &opt hwnd-list]
+  (def [dump-type children] dumped)
+  (unless (= :vdc dump-type)
+    (errorf "can not restore dump type to a virtual desktop container: %n" dump-type))
+
+  (default hwnd-list (enum-all-hwnds))
+  (def hwnd-map (hwnd-list-to-map hwnd-list))
+
+  (:clear-children self)
+
+  (each c children
+    (def [_ lo-id lo-name _] c)
+    (def vd-info {:id lo-id :name lo-name})
+    (def lo (:new-layout self vd-info))
+    (:add-child self lo)
+    (log/debug "restoring layout, id = %n" lo-id)
+    (:load lo c hwnd-map))
+
+  hwnd-map)
+
+
 (def- virtual-desktop-container-proto
   (table/setproto
    @{:new-layout vdc-new-layout
      :get-current-frame-on-desktop vdc-get-current-frame-on-desktop
-     :purge-windows vdc-purge-windows}
+     :purge-windows vdc-purge-windows
+     :dump vdc-dump
+     :load vdc-load}
    tree-node-proto))
 
 
