@@ -54,6 +54,9 @@
       (:register-loader (in context :module-manager)
                         ;(get-mod-paths cli-args data-dir))
 
+      (put context :data-dir data-dir)
+      (put context :user-config-file config-found)
+
       (def config-env
         (try
           (load-config-file config-found context)
@@ -66,8 +69,6 @@
                              (get-stack-trace fib)))
            nil)))
       (when config-env
-        (put context :data-dir data-dir)
-        (put context :user-config-file config-found)
         (put context :user-config config-env)
         (:add-cached-module (in context :module-manager) "jwno/user-config" config-env)
         # Only proceed after the config file is successfully loaded
