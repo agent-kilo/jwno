@@ -91,6 +91,23 @@
     path))
 
 
+################## Pointers ##################
+
+(def pointer-peg
+  (peg/compile
+   ~{:left-delim "<"
+     :right-delim ">"
+     :hex-digit (choice (range "09") (range "af") (range "AF"))
+     :hex-addr (capture (sequence "0x" (some :hex-digit)))
+     :main (sequence :left-delim :s* "pointer" :s+ :hex-addr :s* :right-delim)}))
+
+
+(defn pointer-to-number [pointer]
+  (def pointer-str (string pointer))
+  (def matched (peg/match pointer-peg pointer-str))
+  (parse ;matched))
+
+
 ################## Calculations ##################
 
 (defmacro rect-center [rect]
