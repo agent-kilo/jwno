@@ -43,6 +43,7 @@
       ["./indicator" "jwno/indicator"]
       ["./ui-hint" "jwno/ui-hint"]
       ["./scratch-pad" "jwno/scratch-pad"]
+      ["./layout-history" "jwno/layout-history"]
       ["./util" "jwno/util"]
       ["./log" "jwno/log"]])
 
