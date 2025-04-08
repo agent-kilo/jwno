@@ -970,6 +970,21 @@
       (in lo :current-child))))
 
 
+(defn tree-node-get-current-layout [self]
+  (case (in self :type)
+    :window
+    (:get-layout self)
+
+    :frame
+    (:get-layout self)
+
+    :layout
+    self
+
+    :virtual-desktop-container
+    (in self :current-child)))
+
+
 (defn tree-node-get-first-frame [self]
   (def children (in self :children))
 
@@ -1432,6 +1447,7 @@
     :find-hwnd tree-node-find-hwnd
     :purge-windows tree-node-purge-windows
     :get-layout tree-node-get-layout
+    :get-current-layout tree-node-get-current-layout
     :get-root tree-node-get-root
     :get-window-manager tree-node-get-window-manager
     :get-top-frame tree-node-get-top-frame
@@ -2557,16 +2573,26 @@
         :name desktop-name}
     desktop-info)
 
+  (def lo (:get-layout-on-desktop self desktop-info))
+  (:get-current-frame lo))
+
+
+(defn vdc-get-layout-on-desktop [self desktop-info]
+  (def {:id desktop-id
+        :name desktop-name}
+    desktop-info)
+
   (var layout-found nil)
   (each lo (in self :children)
     (when (= (in lo :id) desktop-id)
       (set layout-found lo)
       (break)))
   (if layout-found
-    (:get-current-frame layout-found)
+    layout-found
     (let [new-layout (:new-layout self desktop-info)]
       (:add-child self new-layout)
-      (:get-current-frame new-layout))))
+      (:layout-created (in self :window-manager) new-layout)
+      new-layout)))
 
 
 (defn vdc-new-layout [self desktop-info]
@@ -2582,7 +2608,6 @@
                  monitors)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
-  (:layout-created wm new-layout)
   new-layout)
 
 
@@ -2626,6 +2651,7 @@
 (def- virtual-desktop-container-proto
   (table/setproto
    @{:new-layout vdc-new-layout
+     :get-layout-on-desktop vdc-get-layout-on-desktop
      :get-current-frame-on-desktop vdc-get-current-frame-on-desktop
      :purge-windows vdc-purge-windows
      :dump vdc-dump
@@ -3000,6 +3026,12 @@
         (:set-focus self lo)))))
 
 
+(defn wm-layouts-changed [self lo-list]
+  (def {:hook-manager hook-man} self)
+  (each lo lo-list
+    (:call-hook hook-man :layout-changed lo)))
+
+
 (defn wm-frames-resized [self frame-list &opt trigger-layout-changed]
   (default trigger-layout-changed true)
 
@@ -3025,8 +3057,7 @@
       (:frames-resized self (in fr :children) false)))
 
   (unless (empty? changed-layouts)
-    (each lo changed-layouts
-      (:call-hook hook-man :layout-changed lo))))
+    (:layouts-changed self (values changed-layouts))))
 
 
 (defn wm-monitor-updated [self top-frame]
@@ -3150,6 +3181,7 @@
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
     :desktop-name-changed wm-desktop-name-changed
+    :layouts-changed wm-layouts-changed
     :frames-resized wm-frames-resized
     :monitor-updated wm-monitor-updated
     :layout-created wm-layout-created
