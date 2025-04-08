@@ -1,8 +1,8 @@
-{:title ":window-activated"
+{:title ":layout-changed"
  :template "main.html"
  :back-to ["Built-In Hooks" "index.html"]
- :order 20
- :generated :partial}
+ :order 15
+ :generated true}
 ---
 
 ### Type
@@ -12,7 +12,7 @@
 ### Function Signature
 
 @codeblock[janet]```
-(hook-fn new-win)
+(hook-fn lo)
 ```
 
 ### Description

@@ -26,6 +26,7 @@ These are the hooks available in Jwno by default.
 @li{@link[keymap-pushed.html]{:keymap-pushed}}
 @li{@link[keymap-reset.html]{:keymap-reset}}
 @li{@link[keymap-switched.html]{:keymap-switched}}
+@li{@link[layout-changed.html]{:layout-changed}}
 @li{@link[layout-created.html]{:layout-created}}
 @li{@link[monitor-updated.html]{:monitor-updated}}
 @li{@link[shutting-down.html]{:shutting-down}}

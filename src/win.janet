@@ -3000,9 +3000,17 @@
         (:set-focus self lo)))))
 
 
-(defn wm-frames-resized [self frame-list]
+(defn wm-frames-resized [self frame-list &opt trigger-layout-changed]
+  (default trigger-layout-changed true)
+
   (def hook-man (in self :hook-manager))
+  (def changed-layouts @{})
+
   (each fr frame-list
+    (when trigger-layout-changed
+      (when-let [lo (:get-layout fr)]
+        (put changed-layouts (in lo :id) lo)))
+
     (def children (in fr :children))
 
     # Only call hooks on leaf frames
@@ -3014,7 +3022,11 @@
       (:call-hook hook-man :frame-resized fr)
 
       (= :frame (get-in fr [:children 0 :type]))
-      (:frames-resized self (in fr :children)))))
+      (:frames-resized self (in fr :children) false)))
+
+  (unless (empty? changed-layouts)
+    (each lo changed-layouts
+      (:call-hook hook-man :layout-changed lo))))
 
 
 (defn wm-monitor-updated [self top-frame]
