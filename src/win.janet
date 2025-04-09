@@ -2793,6 +2793,7 @@
       (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
+  (:layouts-changed self [(:get-layout frame-found)])
   (:transform new-win (:get-padded-rect frame-found) nil self)
 
   new-win)
