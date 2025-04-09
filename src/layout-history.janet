@@ -1,5 +1,7 @@
+(import ./win)
 (import ./log)
 
+(use jw32/_dwmapi)
 (use jw32/_util)
 (use ./util)
 
@@ -74,6 +76,35 @@
     (:remove-hook hook-man h f)))
 
 
+(defn place-excessive-windows [lo hwnd-list all-win-list]
+  (def win-map @{})
+  (each w all-win-list
+    (put win-map (in w :hwnd) w))
+
+  (log/debug "all windows: %n" (keys win-map))
+  (log/debug "excessive windows: %n" hwnd-list)
+
+  (def all-leaves (:get-all-leaf-frames lo))
+  (def first-frame (:get-first-frame lo))
+
+  (each hwnd hwnd-list
+    (when-let [win (in win-map hwnd)]
+      (def hwnd-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+      (def [found-fr _ dist]
+        (win/find-closest-frame hwnd-rect all-leaves))
+      (def target-fr
+        (if found-fr
+          (do
+            (log/debug "found frame %n for window %n, dist = %n"
+                       (in found-fr :rect) hwnd-rect dist)
+            found-fr)
+          # else
+          (do
+            (log/debug "can not find a close frame, fallback to first frame")
+            first-frame)))
+      (:add-child target-fr win))))
+
+
 (defn load-layout [lo dump wm uia-man]
   (def focused-hwnd
     (with-uia [uia-win (:get-focused-window uia-man)]
@@ -82,7 +113,10 @@
         (if (null? hwnd?)
           nil
           hwnd?))))
-  (:load lo dump)
+  (def win-list (:get-all-windows lo))
+  (def exc-hwnd-map (:load lo dump (map |(in $ :hwnd) win-list)))
+  (def exc-hwnd-list (values exc-hwnd-map))
+  (place-excessive-windows lo exc-hwnd-list win-list)
   (:retile wm lo)
   (when-let [w (:find-hwnd lo focused-hwnd)]
     (:activate w)))
