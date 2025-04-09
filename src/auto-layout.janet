@@ -33,6 +33,7 @@
     (with-activation-hooks window-man
       (:close parent))
     (def to-retile (in parent :parent))
+    (:layouts-changed window-man [(:get-layout to-retile)])
     # ev/spawn to put the :retile call in the event queue
     (ev/spawn
      (:retile window-man to-retile))))
@@ -179,6 +180,8 @@
       (:reset-visual-state w true false)
       (:add-child fr w))
 
+    (:layouts-changed window-man [(:get-layout top-frame)])
+
     (:retile window-man top-frame)
     (if last-focus
       (:activate last-focus)
@@ -322,6 +325,8 @@
            (:add-child fr win))
          (in top-frame :children)
          all-wins)
+
+    (:layouts-changed window-man [(:get-layout top-frame)])
 
     (:retile window-man top-frame)
     (if last-focus
