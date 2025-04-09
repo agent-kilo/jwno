@@ -1419,7 +1419,18 @@
     (array/clear child-arr)
     (put self :current-child nil)
     (each c children
-      (put c :parent nil))))
+      (put c :parent nil))
+    (when (= :frame (in self :type)) 
+      # The frame is now empty, reset its direction
+      (def dir (:get-direction self))
+      (if (or (= dir :horizontal)
+              (= dir :vertical))
+        (table/setproto self frame-proto)
+        # else
+        (unless (= nil dir)
+          (log/warning
+           "unknown direction %n for frame %n, skip resetting prototype"
+           dir (in self :rect)))))))
 
 
 (def- tree-node-proto
@@ -2278,6 +2289,11 @@
 
   (:clear-children self)
 
+  # This has to happen before doing anything layout-related,
+  # since the tags may contain layout settings (paddings etc.)
+  (eachp [k v] tags
+    (put (in self :tags) k v))
+
   (if-let [split-params (calc-loading-split-params children)]
     (do
       # The frame is not empty, and the children are sub-frames
@@ -2314,9 +2330,6 @@
         (def [_ hwnd-num _] c)
         (when-let [hwnd (in hwnd-map hwnd-num)]
           (maybe-restore hwnd-num hwnd c)))))
-
-  (eachp [k v] tags
-         (put (in self :tags) k v))
 
   hwnd-map)
 
