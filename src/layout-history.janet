@@ -114,6 +114,13 @@
           nil
           hwnd?))))
   (def win-list (:get-all-windows lo))
+
+  # Clear all top frames first, or there may be duplicate window objects
+  # linked to different parents, since we're generating all windows anew
+  # below.
+  (each fr (in lo :children)
+    (:clear-children fr))
+
   (def exc-hwnd-map (:load lo dump (map |(in $ :hwnd) win-list)))
   (def exc-hwnd-list (values exc-hwnd-map))
   (place-excessive-windows lo exc-hwnd-list win-list)
