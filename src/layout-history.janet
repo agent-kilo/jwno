@@ -1,5 +1,8 @@
 (import ./log)
 
+(use jw32/_util)
+(use ./util)
+
 
 (defn history-stack []
   [@[] @[]])
@@ -71,22 +74,38 @@
     (:remove-hook hook-man h f)))
 
 
+(defn load-layout [lo dump wm uia-man]
+  (def focused-hwnd
+    (with-uia [uia-win (:get-focused-window uia-man)]
+      (when uia-win
+        (def hwnd? (:get_CachedNativeWindowHandle uia-win))
+        (if (null? hwnd?)
+          nil
+          hwnd?))))
+  (:load lo dump)
+  (:retile wm lo)
+  (when-let [w (:find-hwnd lo focused-hwnd)]
+    (:activate w)))
+
+
 (defn layout-history-undo [self lo]
-  # TODO: Handle focus
+  (def {:window-manager window-man
+        :uia-manager uia-man}
+    self)
   (def lo-id (in lo :id))
   (def lo-stack (get-in self [:stacks lo-id]))
   (def dump (history-stack-undo lo-stack))
-  (:load lo dump)
-  (:retile (in self :window-manager) lo))
+  (load-layout lo dump window-man uia-man))
 
 
 (defn layout-history-redo [self lo]
-  # TODO: Handle focus
+  (def {:window-manager window-man
+        :uia-manager uia-man}
+    self)
   (def lo-id (in lo :id))
   (def lo-stack (get-in self [:stacks lo-id]))
   (def dump (history-stack-redo lo-stack))
-  (:load lo dump)
-  (:retile (in self :window-manager) lo))
+  (load-layout lo dump window-man uia-man))
 
 
 (defn layout-history-set-manual [self manual?]
@@ -125,10 +144,12 @@
 
 (defn layout-history [context]
   (def {:window-manager window-man
+        :uia-manager uia-man
         :hook-manager hook-man}
     context)
   (table/setproto
    @{:window-manager window-man
+     :uia-manager uia-man
      :hook-manager hook-man
      :stacks @{}
      :hook-fns @{}}
