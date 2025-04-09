@@ -36,12 +36,25 @@
 
 
 (defn layout-history-on-layout-changed [self lo]
-  (def {:stacks stacks} self)
+  (def {:layout-states layout-states} self)
   (def lo-id (in lo :id))
-  (def dump (:dump lo))
-  (def lo-stack (in stacks lo-id (history-stack)))
-  (history-stack-push lo-stack dump)
-  (put stacks lo-id lo-stack))
+  (def lo-state (in layout-states
+                    lo-id
+                    @{:top-frame-count nil
+                      :history (history-stack)}))
+
+  (def old-top-frame-count (in lo-state :top-frame-count))
+  (def new-top-frame-count (length (in lo :children)))
+  # The :layout-changed hook also gets triggered when a new monitor
+  # is plugged in, but currently all new monitors are empty, and it's
+  # meaningless to save an empty top frame, so we opt out in this case.
+  (when (or (nil? old-top-frame-count)
+            (<= new-top-frame-count old-top-frame-count))
+    (def dump (:dump lo))
+    (history-stack-push (in lo-state :history) dump))
+
+  (put lo-state :top-frame-count new-top-frame-count)
+  (put layout-states lo-id lo-state))
 
 
 (defn layout-history-enable [self]
@@ -53,7 +66,7 @@
     self)
 
   # Clear and re-init history stacks every time
-  (put self :stacks @{})
+  (put self :layout-states @{})
   (each lo (get-in window-man [:root :children])
     (:on-layout-changed self lo))
 
@@ -134,8 +147,8 @@
         :uia-manager uia-man}
     self)
   (def lo-id (in lo :id))
-  (def lo-stack (get-in self [:stacks lo-id]))
-  (def dump (history-stack-undo lo-stack))
+  (def lo-state (get-in self [:layout-states lo-id]))
+  (def dump (history-stack-undo (in lo-state :history)))
   (load-layout lo dump window-man uia-man))
 
 
@@ -144,8 +157,8 @@
         :uia-manager uia-man}
     self)
   (def lo-id (in lo :id))
-  (def lo-stack (get-in self [:stacks lo-id]))
-  (def dump (history-stack-redo lo-stack))
+  (def lo-state (get-in self [:layout-states lo-id]))
+  (def dump (history-stack-redo (in lo-state :history)))
   (load-layout lo dump window-man uia-man))
 
 
@@ -192,6 +205,6 @@
    @{:window-manager window-man
      :uia-manager uia-man
      :hook-manager hook-man
-     :stacks @{}
+     :layout-states @{}
      :hook-fns @{}}
    layout-history-proto))
