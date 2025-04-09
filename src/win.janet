@@ -2454,13 +2454,19 @@
   (cond
     (= fr-count mon-count)
     # Only the resolutions or monitor configurations are changed
-    (map (fn [fr mon]
-           (unless (= mon (in fr :monitor))
-             (:transform fr (in mon :work-area) (in mon :dpi))
-             (put fr :monitor mon)
-             (:monitor-updated wm fr)))
-         top-frames
-         monitors)
+    (do
+      (var updated false)
+      (map (fn [fr mon]
+             (unless (= mon (in fr :monitor))
+               (:transform fr (in mon :work-area) (in mon :dpi))
+               (put fr :monitor mon)
+               (:monitor-updated wm fr)
+               (set updated true)))
+           top-frames
+           monitors)
+      (when updated
+        # Trigger :layout-changed hook
+        (:layouts-changed wm [self])))
 
     (> fr-count mon-count)
     # Some of the monitors got unplugged
@@ -2489,7 +2495,9 @@
         (:add-child move-to-fr w))
       (put self :children @[;alive-frames])
       (when (find |(= $ (in self :current-child)) dead-frames)
-        (put self :current-child main-fr)))
+        (put self :current-child main-fr))
+      # Trigger :layout-changed hook
+      (:layouts-changed wm [self]))
 
     (< fr-count mon-count)
     # New monitors got plugged in
@@ -2509,7 +2517,9 @@
            old-mons)
       (each fr new-frames
         (:add-child self fr)
-        (:monitor-updated wm fr)))))
+        (:monitor-updated wm fr))
+      # Trigger :layout-changed hook
+      (:layouts-changed wm [self]))))
 
 
 (defn layout-rotate-children [self direction]
