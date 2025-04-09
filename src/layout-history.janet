@@ -10,10 +10,13 @@
   [@[] @[]])
 
 
-(defn history-stack-push [stack x]
+(defn history-stack-push [stack x &opt limit]
   (def [bottom top] stack)
   (array/clear top)
   (array/push bottom x)
+  (when (and limit
+             (> (length bottom) limit))
+    (array/remove bottom 0 (- (length bottom) limit)))
   stack)
 
 
@@ -36,7 +39,10 @@
 
 
 (defn layout-history-on-layout-changed [self lo]
-  (def {:layout-states layout-states} self)
+  (def {:layout-states layout-states
+        :limit limit}
+    self)
+
   (def lo-id (in lo :id))
   (def lo-state (in layout-states
                     lo-id
@@ -51,13 +57,16 @@
   (when (or (nil? old-top-frame-count)
             (<= new-top-frame-count old-top-frame-count))
     (def dump (:dump lo))
-    (history-stack-push (in lo-state :history) dump))
+    (history-stack-push (in lo-state :history) dump limit))
 
   (put lo-state :top-frame-count new-top-frame-count)
   (put layout-states lo-id lo-state))
 
 
-(defn layout-history-enable [self]
+(defn layout-history-enable [self &opt manual? add-commands?]
+  (default manual? false)
+  (default add-commands? true)
+
   (:disable self)
 
   (def {:window-manager window-man
@@ -70,14 +79,18 @@
   (each lo (get-in window-man [:root :children])
     (:on-layout-changed self lo))
 
-  (put hook-fns :layout-changed
-     (:add-hook hook-man :layout-changed
-        (fn [& args]
-          (:on-layout-changed self ;args))))
+  (unless manual?
+    (put hook-fns :layout-changed
+       (:add-hook hook-man :layout-changed
+          (fn [& args]
+            (:on-layout-changed self ;args)))))
   (put hook-fns :layout-created
      (:add-hook hook-man :layout-created
         (fn [& args]
-          (:on-layout-changed self ;args)))))
+          (:on-layout-changed self ;args))))
+
+  (when add-commands?
+    (:add-commands self)))
 
 
 (defn layout-history-disable [self]
@@ -86,7 +99,8 @@
     self)
   (eachp [h f] (table/clone hook-fns)
     (put hook-fns h nil)
-    (:remove-hook hook-man h f)))
+    (:remove-hook hook-man h f))
+  (:remove-commands self))
 
 
 (defn place-excessive-windows [lo hwnd-list all-win-list]
@@ -186,6 +200,29 @@
   (:on-layout-changed self lo))
 
 
+(defn layout-history-add-commands [self]
+  (def {:window-manager window-man
+        :command-manager command-man} self)
+
+  (:add-command command-man :undo-layout-history
+     (fn []
+       (:undo self (:get-current-layout (in window-man :root)))))
+  (:add-command command-man :redo-layout-history
+     (fn []
+       (:redo self (:get-current-layout (in window-man :root)))))
+  (:add-command command-man :push-layout-history
+     (fn []
+       (:push self (:get-current-layout (in window-man :root))))))
+
+
+(defn layout-history-remove-commands [self]
+  (def {:command-manager command-man} self)
+
+  (:remove-command command-man :undo-layout-history)
+  (:remove-command command-man :redo-layout-history)
+  (:remove-command command-man :push-layout-history))
+
+
 (def layout-history-proto
   @{:on-layout-changed layout-history-on-layout-changed
     :enable layout-history-enable
@@ -193,18 +230,27 @@
     :undo layout-history-undo
     :redo layout-history-redo
     :push layout-history-push
-    :set-manual layout-history-set-manual})
+    :set-manual layout-history-set-manual
+    :add-commands layout-history-add-commands
+    :remove-commands layout-history-remove-commands})
 
 
 (defn layout-history [context]
   (def {:window-manager window-man
         :uia-manager uia-man
-        :hook-manager hook-man}
+        :hook-manager hook-man
+        :command-manager command-man}
     context)
+
   (table/setproto
    @{:window-manager window-man
      :uia-manager uia-man
      :hook-manager hook-man
+     :command-manager command-man
+
      :layout-states @{}
-     :hook-fns @{}}
+     :hook-fns @{}
+
+     # default settings
+     :limit 1024}
    layout-history-proto))

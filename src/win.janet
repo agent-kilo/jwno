@@ -2556,6 +2556,8 @@
   (each c children
     (def [_ rect _ _] c)
     (def [found-fr found-idx dist]
+      # XXX: The result is dependent on the order of children
+      # Maybe we should calculate a matrix of distances instead
       (find-closest-frame rect all-top-frames))
     (if found-fr
       (do
