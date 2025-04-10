@@ -1159,7 +1159,20 @@
   (assert (= (:get-adjacent-frame dummy-frame :left)
              dummy-frame2))
   (assert (= (:get-adjacent-frame dummy-frame2 :right)
-             dummy-frame)))
+             dummy-frame))
+
+  # out-of-order top-level frames
+  (set dummy-frame (frame {:top 0 :left 0 :bottom 100 :right 100}))
+  (var dummy-frame3 (frame {:top 0 :left 100 :bottom 100 :right 200}))
+  (set dummy-frame2 (frame {:top 0 :left 200 :bottom 100 :right 300}))
+  (set dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame dummy-frame2 dummy-frame3]))
+
+  (assert (= (:get-adjacent-frame dummy-frame :right)
+             dummy-frame3))
+  (assert (= (:get-adjacent-frame dummy-frame3 :right)
+             dummy-frame2))
+  (assert (nil? (:get-adjacent-frame dummy-frame2 :right)))
+  (assert (nil? (:get-adjacent-frame dummy-frame :left))))
 
 
 (defn test-tree-node-attached? []
