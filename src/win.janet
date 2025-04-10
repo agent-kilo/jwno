@@ -2543,6 +2543,26 @@
    (tuple/slice (map |(:dump $) (in self :children)))])
 
 
+(defn calc-rect-dist [a b]
+  (def [cxa cya] (rect-center a))
+  (def [cxb cyb] (rect-center b))
+  (def dx (- cxa cxb))
+  (def dy (- cya cyb))
+  (+ (* dx dx) (* dy dy)))
+
+
+# rects-a (jobs/cols) should be from top frames, and rects-b
+# (workers/rows) should be from dumped data
+(defn calc-rect-dist-matrix [rects-a rects-b]
+  (def dist @[])
+  (eachp [idx-a ra] rects-a
+    (def col @[])
+    (array/push dist col)
+    (eachp [idx-b rb] rects-b
+      (array/push col (calc-rect-dist ra rb))))
+  dist)
+
+
 (defn layout-load [self dumped &opt hwnd-list]
   (def [dump-type lo-id lo-name children] dumped)
   (unless (= :layout dump-type)
@@ -2553,22 +2573,35 @@
 
   (def all-top-frames (array/slice (in self :children)))
 
-  (each c children
-    (def [_ rect _ _] c)
-    (def [found-fr found-idx dist]
-      # XXX: The result is dependent on the order of children
-      # Maybe we should calculate a matrix of distances instead
-      (find-closest-frame rect all-top-frames))
-    (if found-fr
-      (do
-        (log/debug "found top frame to restore, rect = %n, frame rect = %n, dist = %n"
-                   rect (in found-fr :rect) dist)
-        (array/remove all-top-frames found-idx)
-        (:load found-fr c hwnd-map))
-      # else
-      (log/debug "top frame for dump data not found, rect = %n" rect)))
+  (def frame-rects (map |(in $ :rect) all-top-frames))
+  (def dumped-rects (map |(in $ 1) children))
 
-  (log/debug "top frames not restored: %n" (map |(in $ :rect) all-top-frames))
+  (if (<= (length frame-rects)
+          (length dumped-rects))
+    (do
+      (def dist-matrix (calc-rect-dist-matrix frame-rects dumped-rects))
+      (def [total-dist dumped-to-frame] (hungarian-assignment dist-matrix))
+
+      (log/debug "dist-matrix = %n" dist-matrix)
+      (log/debug "total-dist = %n" total-dist)
+      (log/debug "dumped-to-frame = %n" dumped-to-frame)
+
+      (eachp [dump-idx fr-idx] dumped-to-frame
+        (when (<= 0 fr-idx)
+          (:load (in all-top-frames fr-idx) (in children dump-idx) hwnd-map))))
+
+    # else
+    (do
+      (def dist-matrix (calc-rect-dist-matrix dumped-rects frame-rects))
+      (def [total-dist frame-to-dumped] (hungarian-assignment dist-matrix))
+
+      (log/debug "dist-matrix = %n" dist-matrix)
+      (log/debug "total-dist = %n" total-dist)
+      (log/debug "frame-to-dumped = %n" frame-to-dumped)
+
+      (eachp [fr-idx dump-idx] frame-to-dumped
+        (when (<= 0 dump-idx)
+          (:load (in all-top-frames fr-idx) (in children dump-idx) hwnd-map)))))
 
   hwnd-map)
 

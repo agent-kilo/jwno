@@ -193,6 +193,70 @@
    (/ (int/to-number dpi-y) const/USER-DEFAULT-SCREEN-DPI)])
 
 
+(defmacro- ckmin [a b]
+  (def a-sym (gensym))
+  (def b-sym (gensym))
+  ~(let [,a-sym ,a
+         ,b-sym ,b]
+     (if (< ,b-sym ,a-sym)
+       (do
+         (set ,a ,b-sym)
+         true)
+       # else
+       false)))
+
+#
+# Copied from https://en.wikipedia.org/wiki/Hungarian_algorithm
+#
+(defn hungarian-assignment [C]
+  (def J (length C))
+  (def W (length (in C 0)))
+  (assert (<= J W))
+
+  (def job (array/new-filled (+ 1 W) -1))
+  (def ys (array/new-filled J 0))
+  (def yt (array/new-filled (+ 1 W) 0))
+  (def total-costs @[])
+  (def inf math/int-max)
+
+  (for j_cur 0 J
+    (var w_cur W)
+    (set (job w_cur) j_cur)
+    (def min_to (array/new-filled (+ 1 W) inf))
+    (def prv (array/new-filled (+ 1 W) -1))
+    (def in_Z (array/new-filled (+ 1 W) false))
+    (while (not= -1 (in job w_cur))
+      (set (in_Z w_cur) true)
+      (def j (in job w_cur))
+      (var delta inf)
+      (var w_next 0)
+      (for w 0 W
+        (unless (in in_Z w)
+          (when (ckmin (min_to w)
+                       (- (get-in C [j w])
+                          (in ys j)
+                          (in yt w)))
+            (set (prv w) w_cur))
+          (when (ckmin delta (in min_to w))
+            (set w_next w))))
+      (for w 0 (+ 1 W)
+        (if (in in_Z w)
+          (do
+            (+= (ys (in job w)) delta)
+            (-= (yt w) delta))
+          # else
+          (-= (min_to w) delta)))
+      (set w_cur w_next))
+    (var w 0)
+    (while (not= w_cur W)
+      (set w (in prv w_cur))
+      (set (job w_cur) (in job w))
+      (set w_cur w))
+    (array/push total-costs (- (in yt W))))
+
+  [(last total-costs) (slice job 0 W)])
+
+
 ################## Hook Helpers ##################
 
 (defmacro with-activation-hooks [wm & body]
