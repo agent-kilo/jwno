@@ -1186,8 +1186,7 @@
             (def cur-dist (math/abs (- node-prop-val sib-prop-val)))
             (when (< cur-dist min-dist)
               (set min-dist cur-dist)
-              (set adj-fr sibling)
-              (break))))))
+              (set adj-fr sibling))))))
 
     (if adj-fr
       (get-adjacent-frame-impl-descent orig-node adj-fr dir)
