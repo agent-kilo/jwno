@@ -14,10 +14,16 @@
   (def [bottom top] stack)
   (array/clear top)
   (array/push bottom x)
+  (def count (length bottom))
   (when (and limit
-             (> (length bottom) limit))
-    (array/remove bottom 0 (- (length bottom) limit)))
+             (> count limit))
+    (array/remove bottom 0 (- count limit)))
   stack)
+
+
+(defn history-stack-peek [stack]
+  (def [bottom top] stack)
+  (last bottom))
 
 
 (defn history-stack-undo [stack]
@@ -38,33 +44,83 @@
   (last bottom))
 
 
+#
+# Manual mode and automatic mode have different timings when pushing
+# a layout: Manual mode pushes BEFORE the layout change, and automatic
+# mode pushes AFTER the change. This results in an off-by-one situation,
+# which we have different push/peek/undo/redo logic to deal with.
+#
+(defn history-stack-manual-push [stack x &opt limit]
+  (def [bottom top] stack)
+  (def last-layout (last top))
+  (array/clear top)
+  (when last-layout
+    (array/push bottom last-layout))
+  (array/push top x)
+  (def count (+ 1 (length bottom)))
+  (when (and limit
+             (> count limit))
+    (array/remove bottom 0 (- count limit)))
+  stack)
+
+
+(defn history-stack-manual-peek [stack]
+  (def [bottom top] stack)
+  (last top))
+
+
+(defn history-stack-manual-undo [stack]
+  (def [bottom top] stack)
+  (def x (array/pop bottom))
+  (when x
+    (array/push top x))
+  (last top))
+
+
+(defn history-stack-manual-redo [stack]
+  (def [bottom top] stack)
+  (def x
+    (when (< 1 (length top))
+      (array/pop top)))
+  (when x
+    (array/push bottom x))
+  (last top))
+
+
+(defn new-layout-state []
+  @{:top-frame-count nil
+    :history (history-stack)})
+
+
 (defn layout-history-on-layout-changed [self lo]
   (def {:layout-states layout-states
-        :limit limit}
+        :manual manual-state}
     self)
 
+  (when manual-state
+    (put self :unsaved-layout-changes true)
+    # Early return
+    (break))
+
   (def lo-id (in lo :id))
-  (def lo-state (in layout-states
-                    lo-id
-                    @{:top-frame-count nil
-                      :history (history-stack)}))
+  (def lo-state (in layout-states lo-id (new-layout-state)))
+  (put layout-states lo-id lo-state)
 
   (def old-top-frame-count (in lo-state :top-frame-count))
   (def new-top-frame-count (length (in lo :children)))
   # The :layout-changed hook also gets triggered when a new monitor
   # is plugged in, but currently all new monitors are empty, and it's
   # meaningless to save an empty top frame, so we opt out in this case.
-  (when (or (nil? old-top-frame-count)
+  (if (or (nil? old-top-frame-count)
             (<= new-top-frame-count old-top-frame-count))
-    (def dump (:dump lo))
-    (history-stack-push (in lo-state :history) dump limit))
+    (:push self lo)
+    # else, treat all empty top frames as "saved"
+    (do
+      (put lo-state :top-frame-count new-top-frame-count)
+      (put self :unsaved-layout-changes nil))))
 
-  (put lo-state :top-frame-count new-top-frame-count)
-  (put layout-states lo-id lo-state))
 
-
-(defn layout-history-enable [self &opt manual? add-commands?]
-  (default manual? false)
+(defn layout-history-enable [self &opt add-commands?]
   (default add-commands? true)
 
   (:disable self)
@@ -79,11 +135,10 @@
   (each lo (get-in window-man [:root :children])
     (:on-layout-changed self lo))
 
-  (unless manual?
-    (put hook-fns :layout-changed
-       (:add-hook hook-man :layout-changed
-          (fn [& args]
-            (:on-layout-changed self ;args)))))
+  (put hook-fns :layout-changed
+     (:add-hook hook-man :layout-changed
+        (fn [& args]
+          (:on-layout-changed self ;args))))
   (put hook-fns :layout-created
      (:add-hook hook-man :layout-created
         (fn [& args]
@@ -158,46 +213,117 @@
 
 (defn layout-history-undo [self lo]
   (def {:window-manager window-man
-        :uia-manager uia-man}
+        :uia-manager uia-man
+        :manual manual-state
+        :unsaved-layout-changes unsaved}
     self)
   (def lo-id (in lo :id))
   (def lo-state (get-in self [:layout-states lo-id]))
-  (def dump (history-stack-undo (in lo-state :history)))
-  (load-layout lo dump window-man uia-man))
+  (unless lo-state
+    # Early return
+    (break))
+
+  (def history (in lo-state :history))
+  (def dump
+    (cond
+      (and unsaved manual-state)
+      # manual mode with unsaved changes
+      (history-stack-manual-peek history)
+
+      unsaved
+      # automatic mode with unsaved changes
+      (history-stack-peek history)
+
+      manual-state
+      (history-stack-manual-undo history)
+
+      true
+      (history-stack-undo history)))
+  (when dump
+    (put self :unsaved-layout-changes nil)
+    (load-layout lo dump window-man uia-man)))
 
 
 (defn layout-history-redo [self lo]
   (def {:window-manager window-man
-        :uia-manager uia-man}
+        :uia-manager uia-man
+        :manual manual-state
+        :unsaved-layout-changes unsaved}
     self)
   (def lo-id (in lo :id))
   (def lo-state (get-in self [:layout-states lo-id]))
-  (def dump (history-stack-redo (in lo-state :history)))
-  (load-layout lo dump window-man uia-man))
+  (unless lo-state
+    # Early return
+    (break))
+
+  (def history (in lo-state :history))
+  (def dump
+    (cond
+      (and unsaved manual-state)
+      # manual mode with unsaved changes
+      (history-stack-manual-peek history)
+
+      unsaved
+      # automatic mode with unsaved changes
+      (history-stack-peek history)
+
+      manual-state
+      (history-stack-manual-redo history)
+
+      true
+      (history-stack-redo history)))
+  (when dump
+    (put self :unsaved-layout-changes nil)
+    (load-layout lo dump window-man uia-man)))
 
 
 (defn layout-history-set-manual [self manual?]
   (def {:hook-fns hook-fns
-        :hook-manager hook-man}
+        :hook-manager hook-man
+        :layout-states layout-states
+        :manual manual-state}
     self)
   (def hook-fn (in hook-fns :layout-changed))
-  (cond
-    (and hook-fn manual?)
-    (do
-      (put hook-fns :layout-changed nil)
-      (:remove-hook hook-man :layout-changed hook-fn))
 
-    (and (nil? hook-fn) (not manual?))
+  (cond
+    (and (not manual-state) manual?)
+    # automatic -> manual
     (do
-      (def new-fn
-        (:add-hook hook-man :layout-changed
-           (fn [& args]
-             (:on-layout-changed self ;args))))
-      (put hook-fns :layout-changed new-fn))))
+      (put self :manual true)
+      # Adjust for the off-by-one case
+      (each {:history h} layout-states
+        (history-stack-manual-undo h)))
+
+    (and manual-state (not manual?))
+    # manual -> automatic
+    (do
+      (put self :manual false)
+      # Adjust for the off-by-one case
+      (each {:history h} layout-states
+        (history-stack-redo h)))))
+
+
+(defn layout-history-manual? [self]
+  (in self :manual))
 
 
 (defn layout-history-push [self lo]
-  (:on-layout-changed self lo))
+  (def {:layout-states layout-states
+        :manual manual-state
+        :limit limit}
+    self)
+
+  (def lo-id (in lo :id))
+  (def lo-state (in layout-states lo-id (new-layout-state)))
+  (put layout-states lo-id lo-state)
+
+  (def dump (:dump lo))
+  (if manual-state
+    (history-stack-manual-push (in lo-state :history) dump limit)
+    # else
+    (history-stack-push (in lo-state :history) dump limit))
+  (put lo-state :top-frame-count (length (in lo :children)))
+  (put self :unsaved-layout-changes nil))
 
 
 (defn layout-history-add-commands [self]
@@ -231,6 +357,7 @@
     :redo layout-history-redo
     :push layout-history-push
     :set-manual layout-history-set-manual
+    :manual? layout-history-manual?
     :add-commands layout-history-add-commands
     :remove-commands layout-history-remove-commands})
 
@@ -250,6 +377,7 @@
 
      :layout-states @{}
      :hook-fns @{}
+     :manual false
 
      # default settings
      :limit 1024}
