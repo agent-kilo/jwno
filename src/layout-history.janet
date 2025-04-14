@@ -99,14 +99,14 @@
         :manual manual-state}
     self)
 
-  (when manual-state
-    (put self :unsaved-layout-changes true)
-    # Early return
-    (break))
-
   (def lo-id (in lo :id))
   (def lo-state (in layout-states lo-id (new-layout-state)))
   (put layout-states lo-id lo-state)
+
+  (when manual-state
+    (put lo-state :unsaved-changes true)
+    # Early return
+    (break))
 
   (def old-top-frame-count (in lo-state :top-frame-count))
   (def new-top-frame-count (length (in lo :children)))
@@ -119,7 +119,7 @@
     # else, treat all empty top frames as "saved"
     (do
       (put lo-state :top-frame-count new-top-frame-count)
-      (put self :unsaved-layout-changes nil))))
+      (put lo-state :unsaved-changes nil))))
 
 
 (defn layout-history-save-to-backing-file [self]
@@ -236,8 +236,7 @@
 
 (defn layout-history-undo [self lo]
   (def {:context context
-        :manual manual-state
-        :unsaved-layout-changes unsaved}
+        :manual manual-state}
     self)
   (def {:window-manager window-man
         :uia-manager uia-man}
@@ -248,7 +247,9 @@
     # Early return
     (break))
 
+  (def unsaved (in lo-state :unsaved-changes))
   (def history (in lo-state :history))
+
   (def dump
     (cond
       (and unsaved manual-state)
@@ -265,14 +266,13 @@
       true
       (history-stack-undo history)))
   (when dump
-    (put self :unsaved-layout-changes nil)
+    (put lo-state :unsaved-changes nil)
     (load-layout lo dump window-man uia-man)))
 
 
 (defn layout-history-redo [self lo]
   (def {:context context
-        :manual manual-state
-        :unsaved-layout-changes unsaved}
+        :manual manual-state}
     self)
   (def {:window-manager window-man
         :uia-manager uia-man}
@@ -283,7 +283,9 @@
     # Early return
     (break))
 
+  (def unsaved (in lo-state :unsaved-changes))
   (def history (in lo-state :history))
+
   (def dump
     (cond
       (and unsaved manual-state)
@@ -300,7 +302,7 @@
       true
       (history-stack-redo history)))
   (when dump
-    (put self :unsaved-layout-changes nil)
+    (put lo-state :unsaved-changes nil)
     (load-layout lo dump window-man uia-man)))
 
 
@@ -352,7 +354,7 @@
     # else
     (history-stack-push (in lo-state :history) dump limit))
   (put lo-state :top-frame-count (length (in lo :children)))
-  (put self :unsaved-layout-changes nil))
+  (put lo-state :unsaved-changes nil))
 
 
 (defn layout-history-add-commands [self]
