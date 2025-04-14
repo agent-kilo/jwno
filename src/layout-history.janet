@@ -188,6 +188,7 @@
 
 
 (defn load-layout [lo dump wm uia-man]
+  (def [_ts dump-data] dump)
   (def focused-hwnd
     (with-uia [uia-win (:get-focused-window uia-man)]
       (when uia-win
@@ -203,7 +204,7 @@
   (each fr (in lo :children)
     (:clear-children fr))
 
-  (def exc-hwnd-map (:load lo dump (map |(in $ :hwnd) win-list)))
+  (def exc-hwnd-map (:load lo dump-data (map |(in $ :hwnd) win-list)))
   (def exc-hwnd-list (values exc-hwnd-map))
   (place-excessive-windows lo exc-hwnd-list win-list)
   (:retile wm lo)
@@ -317,7 +318,8 @@
   (def lo-state (in layout-states lo-id (new-layout-state)))
   (put layout-states lo-id lo-state)
 
-  (def dump (:dump lo))
+  (def now (os/clock :realtime))
+  (def dump [now (:dump lo)])
   (if manual-state
     (history-stack-manual-push (in lo-state :history) dump limit)
     # else
