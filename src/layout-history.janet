@@ -1,6 +1,8 @@
 (import ./win)
 (import ./log)
 
+(import spork/path)
+
 (use jw32/_dwmapi)
 (use jw32/_util)
 (use ./util)
@@ -120,15 +122,34 @@
       (put self :unsaved-layout-changes nil))))
 
 
+(defn layout-history-save-to-backing-file [self]
+  (unless (in self :backing-file)
+    # Early return
+    (break))
+
+  (def {:context context} self)
+  (def {:window-manager window-man
+        :data-dir data-dir}
+    context)
+  (def bfile (in self :backing-file))
+  (def dump-file
+    (if (path/abspath? bfile)
+      bfile
+      (path/join data-dir bfile)))
+  (spit dump-file (string/format "%n" (in self :layout-states))))
+
+
 (defn layout-history-enable [self &opt add-commands?]
   (default add-commands? true)
 
   (:disable self)
 
-  (def {:window-manager window-man
-        :hook-manager hook-man
+  (def {:context context
         :hook-fns hook-fns}
     self)
+  (def {:window-manager window-man
+        :hook-manager hook-man}
+    context)
 
   # Clear and re-init history stacks every time
   (put self :layout-states @{})
@@ -149,9 +170,10 @@
 
 
 (defn layout-history-disable [self]
-  (def {:hook-manager hook-man
+  (def {:context context
         :hook-fns hook-fns}
     self)
+  (def {:hook-manager hook-man} context)
   (eachp [h f] (table/clone hook-fns)
     (put hook-fns h nil)
     (:remove-hook hook-man h f))
@@ -213,11 +235,13 @@
 
 
 (defn layout-history-undo [self lo]
-  (def {:window-manager window-man
-        :uia-manager uia-man
+  (def {:context context
         :manual manual-state
         :unsaved-layout-changes unsaved}
     self)
+  (def {:window-manager window-man
+        :uia-manager uia-man}
+    context)
   (def lo-id (in lo :id))
   (def lo-state (get-in self [:layout-states lo-id]))
   (unless lo-state
@@ -246,11 +270,13 @@
 
 
 (defn layout-history-redo [self lo]
-  (def {:window-manager window-man
-        :uia-manager uia-man
+  (def {:context context
         :manual manual-state
         :unsaved-layout-changes unsaved}
     self)
+  (def {:window-manager window-man
+        :uia-manager uia-man}
+    context)
   (def lo-id (in lo :id))
   (def lo-state (get-in self [:layout-states lo-id]))
   (unless lo-state
@@ -279,11 +305,12 @@
 
 
 (defn layout-history-set-manual [self manual?]
-  (def {:hook-fns hook-fns
-        :hook-manager hook-man
+  (def {:context context
+        :hook-fns hook-fns
         :layout-states layout-states
         :manual manual-state}
     self)
+  (def {:hook-manager hook-man} context)
   (def hook-fn (in hook-fns :layout-changed))
 
   (cond
@@ -329,8 +356,10 @@
 
 
 (defn layout-history-add-commands [self]
+  (def {:context context} self)
   (def {:window-manager window-man
-        :command-manager command-man} self)
+        :command-manager command-man}
+    context)
 
   (:add-command command-man :undo-layout-history
      (fn []
@@ -344,7 +373,8 @@
 
 
 (defn layout-history-remove-commands [self]
-  (def {:command-manager command-man} self)
+  (def {:context context} self)
+  (def {:command-manager command-man} context)
 
   (:remove-command command-man :undo-layout-history)
   (:remove-command command-man :redo-layout-history)
@@ -361,26 +391,18 @@
     :set-manual layout-history-set-manual
     :manual? layout-history-manual?
     :add-commands layout-history-add-commands
-    :remove-commands layout-history-remove-commands})
+    :remove-commands layout-history-remove-commands
+    :save-to-backing-file layout-history-save-to-backing-file})
 
 
 (defn layout-history [context]
-  (def {:window-manager window-man
-        :uia-manager uia-man
-        :hook-manager hook-man
-        :command-manager command-man}
-    context)
-
   (table/setproto
-   @{:window-manager window-man
-     :uia-manager uia-man
-     :hook-manager hook-man
-     :command-manager command-man
-
+   @{:context context
      :layout-states @{}
      :hook-fns @{}
      :manual false
 
      # default settings
-     :limit 1024}
+     :limit 1024
+     :backing-file nil}
    layout-history-proto))
