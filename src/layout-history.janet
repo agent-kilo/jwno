@@ -3,6 +3,7 @@
 
 (import spork/path)
 
+(use jw32/_winuser)
 (use jw32/_dwmapi)
 (use jw32/_util)
 (use ./util)
@@ -122,39 +123,146 @@
       (put lo-state :unsaved-changes nil))))
 
 
+(defn layout-history-get-backing-file-path [self]
+  (def bfile (in self :backing-file))
+  (unless bfile
+    # Early return
+    (break nil))
+
+  (def {:context context} self)
+  (def {:data-dir data-dir} context)
+  (if (path/abspath? bfile)
+    bfile
+    (path/join data-dir bfile)))
+
+
 (defn layout-history-save-to-backing-file [self]
-  (unless (in self :backing-file)
+  (def dump-file (:get-backing-file-path self))
+  (unless dump-file
     # Early return
     (break))
 
-  (def {:context context} self)
-  (def {:window-manager window-man
-        :data-dir data-dir}
-    context)
-  (def bfile (in self :backing-file))
-  (def dump-file
-    (if (path/abspath? bfile)
-      bfile
-      (path/join data-dir bfile)))
-  (spit dump-file (string/format "%n" (in self :layout-states))))
+  (def to-write @{})
+  (eachp [lo-id lo-state] (in self :layout-states)
+    (def history (in lo-state :history))
+    (def stack (array/join @[] ;history))
+    (put to-write lo-id (tuple/slice stack)))
+  (spit dump-file (string/format "%n" (table/to-struct to-write))))
+
+
+(defn find-layout-by-id [wm lo-id]
+  (var layout-found nil)
+  (each lo (get-in wm [:root :children])
+    (when (= lo-id (in lo :id))
+      (set layout-found lo)
+      (break)))
+  layout-found)
+
+
+(defn layout-history-load-from-backing-file [self]
+  (def dump-file (:get-backing-file-path self))
+  (unless dump-file
+    # Early return
+    (break false))
+
+  (def text
+    (try
+      (slurp dump-file)
+      ((err fib)
+       (log/warning "failed to load from file: %s\n%s"
+                    dump-file
+                    (get-stack-trace fib))
+       nil)))
+
+  (unless text
+    # Early return
+    (break false))
+
+  (def to-load
+    (try
+      (parse text)
+      ((err fib)
+       (log/warning "failed to parse loaded text: %n\n%s"
+                    err
+                    (get-stack-trace fib))
+       nil)))
+
+  (unless to-load
+    # Early return
+    (break false))
+
+  (def {:context context
+        :manual manual-state}
+    self)
+  (def {:window-manager window-man} context)
+
+  (def layout-states @{})
+  (eachp [lo-id lo-stack] to-load
+    (def lo-state (new-layout-state))
+    (put layout-states lo-id lo-state)
+
+    # Restore :history
+    (def history (in lo-state :history))
+    (def bottom (first history))
+    (each d lo-stack
+      (array/push bottom d))
+
+    (when manual-state
+      # Adjust for the off-by-one case
+      (history-stack-manual-undo history))
+
+    # Restore :top-frame-count
+    (def lo (find-layout-by-id window-man lo-id))
+    (when lo
+      (put lo-state :top-frame-count (length (in lo :children))))
+
+    # XXX: Always assume the layout does not match the last entry in the history
+    (put lo-state :unsaved-changes true))
+
+  (put self :layout-states layout-states)
+  true)
+
+
+(defn same-user-session? [root-uia-elem]
+  (def desktop-hwnd (:get_CachedNativeWindowHandle root-uia-elem))
+  (def prop-name "_jwno-layout-history-same-user-session_")
+  (if (null? (GetProp desktop-hwnd prop-name))
+    (do
+      (SetProp desktop-hwnd prop-name 1)
+      false)
+    true))
 
 
 (defn layout-history-enable [self &opt add-commands?]
   (default add-commands? true)
 
-  (:disable self)
+  (:disable self false)
 
   (def {:context context
         :hook-fns hook-fns}
     self)
   (def {:window-manager window-man
+        :uia-manager uia-man
         :hook-manager hook-man}
     context)
 
   # Clear and re-init history stacks every time
   (put self :layout-states @{})
-  (each lo (get-in window-man [:root :children])
-    (:on-layout-changed self lo))
+  (def bfile-loaded (:load-from-backing-file self))
+  (cond
+    (not bfile-loaded)
+    # No backing file is loaded, update the history to reflect
+    # current layouts
+    (each lo (get-in window-man [:root :children])
+      (:on-layout-changed self lo))
+
+    (same-user-session? (in uia-man :root))
+    # We got restarted in the same user session, try to restore last
+    # history entry from backing file
+    'TODO
+
+    # Otherwise, we're in a new user session, start afresh
+    )
 
   (put hook-fns :layout-changed
      (:add-hook hook-man :layout-changed
@@ -164,12 +272,18 @@
      (:add-hook hook-man :layout-created
         (fn [& args]
           (:on-layout-changed self ;args))))
+  (put hook-fns :shutting-down
+     (:add-hook hook-man :shutting-down
+        (fn [& _args]
+          (:save-to-backing-file self))))
 
   (when add-commands?
     (:add-commands self)))
 
 
-(defn layout-history-disable [self]
+(defn layout-history-disable [self &opt save-backing-file]
+  (default save-backing-file true)
+
   (def {:context context
         :hook-fns hook-fns}
     self)
@@ -177,7 +291,10 @@
   (eachp [h f] (table/clone hook-fns)
     (put hook-fns h nil)
     (:remove-hook hook-man h f))
-  (:remove-commands self))
+  (:remove-commands self)
+
+  (when save-backing-file
+    (:save-to-backing-file self)))
 
 
 (defn place-excessive-windows [lo hwnd-list all-win-list]
@@ -226,7 +343,8 @@
   (each fr (in lo :children)
     (:clear-children fr))
 
-  (def exc-hwnd-map (:load lo dump-data (map |(in $ :hwnd) win-list)))
+  (def exc-hwnd-map (:load lo dump-data #(map |(in $ :hwnd) win-list)
+                           ))
   (def exc-hwnd-list (values exc-hwnd-map))
   (place-excessive-windows lo exc-hwnd-list win-list)
   (:retile wm lo)
@@ -394,7 +512,9 @@
     :manual? layout-history-manual?
     :add-commands layout-history-add-commands
     :remove-commands layout-history-remove-commands
-    :save-to-backing-file layout-history-save-to-backing-file})
+    :get-backing-file-path layout-history-get-backing-file-path
+    :save-to-backing-file layout-history-save-to-backing-file
+    :load-from-backing-file layout-history-load-from-backing-file})
 
 
 (defn layout-history [context]
