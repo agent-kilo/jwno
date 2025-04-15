@@ -2312,8 +2312,8 @@
         (if lo
           # attached frame, need to check its virtual desktop
           (fn [hwnd-num hwnd c]
-            (when-let [vd-info (:get-hwnd-virtual-desktop wm hwnd)]
-              (when (= (in lo :id) (in vd-info :id))
+            (when-let [vd-id (:get-hwnd-virtual-desktop-id wm hwnd)]
+              (when (= vd-id (in lo :id))
                 (put hwnd-map hwnd-num nil)
                 (def win (window hwnd))
                 (:load win c)
@@ -2764,6 +2764,10 @@
   (default cr (get-in self [:uia-manager :focus-cr]))
   (def uia-man (in self :uia-manager))
   (get-hwnd-uia-element hwnd (in uia-man :com) cr))
+
+
+(defn wm-get-hwnd-virtual-desktop-id [self hwnd]
+  (get-hwnd-virtual-desktop-id hwnd (in self :vdm-com)))
 
 
 (defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
@@ -3250,6 +3254,7 @@
     :set-focus wm-set-focus
 
     :get-hwnd-path wm-get-hwnd-path
+    :get-hwnd-virtual-desktop-id wm-get-hwnd-virtual-desktop-id
     :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
     :get-hwnd-uia-element wm-get-hwnd-uia-element
     :get-hwnd-info wm-get-hwnd-info
