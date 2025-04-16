@@ -3217,7 +3217,9 @@
 (defn wm-with-activation-hooks [self op-fn]
   (def root (in self :root))
   (def old-frame (:get-current-frame root))
-  (def old-win (:get-current-window old-frame))
+  (def old-win
+    (when old-frame
+      (:get-current-window old-frame)))
 
   (def ret (op-fn))
 
