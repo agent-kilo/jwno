@@ -1,0 +1,33 @@
+{:title "Built-In Modules"
+ :template "main.html"
+ :back-to ["Reference Index" "../index.html"]
+ :order 5
+ :generated true}
+---
+
+These are the modules available in Jwno by default.
+
+
+### Table of Contents
+
+@ul{
+
+@li{@link[jwno--auto-layout.html]{jwno/auto-layout}}
+@li{@link[jwno--indicator.html]{jwno/indicator}}
+@li{@link[jwno--layout-history.html]{jwno/layout-history}}
+@li{@link[jwno--log.html]{jwno/log}}
+@li{@link[jwno--scratch-pad.html]{jwno/scratch-pad}}
+@li{@link[jwno--ui-hint.html]{jwno/ui-hint}}
+@li{@link[jwno--user-config.html]{jwno/user-config}}
+@li{@link[jwno--util.html]{jwno/util}}
+
+}
+
+
+### See Also
+
+@ul{
+  @li{
+    @link[../../using-modules.html]{Using Modules}
+  }
+}

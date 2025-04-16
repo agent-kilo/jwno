@@ -21,7 +21,7 @@
     @link[built-in-hooks/index.html]{Built-In Hooks}
   }
   @li{
-    @link[built-in-modules.html]{Built-In Modules}
+    @link[built-in-modules/index.html]{Built-In Modules}
   }
   @li{
     @link[context-object.html]{The Context Object}
