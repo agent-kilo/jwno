@@ -61,7 +61,11 @@ TODO
         default-content)))
 
   (def text
-    (string/format page-template mod-name idx gen-state-str content))
+    (string/format page-template
+                   mod-name
+                   (+ 1 idx)
+                   gen-state-str
+                   content))
   (spit out-file text)
   (printf "-- Generated %n" out-file)
 
