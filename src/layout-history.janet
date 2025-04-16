@@ -233,19 +233,52 @@
     true))
 
 
+(defn load-last-history-entries [layout-states manual-state window-man uia-man]
+  (def focused-hwnd
+    (with-uia [uia-win (:get-focused-window uia-man)]
+      (when uia-win
+        (def hwnd? (:get_CachedNativeWindowHandle uia-win))
+        (if (null? hwnd?)
+          nil
+          hwnd?))))
+
+  (with-activation-hooks window-man
+    (def root (in window-man :root))
+    (:clear-children root)
+
+    (each lo-state layout-states
+      (def dump
+        (if manual-state
+          (history-stack-manual-redo (in lo-state :history))
+          (history-stack-redo (in lo-state :history))))
+      (when dump
+        (def [_ dump-data] dump)
+        (def [_ lo-id lo-name _] dump-data)
+        (def vd-info {:id lo-id :name lo-name})
+        (def lo (:new-layout root vd-info))
+        (:add-child root lo)
+        (:load lo dump-data)))
+
+    (:retile window-man)
+    (when-let [w (:find-hwnd root focused-hwnd)]
+      (:activate w))))
+
+
 (defn layout-history-enable [self &opt add-commands?]
   (default add-commands? true)
 
   (:disable self false)
 
   (def {:context context
-        :hook-fns hook-fns}
+        :hook-fns hook-fns
+        :manual manual-state}
     self)
   (def {:window-manager window-man
         :uia-manager uia-man
         :hook-manager hook-man}
     context)
 
+  (def same-session (same-user-session? (in uia-man :root)))
   # Clear and re-init history stacks every time
   (put self :layout-states @{})
   (def bfile-loaded (:load-from-backing-file self))
@@ -256,10 +289,13 @@
     (each lo (get-in window-man [:root :children])
       (:on-layout-changed self lo))
 
-    (same-user-session? (in uia-man :root))
+    same-session
     # We got restarted in the same user session, try to restore last
     # history entry from backing file
-    'TODO
+    (load-last-history-entries (in self :layout-states)
+                               manual-state
+                               window-man
+                               uia-man)
 
     # Otherwise, we're in a new user session, start afresh
     )
@@ -337,19 +373,19 @@
           hwnd?))))
   (def win-list (:get-all-windows lo))
 
-  # Clear all top frames first, or there may be duplicate window objects
-  # linked to different parents, since we're generating all windows anew
-  # below.
-  (each fr (in lo :children)
-    (:clear-children fr))
+  (with-activation-hooks wm
+    # Clear all top frames first, or there may be duplicate window objects
+    # linked to different parents, since we're generating all windows anew
+    # below.
+    (each fr (in lo :children)
+      (:clear-children fr))
 
-  (def exc-hwnd-map (:load lo dump-data #(map |(in $ :hwnd) win-list)
-                           ))
-  (def exc-hwnd-list (values exc-hwnd-map))
-  (place-excessive-windows lo exc-hwnd-list win-list)
-  (:retile wm lo)
-  (when-let [w (:find-hwnd lo focused-hwnd)]
-    (:activate w)))
+    (def exc-hwnd-map (:load lo dump-data (map |(in $ :hwnd) win-list)))
+    (def exc-hwnd-list (values exc-hwnd-map))
+    (place-excessive-windows lo exc-hwnd-list win-list)
+    (:retile wm lo)
+    (when-let [w (:find-hwnd lo focused-hwnd)]
+      (:activate w))))
 
 
 (defn layout-history-undo [self lo]
@@ -472,7 +508,8 @@
     # else
     (history-stack-push (in lo-state :history) dump limit))
   (put lo-state :top-frame-count (length (in lo :children)))
-  (put lo-state :unsaved-changes nil))
+  (put lo-state :unsaved-changes nil)
+  (:save-to-backing-file self))
 
 
 (defn layout-history-add-commands [self]
