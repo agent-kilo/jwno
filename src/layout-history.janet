@@ -264,8 +264,9 @@
       (:activate w))))
 
 
-(defn layout-history-enable [self &opt add-commands?]
+(defn layout-history-enable [self &opt add-commands? load-last-layouts?]
   (default add-commands? true)
+  (default load-last-layouts? false)
 
   (:disable self false)
 
@@ -289,7 +290,8 @@
     (each lo (get-in window-man [:root :children])
       (:on-layout-changed self lo))
 
-    same-session
+    (and same-session
+         load-last-layouts?)
     # We got restarted in the same user session, try to restore last
     # history entry from backing file
     (load-last-history-entries (in self :layout-states)
@@ -297,7 +299,7 @@
                                window-man
                                uia-man)
 
-    # Otherwise, we're in a new user session, start afresh
+    # Otherwise, start with saved history, but don't restore last layouts
     )
 
   (put hook-fns :layout-changed
