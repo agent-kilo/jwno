@@ -522,13 +522,16 @@
 
   (:add-command command-man :undo-layout-history
      (fn []
-       (:undo self (:get-current-layout (in window-man :root)))))
+       (when-let [lo (:get-current-layout (in window-man :root))]
+         (:undo self lo))))
   (:add-command command-man :redo-layout-history
      (fn []
-       (:redo self (:get-current-layout (in window-man :root)))))
+       (when-let [lo (:get-current-layout (in window-man :root))]
+         (:redo self lo))))
   (:add-command command-man :push-layout-history
      (fn []
-       (:push self (:get-current-layout (in window-man :root))))))
+       (when-let [lo (:get-current-layout (in window-man :root))]
+         (:push self lo)))))
 
 
 (defn layout-history-remove-commands [self]
