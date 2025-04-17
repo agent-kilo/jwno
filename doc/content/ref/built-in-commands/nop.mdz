@@ -1,0 +1,18 @@
+{:title ":nop"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 19
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:nop)
+```
+
+### Description
+
+Does nothing. When you want to return from a sub-keymap, without
+executing any actual commands, map a key to call this command, and
+it'll act as a "cancel" key.

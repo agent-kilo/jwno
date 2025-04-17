@@ -124,7 +124,26 @@ $}
         var el = document.getElementById('toc-toggle');
         el.addEventListener('click', toggleToc);
       }
+      function toggleCaretToc(ev) {
+          var toc = ev.target.parentElement.querySelector('ul');
+          toc.classList.toggle('shown');
+      }
+      function addCaretToggle() {
+          var toc = document.querySelector('.toc');
+          var clickable_entries = toc.querySelectorAll('.caret > span:first-of-type');
+          for (let i = 0; i < clickable_entries.length; i++) {
+              clickable_entries[i].addEventListener('click', toggleCaretToc);
+          }
+      }
+      function showSelectedCaretToc() {
+          var toc_entries = document.querySelectorAll('.toc .selected + ul, .toc li ul:has(span.selected)');
+          for (let i = 0; i < toc_entries.length; i++) {
+              toc_entries[i].classList.toggle('shown');
+          }
+      }
       window.addEventListener('DOMContentLoaded', addTocToggle);
+      window.addEventListener('DOMContentLoaded', addCaretToggle);
+      showSelectedCaretToc();
       if (window.localStorage.getItem('show-toc') === 'true') {
         toggleToc()
       }

@@ -1,0 +1,16 @@
+{:title ":exec"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 12
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:exec & cli)
+```
+
+### Description
+
+Executes a command line specified by cli.

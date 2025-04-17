@@ -34,12 +34,12 @@
     paths))
 
 
-(defn get-mod-paths [cli-args config-file-path]
+(defn get-mod-paths [cli-args data-dir]
   (def ret
     (if-let [paths (in cli-args "mod-path")]
       paths
       @[]))
-  (array/push ret (path/dirname config-file-path))
+  (array/push ret (path/dirname data-dir))
   ret)
 
 
@@ -49,8 +49,13 @@
 
   (if config-found
     (do
+      (def data-dir (path/dirname config-found))
+
       (:register-loader (in context :module-manager)
-                        ;(get-mod-paths cli-args config-found))
+                        ;(get-mod-paths cli-args data-dir))
+
+      (put context :data-dir data-dir)
+      (put context :user-config-file config-found)
 
       (def config-env
         (try
@@ -152,21 +157,26 @@
        [:uia/desktop-name-changed vd-name]
        (:desktop-name-changed (in context :window-manager) vd-name)
 
-       [:key/command cmd-info]
-       (let [{:cmd cmd} cmd-info]
+       [:key/command cmd-info-ptr]
+       (let [cmd-info (:unmarshal-keymap (in context :key-manager) cmd-info-ptr)
+             {:cmd cmd} cmd-info]
          (:dispatch-command (in context :command-manager) cmd))
 
-       [:key/switch-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-switched cur-keymap)
+       [:key/switch-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-switched cur-keymap))
 
-       [:key/reset-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-reset cur-keymap)
+       [:key/reset-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-reset cur-keymap))
 
-       [:key/push-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-pushed cur-keymap)
+       [:key/push-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-pushed cur-keymap))
 
-       [:key/pop-keymap cur-keymap]
-       (:call-hook (in context :hook-manager) :keymap-popped cur-keymap)
+       [:key/pop-keymap cur-keymap-ptr]
+       (let [cur-keymap (:unmarshal-keymap (in context :key-manager) cur-keymap-ptr)]
+         (:call-hook (in context :hook-manager) :keymap-popped cur-keymap))
 
        [:key/raw raw-key]
        (:call-hook (in context :hook-manager) :key-pressed raw-key)
@@ -310,6 +320,11 @@
   # The config file environment, initialized in late-init,
   # after loading the config file
   (put context :user-config nil)
+  # The file path of the current config, initialized in late-init
+  (put context :user-config-file nil)
+  # The path of the data directory (where the config file resides),
+  # initialized in late-init
+  (put context :data-dir nil)
 
   (add-default-commands command-man context)
 
@@ -349,6 +364,8 @@
 
      unknown-ev
      (log/warning "Unknown event from main loop supervisor: %n" unknown-ev)))
+
+  (:call-hook hook-man :shutting-down)
 
   (:stop-all-servers repl-man)
   (:unregister-loader module-man)

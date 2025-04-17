@@ -1,0 +1,16 @@
+{:title ":ignore-window"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 15
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:ignore-window)
+```
+
+### Description
+
+Removes the current window from the list of managed windows.

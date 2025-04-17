@@ -541,6 +541,180 @@
             (get-hwnd-virtual-desktop-id hwnd (in wm :vdm-com)))))
 
 
+(defn dump-tag-value [x]
+  (def x-type (type x))
+  (cond
+    (or (= x-type :array)
+        (= x-type :tuple))
+    (tuple/slice (map |(dump-tag-value $) x))
+
+    (or (= x-type :table)
+        (= x-type :struct))
+    (do
+      (def new-tab @{})
+      (eachp [k v] x
+             (def new-k (dump-tag-value k))
+             (def new-v (dump-tag-value v))
+             (put new-tab new-k new-v))
+      (table/to-struct new-tab))
+
+    (or (= x-type :core/s64)
+        (= x-type :core/u64))
+    (int/to-number x) # XXX: type conversion
+
+    (abstract? x)
+    (errorf "non-trivial type: %n" x)
+
+    (or (= x-type :function)
+        (= x-type :cfunction)
+        (= x-type :fiber))
+    (errorf "non-trivial type: %n" x)
+
+    (= x-type :pointer)
+    (errorf "non-trivial type: %n" x)
+
+    true
+    x))
+
+
+(defn dump-tags [orig-tags]
+  (def tags @{})
+  (each k (keys orig-tags)
+    (if (or (keyword? k)
+            (symbol? k))
+      (do
+        (def v
+          (try
+            (dump-tag-value (in orig-tags k))
+            ((err fib)
+             (if (and (string? err)
+                      (string/has-prefix? "non-trivial type:" err))
+               (do
+                 (log/warning "non-trivial value in tag %n: %n\n%s"
+                              k
+                              (in orig-tags k)
+                              (get-stack-trace fib))
+                 nil)
+               # else
+               (do
+                 (log/error "failed to dump tag value: %n\n%s"
+                            err
+                            (get-stack-trace fib))
+                 (error err))))))
+        (put tags k v))
+
+      # else
+      (log/warning "ignoring tag: %n" k)))
+  (table/to-struct tags))
+
+
+(defn hwnd-list-to-map [hwnd-list]
+  (cond
+    (table? hwnd-list)
+    hwnd-list
+
+    (indexed? hwnd-list)
+    (let [hwnd-map @{}]
+      (each hwnd hwnd-list
+        (put hwnd-map (pointer-to-number hwnd) hwnd))
+      hwnd-map)
+
+    true
+    (errorf "unsupported hwnd list: %n" hwnd-list)))
+
+
+(defn enum-all-hwnds []
+  (def hwnd-list @[])
+  (EnumChildWindows
+   nil
+   (fn [hwnd]
+     (array/push hwnd-list hwnd)
+     1 # !!! IMPORTANT
+     ))
+  hwnd-list)
+
+
+(defn calc-loading-split-params [dumped-children]
+  (var direction nil)
+  (var last-rect nil)
+  (var total-width 0)
+  (var total-height 0)
+
+  (def child-widths @[])
+  (def child-heights @[])
+
+  # First pass: Calculate total-width, total-height and direction
+  (each c dumped-children
+    (def child-type (first c))
+
+    (case child-type
+      :window
+      (do
+        (set direction nil)
+        # out of each loop
+        (break))
+
+      :frame
+      (do
+        (def [_ rect _tags] c)
+        (def [width height] (rect-size rect))
+        (array/push child-widths width)
+        (array/push child-heights height)
+        (if last-rect
+          (cond
+            (= (in rect :top)
+               (in last-rect :top))
+            (do
+              (set direction :horizontal)
+              (+= total-width width))
+
+            (= (in rect :left)
+               (in last-rect :left))
+            (do
+              (set direction :vertical)
+              (+= total-height height)))
+          # else
+          (do
+            (set total-width width)
+            (set total-height height)))
+        (set last-rect rect))
+
+      (errorf "unknown child node type: %n" child-type)))
+
+  (unless direction
+    # early return
+    (break nil))
+
+  # Second pass: Calculate actual ratios
+  (def ratios
+    (case direction
+      :horizontal
+       (map |(/ $ total-width) child-widths)
+
+       :vertical
+       (map |(/ $ total-height) child-heights)))
+
+  [direction ratios])
+
+
+(defn find-closest-frame [rect all-frames]
+  (def [center-x center-y] (rect-center rect))
+  (var min-dist math/int-max)
+  (var found nil)
+  (var found-idx nil)
+  (eachp [idx fr] all-frames
+    (def fr-rect (in fr :rect))
+    (def [fr-center-x fr-center-y] (rect-center fr-rect))
+    (def dx (- center-x fr-center-x))
+    (def dy (- center-y fr-center-y))
+    (def dist (+ (* dx dx) (* dy dy)))
+    (when (< dist min-dist)
+      (set found fr)
+      (set found-idx idx)
+      (set min-dist dist)))
+  [found found-idx min-dist])
+
+
 ######### Generic tree node #########
 
 (defn tree-node-activate [self]
@@ -796,6 +970,21 @@
       (in lo :current-child))))
 
 
+(defn tree-node-get-current-layout [self]
+  (case (in self :type)
+    :window
+    (:get-layout self)
+
+    :frame
+    (:get-layout self)
+
+    :layout
+    self
+
+    :virtual-desktop-container
+    (in self :current-child)))
+
+
 (defn tree-node-get-first-frame [self]
   (def children (in self :children))
 
@@ -997,8 +1186,7 @@
             (def cur-dist (math/abs (- node-prop-val sib-prop-val)))
             (when (< cur-dist min-dist)
               (set min-dist cur-dist)
-              (set adj-fr sibling)
-              (break))))))
+              (set adj-fr sibling))))))
 
     (if adj-fr
       (get-adjacent-frame-impl-descent orig-node adj-fr dir)
@@ -1141,7 +1329,7 @@
    (in rect :bottom)])
 
 
-(defn tree-node-dump-subtree [self &opt level indent-width indent-char wm]
+(defn tree-node-print-subtree [self &opt level indent-width indent-char wm]
   (default level 0)
   (default indent-width const/DEFAULT-FRAME-TREE-DUMP-INDENT-WIDTH)
   (default indent-char const/DEFAULT-FRAME-TREE-DUMP-INDENT-CHAR)
@@ -1221,7 +1409,27 @@
 
   (when-let [children (in self :children)]
     (each child children
-      (:dump-subtree child (+ 1 level) indent-width indent-char wm))))
+      (:print-subtree child (+ 1 level) indent-width indent-char wm))))
+
+
+(defn tree-node-clear-children [self]
+  (when-let [child-arr (in self :children)]
+    (def children (slice child-arr))
+    (array/clear child-arr)
+    (put self :current-child nil)
+    (each c children
+      (put c :parent nil))
+    (when (= :frame (in self :type)) 
+      # The frame is now empty, reset its direction
+      (def dir (:get-direction self))
+      (if (or (= dir :horizontal)
+              (= dir :vertical))
+        (table/setproto self frame-proto)
+        # else
+        (unless (= nil dir)
+          (log/warning
+           "unknown direction %n for frame %n, skip resetting prototype"
+           dir (in self :rect)))))))
 
 
 (def- tree-node-proto
@@ -1234,6 +1442,7 @@
     :get-prev-sibling tree-node-get-prev-sibling
     :add-child tree-node-add-child
     :remove-child tree-node-remove-child
+    :clear-children tree-node-clear-children
     :get-all-windows tree-node-get-all-windows
     :get-all-leaf-frames tree-node-get-all-leaf-frames
     :get-top-window tree-node-get-top-window
@@ -1248,11 +1457,12 @@
     :find-hwnd tree-node-find-hwnd
     :purge-windows tree-node-purge-windows
     :get-layout tree-node-get-layout
+    :get-current-layout tree-node-get-current-layout
     :get-root tree-node-get-root
     :get-window-manager tree-node-get-window-manager
     :get-top-frame tree-node-get-top-frame
     :get-depth tree-node-get-depth
-    :dump-subtree tree-node-dump-subtree})
+    :print-subtree tree-node-print-subtree})
 
 
 (defn tree-node [node-type &opt parent children &keys extra-fields]
@@ -1379,6 +1589,29 @@
   (:set-focus-to-window uia-man (in self :hwnd)))
 
 
+(defn window-dump [self]
+  [:window
+   (pointer-to-number (in self :hwnd))
+   (dump-tags (in self :tags))])
+
+
+(defn window-load [self dumped]
+  (def [dump-type hwnd-num tags] dumped)
+
+  (unless (= :window dump-type)
+    (errorf "can not restore dump type to a window: %n" dump-type))
+  (unless (= hwnd-num
+             (pointer-to-number (in self :hwnd)))
+    (log/debug "restoring dump data for 0x%x to %n" hwnd-num (in self :hwnd)))
+
+  (eachp [k v] tags
+    (put (in self :tags) k v))
+
+  # Return an empty table, to make it consistent with other
+  # restore-* functions
+  @{})
+
+
 (def- window-proto
   (table/setproto
    @{:close window-close
@@ -1396,7 +1629,9 @@
      :get-info window-get-info
      :get-margins window-get-margins
      :get-dwm-border-margins window-get-dwm-border-margins
-     :set-focus window-set-focus}
+     :set-focus window-set-focus
+     :dump window-dump
+     :load window-load}
    tree-node-proto))
 
 
@@ -2034,6 +2269,70 @@
     (error "inconsistent states for frame tree")))
 
 
+(defn frame-dump [self]
+  [:frame
+   (in self :rect)
+   (dump-tags (in self :tags))
+   (tuple/slice (map |(:dump $) (in self :children)))])
+
+
+(defn frame-load [self dumped &opt hwnd-list]
+  (def [dump-type rect tags children] dumped)
+  (unless (= :frame dump-type)
+    (errorf "can not restore dump type to a frame: %n" dump-type))
+
+  # XXX: hwnd-list is also re-used in recursion to pass down hwnd-map,
+  # so it can be a table, instead of a list/array.
+  (default hwnd-list (enum-all-hwnds))
+  (def hwnd-map (hwnd-list-to-map hwnd-list))
+
+  (:clear-children self)
+
+  # This has to happen before doing anything layout-related,
+  # since the tags may contain layout settings (paddings etc.)
+  (eachp [k v] tags
+    (put (in self :tags) k v))
+
+  (if-let [split-params (calc-loading-split-params children)]
+    (do
+      # The frame is not empty, and the children are sub-frames
+      (def [direction ratios] split-params)
+      (:split self direction (length children) ratios)
+      (map (fn [sub-fr d]
+             (:load sub-fr d hwnd-map))
+           (in self :children)
+           children))
+    # else
+    (unless (empty? children)
+      # The frame is not empty, and the children are windows
+      (def lo (:get-layout self))
+      (def wm (when lo (:get-window-manager lo)))
+
+      (def maybe-restore
+        (if lo
+          # attached frame, need to check its virtual desktop
+          (fn [hwnd-num hwnd c]
+            (when-let [vd-id (:get-hwnd-virtual-desktop-id wm hwnd)]
+              (when (= vd-id (in lo :id))
+                (put hwnd-map hwnd-num nil)
+                (def win (window hwnd))
+                (:load win c)
+                (:add-child self win))))
+          # else, detached frame
+          (fn [hwnd-num hwnd c]
+            (put hwnd-map hwnd-num nil)
+            (def win (window hwnd))
+            (:load win c)
+            (:add-child self win))))
+
+      (each c children
+        (def [_ hwnd-num _] c)
+        (when-let [hwnd (in hwnd-map hwnd-num)]
+          (maybe-restore hwnd-num hwnd c)))))
+
+  hwnd-map)
+
+
 (set frame-proto
      (table/setproto
       @{:split frame-split
@@ -2050,7 +2349,9 @@
         :set-direction frame-set-direction
         :toggle-direction frame-toggle-direction
         :rotate-children frame-rotate-children
-        :reverse-children frame-reverse-children}
+        :reverse-children frame-reverse-children
+        :dump frame-dump
+        :load frame-load}
       tree-node-proto))
 
 
@@ -2152,13 +2453,19 @@
   (cond
     (= fr-count mon-count)
     # Only the resolutions or monitor configurations are changed
-    (map (fn [fr mon]
-           (unless (= mon (in fr :monitor))
-             (:transform fr (in mon :work-area) (in mon :dpi))
-             (put fr :monitor mon)
-             (:monitor-updated wm fr)))
-         top-frames
-         monitors)
+    (do
+      (var updated false)
+      (map (fn [fr mon]
+             (unless (= mon (in fr :monitor))
+               (:transform fr (in mon :work-area) (in mon :dpi))
+               (put fr :monitor mon)
+               (:monitor-updated wm fr)
+               (set updated true)))
+           top-frames
+           monitors)
+      (when updated
+        # Trigger :layout-changed hook
+        (:layouts-changed wm [self])))
 
     (> fr-count mon-count)
     # Some of the monitors got unplugged
@@ -2187,7 +2494,9 @@
         (:add-child move-to-fr w))
       (put self :children @[;alive-frames])
       (when (find |(= $ (in self :current-child)) dead-frames)
-        (put self :current-child main-fr)))
+        (put self :current-child main-fr))
+      # Trigger :layout-changed hook
+      (:layouts-changed wm [self]))
 
     (< fr-count mon-count)
     # New monitors got plugged in
@@ -2207,7 +2516,9 @@
            old-mons)
       (each fr new-frames
         (:add-child self fr)
-        (:monitor-updated wm fr)))))
+        (:monitor-updated wm fr))
+      # Trigger :layout-changed hook
+      (:layouts-changed wm [self]))))
 
 
 (defn layout-rotate-children [self direction]
@@ -2224,11 +2535,83 @@
   (:update-work-areas self monitors))
 
 
+(defn layout-dump [self]
+  [:layout
+   (in self :id)
+   (in self :name)
+   (tuple/slice (map |(:dump $) (in self :children)))])
+
+
+(defn calc-rect-dist [a b]
+  (def [cxa cya] (rect-center a))
+  (def [cxb cyb] (rect-center b))
+  (def dx (- cxa cxb))
+  (def dy (- cya cyb))
+  (+ (* dx dx) (* dy dy)))
+
+
+# rects-a (jobs/cols) should be from top frames, and rects-b
+# (workers/rows) should be from dumped data
+(defn calc-rect-dist-matrix [rects-a rects-b]
+  (def dist @[])
+  (eachp [idx-a ra] rects-a
+    (def col @[])
+    (array/push dist col)
+    (eachp [idx-b rb] rects-b
+      (array/push col (calc-rect-dist ra rb))))
+  dist)
+
+
+(defn layout-load [self dumped &opt hwnd-list]
+  (def [dump-type lo-id lo-name children] dumped)
+  (unless (= :layout dump-type)
+    (errorf "can not restore dump type to a layout: %n" dump-type))
+
+  (default hwnd-list (enum-all-hwnds))
+  (def hwnd-map (hwnd-list-to-map hwnd-list))
+
+  (def all-top-frames (array/slice (in self :children)))
+
+  (def frame-rects (map |(in $ :rect) all-top-frames))
+  (def dumped-rects (map |(in $ 1) children))
+
+  (if (<= (length frame-rects)
+          (length dumped-rects))
+    (do
+      (def dist-matrix (calc-rect-dist-matrix frame-rects dumped-rects))
+      (def [total-dist dumped-to-frame] (hungarian-assignment dist-matrix))
+
+      (log/debug "dist-matrix = %n" dist-matrix)
+      (log/debug "total-dist = %n" total-dist)
+      (log/debug "dumped-to-frame = %n" dumped-to-frame)
+
+      (eachp [dump-idx fr-idx] dumped-to-frame
+        (when (<= 0 fr-idx)
+          (:load (in all-top-frames fr-idx) (in children dump-idx) hwnd-map))))
+
+    # else
+    (do
+      (def dist-matrix (calc-rect-dist-matrix dumped-rects frame-rects))
+      (def [total-dist frame-to-dumped] (hungarian-assignment dist-matrix))
+
+      (log/debug "dist-matrix = %n" dist-matrix)
+      (log/debug "total-dist = %n" total-dist)
+      (log/debug "frame-to-dumped = %n" frame-to-dumped)
+
+      (eachp [fr-idx dump-idx] frame-to-dumped
+        (when (<= 0 dump-idx)
+          (:load (in all-top-frames fr-idx) (in children dump-idx) hwnd-map)))))
+
+  hwnd-map)
+
+
 (def- layout-proto
   (table/setproto
    @{:update-work-areas layout-update-work-areas
      :rotate-children layout-rotate-children
-     :reverse-children layout-reverse-children}
+     :reverse-children layout-reverse-children
+     :dump layout-dump
+     :load layout-load}
    tree-node-proto))
 
 
@@ -2247,16 +2630,26 @@
         :name desktop-name}
     desktop-info)
 
+  (def lo (:get-layout-on-desktop self desktop-info))
+  (:get-current-frame lo))
+
+
+(defn vdc-get-layout-on-desktop [self desktop-info]
+  (def {:id desktop-id
+        :name desktop-name}
+    desktop-info)
+
   (var layout-found nil)
   (each lo (in self :children)
     (when (= (in lo :id) desktop-id)
       (set layout-found lo)
       (break)))
   (if layout-found
-    (:get-current-frame layout-found)
+    layout-found
     (let [new-layout (:new-layout self desktop-info)]
       (:add-child self new-layout)
-      (:get-current-frame new-layout))))
+      (:layout-created (in self :window-manager) new-layout)
+      new-layout)))
 
 
 (defn vdc-new-layout [self desktop-info]
@@ -2272,7 +2665,6 @@
                  monitors)))
   (def to-activate (or main-idx 0))
   (:activate (get-in new-layout [:children to-activate]))
-  (:layout-created wm new-layout)
   new-layout)
 
 
@@ -2287,11 +2679,40 @@
   dead-arr)
 
 
+(defn vdc-dump [self]
+  [:vdc
+   (tuple/slice (map |(:dump $) (in self :children)))])
+
+
+(defn vdc-load [self dumped &opt hwnd-list]
+  (def [dump-type children] dumped)
+  (unless (= :vdc dump-type)
+    (errorf "can not restore dump type to a virtual desktop container: %n" dump-type))
+
+  (default hwnd-list (enum-all-hwnds))
+  (def hwnd-map (hwnd-list-to-map hwnd-list))
+
+  (:clear-children self)
+
+  (each c children
+    (def [_ lo-id lo-name _] c)
+    (def vd-info {:id lo-id :name lo-name})
+    (def lo (:new-layout self vd-info))
+    (:add-child self lo)
+    (log/debug "restoring layout, id = %n" lo-id)
+    (:load lo c hwnd-map))
+
+  hwnd-map)
+
+
 (def- virtual-desktop-container-proto
   (table/setproto
    @{:new-layout vdc-new-layout
+     :get-layout-on-desktop vdc-get-layout-on-desktop
      :get-current-frame-on-desktop vdc-get-current-frame-on-desktop
-     :purge-windows vdc-purge-windows}
+     :purge-windows vdc-purge-windows
+     :dump vdc-dump
+     :load vdc-load}
    tree-node-proto))
 
 
@@ -2343,6 +2764,10 @@
   (default cr (get-in self [:uia-manager :focus-cr]))
   (def uia-man (in self :uia-manager))
   (get-hwnd-uia-element hwnd (in uia-man :com) cr))
+
+
+(defn wm-get-hwnd-virtual-desktop-id [self hwnd]
+  (get-hwnd-virtual-desktop-id hwnd (in self :vdm-com)))
 
 
 (defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
@@ -2406,6 +2831,7 @@
       (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
   (:add-child frame-found new-win)
+  (:layouts-changed self [(:get-layout frame-found)])
   (:transform new-win (:get-padded-rect frame-found) nil self)
 
   new-win)
@@ -2662,9 +3088,23 @@
         (:set-focus self lo)))))
 
 
-(defn wm-frames-resized [self frame-list]
+(defn wm-layouts-changed [self lo-list]
+  (def {:hook-manager hook-man} self)
+  (each lo lo-list
+    (:call-hook hook-man :layout-changed lo)))
+
+
+(defn wm-frames-resized [self frame-list &opt trigger-layout-changed]
+  (default trigger-layout-changed true)
+
   (def hook-man (in self :hook-manager))
+  (def changed-layouts @{})
+
   (each fr frame-list
+    (when trigger-layout-changed
+      (when-let [lo (:get-layout fr)]
+        (put changed-layouts (in lo :id) lo)))
+
     (def children (in fr :children))
 
     # Only call hooks on leaf frames
@@ -2676,7 +3116,10 @@
       (:call-hook hook-man :frame-resized fr)
 
       (= :frame (get-in fr [:children 0 :type]))
-      (:frames-resized self (in fr :children)))))
+      (:frames-resized self (in fr :children) false)))
+
+  (unless (empty? changed-layouts)
+    (:layouts-changed self (values changed-layouts))))
 
 
 (defn wm-monitor-updated [self top-frame]
@@ -2774,7 +3217,9 @@
 (defn wm-with-activation-hooks [self op-fn]
   (def root (in self :root))
   (def old-frame (:get-current-frame root))
-  (def old-win (:get-current-window old-frame))
+  (def old-win
+    (when old-frame
+      (:get-current-window old-frame)))
 
   (def ret (op-fn))
 
@@ -2800,6 +3245,7 @@
   @{:focus-changed wm-focus-changed
     :window-opened wm-window-opened
     :desktop-name-changed wm-desktop-name-changed
+    :layouts-changed wm-layouts-changed
     :frames-resized wm-frames-resized
     :monitor-updated wm-monitor-updated
     :layout-created wm-layout-created
@@ -2810,6 +3256,7 @@
     :set-focus wm-set-focus
 
     :get-hwnd-path wm-get-hwnd-path
+    :get-hwnd-virtual-desktop-id wm-get-hwnd-virtual-desktop-id
     :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
     :get-hwnd-uia-element wm-get-hwnd-uia-element
     :get-hwnd-info wm-get-hwnd-info

@@ -1,0 +1,14 @@
+{:title "jwno/auto-layout"
+ :template "main.html"
+ :back-to ["Built-In Modules" "index.html"]
+ :order 1
+ :generated :partial}
+---
+
+### Synopsis
+
+TODO
+
+### Description
+
+TODO

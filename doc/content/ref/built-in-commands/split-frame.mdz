@@ -1,0 +1,25 @@
+{:title ":split-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 26
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:split-frame dir &opt nfr ratios after-split-fn)
+```
+
+### Description
+
+Divides a frame into multiple sub-frames. Dir can be :vertical or
+:horizontal. Nfr specifies the number of sub-frames which defaults
+to 2. Ratios, if provided, should be a tuple or array, containing
+ratios for sub-frame sizes. After-split-fn is a function accepting
+the frame object being divided as its sole argument, and it will
+be called after the split.
+
+For example, calling the command (:split-frame :vertical 3 [0.1 0.3 0.6])
+splits the current frame into 3 vertical sub-frames, whose heights
+are 0.1, 0.3 and 0.6 of the original frame height, respectively.

@@ -1,0 +1,14 @@
+{:title "jwno/ui-hint"
+ :template "main.html"
+ :back-to ["Built-In Modules" "index.html"]
+ :order 6
+ :generated :partial}
+---
+
+### Synopsis
+
+TODO
+
+### Description
+
+TODO

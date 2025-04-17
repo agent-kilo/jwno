@@ -19,6 +19,9 @@ Jwno can be extended via pure Janet code, but sometimes that's not enough. Maybe
   @li{
     @link[about-jw32.html]{About Jw32}
   }
+  @li{
+    @link[building-documentation.html]{Building Documentation}
+  }
 }
 
 ### See Also

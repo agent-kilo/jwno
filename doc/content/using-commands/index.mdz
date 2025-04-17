@@ -33,12 +33,12 @@ Some Commands can accept arguments, but the syntaxes to pass arguments to them d
 
 @ul{
   @li{
-    @link[ref/command-manager-object.html]{The Command Manager Object}
+    @link[../ref/command-manager-object.html]{The Command Manager Object}
   }
   @li{
-    @link[ref/keymap-objects.html]{Keymap Objects}
+    @link[../ref/keymap-objects.html]{Keymap Objects}
   }
   @li{
-    @link[ref/built-in-commands.html]{Built-In Commands}
+    @link[../ref/built-in-commands/index.html]{Built-In Commands}
   }
 }

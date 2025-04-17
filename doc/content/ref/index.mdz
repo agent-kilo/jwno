@@ -15,13 +15,13 @@
     @link[key-names.html]{List of Key Names}
   }
   @li{
-    @link[built-in-commands.html]{Built-In Commands}
+    @link[built-in-commands/index.html]{Built-In Commands}
   }
   @li{
-    @link[built-in-hooks.html]{Built-In Hooks}
+    @link[built-in-hooks/index.html]{Built-In Hooks}
   }
   @li{
-    @link[built-in-modules.html]{Built-In Modules}
+    @link[built-in-modules/index.html]{Built-In Modules}
   }
   @li{
     @link[context-object.html]{The Context Object}

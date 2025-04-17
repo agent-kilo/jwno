@@ -1,0 +1,29 @@
+{:title ":rotate-sibling-frames"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 25
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:rotate-sibling-frames &opt dir steps depth)
+```
+
+### Description
+
+Rotates sibling frames.
+
+When dir is :forward, the first frame will be moved to the end
+of the frame list. When dir is :backward, the last frame will be
+moved to the beginning of the frame list instead. Defaults to
+:forward.
+
+Steps specifies how many times the frame list should be rotated.
+Defaults to 1.
+
+Depth specifies which level of frames should be rotated. 0 means
+to rotate top-level frames, 1 means to rotate children of top-level
+frames, etc. Defaults to the level of the current active leaf
+frame.

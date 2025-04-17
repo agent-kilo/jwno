@@ -53,6 +53,9 @@ This page is a collection of recipes for some @html```<del>&nbsp;funny tricks&nb
   @li{
     @link[export-a-value-to-the-repl.html]{Export a Value to the REPL}
   }
+  @li{
+    @link[pause-key-binding-handling.html]{Pause Key Binding Handling}
+  }
 }
 
 ### Next Step

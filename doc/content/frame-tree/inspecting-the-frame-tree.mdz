@@ -4,10 +4,10 @@
  :order 1}
 ---
 
-You can dump the entire frame tree in the REPL:
+You can show the entire frame tree in the REPL:
 
 @codeblock[janet]```
-(:dump-subtree (get-in jwno/context [:window-manager :root]))
+(:print-subtree (get-in jwno/context [:window-manager :root]))
 ```
 
 And the output would look like this:

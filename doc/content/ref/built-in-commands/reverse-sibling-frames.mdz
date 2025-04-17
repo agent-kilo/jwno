@@ -1,0 +1,21 @@
+{:title ":reverse-sibling-frames"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 24
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:reverse-sibling-frames &opt depth)
+```
+
+### Description
+
+Reverses the order of sibling frames.
+
+Depth specifies which level of frames should be reversed. 0 means
+to reverse top-level frames, 1 means to reverse children of top-level
+frames, etc. Defaults to the level of the current active leaf
+frame.

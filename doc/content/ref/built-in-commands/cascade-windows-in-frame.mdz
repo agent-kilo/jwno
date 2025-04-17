@@ -1,0 +1,18 @@
+{:title ":cascade-windows-in-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 3
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:cascade-windows-in-frame &opt dx dy)
+```
+
+### Description
+
+Cascades windows in the current frame. Dx and dy are the X and
+Y offsets for each window, respectively. Dx and dy are both in
+virtual pixels, and default to 32.

@@ -1,0 +1,19 @@
+{:title ":balance-frames"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 2
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:balance-frames &opt recursive?)
+```
+
+### Description
+
+Resizes frames, so that all siblings belonging to the same parent
+have the same size. When recursive? is true (the default), resizes
+all frames in the current monitor. Otherwise, only resizes the
+siblings of the current frame.

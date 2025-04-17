@@ -1,0 +1,14 @@
+{:title "jwno/indicator"
+ :template "main.html"
+ :back-to ["Built-In Modules" "index.html"]
+ :order 2
+ :generated :partial}
+---
+
+### Synopsis
+
+TODO
+
+### Description
+
+TODO

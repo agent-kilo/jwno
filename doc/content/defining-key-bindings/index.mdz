@@ -38,12 +38,12 @@
 
 @ul{
   @li{
-    @link[ref/keymap-objects.html]{Keymap Objects}
+    @link[../ref/keymap-objects.html]{Keymap Objects}
   }
   @li{
-    @link[ref/key-manager-object.html]{The Key Manager Object}
+    @link[../ref/key-manager-object.html]{The Key Manager Object}
   }
   @li{
-    @link[ref/key-names.html]{List of Key Names}
+    @link[../ref/key-names.html]{List of Key Names}
   }
 }

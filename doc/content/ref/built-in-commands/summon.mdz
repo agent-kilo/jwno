@@ -1,0 +1,21 @@
+{:title ":summon"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 27
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:summon match-fn &opt pull? & cli)
+```
+
+### Description
+
+Summons a managed window for which match-fn returns a truthy value.
+Match-fn should accept a window object as its sole argument. When
+pull? is truthy, and the matching window is on the currently active
+virtual desktop, that window will be pulled into the current frame.
+Otherwise, simply bring focus to the matching window. If no matching
+window is found, will try to execute cli unless its empty.

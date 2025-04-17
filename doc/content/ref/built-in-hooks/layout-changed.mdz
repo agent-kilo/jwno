@@ -1,0 +1,20 @@
+{:title ":layout-changed"
+ :template "main.html"
+ :back-to ["Built-In Hooks" "index.html"]
+ :order 15
+ :generated true}
+---
+
+### Type
+
+@p{@link[../../using-hooks/normal-hooks.html]{Normal}}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn lo)
+```
+
+### Description
+
+TODO

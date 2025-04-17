@@ -1,0 +1,17 @@
+{:title ":resize-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 22
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:resize-frame dw dh)
+```
+
+### Description
+
+Resizes the current frame. Dw and dh are the deltas of width and
+height, respectively. Both of them are in physical pixels.

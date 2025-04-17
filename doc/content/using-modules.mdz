@@ -45,6 +45,6 @@ Built-in modules providing high-level APIs have the @code{jwno/} prefix, and tho
     @link[ref/command-line-options.html]{Command Line Options}
   }
   @li{
-    @link[ref/built-in-modules.html]{Built-In Modules}
+    @link[ref/built-in-modules/index.html]{Built-In Modules}
   }
 }

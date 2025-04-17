@@ -33,6 +33,7 @@
     (with-activation-hooks window-man
       (:close parent))
     (def to-retile (in parent :parent))
+    (:layouts-changed window-man [(:get-layout to-retile)])
     # ev/spawn to put the :retile call in the event queue
     (ev/spawn
      (:retile window-man to-retile))))
@@ -70,6 +71,21 @@
    close-empty-frame-proto))
 
 
+# ================== Common Code for Auto Layouts ==================
+
+(var auto-layout-default-filter-hook-fn nil)
+
+(defn auto-layout-default-filter [win uia-win exe-path desktop-info]
+  (cond
+    (= "#32770" (:get_CachedClassName uia-win))
+    false
+
+    (not= 0 (:GetCurrentPropertyValue uia-win UIA_IsDialogPropertyId))
+    false
+
+    true))
+
+
 # ================== BSP Layout ==================
 #
 # Automatically split and arrange frames in the good old BSP fasion.
@@ -83,23 +99,13 @@
 #     (:disable bsp-layout)
 #
 
-(defn bsp-do-default-filter [self win uia-win exe-path desktop-info]
-  (cond
-    (= "#32770" (:get_CachedClassName uia-win))
-    false
-
-    (not= 0 (:GetCurrentPropertyValue uia-win UIA_IsDialogPropertyId))
-    false
-
-    true))
-
 
 (defn bsp-on-window-created [self win uia-win exe-path desktop-info]
   (def filter-result
     (:call-filter-hook
        (in self :hook-manager)
        :and
-       :filter-bsp-window
+       :filter-auto-layout-window
        win uia-win exe-path desktop-info))
 
   (unless filter-result
@@ -126,10 +132,10 @@
 
   (def hook-man (in self :hook-manager))
 
-  (put self :default-filter-hook-fn
-     (:add-hook hook-man :filter-bsp-window
-        (fn [& args]
-          (:do-default-filter self ;args))))
+  (unless auto-layout-default-filter-hook-fn
+    (set auto-layout-default-filter-hook-fn
+         (:add-hook hook-man :filter-auto-layout-window
+            auto-layout-default-filter)))
 
   (put self :hook-fn
      (:add-hook hook-man :window-created
@@ -139,17 +145,12 @@
 
 (defn bsp-disable [self]
   (def {:hook-manager hook-man
-        :hook-fn hook-fn
-        :default-filter-hook-fn default-filter-hook-fn}
+        :hook-fn hook-fn}
     self)
 
   (when hook-fn
     (put self :hook-fn nil)
-    (:remove-hook hook-man :window-created hook-fn))
-
-  (when default-filter-hook-fn
-    (put self :default-filter-hook-fn nil)
-    (:remove-hook hook-man :filter-bsp-window)))
+    (:remove-hook hook-man :window-created hook-fn)))
 
 
 (defn bsp-refresh [self]
@@ -179,6 +180,8 @@
       (:reset-visual-state w true false)
       (:add-child fr w))
 
+    (:layouts-changed window-man [(:get-layout top-frame)])
+
     (:retile window-man top-frame)
     (if last-focus
       (:activate last-focus)
@@ -186,8 +189,7 @@
 
 
 (def bsp-proto
-  @{:do-default-filter bsp-do-default-filter
-    :on-window-created bsp-on-window-created
+  @{:on-window-created bsp-on-window-created
     :enable bsp-enable
     :disable bsp-disable
     :refresh bsp-refresh})
@@ -201,6 +203,155 @@
    @{:window-manager window-man
      :hook-manager hook-man}
    bsp-proto))
+
+
+# ================== Rows Layout ==================
+#
+# Automatically split and arrange frames into horizontal or vertical rows.
+# To use it, add these in your config:
+#
+#     (def rows-layout (auto-layout/rows jwno/context))
+#     (put rows-layout :direction :horizontal)  # or :vertical, defaults to :horizontal
+#     (:enable rows-layout)
+#
+# To stop it:
+#
+#     (:disable rows-layout)
+#
+
+
+(defn rows-on-window-created [self win uia-win exe-path desktop-info]
+  (def filter-result
+    (:call-filter-hook
+       (in self :hook-manager)
+       :and
+       :filter-auto-layout-window
+       win uia-win exe-path desktop-info))
+
+  (unless filter-result
+    (break))
+
+  (def {:window-manager window-man} self)
+  (def cur-frame
+    (:get-current-frame-on-desktop (in window-man :root) desktop-info))
+  (unless (empty? (in cur-frame :children))
+    (def cur-top-frame (:get-top-frame cur-frame))
+    (def top-dir (:get-direction cur-top-frame))
+    (def rows-dir (in self :direction))
+    (def target-fr
+      (cond
+        (nil? top-dir)
+        (do
+          (:split cur-top-frame rows-dir)
+          (get-in cur-top-frame [:children 1]))
+
+        (= top-dir rows-dir)
+        (do
+          (:insert-sub-frame cur-top-frame -1)
+          (last (in cur-top-frame :children)))
+
+        (not= top-dir rows-dir)
+        (do
+          (def orig-children (slice (in cur-top-frame :children)))
+          (array/clear (in cur-top-frame :children))
+          (put cur-top-frame :current-child nil)
+          (def orig-proto (table/getproto cur-top-frame))
+          (:split cur-top-frame rows-dir)
+          (def fr (get-in cur-top-frame [:children 0]))
+          (each vc orig-children
+            (put vc :parent nil)
+            (:add-child fr vc))
+          (table/setproto fr orig-proto)
+          # re-calculate sub-frame rects
+          (:transform fr (in fr :rect))
+          # return target frame
+          (last (in cur-top-frame :children)))))
+
+    (put (in win :tags) :frame target-fr)
+
+    # ev/spawn to put the :retile call in the event queue
+    (ev/spawn
+     (:retile window-man cur-top-frame))))
+
+
+(defn rows-enable [self]
+  (:disable self)
+
+  (def hook-man (in self :hook-manager))
+
+  (unless auto-layout-default-filter-hook-fn
+    (set auto-layout-default-filter-hook-fn
+         (:add-hook hook-man :filter-auto-layout-window
+            auto-layout-default-filter)))
+
+  (put self :hook-fn
+     (:add-hook hook-man :window-created
+        (fn [& args]
+          (:on-window-created self ;args)))))
+
+
+(defn rows-disable [self]
+  (def {:hook-manager hook-man
+        :hook-fn hook-fn}
+    self)
+
+  (when hook-fn
+    (put self :hook-fn nil)
+    (:remove-hook hook-man :window-created hook-fn)))
+
+
+(defn rows-refresh [self]
+  (def {:window-manager window-man
+        :direction rows-dir}
+    self)
+
+  (def cur-frame (:get-current-frame (in window-man :root)))
+  (unless cur-frame
+    (break))
+  (def top-frame (:get-top-frame cur-frame))
+  (def last-focus (:get-current-window top-frame))
+  (def all-wins (:get-all-windows top-frame))
+
+  (with-activation-hooks window-man
+    (array/clear (in top-frame :children))
+    (put top-frame :current-child nil)
+
+    (when (empty? all-wins)
+      (break))
+
+    (:split top-frame rows-dir (length all-wins))
+    (map (fn [fr win]
+           (:reset-visual-state win true false)
+           (:add-child fr win))
+         (in top-frame :children)
+         all-wins)
+
+    (:layouts-changed window-man [(:get-layout top-frame)])
+
+    (:retile window-man top-frame)
+    (if last-focus
+      (:activate last-focus)
+      (:set-focus window-man top-frame))))
+
+
+(def rows-proto
+  @{:on-window-created rows-on-window-created
+    :enable rows-enable
+    :disable rows-disable
+    :refresh rows-refresh})
+
+
+(defn rows [context]
+  (def {:window-manager window-man
+        :hook-manager hook-man}
+    context)
+  (table/setproto
+   @{:window-manager window-man
+     :hook-manager hook-man
+
+     # default settings
+     :direction :horizontal}
+   rows-proto))
 
 
 # ================== Auto Zoom-In ==================

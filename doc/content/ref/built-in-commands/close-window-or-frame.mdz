@@ -1,0 +1,17 @@
+{:title ":close-window-or-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 7
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:close-window-or-frame)
+```
+
+### Description
+
+If the current frame is not empty, closes its active window.
+Otherwise, closes the current frame.

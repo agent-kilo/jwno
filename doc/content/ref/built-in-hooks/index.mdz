@@ -1,0 +1,47 @@
+{:title "Built-In Hooks"
+ :template "main.html"
+ :back-to ["Reference Index" "../index.html"]
+ :order 4
+ :generated true}
+---
+
+These are the hooks available in Jwno by default.
+
+
+### Table of Contents
+
+@ul{
+
+@li{@link[command-executed.html]{:command-executed}}
+@li{@link[filter-auto-layout-window.html]{:filter-auto-layout-window}}
+@li{@link[filter-command.html]{:filter-command}}
+@li{@link[filter-forced-window.html]{:filter-forced-window}}
+@li{@link[filter-scratch-pad-window.html]{:filter-scratch-pad-window}}
+@li{@link[filter-window.html]{:filter-window}}
+@li{@link[focus-changed.html]{:focus-changed}}
+@li{@link[frame-activated.html]{:frame-activated}}
+@li{@link[frame-resized.html]{:frame-resized}}
+@li{@link[key-pressed.html]{:key-pressed}}
+@li{@link[keymap-popped.html]{:keymap-popped}}
+@li{@link[keymap-pushed.html]{:keymap-pushed}}
+@li{@link[keymap-reset.html]{:keymap-reset}}
+@li{@link[keymap-switched.html]{:keymap-switched}}
+@li{@link[layout-changed.html]{:layout-changed}}
+@li{@link[layout-created.html]{:layout-created}}
+@li{@link[monitor-updated.html]{:monitor-updated}}
+@li{@link[shutting-down.html]{:shutting-down}}
+@li{@link[virtual-desktop-changed.html]{:virtual-desktop-changed}}
+@li{@link[window-activated.html]{:window-activated}}
+@li{@link[window-created.html]{:window-created}}
+@li{@link[window-removed.html]{:window-removed}}
+
+}
+
+
+### See Also
+
+@ul{
+  @li{
+    @link[../../using-hooks/index.html]{Using Hooks}
+  }
+}

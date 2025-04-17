@@ -4,4 +4,116 @@
  :order 5}
 ---
 
-⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️
+Frame nodes are container nodes that accommodate either window nodes or other frame nodes (not both). There are currently three frame-specific properties, and one container-specific property, in a frame object.
+
+Frame-specific properties: @code{:monitor}, @code{:rect} and @code{:tags}.
+
+Container-specific property: @code{:current-child}.
+
+
+### @code{:monitor} Property
+
+@p{@em{This property only exists in top-level frames that represent physical monitors.}}
+
+For example, to get some info about the current monitor in the REPL:
+
+@codeblock[janet]```
+(def fr (:get-current-top-frame (get-in jwno/context [:window-manager :root])))
+(pp (in fr :monitor))
+```
+
+And something like this should come out (I changed the formatting to make it more readable):
+
+@codeblock[text]```
+{
+  :device    "\\\\.\\DISPLAY1"
+  :dpi       (96 96)
+  :flags     <core/u64 1>
+  :rect      { :bottom 1080 :left 0 :right 1920 :top 0}
+  :work-area { :bottom 1080 :left 0 :right 1858 :top 0}
+}
+```
+
+@p{@code{1} in the @code{:flags} means this is the primary monitor.}
+
+The @code{:monitor-updated} hook will fire after the @code{:monitor} property of a frame gets updated.
+
+
+### @code{:rect} Property
+
+This is the on-screen rectangle the frame covers. For example, to obtain the rectangle area for the current frame in the REPL:
+
+@codeblock[janet]```
+(def fr (:get-current-frame (get-in jwno/context [:window-manager :root])))
+(in fr :rect)
+```
+
+And the result would be something like this:
+
+@codeblock[janet]```
+{:bottom 1070 :left 929 :right 1848 :top 10}
+```
+
+If you want to change a frame node's @code{:rect}, you should normally use the @code{:transform} or @code{:resize} methods of a frame node. They will transform the frame's descendant containers (if there's any) automatically. For example, to "shrink" the current top-level frame by 100 pixels on its left and top sides in the REPL:
+
+@codeblock[janet]```
+(def fr (:get-current-top-frame (get-in jwno/context [:window-manager :root])))
+(def old-rect (in fr :rect))
+(def new-rect
+  {:left   (+ 100 (in old-rect :left))
+   :top    (+ 100 (in old-rect :top))
+   :right  (in old-rect :right)
+   :bottom (in old-rect :bottom)})
+(:transform fr new-rect)
+(:retile (in jwno/context :window-manager) fr)  # Needs this to actually resize the windows
+```
+
+And to make the top frame "fullscreen" again:
+
+@codeblock[janet]```
+(:transform fr (get-in fr [:monitor :work-area]))
+(:retile (in jwno/context :window-manager) fr)
+```
+
+
+### @code{:tags} Property
+
+Akin to the @code{:tags} property of window nodes, a frame node's @code{:tags} are used to store any user-defined properties for that frame. See @link[window-nodes.html]{Window Nodes} for an example of marking your favorite nodes with @code{:tags}.
+
+There're again reserved tag names, which Jwno uses to layout frames and windows. You can set them to the values you prefer, but cannot use these names for other purposes:
+
+@tag[table]{
+  @tr{
+    @th{Tag Name} @th{Description}
+  }
+  @tr{
+    @td{@code{:padding} and @code{:paddings}} @td{Used to specify paddings (gaps) inside the frame, when fitting windows into it. You can specify non-uniform padding values in @code{:paddings} like this: @code```(put (in frame :tags) :paddings {:left 10 :top 20 :right 30 :bottom 40})```, and they will override the value in @code{:padding}.}
+  }
+}
+
+All these tags take effect when retiling or transforming/resizing a frame.
+
+
+### @code{:current-child} Property
+
+This property always points to one of the frame's @code{:children}. It can only be @code{nil} when the frame is empty. And it's the child node that will have the input focus when the frame gets activated. This property is mainly used to track input focus and coordinate with window/frame selection commands. You can set this property directly to point to one of the children, or call the @code{:activate} method on one of the children.
+
+To explain how tree node activation works, suppose we have such a tree:
+
+@codeblock[text]```
+top-frame --+-- frame-1 * --+-- frame-11 *
+            |               |
+            |               +-- frame-12
+            |
+            +-- frame-2   --+-- frame-21
+                            |
+                            +-- frame-22 *
+```
+
+The nodes with a @code{*} are the @code{:current-child}'s of their parents.
+
+To determin the current input focus, Jwno walks from the the top of the tree (@code{top-frame} in this case), following @code{:current-child} in each level, and that brings us to @code{frame-11}. This is exactly what happens when we call the @code{:get-current-frame}/@code{:get-current-window} methods from the @code{top-frame} object.
+
+Then if we call the @code{:activate} method on @code{frame-2}, @code{frame-2} will become @code{top-frame}'s @code{:current-child}, and subsequent @code{:get-current-frame} calls on @code{top-frame} will return @code{frame-22} instead.
+
+(@code{:get-current-frame} always returns a leaf frame. @smaller{Maybe it should be named @code{:get-current-leaf-frame} instead.})

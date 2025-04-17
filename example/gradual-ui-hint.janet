@@ -13,6 +13,8 @@
 #   Blue:   Set input focus
 #   Green:  Invoke default action (e.g. click a button)
 #
+# Keep pressing `Backspace` to return to upper-level elements.
+#
 # The :gradual-ui-hint command is generally more responsive than :ui-hint,
 # since it limits its scope when searching for UI elements, but you usually
 # need to type more keys to get to your target element.

@@ -1,0 +1,20 @@
+{:title ":filter-forced-window"
+ :template "main.html"
+ :back-to ["Built-In Hooks" "index.html"]
+ :order 4
+ :generated :partial}
+---
+
+### Type
+
+@p{@link[../../using-hooks/filter-hooks.html]{Filter} \(or)}
+
+### Function Signature
+
+@codeblock[janet]```
+(hook-fn hwnd uia-win exe-path desktop-info)
+```
+
+### Description
+
+TODO

@@ -1,0 +1,17 @@
+{:title ":adjacent-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 1
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:adjacent-frame dir)
+```
+
+### Description
+
+Brings focus to the adjacent frame in the specified direction.
+Dir can be :left, :right, :up or :down.

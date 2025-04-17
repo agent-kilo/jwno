@@ -100,6 +100,8 @@
     (when after-split-fn
       (after-split-fn cur-frame))
 
+    (:layouts-changed wm [(:get-layout cur-frame)])
+
     (:retile wm cur-frame)
     (:set-focus wm cur-frame)))
 
@@ -180,6 +182,7 @@
     true
     (with-activation-hooks wm
       (:flatten parent)
+      (:layouts-changed wm [(:get-layout parent)])
       (:retile wm parent)
       (:set-focus wm (:get-current-window parent)))))
 
@@ -254,6 +257,7 @@
              adj-fr (:get-adjacent-frame cur-frame dir)]
     (with-activation-hooks wm
       (:add-child adj-fr cur-win)
+      (:layouts-changed wm [(:get-layout cur-frame)])
       (:transform cur-win (:get-padded-rect adj-fr) nil wm)
       # The focus is still on cur-win, so focus-changed event will not
       # fire, we need to activate its new parent frame manually here
@@ -385,12 +389,12 @@
     (do
       (repeat steps
         (:rotate-children parent dir))
-      (:retile wm parent)
       # To update visual indicators, the :frame-resized hook
       # needs to fire, even though the frame sizes are always
       # the same after rotation. Maybe rename the hook to
       # :frame-rect-updated ?
-      (:frames-resized wm (slice (in parent :children))))))
+      (:frames-resized wm (slice (in parent :children)))
+      (:retile wm parent))))
 
 
 (defn cmd-reverse-sibling-frames [wm &opt depth?]
@@ -408,11 +412,11 @@
         (= :layout (in parent :type)))
     (do
       (:reverse-children parent)
-      (:retile wm parent)
       # To update visual indicators, the :frame-resized hook
       # needs to fire, even though the frame sizes are always
       # the same after reversing.
-      (:frames-resized wm (slice (in parent :children))))))
+      (:frames-resized wm (slice (in parent :children)))
+      (:retile wm parent))))
 
 
 (defn cmd-toggle-parent-direction [wm &opt recursive depth?]
@@ -432,8 +436,8 @@
     true
     (do
       (:toggle-direction parent recursive)
-      (:retile wm parent)
-      (:frames-resized wm (slice (in parent :children))))))
+      (:frames-resized wm (slice (in parent :children)))
+      (:retile wm parent))))
 
 
 (defn cmd-close-frame [wm &opt cur-frame]
@@ -448,18 +452,21 @@
   (with-activation-hooks wm
     (:close cur-frame)
 
-    (def parent-cur-children (get-in cur-frame [:parent :children]))
+    (def parent (in cur-frame :parent))
+    (def parent-cur-children (in parent :children))
     (cond
       (empty? parent-cur-children)
       # All sibling frames are closed
-      :nop
+      (:layouts-changed wm [(:get-layout parent)])
+
+      (= :window (get-in parent-cur-children [0 :type]))
+      # The parent's current children are windows, in that
+      # case all sibling frames are closed too.
+      (:layouts-changed wm [(:get-layout parent)])
 
       (= :frame (get-in parent-cur-children [0 :type]))
-      (:frames-resized wm parent-cur-children)
-
-      # :nop when the parent's current children are windows, since
-      # in that case all sibling frames are closed too.
-      )
+      # :frames-resized will trigger :layouts-changed
+      (:frames-resized wm parent-cur-children))
 
     (:retile wm (in cur-frame :parent))
     (if cur-win
@@ -630,6 +637,20 @@
           (:add-hwnd wm info :forced))))))
 
 
+(var wm-pause-hook-fn nil)
+
+(defn cmd-toggle-window-management [hook-man ui-man]
+  (if wm-pause-hook-fn
+    (do
+      (:remove-hook hook-man :filter-window wm-pause-hook-fn)
+      (set wm-pause-hook-fn nil)
+      (:show-tooltip ui-man :toggle-window-management "Window management enabled."))
+    # else
+    (do
+      (set wm-pause-hook-fn (:add-hook hook-man :filter-window (fn [&] false)))
+      (:show-tooltip ui-man :toggle-window-management "Window management disabled."))))
+
+
 (defn cmd-ignore-window [wm ui-man]
   (with-uia [uia-win (:get-focused-window (in wm :uia-manager) true)]
     (unless uia-win
@@ -796,10 +817,8 @@
 
 (defn add-default-commands [command-man context]
   (def {:ui-manager ui-man
-        :uia-manager uia-man
-        :key-manager key-man
-        :window-manager wm
-        :repl repl}
+        :hook-manager hook-man
+        :window-manager wm}
     context)
 
   (:add-command command-man :nop cmd-nop
@@ -1073,6 +1092,15 @@
 
      Forcibly adds the current window to the list of managed windows.
      ```)
+
+  (:add-command command-man :toggle-window-management
+     (fn [] (cmd-toggle-window-management hook-man ui-man))
+     ```
+     (:toggle-window-management)
+
+     Pauses/unpauses window management. Will not affect windows that
+     are already managed.
+     ``` )
 
   (:add-command command-man :ignore-window
      (fn [] (cmd-ignore-window wm ui-man))

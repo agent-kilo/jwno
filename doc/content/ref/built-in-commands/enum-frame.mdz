@@ -1,0 +1,17 @@
+{:title ":enum-frame"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 10
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:enum-frame dir)
+```
+
+### Description
+
+Brings focus to another frame in the specified direction. Dir
+can be :next or :prev.

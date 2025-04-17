@@ -21,7 +21,10 @@ The rectangular screen areas managed by Jwno are called @em{frames}, and they ar
     @link[window-nodes.html]{Window Nodes}
   }
   @li{
-    @link[frame-nodes.html]{Frame Nodes ⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️}
+    @link[frame-nodes.html]{Frame Nodes}
+  }
+  @li{
+    @link[layout-nodes.html]{Layout Nodes}
   }
 }
 

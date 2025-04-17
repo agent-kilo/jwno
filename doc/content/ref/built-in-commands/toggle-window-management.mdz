@@ -1,0 +1,17 @@
+{:title ":toggle-window-management"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 29
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:toggle-window-management)
+```
+
+### Description
+
+Pauses/unpauses window management. Will not affect windows that
+are already managed.

@@ -1,0 +1,22 @@
+{:title ":toggle-parent-direction"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 28
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:toggle-parent-direction &opt recursive depth)
+```
+
+### Description
+
+Changes the direction of the parent frame. If the direction was
+:horizontal, it becomes :vertical, and vice versa.
+
+Depth specifies which level of frame's direction should be toggled.
+1 means to toggle top-level frames, 2 means to toggle children of
+top-level frames, etc. Defaults to the parent of the current active
+leaf frame.
