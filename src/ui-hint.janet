@@ -49,10 +49,12 @@
   hfont)
 
 
-(defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache]
+(defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache &opt text-scale]
+  (default text-scale 1)
+
   (def [scale-x scale-y] (calc-pixel-scale rect))
 
-  (def hfont (create-cached-font scale-y font-cache))
+  (def hfont (create-cached-font (* text-scale scale-y) font-cache))
   (def orig-hfont (SelectObject hdc hfont))
 
   (defer
@@ -84,7 +86,7 @@
     (def bottom (- (in rect 3) offset-y))
 
     # TODO: Anchoring
-    (def text-x left)
+    (def text-x (+ left padding-x))
     (def text-y (brshift (+ top bottom (- text-height)) 1))
     (def text-right (+ text-x text-width))
     (def text-bottom (+ text-y text-height))
