@@ -18,57 +18,11 @@
 (var global-hint-state nil)
 
 
-(defn draw-label [hdc label rect text-color bg-color border-color shadow-color scale-x scale-y]
-  (def dt-format (bor DT_SINGLELINE DT_NOCLIP))
-  (def [height text-rect] (DrawText hdc label [0 0 0 0] (bor dt-format DT_CALCRECT)))
-  (when (>= 0 height)
-    (error "DrawText DT_CALCRECT failed"))
-  (def {:right text-width
-        :bottom text-height}
-    text-rect)
+(defn create-cached-font [scale cache]
+  (when-let [cached (in cache scale)]
+    # Early return
+    (break cached))
 
-  (def padding 2)
-  (def padding-x (math/floor (* padding scale-x)))
-  (def padding-y (math/floor (* padding scale-y)))
-
-  (def shadow-offset 2)
-  (def shadow-offset-x (math/floor (* shadow-offset scale-x)))
-  (def shadow-offset-y (math/floor (* shadow-offset scale-y)))
-
-  (def [left top right bottom] rect)
-
-  (def text-x left)
-  (def text-y (brshift (+ top bottom (- text-height)) 1))
-  (def text-right (+ text-x text-width))
-  (def text-bottom (+ text-y text-height))
-
-  (def box-x (- text-x padding-x))
-  (def box-y (- text-y padding-y))
-  (def box-right (+ text-right padding-x))
-  (def box-bottom (+ text-bottom padding-y))
-
-  # Shadow
-  (unless (= :none shadow-color)
-    (SetDCBrushColor hdc shadow-color)
-    (SetDCPenColor hdc shadow-color)
-    (Rectangle hdc
-               (+ box-x shadow-offset-x)
-               (+ box-y shadow-offset-y)
-               (+ box-right shadow-offset-x)
-               (+ box-bottom shadow-offset-y)))
-
-  # Background
-  (SetDCBrushColor hdc bg-color)
-  (SetDCPenColor hdc border-color)
-  (Rectangle hdc box-x box-y box-right box-bottom)
-
-  # Text
-  (SetTextColor hdc text-color)
-  (SetBkMode hdc TRANSPARENT)
-  (DrawText hdc label [text-x text-y text-right text-bottom] dt-format))
-
-
-(defn create-font [scale]
   # We simply copy a system font, and apply the scaling here
   (def [spi-ret spi-ncm] (SystemParametersInfo SPI_GETNONCLIENTMETRICS 0 nil 0))
   (when (= FALSE spi-ret)
@@ -90,7 +44,75 @@
                          (in cap-font :lfFaceName)))
   (when (null? hfont)
     (errorf "CreateFont failed"))
+
+  (put cache scale hfont)
   hfont)
+
+
+(defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache]
+  (def [scale-x scale-y] (calc-pixel-scale rect))
+
+  (def hfont (create-cached-font scale-y font-cache))
+  (def orig-hfont (SelectObject hdc hfont))
+
+  (defer
+    (do
+      (SelectObject hdc orig-hfont))
+
+    # body
+    (def dt-format (bor DT_SINGLELINE DT_NOCLIP))
+    (def [height text-rect] (DrawText hdc label [0 0 0 0] (bor dt-format DT_CALCRECT)))
+    (when (>= 0 height)
+      (error "DrawText DT_CALCRECT failed"))
+    (def {:right text-width
+          :bottom text-height}
+      text-rect)
+
+    (def padding 2)
+    (def padding-x (math/floor (* padding scale-x)))
+    (def padding-y (math/floor (* padding scale-y)))
+
+    (def shadow-offset 2)
+    (def shadow-offset-x (math/floor (* shadow-offset scale-x)))
+    (def shadow-offset-y (math/floor (* shadow-offset scale-y)))
+
+    (def offset-x (in client-rect :left))
+    (def offset-y (in client-rect :top))
+    (def left   (- (in rect 0) offset-x))
+    (def top    (- (in rect 1) offset-y))
+    (def right  (- (in rect 2) offset-x))
+    (def bottom (- (in rect 3) offset-y))
+
+    # TODO: Anchoring
+    (def text-x left)
+    (def text-y (brshift (+ top bottom (- text-height)) 1))
+    (def text-right (+ text-x text-width))
+    (def text-bottom (+ text-y text-height))
+
+    (def box-x (- text-x padding-x))
+    (def box-y (- text-y padding-y))
+    (def box-right (+ text-right padding-x))
+    (def box-bottom (+ text-bottom padding-y))
+
+    # Shadow
+    (unless (= :none shadow-color)
+      (SetDCBrushColor hdc shadow-color)
+      (SetDCPenColor hdc shadow-color)
+      (Rectangle hdc
+                 (+ box-x shadow-offset-x)
+                 (+ box-y shadow-offset-y)
+                 (+ box-right shadow-offset-x)
+                 (+ box-bottom shadow-offset-y)))
+
+    # Background
+    (SetDCBrushColor hdc bg-color)
+    (SetDCPenColor hdc border-color)
+    (Rectangle hdc box-x box-y box-right box-bottom)
+
+    # Text
+    (SetTextColor hdc text-color)
+    (SetBkMode hdc TRANSPARENT)
+    (DrawText hdc label [text-x text-y text-right text-bottom] dt-format)))
 
 
 (defn hint-area-wndproc [hwnd msg wparam lparam]
@@ -116,28 +138,28 @@
             (def border-color (in colors :border 0x828282))
             (def shadow-color (in colors :shadow 0x828282))
 
-            (def [scale-x scale-y] (calc-pixel-scale client-rect))
-            (def font (create-font scale-y))
-            (def orig-font (SelectObject hdc font))
+            (SelectObject hdc (GetStockObject DC_BRUSH))
+            (SelectObject hdc (GetStockObject DC_PEN))
+
+            (def font-cache @{})
 
             (defer
               (do
-                (SelectObject hdc orig-font)
-                (DeleteObject font))
-              (do
-                (SelectObject hdc (GetStockObject DC_BRUSH))
-                (SelectObject hdc (GetStockObject DC_PEN))
+                (log/debug "releasing %n cached fonts" (length font-cache))
+                (each f font-cache
+                  (DeleteObject f)))
 
-                (each [label rect] hint-list
-                  (draw-label hdc
-                              label
-                              rect
-                              text-color
-                              bg-color
-                              border-color
-                              shadow-color
-                              scale-x
-                              scale-y)))))))
+              # body
+              (each [label rect] hint-list
+                (draw-label hdc
+                            label
+                            rect
+                            text-color
+                            bg-color
+                            border-color
+                            shadow-color
+                            client-rect
+                            font-cache))))))
       0)
 
     WM_CLOSE
@@ -253,8 +275,6 @@
 
   (when-let [hbr (in hint-state :win-hbr)]
     (DeleteObject hbr))
-  (when-let [hfont (in hint-state :font)]
-    (DeleteObject hfont))
 
   (when-let [custom-msgs (in state :custom-messages)
              cleanup-fn (in custom-msgs msg)]
@@ -469,17 +489,15 @@
   (when colors
     (:post-message ui-man colors-msg (alloc-and-marshal colors) 0))
 
-  (def offset-x (in win-rect :left))
-  (def offset-y (in win-rect :top))
   (def to-show @[])
   (eachp [l e] labeled
     (def rect (:get_CachedBoundingRectangle e))
     (array/push to-show
                 [l
-                 [(- (in rect :left) offset-x)
-                  (- (in rect :top) offset-y)
-                  (- (in rect :right) offset-x)
-                  (- (in rect :bottom) offset-y)]]))
+                 [(in rect :left)
+                  (in rect :top)
+                  (in rect :right)
+                  (in rect :bottom)]]))
   (:post-message ui-man show-msg (alloc-and-marshal [win-rect to-show]) 0))
 
 
