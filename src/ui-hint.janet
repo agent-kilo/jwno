@@ -219,8 +219,31 @@
   0)
 
 
+(defn calc-spanning-rect [hint-list]
+  (var ret-left math/int-max)
+  (var ret-top  math/int-max)
+  (var ret-right  math/int-min)
+  (var ret-bottom math/int-min)
+  (each [_ r] hint-list
+    (def [left top right bottom] r)
+    (when (< left ret-left)
+      (set ret-left left))
+    (when (< top ret-top)
+      (set ret-top top))
+    (when (> right ret-right)
+      (set ret-right right))
+    (when (> bottom ret-bottom)
+      (set ret-bottom bottom)))
+  (when (and (<= ret-left ret-right)
+             (<= ret-top ret-bottom))
+    {:left ret-left
+     :top  ret-top
+     :right  ret-right
+     :bottom ret-bottom}))
+
+
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
-  (def [rect hint-list] (unmarshal-and-free wparam))
+  (def hint-list (unmarshal-and-free wparam))
   (def hint-state (in state :hint-state @{}))
 
   (def hint-hwnd
@@ -235,23 +258,28 @@
         (put hint-state :win-hbr win-hbr)
         new-hwnd)))
 
-  (put hint-state :area-rect rect)
+  (def spanning-rect (calc-spanning-rect hint-list))
+  (log/debug "spanning-rect = %n" spanning-rect)
+  (unless spanning-rect
+    (log/warning "empty spanning rect for hint-list: %n" hint-list)
+    # Early return
+    (break 0))
+
+  (put hint-state :area-rect spanning-rect)
   (put hint-state :hint-list hint-list)
   (put state :hint-state hint-state)
   (set global-hint-state hint-state)
 
-  (ShowWindow hint-hwnd SW_SHOW)
-  (InvalidateRect hint-hwnd nil true)
-  (UpdateWindow hint-hwnd)
-
-  (def [width height] (rect-size rect))
+  (def [width height] (rect-size spanning-rect))
   (SetWindowPos hint-hwnd
                 HWND_TOPMOST
-                (in rect :left)
-                (in rect :top)
+                (in spanning-rect :left)
+                (in spanning-rect :top)
                 width
                 height
-                (bor SWP_NOACTIVATE))
+                (bor SWP_NOACTIVATE SWP_NOREDRAW))
+  (InvalidateRect hint-hwnd nil true)
+  (ShowWindow hint-hwnd SW_SHOW)
   0)
 
 
@@ -500,7 +528,7 @@
                   (in rect :top)
                   (in rect :right)
                   (in rect :bottom)]]))
-  (:post-message ui-man show-msg (alloc-and-marshal [win-rect to-show]) 0))
+  (:post-message ui-man show-msg (alloc-and-marshal to-show) 0))
 
 
 #
