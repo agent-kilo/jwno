@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Used by the auto-layout code to determine whether a new window should affect the frame layout. @code{win} is the new window object. @code{uia-win} is the UI Automation element object for the new window. @code{exe-path} is the path of the .exe file that created the window. And @code{desktop-info} contains the @code{:id} and @code{:name} of the window's virtual desktop. 
+
+@p{@code{hook-fn} should return @code{true} if the new window should affect the frame layout, or @code{false} otherwise.}

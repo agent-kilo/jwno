@@ -17,4 +17,8 @@
 
 ### Description
 
-TODO
+Used by the command manager to determine whether a command can be executed. @code{cmd} is the command's name, and @code{args} is a tuple containing the command's arguments.
+
+@p{@code{hook-fn} should return @code{true} if the command can be executed, or @code{false} otherwise.}
+
+Special keymap commands, such as @code{:push-keymap} and @code{:pop-keymap}, will not trigger this hook.
