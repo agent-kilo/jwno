@@ -131,7 +131,8 @@
           (when global-hint-state
             (log/debug "global-hint-state = %n" global-hint-state)
             (def {:area-rect client-rect
-                  :hint-list hint-list}
+                  :hint-list hint-list
+                  :text-scale text-scale}
               global-hint-state)
 
             (def colors (in global-hint-state :colors @{}))
@@ -161,7 +162,8 @@
                             border-color
                             shadow-color
                             client-rect
-                            font-cache))))))
+                            font-cache
+                            text-scale))))))
       0)
 
     WM_CLOSE
@@ -243,7 +245,7 @@
 
 
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
-  (def hint-list (unmarshal-and-free wparam))
+  (def [text-scale hint-list] (unmarshal-and-free wparam))
   (def hint-state (in state :hint-state @{}))
 
   (def hint-hwnd
@@ -267,6 +269,7 @@
 
   (put hint-state :area-rect spanning-rect)
   (put hint-state :hint-list hint-list)
+  (put hint-state :text-scale text-scale)
   (put state :hint-state hint-state)
   (set global-hint-state hint-state)
 
@@ -314,221 +317,23 @@
 ################## ^^^^ Runs in UI thread ^^^^ ##################
 
 
-(defn normalize-key-list [key-list]
-  (string/ascii-upper key-list))
+#
+# ------------------- uia-hinter -------------------
+#
 
-
-
-
-
-(defn calc-label-len [elem-count key-count]
-  (max 1 (math/ceil (/ (math/log elem-count) (math/log key-count)))))
-
-
-(defn make-label-coro [key-list &opt next-coro]
-  (fn []
-    (coro
-     (each k key-list
-       (if next-coro
-         (let [c (next-coro)]
-           (while (def n (resume c))
-             (def buf (buffer/new-filled 1 k))
-             (buffer/push buf n)
-             (yield buf)))
-         (yield (buffer/new-filled 1 k)))))))
-
-
-(defn make-label-coro-for-label-len [label-len key-list]
-  (var coro-ctor nil)
-  (for i 0 label-len
-    (set coro-ctor (make-label-coro key-list coro-ctor)))
-  coro-ctor)
-
-
-(defn generate-labels [elem-list key-list]
-  (def label-len (calc-label-len (length elem-list) (length key-list)))
-  (def coro-ctor (make-label-coro-for-label-len label-len key-list))
-  (def label-coro (coro-ctor))
-  (def labeled @{})
-  (each e elem-list
-    (put labeled (resume label-coro) e))
-  labeled)
-
-
-(defn filter-hint-labels [current-keys labeled-elems]
-  (def current-keys-len (length current-keys))
-  (def filtered @{})
-
-  (eachp [l e] labeled-elems
-    (when (string/has-prefix? current-keys l)
-      (def new-label (slice l current-keys-len))
-      (put filtered new-label e)))
-
-  filtered)
-
-
-(defn ui-hint-clean-up [self]
-  (def {:context context
-        :labeled-elems labeled-elems
-        :hook-fn hook-fn
-        :hide-msg hide-msg}
-    self)
-  (def {:hook-manager hook-man
-        :ui-manager ui-man
-        :key-manager key-man}
-    context)
-
-  (:set-key-mode key-man :command)
-  (:remove-hook hook-man :key-pressed hook-fn)
-  (eachp [l e] labeled-elems
-    (def name (:get_CachedName e))
-    (def control-type (:get_CachedControlType e))
-    (def refc (:Release e))
-    (unless (= refc (int/u64 0))
-      (log/warning "bad ref count in ui-hint-clean-up: %n (%n, %n)" refc name control-type)))
-  (:post-message ui-man hide-msg 0 0)
-
-  (put self :hook-fn nil)
-  (put self :labeled-elems nil))
-
-
-(defn get-click-point [target]
-  (def [point ret] (:GetClickablePoint target))
-  (if (= ret FALSE)
-    (do
-      (log/debug "failed to get clickable point for (%n, %n), falling back to center point"
-                 (:get_CachedName target)
-                 (:get_CachedControlType target))
-      (rect-center (:get_CachedBoundingRectangle target)))
-    # else
-    point))
-
-
-(defn move-mouse-cursor [x y]
-  (def spcp-ret (SetPhysicalCursorPos x y))
-  (when (= spcp-ret FALSE)
-    (errorf "SetPhysicalCursorPos failed: %n" (GetLastError))))
-
-
-(defn handle-action-invoke [_ui-hint target]
-  (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
-    (do
-      (try
-        # Some elements can't have focus, and this will return 0x80020003
-        # (Member not found) for them. We just ignore it here.
-        (:SetFocus target)
-        ((_err _fib)
-         :ignored))
-      (with-uia [invoke-pat (:GetCachedPatternAs target
-                                                 UIA_InvokePatternId
-                                                 IUIAutomationInvokePattern)]
-        (:Invoke invoke-pat)))
-
-    # else: No invoke pattern, focus it only
-    (:SetFocus target)))
-
-
-(defn handle-action-focus [_ui-hint target]
-  (:SetFocus target))
-
-
-(defn handle-action-move-cursor [_ui-hint target]
-  (def rect (:get_CachedBoundingRectangle target))
-  (move-mouse-cursor ;(rect-center rect)))
-
-
-(defn handle-action-click [_ui-hint target]
-  (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-button-input :left :down)
-              (mouse-button-input :left :up)))
-
-
-(defn handle-action-middle-click [_ui-hint target]
-  (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-button-input :middle :down)
-              (mouse-button-input :middle :up)))
-
-
-(defn handle-action-right-click [_ui-hint target]
-  (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-button-input :right :down)
-              (mouse-button-input :right :up)))
-
-
-(defn handle-action-double-click [_ui-hint target]
-  (move-mouse-cursor ;(get-click-point target))
-  (send-input (mouse-button-input :left :down)
-              (mouse-button-input :left :up)
-              (mouse-button-input :left :down)
-              (mouse-button-input :left :up)))
-
-
-(defn ui-hint-process-filter-result [self filtered]
-  (def {:action action
-        :action-handlers action-handlers}
-    self)
-
-  (case (length filtered)
-    1
-    # Reached the target
-    (let [target (in filtered (first (keys filtered)))]
-      (:AddRef target)
-      # Our message loop may get suspended when invoking certain UI elements,
-      # e.g. a button that opens a dialog box or a pop-up menu, so we send
-      # the clean up messages before invoking anything.
-      (:clean-up self)
-
-      (cond
-        (or (function? action)
-            (cfunction? action))
-        # Custom action
-        :todo
-
-        true
-        (when-let [handler (in action-handlers action)]
-          (try
-            (handler self target)
-            ((err fib)
-             (log/error "ui-hint action %n failed for element (%n, %n): %n\n%s"
-                        action
-                        (:get_CachedName target)
-                        (:get_CachedControlType target)
-                        err
-                        (get-stack-trace fib))))))
-
-      (:Release target))
-
-    0
-    # The prefix does not exist, clean up so we don't confuse the user
-    (:clean-up self)
-
-    # Other values mean that we still have multiple choices, wait
-    # for more input.
-    (:show-hints self filtered)))
-
-
-(defn ui-hint-show-hints [self labeled]
-  (def {:context context
-        :colors colors
-        :win-rect win-rect
-        :show-msg show-msg
-        :colors-msg colors-msg}
-    self)
-  (def {:ui-manager ui-man} context)
-
-  (when colors
-    (:post-message ui-man colors-msg (alloc-and-marshal colors) 0))
-
-  (def to-show @[])
-  (eachp [l e] labeled
-    (def rect (:get_CachedBoundingRectangle e))
-    (array/push to-show
-                [l
-                 [(in rect :left)
-                  (in rect :top)
-                  (in rect :right)
-                  (in rect :bottom)]]))
-  (:post-message ui-man show-msg (alloc-and-marshal to-show) 0))
+(defn- create-cache-request [uia-man]
+  (:create-cache-request
+     uia-man
+     [UIA_NamePropertyId
+      UIA_ClassNamePropertyId
+      UIA_FrameworkIdPropertyId
+      UIA_NativeWindowHandlePropertyId
+      UIA_ControlTypePropertyId
+      UIA_BoundingRectanglePropertyId
+      UIA_IsInvokePatternAvailablePropertyId
+      UIA_IsOffscreenPropertyId
+      UIA_IsEnabledPropertyId]
+     [UIA_InvokePatternId]))
 
 
 #
@@ -538,8 +343,8 @@
 # This is to filter out all the offscreen tabs. It should deal with other
 # browsers based on Firefox too. E.g. Zen browser.
 #
-(defn find-firefox-init-elements [uia-win uia-man &opt cr?]
-  (log/debug "find-firefox-init-elements for window: %n" (:get_CachedName uia-win))
+(defn find-firefox-init-uia-elements [uia-win uia-man &opt cr?]
+  (log/debug "find-firefox-init-uia-elements for window: %n" (:get_CachedName uia-win))
 
   (def elem-list @[])
 
@@ -610,8 +415,8 @@
 # So the runtime IDs in the same process should all be different from each other, right?
 # Is this a bug in UIAutomation or WinUI?
 #
-(defn find-win-ui-init-elements [uia-win uia-man &opt cr?]
-  (log/debug "find-win-ui-init-elements for window: %n" (:get_CachedName uia-win))
+(defn find-win-ui-init-uia-elements [uia-win uia-man &opt cr?]
+  (log/debug "find-win-ui-init-uia-elements for window: %n" (:get_CachedName uia-win))
 
   (def elem-list @[])
 
@@ -640,25 +445,22 @@
        nil
        cr))
 
-  (log/debug "find-win-ui-init-elements: found %n children" (length elem-list))
+  (log/debug "find-win-ui-init-uia-elements: found %n children" (length elem-list))
   elem-list)
 
 
-(defn ui-hint-find-ui-elements [self uia-win cond-spec &opt cr filter-runtime-ids]
+(defn find-uia-elements [uia-man uia-win cond-spec &opt cr filter-runtime-ids]
   (default filter-runtime-ids false)
-
-  (def {:context context} self)
-  (def {:uia-manager uia-man} context)
 
   (def init-elems
     (cond
       (and (= UIA_WindowControlTypeId (:get_CachedControlType uia-win))
            (= "Gecko" (:get_CachedFrameworkId uia-win))
            (= "MozillaWindowClass" (:get_CachedClassName uia-win)))
-      (find-firefox-init-elements uia-win uia-man cr)
+      (find-firefox-init-uia-elements uia-win uia-man cr)
 
       (= "WinUIDesktopWin32WindowClass" (:get_CachedClassName uia-win))
-      (find-win-ui-init-elements uia-win uia-man cr)
+      (find-win-ui-init-uia-elements uia-win uia-man cr)
 
       true
       (do
@@ -712,12 +514,433 @@
   elem-list)
 
 
-(defn ui-hint-cmd [self raw-key-list &opt cond-spec action]
+(defn uia-hinter-init [self ui-hint]
+  (log/debug "-- uia-hinter-init --")
+
+  (def {:cond-spec cond-spec} self)
+  (def {:context context} ui-hint)
+  (def {:uia-manager uia-man} context)
+
+  (when-let [elem-list (in self :elem-list)]
+    # Early return
+    (break elem-list))
+
+  (def elem-list
+    (with-uia [cr (create-cache-request uia-man)]
+      (with-uia [uia-win (:get-focused-window uia-man true cr)]
+        (unless uia-man
+          # Out of with-uia
+          (break @[]))
+
+        (def win-hwnd (:get_CachedNativeWindowHandle uia-win))
+        (when (or (nil? win-hwnd)
+                  (null? win-hwnd))
+          (log/debug "Invalid HWND for uia-hinter: %n" win-hwnd)
+          # Out of with-uia
+          (break @[]))
+
+        (find-uia-elements uia-man
+                           uia-win
+                           # Always ignore disabled and off-screen elements
+                           [:and
+                            [:property UIA_IsOffscreenPropertyId false]
+                            [:property UIA_IsEnabledPropertyId true]
+                            cond-spec]
+                           cr))))
+
+  (log/debug "Found %n UI elements" (length elem-list))
+
+  (put self :elem-list elem-list)
+  (map (fn [e]
+         (def rect (:get_CachedBoundingRectangle e))
+         [[(in rect :left)
+           (in rect :top)
+           (in rect :right)
+           (in rect :bottom)]
+          e])
+       elem-list))
+
+
+(defn uia-hinter-select [self elem]
+  (log/debug "-- uia-hinter-select --")
+
+  (def {:action action
+        :action-handlers action-handlers}
+    self)
+
+  (unless (in self :elem-list)
+    (log/warning "uia-hinter: selection after cancellation")
+    # Early return
+    (break))
+
+  (:AddRef elem)
+
+  # Our message loop may get suspended when invoking certain UI elements,
+  # e.g. a button that opens a dialog box or a pop-up menu, so we do the
+  # clean-up before invoking anything.
+  (:cancel self)
+
+  (cond
+    (or (function? action)
+        (cfunction? action))
+    # Custom action
+    'TODO
+
+    true
+    (when-let [handler (in action-handlers action)]
+      (try
+        (handler self elem)
+        ((err fib)
+         (log/error "uia-hinter action %n failed for element (%n, %n): %n\n%s"
+                    action
+                    (:get_CachedName elem)
+                    (:get_CachedControlType elem)
+                    err
+                    (get-stack-trace fib))))))
+
+  (:Release elem)
+
+  # !!! IMPORTANT
+  nil)
+
+
+(defn uia-hinter-cancel [self]
+  (log/debug "-- uia-hinter-cancel --")
+  (when-let [elem-list (in self :elem-list)]
+    (put self :elem-list nil)
+    (each e elem-list
+      (def name (:get_CachedName e))
+      (def control-type (:get_CachedControlType e))
+      (def refc (:Release e))
+      (unless (= refc (int/u64 0))
+        (log/warning "bad ref count in ui-hint-clean-up: %n (%n, %n)" refc name control-type)))))
+
+
+(def uia-hinter-proto
+  @{:init uia-hinter-init
+    :select uia-hinter-select
+    :cancel uia-hinter-cancel})
+
+
+(defn get-click-point [target]
+  (def [point ret] (:GetClickablePoint target))
+  (if (= ret FALSE)
+    (do
+      (log/debug "failed to get clickable point for (%n, %n), falling back to center point"
+                 (:get_CachedName target)
+                 (:get_CachedControlType target))
+      (rect-center (:get_CachedBoundingRectangle target)))
+    # else
+    point))
+
+
+(defn move-mouse-cursor [x y]
+  (def spcp-ret (SetPhysicalCursorPos x y))
+  (when (= spcp-ret FALSE)
+    (errorf "SetPhysicalCursorPos failed: %n" (GetLastError))))
+
+
+(defn handle-action-invoke [_hinter target]
+  (if (not= 0 (:GetCachedPropertyValue target UIA_IsInvokePatternAvailablePropertyId))
+    (do
+      (try
+        # Some elements can't have focus, and this will return 0x80020003
+        # (Member not found) for them. We just ignore it here.
+        (:SetFocus target)
+        ((_err _fib)
+         :ignored))
+      (with-uia [invoke-pat (:GetCachedPatternAs target
+                                                 UIA_InvokePatternId
+                                                 IUIAutomationInvokePattern)]
+        (:Invoke invoke-pat)))
+
+    # else: No invoke pattern, focus it only
+    (:SetFocus target)))
+
+
+(defn handle-action-focus [_hinter target]
+  (:SetFocus target))
+
+
+(defn handle-action-move-cursor [_hinter target]
+  (def rect (:get_CachedBoundingRectangle target))
+  (move-mouse-cursor ;(rect-center rect)))
+
+
+(defn handle-action-click [_hinter target]
+  (move-mouse-cursor ;(get-click-point target))
+  (send-input (mouse-button-input :left :down)
+              (mouse-button-input :left :up)))
+
+
+(defn handle-action-middle-click [_hinter target]
+  (move-mouse-cursor ;(get-click-point target))
+  (send-input (mouse-button-input :middle :down)
+              (mouse-button-input :middle :up)))
+
+
+(defn handle-action-right-click [_hinter target]
+  (move-mouse-cursor ;(get-click-point target))
+  (send-input (mouse-button-input :right :down)
+              (mouse-button-input :right :up)))
+
+
+(defn handle-action-double-click [_hinter target]
+  (move-mouse-cursor ;(get-click-point target))
+  (send-input (mouse-button-input :left :down)
+              (mouse-button-input :left :up)
+              (mouse-button-input :left :down)
+              (mouse-button-input :left :up)))
+
+
+(defn uia-hinter [&opt cond-spec action]
   (default cond-spec
     [:or
      [:property UIA_IsKeyboardFocusablePropertyId true]
      [:property UIA_IsInvokePatternAvailablePropertyId true]])
   (default action :invoke)
+
+  (table/setproto
+   @{:action-handlers @{:invoke       handle-action-invoke
+                        :focus        handle-action-focus
+                        :move-cursor  handle-action-move-cursor
+                        :click        handle-action-click
+                        :middle-click handle-action-middle-click
+                        :right-click  handle-action-right-click
+                        :double-click handle-action-double-click}
+     :cond-spec cond-spec
+     :action action}
+   uia-hinter-proto))
+
+
+#
+# ------------------- frame-hinter -------------------
+#
+
+(defn frame-hinter-init [self ui-hint]
+  (log/debug "-- frame-hinter-init --")
+
+  (put self :ui-hint ui-hint)
+  (put self :orig-label-scale (in ui-hint :label-scale))
+  (*= (ui-hint :label-scale) 5)
+
+  (def {:context context} ui-hint)
+  (def {:window-manager window-man} context)
+
+  (def cur-lo (get-in window-man [:root :current-child]))
+  (unless cur-lo
+    (break []))
+
+  (def frame-list (:get-all-leaf-frames cur-lo))
+  (map |(tuple (in $ :rect) $) frame-list))
+
+
+(defn frame-hinter-select [self fr]
+  (log/debug "-- frame-hinter-select --")
+
+  (def {:action-fn action-fn} self)
+  (try
+    (action-fn fr)
+    ((err fib)
+     (log/error "action for frame-hinter failed: %n\n%s"
+                err
+                (get-stack-trace fib))))
+  # Reset text scale
+  (:cancel self)
+  # !!! IMPORTANT
+  nil)
+
+
+(defn frame-hinter-cancel [self]
+  (when-let [orig-label-scale (in self :orig-label-scale)]
+    (put self :orig-label-scale nil)
+    (put (in self :ui-hint)
+         :label-scale
+         orig-label-scale)))
+
+
+(def frame-hinter-proto
+  @{:init frame-hinter-init
+    :select frame-hinter-select
+    :cancel frame-hinter-cancel})
+
+
+(defn frame-hinter [&opt action-fn]
+  (default action-fn
+    (fn [fr]
+      (let [wm (:get-window-manager fr)]
+        (with-activation-hooks wm
+          (:set-focus wm fr)))))
+
+  (table/setproto
+   @{:action-fn action-fn}
+   frame-hinter-proto))
+
+
+#
+# ------------------- ui-hint -------------------
+#
+
+(defn normalize-key-list [key-list]
+  (string/ascii-upper key-list))
+
+
+(defn calc-label-len [elem-count key-count]
+  (max 1 (math/ceil (/ (math/log elem-count) (math/log key-count)))))
+
+
+(defn make-label-coro [key-list &opt next-coro]
+  (fn []
+    (coro
+     (each k key-list
+       (if next-coro
+         (let [c (next-coro)]
+           (while (def n (resume c))
+             (def buf (buffer/new-filled 1 k))
+             (buffer/push buf n)
+             (yield buf)))
+         (yield (buffer/new-filled 1 k)))))))
+
+
+(defn make-label-coro-for-label-len [label-len key-list]
+  (var coro-ctor nil)
+  (for i 0 label-len
+    (set coro-ctor (make-label-coro key-list coro-ctor)))
+  coro-ctor)
+
+
+(defn generate-labels [elem-list key-list]
+  (def label-len (calc-label-len (length elem-list) (length key-list)))
+  (def coro-ctor (make-label-coro-for-label-len label-len key-list))
+  (def label-coro (coro-ctor))
+  (def labeled @{})
+  (each e elem-list
+    (put labeled (resume label-coro) e))
+  labeled)
+
+
+(defn filter-hint-labels [current-keys labeled-elems]
+  (def current-keys-len (length current-keys))
+  (def filtered @{})
+
+  (eachp [l e] labeled-elems
+    (when (string/has-prefix? current-keys l)
+      (def new-label (slice l current-keys-len))
+      (put filtered new-label e)))
+
+  filtered)
+
+
+(defn ui-hint-clean-up [self &opt cancel?]
+  (default cancel? true)
+
+  (def {:context context
+        :hinter hinter
+        :labeled-elems labeled-elems
+        :hook-fn hook-fn
+        :hide-msg hide-msg}
+    self)
+  (def {:hook-manager hook-man
+        :ui-manager ui-man
+        :key-manager key-man}
+    context)
+
+  (:set-key-mode key-man :command)
+  (:remove-hook hook-man :key-pressed hook-fn)
+  (:post-message ui-man hide-msg 0 0)
+
+  (when cancel?
+    (when-let [cancel-fn (in hinter :cancel)]
+      (try
+        (cancel-fn hinter)
+        ((err fib)
+         (log/error ":cancel method from hinter failed: %n\n%s"
+                    err
+                    (get-stack-trace fib))))))
+
+  (put self :hinter nil)
+  (put self :key-list nil)
+  (put self :labeled-elems nil)
+  (put self :current-keys nil)
+  (put self :hook-fn nil))
+
+
+(defn ui-hint-process-filter-result [self filtered]
+  (def {:hinter hinter} self)
+
+  (case (length filtered)
+    1
+    # Reached the target
+    (let [target (in filtered (first (keys filtered)))
+          select-res (:select hinter (last target))]
+      (cond
+        (and (not (nil? select-res))
+             (not (indexed? select-res)))
+        (do
+          # XXX: Raise an error?
+          (log/warning ":select method from hinter returned: %n" select-res)
+          (:clean-up self true))
+
+        (or (nil? select-res)
+            (empty? select-res))
+        # The hinter finished its work
+        (:clean-up self false)
+
+        true
+        # The hinter returned new hints, rinse and repeat
+        (do
+          (put self :labeled-elems (generate-labels select-res (in self :key-list)))
+          (put self :current-keys @"")
+          (:show-hints self (in self :labeled-elems)))))
+
+    0
+    # The prefix does not exist, clean up so we don't confuse the user
+    # Also, cancel the hinter
+    (:clean-up self true)
+
+    # Other values mean that we still have multiple choices, wait
+    # for more input.
+    (:show-hints self filtered)))
+
+
+(defn- normalize-rect [rect]
+  (cond
+    (or (table? rect)
+        (struct? rect))
+    [(in rect :left)
+     (in rect :top)
+     (in rect :right)
+     (in rect :bottom)]
+
+    (indexed? rect)
+    (if (= 4 (length rect))
+      rect
+      (errorf "invalid rect: %n" rect))
+
+    true
+    (errorf "invalid rect: %n" rect)))
+
+
+(defn ui-hint-show-hints [self labeled]
+  (def {:context context
+        :colors colors
+        :show-msg show-msg
+        :colors-msg colors-msg
+        :label-scale label-scale}
+    self)
+  (def {:ui-manager ui-man} context)
+
+  (when colors
+    (:post-message ui-man colors-msg (alloc-and-marshal colors) 0))
+
+  (def to-show @[])
+  (eachp [l e] labeled
+    (array/push to-show [l (normalize-rect (first e))]))
+  (:post-message ui-man show-msg (alloc-and-marshal [label-scale to-show]) 0))
+
+
+(defn ui-hint-cmd [self raw-key-list &opt hinter]
+  (default hinter (uia-hinter))
 
   (when (in self :hook-fn)
     # Another :ui-hint command is in progress, early return
@@ -735,60 +958,17 @@
      :uia-manager uia-man}
     context)
 
-  (var elem-list @[])
-  (var win-rect nil)
+  (def elem-list (:init hinter self))
+  (when (or (nil? elem-list)
+            (>= 0 (length elem-list)))
+    (:show-tooltip ui-man :ui-hint "No matching UI element.")
+    # Early return
+    (break))
 
-  (with-uia [cr (:create-cache-request uia-man
-                                       [UIA_NamePropertyId
-                                        UIA_ClassNamePropertyId
-                                        UIA_FrameworkIdPropertyId
-                                        UIA_NativeWindowHandlePropertyId
-                                        UIA_ControlTypePropertyId
-                                        UIA_BoundingRectanglePropertyId
-                                        UIA_IsInvokePatternAvailablePropertyId
-                                        UIA_IsOffscreenPropertyId
-                                        UIA_IsEnabledPropertyId]
-                                       [UIA_InvokePatternId])]
-    (with-uia [uia-win (:get-focused-window uia-man true cr)]
-      (when uia-win
-        (def win-hwnd (:get_CachedNativeWindowHandle uia-win))
-        (when (or (nil? win-hwnd)
-                  (null? win-hwnd))
-          (log/debug "Invalid HWND for ui-hint: %n" win-hwnd)
-          (break))
-
-        (set win-rect (DwmGetWindowAttribute win-hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
-        (set elem-list
-             (:find-ui-elements
-                self
-                uia-win
-                # XXX: Always ignore disabled and off-screen elements
-                [:and
-                 [:property UIA_IsOffscreenPropertyId false]
-                 [:property UIA_IsEnabledPropertyId true]
-                 cond-spec]
-                cr)))))
-
-  (def elem-count (length elem-list))
-  (log/debug "Found %n UI elements" elem-count)
-
-  (cond
-    (nil? win-rect)
-    (do
-      (:show-tooltip ui-man :ui-hint "Invalid window.")
-      (break)) # early return
-
-    (>= 0 elem-count)
-    (do
-      (:show-tooltip ui-man :ui-hint "No matching UI element.")
-      (break)) # early return
-    )
-
+  (put self :hinter hinter)
   (put self :key-list (normalize-key-list raw-key-list))
   (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
   (put self :current-keys @"")
-  (put self :win-rect win-rect)
-  (put self :action action)
 
   (def hook-fn
     (:add-hook hook-man :key-pressed
@@ -826,7 +1006,7 @@
 
     (or (= key-code VK_ESCAPE)
         (= key-code VK_RETURN))
-    (:clean-up self)))
+    (:clean-up self true)))
 
 
 (defn ui-hint-enable [self]
@@ -852,16 +1032,25 @@
   (put self :colors-msg colors-msg)
 
   (:add-command command-man :ui-hint
-     (fn [key-list &opt cond-spec action]
-       (:cmd self key-list cond-spec action))
+     (fn [key-list &opt hinter]
+       (:cmd self key-list hinter))
      ```
-     (:ui-hint key-list &opt cond-spec action)
+     (:ui-hint key-list &opt hinter)
 
      Shows hints on the UI of the current window, and waits for user's
      input. Key-list should be a string that contains all possible
-     letters which can be used to generate labels for the hints. Once
-     a label is entered by the user, tries to carry out the specified
-     action.
+     letters which can be used to generate labels for the hints. Hinter
+     should be an object implementing the :init and :select methods.
+
+     (:init hinter ui-hint) should return a tuple or array, containing
+     elements in the form of [rect elem], where rect specifies where to
+     draw a hint label, and elem will the passed back to
+     (:select hinter elem), when a user selects that label.
+
+     (:select hinter elem) should process the selected element, then
+     return nil, or a new list of [rect elem]. When nil is returned, the
+     :ui-hint command ends. When a list is returned, new labels will be
+     shown for the elements in that list.
      ```))
 
 
@@ -904,7 +1093,6 @@
   @{:on-key-pressed ui-hint-on-key-pressed
 
     :cmd ui-hint-cmd
-    :find-ui-elements ui-hint-find-ui-elements
     :show-hints ui-hint-show-hints
     :process-filter-result ui-hint-process-filter-result
     :clean-up ui-hint-clean-up
@@ -915,16 +1103,9 @@
 (defn ui-hint [context]
   (table/setproto
    @{:context context
-     :action-handlers @{:invoke handle-action-invoke
-                        :focus handle-action-focus
-                        :move-cursor handle-action-move-cursor
-                        :click handle-action-click
-                        :middle-click handle-action-middle-click
-                        :right-click handle-action-right-click
-                        :double-click handle-action-double-click
-                        :prompt :todo}
 
      # Default settings
+     :label-scale 1
      :colors @{:text 0x505050
                :background 0xf5f5f5
                :border 0x828282
