@@ -1237,9 +1237,13 @@
       (:handle-hint-info self hint-info))
 
     0
-    # The prefix does not exist, clean up so we don't confuse the user
-    # Also, cancel the hinter
-    (:clean-up self true)
+    # The prefix does not exist
+    (if-let [return-fn (in hinter :return)]
+      # The hinter can return to a previous step
+      (let [hint-info (return-fn hinter)]
+        (:handle-hint-info self hint-info))
+      # else, clean up, also cancel the hinter
+      (:clean-up self true))
 
     # Other values mean that we still have multiple choices, wait
     # for more input.
