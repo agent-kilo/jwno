@@ -17,4 +17,4 @@
 
 ### Description
 
-Gets triggered after a frame has been activated. @{new-frame} is the activated frame object.
+Gets triggered after a frame has been activated. @code{new-frame} is the activated frame object.
