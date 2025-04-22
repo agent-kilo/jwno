@@ -798,10 +798,49 @@
   [cur-elem cur-children])
 
 
+(defn clip-rect [clipped clipping]
+  (def {:left clipped-left
+        :top clipped-top
+        :right clipped-right
+        :bottom clipped-bottom}
+    clipped)
+  (def {:left clipping-left
+        :top clipping-top
+        :right clipping-right
+        :bottom clipping-bottom}
+    clipping)
+
+  {:left   (if (< clipped-left clipping-left)
+             clipping-left
+             clipped-left)
+   :top    (if (< clipped-top clipping-top)
+             clipping-top
+             clipped-top)
+   :right  (if (> clipped-right clipping-right)
+             clipping-right
+             clipped-right)
+   :bottom (if (> clipped-bottom clipping-bottom)
+             clipping-bottom
+             clipped-bottom)})
+
+
 (defn- calc-hint-info [stack]
+  (def [root _] (first stack))
   (def [elem children] (last stack))
-  {:highlight-rects [(:get_CachedBoundingRectangle elem)]
-   :elements (map |(tuple (:get_CachedBoundingRectangle $) $)
+
+  (def root-rect
+    (if-let [root-hwnd (:get_CachedNativeWindowHandle root)]
+      (if (not (null? root-hwnd))
+        (DwmGetWindowAttribute root-hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+        # else
+        (:get_CachedBoundingRectangle root))
+      # else
+      (:get_CachedBoundingRectangle root)))
+
+  (def elem-rect (clip-rect (:get_CachedBoundingRectangle elem) root-rect))
+
+  {:highlight-rects [elem-rect]
+   :elements (map |(tuple (clip-rect (:get_CachedBoundingRectangle $) root-rect) $)
                   children)})
 
 
