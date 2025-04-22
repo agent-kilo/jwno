@@ -49,6 +49,73 @@
   hfont)
 
 
+(defn draw-highlight-rect [hdc rect border-color shadow-color client-rect]
+  (def [scale-x scale-y] (calc-pixel-scale rect))
+
+  (def orig-pen (SelectObject hdc (GetStockObject NULL_PEN)))
+
+  (def line-width (math/floor (* 4 scale-x)))
+  (def half-line-width (brshift line-width 1))
+  (def shadow-offset (math/floor (* 2 scale-x)))
+
+  (def offset-x (in client-rect :left))
+  (def offset-y (in client-rect :top))
+  (def left   (- (in rect 0) offset-x))
+  (def top    (- (in rect 1) offset-y))
+  (def right  (- (in rect 2) offset-x))
+  (def bottom (- (in rect 3) offset-y))
+
+  (defer
+    (SelectObject hdc orig-pen)
+
+    (do
+      # Shadow
+      (SetDCBrushColor hdc shadow-color)
+      (Rectangle hdc
+                 left
+                 top
+                 (+ left line-width shadow-offset)
+                 bottom)
+      (Rectangle hdc
+                 left
+                 top
+                 right
+                 (+ top line-width shadow-offset))
+      (Rectangle hdc
+                 (- right line-width shadow-offset)
+                 top
+                 right
+                 bottom)
+      (Rectangle hdc
+                 left
+                 (- bottom line-width shadow-offset)
+                 right
+                 bottom)
+
+      # Box
+      (SetDCBrushColor hdc border-color)
+      (Rectangle hdc
+                 left
+                 top
+                 (+ left line-width)
+                 bottom)
+      (Rectangle hdc
+                 left
+                 top
+                 right
+                 (+ top line-width))
+      (Rectangle hdc
+                 (- right line-width)
+                 top
+                 right
+                 bottom)
+      (Rectangle hdc
+                 left
+                 (- bottom line-width)
+                 right
+                 bottom))))
+
+
 (defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache &opt label-scale]
   (default label-scale 1)
 
@@ -131,6 +198,7 @@
           (when global-hint-state
             (log/debug "global-hint-state = %n" global-hint-state)
             (def {:area-rect client-rect
+                  :highlight-rects highlight-rects
                   :hint-list hint-list
                   :label-scale label-scale}
               global-hint-state)
@@ -140,6 +208,7 @@
             (def bg-color (in colors :background 0xf5f5f5))
             (def border-color (in colors :border 0x828282))
             (def shadow-color (in colors :shadow 0x828282))
+            (def highlight-color (in colors :highlight 0x00a1ff))
 
             (SelectObject hdc (GetStockObject DC_BRUSH))
             (SelectObject hdc (GetStockObject DC_PEN))
@@ -153,6 +222,12 @@
                   (DeleteObject f)))
 
               # body
+              (each rect highlight-rects
+                (draw-highlight-rect hdc
+                                     rect
+                                     highlight-color
+                                     shadow-color
+                                     client-rect))
               (each [label rect] hint-list
                 (draw-label hdc
                             label
@@ -221,12 +296,13 @@
   0)
 
 
-(defn calc-spanning-rect [hint-list]
+(defn calc-spanning-rect [hint-list highlight-rects]
   (var ret-left math/int-max)
   (var ret-top  math/int-max)
   (var ret-right  math/int-min)
   (var ret-bottom math/int-min)
-  (each [_ r] hint-list
+
+  (defn check-rect [r]
     (def [left top right bottom] r)
     (when (< left ret-left)
       (set ret-left left))
@@ -236,6 +312,12 @@
       (set ret-right right))
     (when (> bottom ret-bottom)
       (set ret-bottom bottom)))
+
+  (each [_ r] hint-list
+    (check-rect r))
+  (each r highlight-rects
+    (check-rect r))
+
   (when (and (<= ret-left ret-right)
              (<= ret-top ret-bottom))
     {:left ret-left
@@ -245,7 +327,7 @@
 
 
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
-  (def [label-scale hint-list] (unmarshal-and-free wparam))
+  (def [hint-list label-scale highlight-rects] (unmarshal-and-free wparam))
   (def hint-state (in state :hint-state @{}))
 
   (def hint-hwnd
@@ -260,7 +342,7 @@
         (put hint-state :win-hbr win-hbr)
         new-hwnd)))
 
-  (def spanning-rect (calc-spanning-rect hint-list))
+  (def spanning-rect (calc-spanning-rect hint-list highlight-rects))
   (log/debug "spanning-rect = %n" spanning-rect)
   (unless spanning-rect
     (log/warning "empty spanning rect for hint-list: %n" hint-list)
@@ -269,6 +351,7 @@
 
   (put hint-state :area-rect spanning-rect)
   (put hint-state :hint-list hint-list)
+  (put hint-state :highlight-rects highlight-rects)
   (put hint-state :label-scale label-scale)
   (put state :hint-state hint-state)
   (set global-hint-state hint-state)
@@ -839,9 +922,12 @@
 
   (def elem-rect (clip-rect (:get_CachedBoundingRectangle elem) root-rect))
 
-  {:highlight-rects [elem-rect]
-   :elements (map |(tuple (clip-rect (:get_CachedBoundingRectangle $) root-rect) $)
-                  children)})
+  (def hint-info
+    {:highlight-rects [elem-rect]
+     :elements (map |(tuple (clip-rect (:get_CachedBoundingRectangle $) root-rect) $)
+                    children)})
+  (log/debug "calc-hint-info: hint-info = %n" hint-info)
+  hint-info)
 
 
 (defn gradual-uia-hinter-init [self ui-hint]
@@ -1092,6 +1178,8 @@
 
 
 (defn ui-hint-handle-hint-info [self hint-info]
+  (log/debug "ui-hint-handle-hint-info: hint-info = %n" hint-info)
+
   (cond
     (nil? hint-info)
     # The hinter finished its work
@@ -1115,6 +1203,7 @@
     (do
       (def override-settings hint-info)
       (def elem-list (in hint-info :elements))
+      (def highlight-rects (in hint-info :highlight-rects))
       (if (or (nil? elem-list)
               (empty? elem-list))
         # The hinter finished its work
@@ -1126,7 +1215,7 @@
           # Only save and restore the initial settings
           (unless (in self :orig-settings)
             (put self :orig-settings (merge-settings self override-settings ui-hint-settings)))
-          (:show-hints self (in self :labeled-elems)))))
+          (:show-hints self (in self :labeled-elems) highlight-rects))))
 
     true
     (do
@@ -1173,7 +1262,9 @@
     (errorf "invalid rect: %n" rect)))
 
 
-(defn ui-hint-show-hints [self labeled]
+(defn ui-hint-show-hints [self labeled &opt highlight-rects]
+  (default highlight-rects [])
+
   (def {:context context
         :colors colors
         :show-msg show-msg
@@ -1188,7 +1279,11 @@
   (def to-show @[])
   (eachp [l e] labeled
     (array/push to-show [l (normalize-rect (first e))]))
-  (:post-message ui-man show-msg (alloc-and-marshal [label-scale to-show]) 0))
+  (:post-message ui-man
+                 show-msg
+                 (alloc-and-marshal [to-show
+                                     label-scale
+                                     (map normalize-rect highlight-rects)]) 0))
 
 
 (defn ui-hint-cmd [self raw-key-list &opt hinter]
@@ -1243,7 +1338,7 @@
 
   (:set-key-mode key-man :raw)
 
-  (:show-hints self (in self :labeled-elems)))
+  (:show-hints self (in self :labeled-elems) (in hint-info :highlight-rects)))
 
 
 (defn ui-hint-on-key-pressed [self key]
@@ -1383,6 +1478,7 @@
                :background 0xf5f5f5
                :border 0x828282
                :shadow 0x828282
+               :highlight 0x00a1ff
                :key 0x000000}
     }
    ui-hint-proto))
