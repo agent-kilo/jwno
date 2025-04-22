@@ -49,12 +49,12 @@
   hfont)
 
 
-(defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache &opt text-scale]
-  (default text-scale 1)
+(defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache &opt label-scale]
+  (default label-scale 1)
 
   (def [scale-x scale-y] (calc-pixel-scale rect))
 
-  (def hfont (create-cached-font (* text-scale scale-y) font-cache))
+  (def hfont (create-cached-font (* label-scale scale-y) font-cache))
   (def orig-hfont (SelectObject hdc hfont))
 
   (defer
@@ -71,8 +71,8 @@
       text-rect)
 
     (def padding 2)
-    (def padding-x (math/floor (* padding scale-x)))
-    (def padding-y (math/floor (* padding scale-y)))
+    (def padding-x (math/floor (* padding scale-x label-scale)))
+    (def padding-y (math/floor (* padding scale-y label-scale)))
 
     (def shadow-offset 2)
     (def shadow-offset-x (math/floor (* shadow-offset scale-x)))
@@ -132,7 +132,7 @@
             (log/debug "global-hint-state = %n" global-hint-state)
             (def {:area-rect client-rect
                   :hint-list hint-list
-                  :text-scale text-scale}
+                  :label-scale label-scale}
               global-hint-state)
 
             (def colors (in global-hint-state :colors @{}))
@@ -163,7 +163,7 @@
                             shadow-color
                             client-rect
                             font-cache
-                            text-scale))))))
+                            label-scale))))))
       0)
 
     WM_CLOSE
@@ -245,7 +245,7 @@
 
 
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
-  (def [text-scale hint-list] (unmarshal-and-free wparam))
+  (def [label-scale hint-list] (unmarshal-and-free wparam))
   (def hint-state (in state :hint-state @{}))
 
   (def hint-hwnd
@@ -269,7 +269,7 @@
 
   (put hint-state :area-rect spanning-rect)
   (put hint-state :hint-list hint-list)
-  (put hint-state :text-scale text-scale)
+  (put hint-state :label-scale label-scale)
   (put state :hint-state hint-state)
   (set global-hint-state hint-state)
 
@@ -722,7 +722,7 @@
 
   (put self :ui-hint ui-hint)
   (put self :orig-label-scale (in ui-hint :label-scale))
-  (*= (ui-hint :label-scale) 5)
+  (*= (ui-hint :label-scale) 4)
 
   (def {:context context} ui-hint)
   (def {:window-manager window-man} context)
