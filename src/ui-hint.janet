@@ -1204,8 +1204,10 @@
       (def override-settings hint-info)
       (def elem-list (in hint-info :elements))
       (def highlight-rects (in hint-info :highlight-rects))
-      (if (or (nil? elem-list)
-              (empty? elem-list))
+      (if (and (or (nil? elem-list)
+                   (empty? elem-list))
+               (or (nil? highlight-rects)
+                   (empty? highlight-rects)))
         # The hinter finished its work
         (:clean-up self false)
         # else, rinse and repeat
@@ -1317,9 +1319,12 @@
 
       true
       (errorf ":init method from hinter returned invalid value: %n" hint-info)))
+  (def highlight-rects (in override-settings :highlight-rects))
 
-  (when (or (nil? elem-list)
-            (>= 0 (length elem-list)))
+  (when (and (or (nil? elem-list)
+                 (empty? elem-list))
+             (or (nil? highlight-rects)
+                 (empty? highlight-rects)))
     (:show-tooltip ui-man :ui-hint "No matching UI element.")
     # Early return
     (break))
@@ -1338,7 +1343,7 @@
 
   (:set-key-mode key-man :raw)
 
-  (:show-hints self (in self :labeled-elems) (in hint-info :highlight-rects)))
+  (:show-hints self (in self :labeled-elems) highlight-rects))
 
 
 (defn ui-hint-on-key-pressed [self key]
