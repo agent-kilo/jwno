@@ -17,4 +17,8 @@
 
 ### Description
 
-TODO
+Used by the window manager to determine whether a window should be managed. @code{hwnd} is the native handle for the new window. @code{uia-win} is the UI Automation element for the window. @code{exe-path} is the path of the .exe file that created the window. @code{desktop-info} contains the @code{:id} and @code{:name} of the window's virtual desktop.
+
+@p{@code{hook-fn} should return @code{true}, if a window is to be managed, or @code{false} otherwise.}
+
+The window manager registers its own @code{:filter-window} hook function, to filter out unmanageable windows, using some pre-defined rules.

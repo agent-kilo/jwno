@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a frame has been resized. @code{fr} is the resized frame object.
+
+Only leaf frames can trigger this hook. In other words, @code{fr} is guaranteed to be a leaf frame.
