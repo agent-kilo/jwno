@@ -517,7 +517,9 @@
 (defn uia-hinter-init [self ui-hint]
   (log/debug "-- uia-hinter-init --")
 
-  (def {:cond-spec cond-spec} self)
+  (def {:cond-spec cond-spec
+        :color color}
+    self)
   (def {:context context} ui-hint)
   (def {:uia-manager uia-man} context)
 
@@ -551,14 +553,16 @@
   (log/debug "Found %n UI elements" (length elem-list))
 
   (put self :elem-list elem-list)
-  (map (fn [e]
-         (def rect (:get_CachedBoundingRectangle e))
-         [[(in rect :left)
-           (in rect :top)
-           (in rect :right)
-           (in rect :bottom)]
-          e])
-       elem-list))
+
+  {:colors {:background color}
+   :elements (map (fn [e]
+                    (def rect (:get_CachedBoundingRectangle e))
+                    [[(in rect :left)
+                      (in rect :top)
+                      (in rect :right)
+                      (in rect :bottom)]
+                     e])
+                  elem-list)})
 
 
 (defn uia-hinter-select [self elem]
@@ -693,7 +697,7 @@
               (mouse-button-input :left :up)))
 
 
-(defn uia-hinter [&opt cond-spec action]
+(defn uia-hinter [&opt cond-spec action color]
   (default cond-spec
     [:or
      [:property UIA_IsKeyboardFocusablePropertyId true]
@@ -709,7 +713,8 @@
                         :right-click  handle-action-right-click
                         :double-click handle-action-double-click}
      :cond-spec cond-spec
-     :action action}
+     :action action
+     :color color}
    uia-hinter-proto))
 
 
@@ -720,10 +725,9 @@
 (defn frame-hinter-init [self ui-hint]
   (log/debug "-- frame-hinter-init --")
 
-  (put self :ui-hint ui-hint)
-  (put self :orig-label-scale (in ui-hint :label-scale))
-  (*= (ui-hint :label-scale) 4)
-
+  (def {:scale scale
+        :color color}
+    self)
   (def {:context context} ui-hint)
   (def {:window-manager window-man} context)
 
@@ -732,7 +736,10 @@
     (break []))
 
   (def frame-list (:get-all-leaf-frames cur-lo))
-  (map |(tuple (in $ :rect) $) frame-list))
+
+  {:label-scale scale
+   :colors {:background color}
+   :elements (map |(tuple (in $ :rect) $) frame-list)})
 
 
 (defn frame-hinter-select [self fr]
@@ -745,41 +752,39 @@
      (log/error "action for frame-hinter failed: %n\n%s"
                 err
                 (get-stack-trace fib))))
-  # Reset text scale
-  (:cancel self)
   # !!! IMPORTANT
   nil)
 
 
-(defn frame-hinter-cancel [self]
-  (when-let [orig-label-scale (in self :orig-label-scale)]
-    (put self :orig-label-scale nil)
-    (put (in self :ui-hint)
-         :label-scale
-         orig-label-scale)))
-
-
 (def frame-hinter-proto
   @{:init frame-hinter-init
-    :select frame-hinter-select
-    :cancel frame-hinter-cancel})
+    :select frame-hinter-select})
 
 
-(defn frame-hinter [&opt action-fn]
+(defn frame-hinter [&opt action-fn scale color]
   (default action-fn
     (fn [fr]
       (let [wm (:get-window-manager fr)]
         (with-activation-hooks wm
           (:set-focus wm fr)))))
+  (default scale 3)
 
   (table/setproto
-   @{:action-fn action-fn}
+   @{# Default settings
+     :action-fn action-fn
+     :scale scale
+     :color color}
    frame-hinter-proto))
 
 
 #
 # ------------------- ui-hint -------------------
 #
+
+(def ui-hint-settings
+  @{:label-scale true
+    :colors (fn [old new] (merge old new))})
+
 
 (defn normalize-key-list [key-list]
   (string/ascii-upper key-list))
@@ -862,7 +867,10 @@
   (put self :key-list nil)
   (put self :labeled-elems nil)
   (put self :current-keys nil)
-  (put self :hook-fn nil))
+  (put self :hook-fn nil)
+  (when-let [orig-settings (in self :orig-settings)]
+    (put self :orig-settings nil)
+    (merge-settings self orig-settings)))
 
 
 (defn ui-hint-process-filter-result [self filtered]
@@ -872,26 +880,45 @@
     1
     # Reached the target
     (let [target (in filtered (first (keys filtered)))
-          select-res (:select hinter (last target))]
+          hint-info (:select hinter (last target))]
       (cond
-        (and (not (nil? select-res))
-             (not (indexed? select-res)))
-        (do
-          # XXX: Raise an error?
-          (log/warning ":select method from hinter returned: %n" select-res)
-          (:clean-up self true))
-
-        (or (nil? select-res)
-            (empty? select-res))
+        (nil? hint-info)
         # The hinter finished its work
         (:clean-up self false)
 
-        true
+        (and (indexed? hint-info)
+             (not (empty? hint-info)))
         # The hinter returned new hints, rinse and repeat
         (do
-          (put self :labeled-elems (generate-labels select-res (in self :key-list)))
+          (def elem-list hint-info)
+          (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
           (put self :current-keys @"")
-          (:show-hints self (in self :labeled-elems)))))
+          (:show-hints self (in self :labeled-elems)))
+
+        (or (table? hint-info)
+            (struct? hint-info))
+        # The hinter returned new hints and override settings
+        (do
+          (def override-settings hint-info)
+          (def elem-list (in hint-info :elements))
+          (if (or (nil? elem-list)
+                  (empty? elem-list))
+            # The hinter finished its work
+            (:clean-up self false)
+            # else, rinse and repeat
+            (do
+              (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
+              (put self :current-keys @"")
+              # Only save and restore the initial settings
+              (unless (in self :orig-settings)
+                (put self :orig-settings (merge-settings self override-settings ui-hint-settings)))
+              (:show-hints self (in self :labeled-elems)))))
+
+        true
+        (do
+          # XXX: Raise an error?
+          (log/warning ":select method from hinter returned: %n" hint-info)
+          (:clean-up self true))))
 
     0
     # The prefix does not exist, clean up so we don't confuse the user
@@ -958,7 +985,19 @@
      :uia-manager uia-man}
     context)
 
-  (def elem-list (:init hinter self))
+  (def hint-info (:init hinter self))
+  (def [override-settings elem-list]
+    (cond
+      (indexed? hint-info)
+      [{} hint-info]
+      
+      (or (table? hint-info)
+          (struct? hint-info))
+      [hint-info (in hint-info :elements)]
+
+      true
+      (errorf ":init method from hinter returned invalid value: %n" hint-info)))
+
   (when (or (nil? elem-list)
             (>= 0 (length elem-list)))
     (:show-tooltip ui-man :ui-hint "No matching UI element.")
@@ -969,6 +1008,7 @@
   (put self :key-list (normalize-key-list raw-key-list))
   (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
   (put self :current-keys @"")
+  (put self :orig-settings (merge-settings self override-settings ui-hint-settings))
 
   (def hook-fn
     (:add-hook hook-man :key-pressed
