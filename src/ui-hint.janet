@@ -321,7 +321,7 @@
 # ------------------- uia-hinter -------------------
 #
 
-(defn- create-cache-request [uia-man]
+(defn- create-uia-hinter-cache-request [uia-man]
   (:create-cache-request
      uia-man
      [UIA_NamePropertyId
@@ -528,7 +528,7 @@
     (break elem-list))
 
   (def elem-list
-    (with-uia [cr (create-cache-request uia-man)]
+    (with-uia [cr (create-uia-hinter-cache-request uia-man)]
       (with-uia [uia-win (:get-focused-window uia-man true cr)]
         (unless uia-man
           # Out of with-uia
@@ -608,16 +608,24 @@
   nil)
 
 
+(defn- release [elem]
+  (def name (:get_CachedName elem))
+  (def control-type (:get_CachedControlType elem))
+  (def refc (:Release elem))
+  (unless (= refc (int/u64 0))
+    (log/warning "---- bad ref count: %n (%n, %n)\n%s"
+                 refc
+                 name
+                 control-type
+                 (get-stack-trace (fiber/current)))))
+
+
 (defn uia-hinter-cancel [self]
   (log/debug "-- uia-hinter-cancel --")
   (when-let [elem-list (in self :elem-list)]
     (put self :elem-list nil)
     (each e elem-list
-      (def name (:get_CachedName e))
-      (def control-type (:get_CachedControlType e))
-      (def refc (:Release e))
-      (unless (= refc (int/u64 0))
-        (log/warning "bad ref count in ui-hint-clean-up: %n (%n, %n)" refc name control-type)))))
+      (release e))))
 
 
 (def uia-hinter-proto
@@ -716,6 +724,177 @@
      :action action
      :color color}
    uia-hinter-proto))
+
+
+#
+# ------------------- gradual-uia-hinter -------------------
+#
+
+(defn- create-gradual-uia-hinter-cache-request [uia-man]
+  (:create-cache-request
+     uia-man
+     [UIA_NamePropertyId
+      UIA_ClassNamePropertyId
+      UIA_NativeWindowHandlePropertyId
+      UIA_ControlTypePropertyId
+      UIA_BoundingRectanglePropertyId
+      UIA_IsInvokePatternAvailablePropertyId
+      UIA_IsKeyboardFocusablePropertyId
+      UIA_IsOffscreenPropertyId
+      UIA_IsEnabledPropertyId]
+     [UIA_InvokePatternId]))
+
+
+(defn filter-valid-children [child-arr]
+  (def res @[])
+  (for i 0 (:get_Length child-arr)
+    (with-uia [e (:GetElement child-arr i)]
+      (cond
+        (= FALSE (:get_CachedIsEnabled e))
+        :nop
+
+        (not= FALSE (:get_CachedIsOffscreen e))
+        :nop
+
+        (= "ApplicationFrameInputSinkWindow" (:get_CachedClassName e))
+        :nop
+
+        true
+        (do
+          (:AddRef e)
+          (array/push res e)))))
+  res)
+
+
+(defn strip-nested-elements [elem uia-man cr]
+  (var cur-elem elem)
+  (var cur-children nil)
+  (var stop false)
+
+  (:AddRef cur-elem)
+
+  (with-uia [c (:create-condition uia-man :true)]
+    (while (not stop)
+      (with-uia [child-arr (:FindAllBuildCache cur-elem TreeScope_Children c cr)]
+        (set cur-children (filter-valid-children child-arr))
+        (cond
+          (not= FALSE (:GetCachedPropertyValue cur-elem UIA_IsInvokePatternAvailablePropertyId))
+          (set stop true)
+
+          (not= FALSE (:get_CachedIsKeyboardFocusable cur-elem))
+          (set stop true)
+
+          (= 0 (length cur-children))
+          (set stop true)
+
+          (= 1 (length cur-children))
+          (do
+            (release cur-elem)
+            (set cur-elem (first cur-children)))
+
+          true
+          (set stop true)))))
+
+  [cur-elem cur-children])
+
+
+(defn- calc-hint-info [stack]
+  (def [elem children] (last stack))
+  {:highlight-rects [(:get_CachedBoundingRectangle elem)]
+   :elements (map |(tuple (:get_CachedBoundingRectangle $) $)
+                  children)})
+
+
+(defn gradual-uia-hinter-init [self ui-hint]
+  (log/debug "-- gradual-uia-hinter-init --")
+
+  (def {:context context} ui-hint)
+  (def {:uia-manager uia-man} context)
+
+  (when-let [stack (in self :stack)]
+    (unless (empty? stack)
+      # Early return
+      (break (calc-hint-info stack))))
+
+  (with-uia [cr (create-gradual-uia-hinter-cache-request uia-man)]
+    (with-uia [uia-win (:get-focused-window uia-man true cr)]
+      (unless uia-win
+        # Out of with-uia
+        (break nil))
+
+      (def [elem children] (strip-nested-elements uia-win uia-man cr))
+      (put self :stack @[[elem children]])
+      (put self :uia-manager uia-man)
+
+      (calc-hint-info (in self :stack)))))
+
+
+(defn gradual-uia-hinter-select [self elem]
+  (log/debug "-- gradual-uia-hinter-select --")
+
+  (def {:uia-manager uia-man
+        :stack stack}
+    self)
+
+  (unless (in self :stack)
+    (log/warning "gradual-uia-hinter: selection after cancellation")
+    # Early return
+    (break))
+
+  (def [stripped-elem children]
+    (with-uia [cr (create-gradual-uia-hinter-cache-request uia-man)]
+      (strip-nested-elements elem uia-man cr)))
+  (array/push stack [stripped-elem children])
+  (calc-hint-info stack))
+
+
+(defn pop-gradual-uia-hinter-stack [stack]
+  (if (> (length stack) 1)
+    (do
+      (def [last-elem last-children] (array/pop stack))
+      (each c last-children
+        (release c))
+      (release last-elem)
+      true)
+    false))
+
+
+(defn gradual-uia-hinter-return [self]
+  (def {:stack stack} self)
+  (pop-gradual-uia-hinter-stack stack)
+  (calc-hint-info stack))
+
+
+(defn gradual-uia-hinter-cancel [self]
+  (log/debug "-- gradual-uia-hinter-cancel --")
+  (when-let [stack (in self :stack)]
+    (put self :stack nil)
+    (each [elem children] stack
+      (release elem)
+      (each c children
+        (release c)))))
+
+
+(def gradual-uia-hinter-proto
+  @{:init gradual-uia-hinter-init
+    :select gradual-uia-hinter-select
+    :return gradual-uia-hinter-return
+    :cancel gradual-uia-hinter-cancel})
+
+
+(defn gradual-uia-hinter [&opt action]
+  (default action :invoke)
+
+  (table/setproto
+   @{:action-handlers @{:invoke       handle-action-invoke
+                        :focus        handle-action-focus
+                        :move-cursor  handle-action-move-cursor
+                        :click        handle-action-click
+                        :middle-click handle-action-middle-click
+                        :right-click  handle-action-right-click
+                        :double-click handle-action-double-click}
+     :action action}
+   gradual-uia-hinter-proto))
 
 
 #
@@ -873,6 +1052,50 @@
     (merge-settings self orig-settings)))
 
 
+(defn ui-hint-handle-hint-info [self hint-info]
+  (cond
+    (nil? hint-info)
+    # The hinter finished its work
+    (:clean-up self false)
+
+    (indexed? hint-info)
+    (do
+      (def elem-list hint-info)
+      (if (empty? elem-list)
+        # The hinter finished its work
+        (:clean-up self false)
+        # else, carry on
+        (do
+          (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
+          (put self :current-keys @"")
+          (:show-hints self (in self :labeled-elems)))))
+
+    (or (table? hint-info)
+        (struct? hint-info))
+    # The hinter returned new hints and override settings
+    (do
+      (def override-settings hint-info)
+      (def elem-list (in hint-info :elements))
+      (if (or (nil? elem-list)
+              (empty? elem-list))
+        # The hinter finished its work
+        (:clean-up self false)
+        # else, rinse and repeat
+        (do
+          (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
+          (put self :current-keys @"")
+          # Only save and restore the initial settings
+          (unless (in self :orig-settings)
+            (put self :orig-settings (merge-settings self override-settings ui-hint-settings)))
+          (:show-hints self (in self :labeled-elems)))))
+
+    true
+    (do
+      # XXX: Raise an error?
+      (log/warning ":select method from hinter returned: %n" hint-info)
+      (:clean-up self true))))
+
+
 (defn ui-hint-process-filter-result [self filtered]
   (def {:hinter hinter} self)
 
@@ -881,44 +1104,7 @@
     # Reached the target
     (let [target (in filtered (first (keys filtered)))
           hint-info (:select hinter (last target))]
-      (cond
-        (nil? hint-info)
-        # The hinter finished its work
-        (:clean-up self false)
-
-        (and (indexed? hint-info)
-             (not (empty? hint-info)))
-        # The hinter returned new hints, rinse and repeat
-        (do
-          (def elem-list hint-info)
-          (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
-          (put self :current-keys @"")
-          (:show-hints self (in self :labeled-elems)))
-
-        (or (table? hint-info)
-            (struct? hint-info))
-        # The hinter returned new hints and override settings
-        (do
-          (def override-settings hint-info)
-          (def elem-list (in hint-info :elements))
-          (if (or (nil? elem-list)
-                  (empty? elem-list))
-            # The hinter finished its work
-            (:clean-up self false)
-            # else, rinse and repeat
-            (do
-              (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
-              (put self :current-keys @"")
-              # Only save and restore the initial settings
-              (unless (in self :orig-settings)
-                (put self :orig-settings (merge-settings self override-settings ui-hint-settings)))
-              (:show-hints self (in self :labeled-elems)))))
-
-        true
-        (do
-          # XXX: Raise an error?
-          (log/warning ":select method from hinter returned: %n" hint-info)
-          (:clean-up self true))))
+      (:handle-hint-info self hint-info))
 
     0
     # The prefix does not exist, clean up so we don't confuse the user
@@ -1022,7 +1208,8 @@
 
 
 (defn ui-hint-on-key-pressed [self key]
-  (def {:key-list key-list
+  (def {:hinter hinter
+        :key-list key-list
         :current-keys current-keys
         :labeled-elems labeled-elems}
     self)
@@ -1040,9 +1227,15 @@
     (or (= key-code VK_BACK)
         (= key-code VK_DELETE))
     (do
-      (buffer/popn current-keys 1)
-      (def filtered (filter-hint-labels current-keys labeled-elems))
-      (:process-filter-result self filtered))
+      (if (empty? current-keys)
+        (when-let [return-fn (in hinter :return)]
+          (def hint-info (return-fn hinter))
+          (:handle-hint-info self hint-info))
+        # else
+        (do
+          (buffer/popn current-keys 1)
+          (def filtered (filter-hint-labels current-keys labeled-elems))
+          (:process-filter-result self filtered))))
 
     (or (= key-code VK_ESCAPE)
         (= key-code VK_RETURN))
@@ -1133,6 +1326,7 @@
   @{:on-key-pressed ui-hint-on-key-pressed
 
     :cmd ui-hint-cmd
+    :handle-hint-info ui-hint-handle-hint-info
     :show-hints ui-hint-show-hints
     :process-filter-result ui-hint-process-filter-result
     :clean-up ui-hint-clean-up
