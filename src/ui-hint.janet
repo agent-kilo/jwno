@@ -805,8 +805,8 @@
               (mouse-button-input :left :up)))
 
 
-(defn uia-hinter [&opt cond-spec action color]
-  (default cond-spec
+(defn uia-hinter [&named condition action color]
+  (default condition
     [:or
      [:property UIA_IsKeyboardFocusablePropertyId true]
      [:property UIA_IsInvokePatternAvailablePropertyId true]])
@@ -820,7 +820,7 @@
                         :middle-click handle-action-middle-click
                         :right-click  handle-action-right-click
                         :double-click handle-action-double-click}
-     :cond-spec cond-spec
+     :cond-spec condition
      :action action
      :color color}
    uia-hinter-proto))
