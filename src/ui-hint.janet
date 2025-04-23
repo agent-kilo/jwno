@@ -49,12 +49,12 @@
   hfont)
 
 
-(defn draw-highlight-rect [hdc rect border-color shadow-color client-rect]
+(defn draw-highlight-rect [hdc rect border-color shadow-color virt-line-width client-rect]
   (def [scale-x scale-y] (calc-pixel-scale rect))
 
   (def orig-pen (SelectObject hdc (GetStockObject NULL_PEN)))
 
-  (def line-width (math/floor (* 4 scale-x)))
+  (def line-width (math/floor (* virt-line-width scale-x)))
   (def half-line-width (brshift line-width 1))
   (def shadow-offset (math/floor (* 2 scale-x)))
 
@@ -69,28 +69,29 @@
     (SelectObject hdc orig-pen)
 
     (do
-      # Shadow
-      (SetDCBrushColor hdc shadow-color)
-      (Rectangle hdc
-                 left
-                 top
-                 (+ left line-width shadow-offset)
-                 bottom)
-      (Rectangle hdc
-                 left
-                 top
-                 right
-                 (+ top line-width shadow-offset))
-      (Rectangle hdc
-                 (- right line-width shadow-offset)
-                 top
-                 right
-                 bottom)
-      (Rectangle hdc
-                 left
-                 (- bottom line-width shadow-offset)
-                 right
-                 bottom)
+      (unless (= :none shadow-color)
+        # Shadow
+        (SetDCBrushColor hdc shadow-color)
+        (Rectangle hdc
+                   left
+                   top
+                   (+ left line-width shadow-offset)
+                   bottom)
+        (Rectangle hdc
+                   left
+                   top
+                   right
+                   (+ top line-width shadow-offset))
+        (Rectangle hdc
+                   (- right line-width shadow-offset)
+                   top
+                   right
+                   bottom)
+        (Rectangle hdc
+                   left
+                   (- bottom line-width shadow-offset)
+                   right
+                   bottom))
 
       # Box
       (SetDCBrushColor hdc border-color)
@@ -199,6 +200,7 @@
             (log/debug "global-hint-state = %n" global-hint-state)
             (def {:area-rect client-rect
                   :highlight-rects highlight-rects
+                  :line-width default-line-width
                   :hint-list hint-list
                   :label-scale label-scale}
               global-hint-state)
@@ -223,11 +225,23 @@
 
               # body
               (each rect highlight-rects
-                (draw-highlight-rect hdc
-                                     rect
-                                     highlight-color
-                                     shadow-color
-                                     client-rect))
+                (match rect
+                  [[left top right bottom] color line-width]
+                  (draw-highlight-rect hdc
+                                       [left top right bottom]
+                                       (if color color highlight-color)
+                                       shadow-color
+                                       (if line-width line-width default-line-width)
+                                       client-rect)
+
+                  [left top right bottom]
+                  (draw-highlight-rect hdc
+                                       [left top right bottom]
+                                       highlight-color
+                                       shadow-color
+                                       default-line-width
+                                       client-rect)))
+
               (each [label rect] hint-list
                 (draw-label hdc
                             label
@@ -315,7 +329,7 @@
 
   (each [_ r] hint-list
     (check-rect r))
-  (each r highlight-rects
+  (each [r _ _] highlight-rects
     (check-rect r))
 
   (when (and (<= ret-left ret-right)
@@ -327,7 +341,7 @@
 
 
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
-  (def [hint-list label-scale highlight-rects] (unmarshal-and-free wparam))
+  (def [hint-list label-scale highlight-rects line-width] (unmarshal-and-free wparam))
   (def hint-state (in state :hint-state @{}))
 
   (def hint-hwnd
@@ -353,6 +367,7 @@
   (put hint-state :hint-list hint-list)
   (put hint-state :highlight-rects highlight-rects)
   (put hint-state :label-scale label-scale)
+  (put hint-state :line-width line-width)
   (put state :hint-state hint-state)
   (set global-hint-state hint-state)
 
@@ -936,6 +951,10 @@
   (def [root _] (first stack))
   (def [elem children] (last stack))
 
+  (def {:show-highlights show-highlights
+        :line-width line-width}
+    gradual-uia-hinter)
+
   (def root-rect
     (if-let [root-hwnd (:get_CachedNativeWindowHandle root)]
       (if (not (null? root-hwnd))
@@ -947,9 +966,24 @@
 
   (def elem-rect (clip-rect (:get_CachedBoundingRectangle elem) root-rect))
 
+  (def [scale-x scale-y] (calc-pixel-scale elem-rect))
+  (def box-margins {:left   (math/floor (* line-width scale-x))
+                    :top    (math/floor (* line-width scale-y))
+                    :right  (math/floor (* line-width scale-x))
+                    :bottom (math/floor (* line-width scale-y))})
+
   (def hint-info
-    {:colors {:highlight (get-highlight-color gradual-uia-hinter elem)}
-     :highlight-rects [elem-rect]
+    {:highlight-rects [;(if show-highlights
+                          (map (fn [c]
+                                 {:rect  (clip-rect (expand-rect (:get_CachedBoundingRectangle c) box-margins) root-rect)
+                                  :color (get-highlight-color gradual-uia-hinter c)
+                                  :line-width line-width})
+                               children)
+                          # else
+                          [])
+                       {:rect  (expand-rect elem-rect box-margins)
+                        :color (get-highlight-color gradual-uia-hinter elem)
+                        :line-width line-width}]
      :elements (map |(tuple (clip-rect (:get_CachedBoundingRectangle $) root-rect) $)
                     children)})
   (log/debug "calc-hint-info: hint-info = %n" hint-info)
@@ -1073,9 +1107,11 @@
     :cancel gradual-uia-hinter-cancel})
 
 
-(defn gradual-uia-hinter [&opt action colors]
+(defn gradual-uia-hinter [&named action colors show-highlights line-width]
   (default action :invoke)
   (default colors {})
+  (default show-highlights false)
+  (default line-width 3)
 
   (def default-colors
     {:invokable 0x30e400
@@ -1090,7 +1126,9 @@
                         :right-click  handle-action-right-click
                         :double-click handle-action-double-click}
      :action action
-     :colors (merge default-colors colors)}
+     :colors (merge default-colors colors)
+     :show-highlights show-highlights
+     :line-width line-width}
    gradual-uia-hinter-proto))
 
 
@@ -1353,7 +1391,8 @@
         :colors colors
         :show-msg show-msg
         :colors-msg colors-msg
-        :label-scale label-scale}
+        :label-scale label-scale
+        :line-width line-width}
     self)
   (def {:ui-manager ui-man} context)
 
@@ -1363,11 +1402,17 @@
   (def to-show @[])
   (eachp [l e] labeled
     (array/push to-show [l (normalize-rect (first e))]))
+  (def hl-info-list
+    (map (fn [hlr]
+           (if (has-key? hlr :rect)
+             [(normalize-rect (in hlr :rect)) (in hlr :color) (in hlr :line-width)]
+             # else
+             (normalize-rect hlr)))
+         highlight-rects))
   (:post-message ui-man
                  show-msg
-                 (alloc-and-marshal [to-show
-                                     label-scale
-                                     (map normalize-rect highlight-rects)]) 0))
+                 (alloc-and-marshal [to-show label-scale hl-info-list line-width])
+                 0))
 
 
 (defn ui-hint-cmd [self raw-key-list &opt hinter]
