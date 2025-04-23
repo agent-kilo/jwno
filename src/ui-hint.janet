@@ -909,7 +909,30 @@
              clipped-bottom)})
 
 
-(defn- calc-hint-info [stack]
+(defn- get-highlight-color [gradual-uia-hinter elem]
+  (def colors (in gradual-uia-hinter :colors))
+  (cond
+    (not= FALSE
+          (:GetCachedPropertyValue
+             elem
+             UIA_IsInvokePatternAvailablePropertyId))
+    (do
+      (log/debug "get-highlight-color: element is INVOKABLE")
+      (in colors :invokable))
+
+    (not= FALSE (:get_CachedIsKeyboardFocusable elem))
+    (do
+      (log/debug "get-highlight-color: element is FOCUSABLE")
+      (in colors :focusable))
+
+    true
+    (do
+      (log/debug "get-highlight-color: element is NORMAL")
+      # Use ui-hint's default highlight color
+      nil)))
+
+
+(defn- calc-hint-info [gradual-uia-hinter stack]
   (def [root _] (first stack))
   (def [elem children] (last stack))
 
@@ -925,7 +948,8 @@
   (def elem-rect (clip-rect (:get_CachedBoundingRectangle elem) root-rect))
 
   (def hint-info
-    {:highlight-rects [elem-rect]
+    {:colors {:highlight (get-highlight-color gradual-uia-hinter elem)}
+     :highlight-rects [elem-rect]
      :elements (map |(tuple (clip-rect (:get_CachedBoundingRectangle $) root-rect) $)
                     children)})
   (log/debug "calc-hint-info: hint-info = %n" hint-info)
@@ -941,7 +965,7 @@
   (when-let [stack (in self :stack)]
     (unless (empty? stack)
       # Early return
-      (break (calc-hint-info stack))))
+      (break (calc-hint-info self stack))))
 
   (with-uia [cr (create-gradual-uia-hinter-cache-request uia-man)]
     (with-uia [uia-win (:get-focused-window uia-man true cr)]
@@ -953,7 +977,7 @@
       (put self :stack @[[elem children]])
       (put self :uia-manager uia-man)
 
-      (calc-hint-info (in self :stack)))))
+      (calc-hint-info self (in self :stack)))))
 
 
 (defn gradual-uia-hinter-select [self elem]
@@ -972,7 +996,7 @@
     (with-uia [cr (create-gradual-uia-hinter-cache-request uia-man)]
       (strip-nested-elements elem uia-man cr)))
   (array/push stack [stripped-elem children])
-  (calc-hint-info stack))
+  (calc-hint-info self stack))
 
 
 (defn pop-gradual-uia-hinter-stack [stack]
@@ -990,7 +1014,7 @@
   (log/debug "-- gradual-uia-hinter-return --")
   (def {:stack stack} self)
   (pop-gradual-uia-hinter-stack stack)
-  (calc-hint-info stack))
+  (calc-hint-info self stack))
 
 
 (defn gradual-uia-hinter-confirm [self]
@@ -1049,8 +1073,13 @@
     :cancel gradual-uia-hinter-cancel})
 
 
-(defn gradual-uia-hinter [&opt action]
+(defn gradual-uia-hinter [&opt action colors]
   (default action :invoke)
+  (default colors {})
+
+  (def default-colors
+    {:invokable 0x30e400
+     :focusable 0xffbf66})
 
   (table/setproto
    @{:action-handlers @{:invoke       handle-action-invoke
@@ -1060,7 +1089,8 @@
                         :middle-click handle-action-middle-click
                         :right-click  handle-action-right-click
                         :double-click handle-action-double-click}
-     :action action}
+     :action action
+     :colors (merge default-colors colors)}
    gradual-uia-hinter-proto))
 
 
@@ -1222,6 +1252,11 @@
 (defn ui-hint-handle-hint-info [self hint-info]
   (log/debug "ui-hint-handle-hint-info: hint-info = %n" hint-info)
 
+  # Always reset to original settings before merging the
+  # override values from the hinter
+  (when-let [orig-settings (in self :orig-settings)]
+    (merge-settings self orig-settings))
+
   (cond
     (nil? hint-info)
     # The hinter finished its work
@@ -1256,9 +1291,10 @@
         (do
           (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
           (put self :current-keys @"")
+          (def old-settings (merge-settings self override-settings ui-hint-settings))
           # Only save and restore the initial settings
           (unless (in self :orig-settings)
-            (put self :orig-settings (merge-settings self override-settings ui-hint-settings)))
+            (put self :orig-settings old-settings))
           (:show-hints self (in self :labeled-elems) highlight-rects))))
 
     true
