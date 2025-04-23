@@ -667,23 +667,25 @@
   # clean-up before invoking anything.
   (:cancel self)
 
-  (cond
-    (or (function? action)
-        (cfunction? action))
-    # Custom action
-    'TODO
+  (def handler
+    (if (or (function? action)
+            (cfunction? action))
+      action
+      # else
+      (in action-handlers action)))
 
-    true
-    (when-let [handler (in action-handlers action)]
-      (try
-        (handler self elem)
-        ((err fib)
-         (log/error "uia-hinter action %n failed for element (%n, %n): %n\n%s"
-                    action
-                    (:get_CachedName elem)
-                    (:get_CachedControlType elem)
-                    err
-                    (get-stack-trace fib))))))
+  (if handler
+    (try
+      (handler self elem)
+      ((err fib)
+       (log/error "uia-hinter action %n failed for element (%n, %n): %n\n%s"
+                  action
+                  (:get_CachedName elem)
+                  (:get_CachedControlType elem)
+                  err
+                  (get-stack-trace fib))))
+    # else
+    (log/error "uia-hinter action not found: %n" action))
 
   (:Release elem)
 
@@ -985,9 +987,48 @@
 
 
 (defn gradual-uia-hinter-return [self]
+  (log/debug "-- gradual-uia-hinter-return --")
   (def {:stack stack} self)
   (pop-gradual-uia-hinter-stack stack)
   (calc-hint-info stack))
+
+
+(defn gradual-uia-hinter-confirm [self]
+  (log/debug "-- gradual-uia-hinter-confirm --")
+
+  (when-let [top (last (in self :stack))]
+    (def [elem children] top)
+    (def {:action action
+          :action-handlers action-handlers}
+      self)
+
+    (:AddRef elem)
+    (:cancel self)
+
+    (def handler
+      (if (or (function? action)
+              (cfunction? action))
+        action
+        # else
+        (in action-handlers action)))
+
+    (if handler
+      (try
+        (handler self elem)
+        ((err fib)
+         (log/error "gradual-uia-hinter action %n failed for element (%n, %n): %n\n%s"
+                    action
+                    (:get_CachedName elem)
+                    (:get_CachedControlType elem)
+                    err
+                    (get-stack-trace fib))))
+      # else
+      (log/error "gradual-uia-hinter action not found: %n" action))
+
+    (:Release elem)
+
+    # !!! IMPORTANT
+    nil))
 
 
 (defn gradual-uia-hinter-cancel [self]
@@ -1004,6 +1045,7 @@
   @{:init gradual-uia-hinter-init
     :select gradual-uia-hinter-select
     :return gradual-uia-hinter-return
+    :confirm gradual-uia-hinter-confirm
     :cancel gradual-uia-hinter-cancel})
 
 
@@ -1380,8 +1422,14 @@
           (def filtered (filter-hint-labels current-keys labeled-elems))
           (:process-filter-result self filtered))))
 
-    (or (= key-code VK_ESCAPE)
-        (= key-code VK_RETURN))
+    (= key-code VK_RETURN)
+    (if-let [confirm-fn (in hinter :confirm)]
+      (let [hint-info (confirm-fn hinter)]
+        (:handle-hint-info self hint-info))
+      # else
+      (:clean-up self true))
+
+    (= key-code VK_ESCAPE)
     (:clean-up self true)))
 
 
