@@ -224,19 +224,19 @@
                   (DeleteObject f)))
 
               # body
-              (each rect highlight-rects
-                (match rect
-                  [[left top right bottom] color line-width]
+              (each hlr highlight-rects
+                (match hlr
+                  [[_ _ _ _] color line-width]
                   (draw-highlight-rect hdc
-                                       [left top right bottom]
+                                       (first hlr)
                                        (if color color highlight-color)
                                        shadow-color
                                        (if line-width line-width default-line-width)
                                        client-rect)
 
-                  [left top right bottom]
+                  [_ _ _ _]
                   (draw-highlight-rect hdc
-                                       [left top right bottom]
+                                       hlr
                                        highlight-color
                                        shadow-color
                                        default-line-width
@@ -329,8 +329,13 @@
 
   (each [_ r] hint-list
     (check-rect r))
-  (each [r _ _] highlight-rects
-    (check-rect r))
+  (each hlr highlight-rects
+    (match hlr
+      [[_ _ _ _] _ _]
+      (check-rect (first hlr))
+
+      [_ _ _ _]
+      (check-rect hlr)))
 
   (when (and (<= ret-left ret-right)
              (<= ret-top ret-bottom))
@@ -413,6 +418,32 @@
   0)
 
 ################## ^^^^ Runs in UI thread ^^^^ ##################
+
+
+(defn clip-rect [clipped clipping]
+  (def {:left clipped-left
+        :top clipped-top
+        :right clipped-right
+        :bottom clipped-bottom}
+    clipped)
+  (def {:left clipping-left
+        :top clipping-top
+        :right clipping-right
+        :bottom clipping-bottom}
+    clipping)
+
+  {:left   (if (< clipped-left clipping-left)
+             clipping-left
+             clipped-left)
+   :top    (if (< clipped-top clipping-top)
+             clipping-top
+             clipped-top)
+   :right  (if (> clipped-right clipping-right)
+             clipping-right
+             clipped-right)
+   :bottom (if (> clipped-bottom clipping-bottom)
+             clipping-bottom
+             clipped-bottom)})
 
 
 #
@@ -616,7 +647,9 @@
   (log/debug "-- uia-hinter-init --")
 
   (def {:cond-spec cond-spec
-        :color color}
+        :color color
+        :show-highlights show-highlights
+        :line-width line-width}
     self)
   (def {:context context} ui-hint)
   (def {:uia-manager uia-man} context)
@@ -625,36 +658,54 @@
     # Early return
     (break elem-list))
 
-  (def elem-list
+  (def [elem-list win-rect]
     (with-uia [cr (create-uia-hinter-cache-request uia-man)]
       (with-uia [uia-win (:get-focused-window uia-man true cr)]
-        (unless uia-man
+        (unless uia-win
           # Out of with-uia
-          (break @[]))
+          (break [[] nil]))
 
         (def win-hwnd (:get_CachedNativeWindowHandle uia-win))
         (when (or (nil? win-hwnd)
                   (null? win-hwnd))
           (log/debug "Invalid HWND for uia-hinter: %n" win-hwnd)
           # Out of with-uia
-          (break @[]))
+          (break [[] nil]))
 
-        (find-uia-elements uia-man
-                           uia-win
-                           # Always ignore disabled and off-screen elements
-                           [:and
-                            [:property UIA_IsOffscreenPropertyId false]
-                            [:property UIA_IsEnabledPropertyId true]
-                            cond-spec]
-                           cr))))
+        [(find-uia-elements uia-man
+                            uia-win
+                            # Always ignore disabled and off-screen elements
+                            [:and
+                             [:property UIA_IsOffscreenPropertyId false]
+                             [:property UIA_IsEnabledPropertyId true]
+                             cond-spec]
+                            cr)
+         (DwmGetWindowAttribute win-hwnd DWMWA_EXTENDED_FRAME_BOUNDS)])))
 
   (log/debug "Found %n UI elements" (length elem-list))
 
   (put self :elem-list elem-list)
 
+  (when (empty? elem-list)
+    # Early return
+    (break nil))
+
+  (def [scale-x scale-y] (calc-pixel-scale win-rect))
+  (def box-margins {:left   (math/floor (* line-width scale-x))
+                    :top    (math/floor (* line-width scale-y))
+                    :right  (math/floor (* line-width scale-x))
+                    :bottom (math/floor (* line-width scale-y))})
+
   {:colors {:background color}
+   :highlight-rects (if show-highlights
+                      (map (fn [e]
+                             (clip-rect (expand-rect (:get_CachedBoundingRectangle e) box-margins)
+                                        win-rect))
+                           elem-list)
+                      # else
+                      [])
    :elements (map (fn [e]
-                    (def rect (:get_CachedBoundingRectangle e))
+                    (def rect (clip-rect (:get_CachedBoundingRectangle e) win-rect))
                     [[(in rect :left)
                       (in rect :top)
                       (in rect :right)
@@ -805,12 +856,14 @@
               (mouse-button-input :left :up)))
 
 
-(defn uia-hinter [&named condition action color]
+(defn uia-hinter [&named condition action color show-highlights line-width]
   (default condition
     [:or
      [:property UIA_IsKeyboardFocusablePropertyId true]
      [:property UIA_IsInvokePatternAvailablePropertyId true]])
   (default action :invoke)
+  (default show-highlights false)
+  (default line-width 3)
 
   (table/setproto
    @{:action-handlers @{:invoke       handle-action-invoke
@@ -822,7 +875,9 @@
                         :double-click handle-action-double-click}
      :cond-spec condition
      :action action
-     :color color}
+     :color color
+     :show-highlights show-highlights
+     :line-width line-width}
    uia-hinter-proto))
 
 
@@ -896,32 +951,6 @@
           (set stop true)))))
 
   [cur-elem cur-children])
-
-
-(defn clip-rect [clipped clipping]
-  (def {:left clipped-left
-        :top clipped-top
-        :right clipped-right
-        :bottom clipped-bottom}
-    clipped)
-  (def {:left clipping-left
-        :top clipping-top
-        :right clipping-right
-        :bottom clipping-bottom}
-    clipping)
-
-  {:left   (if (< clipped-left clipping-left)
-             clipping-left
-             clipped-left)
-   :top    (if (< clipped-top clipping-top)
-             clipping-top
-             clipped-top)
-   :right  (if (> clipped-right clipping-right)
-             clipping-right
-             clipped-right)
-   :bottom (if (> clipped-bottom clipping-bottom)
-             clipping-bottom
-             clipped-bottom)})
 
 
 (defn- get-highlight-color [gradual-uia-hinter elem]
@@ -1197,7 +1226,8 @@
 
 (def ui-hint-settings
   @{:label-scale true
-    :colors (fn [old new] (merge old new))})
+    :colors (fn [old new] (merge old new))
+    :line-width true})
 
 
 (defn normalize-key-list [key-list]
@@ -1437,6 +1467,9 @@
   (def hint-info (:init hinter self))
   (def [override-settings elem-list]
     (cond
+      (nil? hint-info)
+      [{} []]
+
       (indexed? hint-info)
       [{} hint-info]
       
@@ -1448,8 +1481,7 @@
       (errorf ":init method from hinter returned invalid value: %n" hint-info)))
   (def highlight-rects (in override-settings :highlight-rects))
 
-  (when (and (or (nil? elem-list)
-                 (empty? elem-list))
+  (when (and (empty? elem-list)
              (or (nil? highlight-rects)
                  (empty? highlight-rects)))
     (:show-tooltip ui-man :ui-hint "No matching UI element.")
@@ -1618,5 +1650,6 @@
                :shadow 0x828282
                :highlight 0x00a1ff
                :key 0x000000}
+     :line-width 3
     }
    ui-hint-proto))
