@@ -1175,7 +1175,7 @@
     :select frame-hinter-select})
 
 
-(defn frame-hinter [&opt action-fn scale color]
+(defn frame-hinter [&named action-fn scale color]
   (default action-fn
     (fn [fr]
       (let [wm (:get-window-manager fr)]
