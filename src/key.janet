@@ -536,7 +536,7 @@
 
   (var binding nil)
   (each comb mod-combinations-to-check
-    (def key-struct (key (hook-struct :vkCode) (sort (keys comb))))
+    (def key-struct (key (hook-struct :vkCode) (keys comb)))
     (log/debug "Finding binding for key: %n" key-struct)
     (if-let [found (:get-key-binding (last (in self :current-keymap)) key-struct)]
       (match found
@@ -641,7 +641,7 @@
   (def pass-through? (in MODIFIER-KEYS key-code))
   (if key-up
     [pass-through? nil]
-    (let [key-struct (key key-code (sort (keys mod-states)))]
+    (let [key-struct (key key-code (keys mod-states))]
       [pass-through? [:key/raw key-struct]])))
 
 
