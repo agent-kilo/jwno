@@ -5,6 +5,7 @@
 
 (use jw32/_winuser)
 (use jw32/_dwmapi)
+(use jw32/_errhandlingapi)
 (use jw32/_util)
 (use ./util)
 
@@ -223,17 +224,22 @@
   true)
 
 
-(defn same-user-session? [root-uia-elem]
+(def SESSION-TIMESTAMP-PROP-NAME "_jwno-layout-history-session-timestamp_")
+
+(defn get-session-timestamp [root-uia-elem]
   (def desktop-hwnd (:get_CachedNativeWindowHandle root-uia-elem))
-  (def prop-name "_jwno-layout-history-same-user-session_")
-  (if (null? (GetProp desktop-hwnd prop-name))
-    (do
-      (SetProp desktop-hwnd prop-name 1)
-      false)
-    true))
+  (def last-ts-ptr (GetProp desktop-hwnd SESSION-TIMESTAMP-PROP-NAME))
+  (if (null? last-ts-ptr)
+    (let [now (math/floor (os/clock :realtime))]
+      (def ret (SetProp desktop-hwnd SESSION-TIMESTAMP-PROP-NAME now))
+      (when (= ret FALSE)
+        (log/warning "layout-history: failed to save session timestamp: %n"
+                     (GetLastError)))
+      0)
+    (pointer-to-number last-ts-ptr)))
 
 
-(defn load-last-history-entries [layout-states manual-state window-man uia-man]
+(defn load-last-history-entries [layout-states manual-state session-ts window-man uia-man]
   (def focused-hwnd
     (with-uia [uia-win (:get-focused-window uia-man)]
       (when uia-win
@@ -252,12 +258,13 @@
           (history-stack-manual-redo (in lo-state :history))
           (history-stack-redo (in lo-state :history))))
       (when dump
-        (def [_ dump-data] dump)
-        (def [_ lo-id lo-name _] dump-data)
-        (def vd-info {:id lo-id :name lo-name})
-        (def lo (:new-layout root vd-info))
-        (:add-child root lo)
-        (:load lo dump-data)))
+        (def [ts dump-data] dump)
+        (when (> ts session-ts)
+          (def [_ lo-id lo-name _] dump-data)
+          (def vd-info {:id lo-id :name lo-name})
+          (def lo (:new-layout root vd-info))
+          (:add-child root lo)
+          (:load lo dump-data))))
 
     (:retile window-man)
     (when-let [w (:find-hwnd root focused-hwnd)]
@@ -279,7 +286,7 @@
         :hook-manager hook-man}
     context)
 
-  (def same-session (same-user-session? (in uia-man :root)))
+  (def session-ts (get-session-timestamp (in uia-man :root)))
   # Clear and re-init history stacks every time
   (put self :layout-states @{})
   (def bfile-loaded (:load-from-backing-file self))
@@ -290,12 +297,13 @@
     (each lo (get-in window-man [:root :children])
       (:on-layout-changed self lo))
 
-    (and same-session
+    (and (< 0 session-ts)
          load-last-layouts?)
     # We got restarted in the same user session, try to restore last
     # history entry from backing file
     (load-last-history-entries (in self :layout-states)
                                manual-state
+                               session-ts
                                window-man
                                uia-man)
 

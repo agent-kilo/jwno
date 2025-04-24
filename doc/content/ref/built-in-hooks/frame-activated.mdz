@@ -17,4 +17,4 @@
 
 ### Description
 
-TODO
+Gets triggered after a frame has been activated. @code{new-frame} is the activated frame object.

@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a new @link[../../defining-key-bindings/multi-level-keymaps.html]{multi-level keymap} has been activated. @code{cur-keymap} is the keymap that's currently in effect.
+
+The key manager registers its own @code{:keymap-switched} hook function, for showing keymap hints.

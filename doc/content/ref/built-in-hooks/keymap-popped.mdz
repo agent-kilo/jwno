@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a @link[../../defining-key-bindings/transient-keymaps.html]{transient keymap} has been popped from the keymap stack by the @code{:pop-keymap} command. @code{cur-keymap} is the new keymap that's currently in effect.
+
+The key manager registers its own @code{:keymap-popped} hook function, for showing keymap hints.

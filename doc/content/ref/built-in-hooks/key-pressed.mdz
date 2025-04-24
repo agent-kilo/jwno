@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a key on the keyboard has been pressed, while the key manager is in @code{:raw} mode. @code{raw-key} is a struct containing the raw @code{:key} code and @code{:modifiers}.
+
+This hook will not fire, if the key manager is in @code{:command} mode.

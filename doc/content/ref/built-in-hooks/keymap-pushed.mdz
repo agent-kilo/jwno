@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a new @link[../../defining-key-bindings/transient-keymaps.html]{transient keymap} has been pushed to the keymap stack by the @code{:push-keymap} command. @code{cur-keymap} is the new keymap that's currently in effect.
+
+The key manager registers its own @code{:keymap-pushed} hook function, for showing keymap hints.

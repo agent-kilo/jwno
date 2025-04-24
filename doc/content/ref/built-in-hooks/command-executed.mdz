@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a command has been executed. @code{cmd} is the command's name, and @code{args} is a tuple containing the arguments that command received.
+
+Special keymap commands, such as @code{:push-keymap} and @code{:pop-keymap}, will not trigger this hook.

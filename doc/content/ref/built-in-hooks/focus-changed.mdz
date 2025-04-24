@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after the input focus has moved to a new window. @code{hwnd} is the native handle for the window that just got the input focus. When no valid window gets the input focus, @code{hwnd} may be @code{nil}.
+
+Unmanaged windows can also trigger this hook.
