@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a window has been removed from Jwno's managed windows. @code{dw} is the window object that's removed from the frame tree.
+
+@p{@code{dw}'s @code{:parent} property still points to its original parent frame.}

@@ -17,4 +17,8 @@
 
 ### Description
 
-TODO
+Gets triggered when the arrangement of windows/frames for a virtual desktop has been changed. @code{lo} is the layout object representing the virtual desktop.
+
+Note that new windows getting managed will also trigger this hook.
+
+The layout history module registers its own @code{:layout-changed} hook function, to track layout changes.

@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after the user has switched to another virtual desktop. @code{vd-name} is the name of the virtual desktop, and @code{lo} is the layout object for that virtual desktop.
+
+Note that Jwno creates layout objects lazily. When switching to a virtual desktop that never had any windows opened on it, @code{lo} can be @code{nil}. And the window manager uses their names to uniquely identify virtual desktops. Jwno's behavior is undefined, if you had more than one virtual desktop with the same name, or changed the name of a virtual desktop while Jwno is running.

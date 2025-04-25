@@ -17,4 +17,4 @@
 
 ### Description
 
-TODO
+Gets triggered after a managed window has been activated. @code{new-win} is the active window object.

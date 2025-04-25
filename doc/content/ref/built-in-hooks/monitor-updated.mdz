@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered when any of a monitor's settings are changed. @code{top-frame} is the top-level frame representing the monitor. The actual monitor settings are stored in @code{top-frame}'s @code{:monitor} property.
+
+The monitor settings include @code{:device}, @code{:dpi}, @code{:flags} \(whether it's the primary monitor or not), @code{:rect}, and @code{:work-area}.
