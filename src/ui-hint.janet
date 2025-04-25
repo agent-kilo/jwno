@@ -128,12 +128,41 @@
        (def text-x (+ left padding-x))
        (def text-y (+ top padding-y))
        [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+   :bottom-left
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (+ left padding-x))
+       (def text-y (- bottom text-height padding-y))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
    :center
      (fn [left top right bottom text-width text-height padding-x padding-y]
        (def text-x (brshift (+ left right (- text-width)) 1))
        (def text-y (brshift (+ top bottom (- text-height)) 1))
        [text-x text-y (+ text-x text-width) (+ text-y text-height)])
-  })
+   :top
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (brshift (+ left right (- text-width)) 1))
+       (def text-y (+ top padding-y))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+   :bottom
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (brshift (+ left right (- text-width)) 1))
+       (def text-y (- bottom text-height padding-y))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+   :right
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (- right text-width padding-x))
+       (def text-y (brshift (+ top bottom (- text-height)) 1))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+   :top-right
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (- right text-width padding-x))
+       (def text-y (+ top padding-y))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+   :bottom-right
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (- right text-width padding-x))
+       (def text-y (- bottom text-height padding-y))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])})
 
 
 (defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache &opt label-scale anchor-fn]
