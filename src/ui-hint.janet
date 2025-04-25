@@ -117,8 +117,28 @@
                  bottom))))
 
 
-(defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache &opt label-scale]
+(def TEXT-ANCHOR-FNS
+  {:left
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (+ left padding-x))
+       (def text-y (brshift (+ top bottom (- text-height)) 1))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+   :top-left
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (+ left padding-x))
+       (def text-y (+ top padding-y))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+   :center
+     (fn [left top right bottom text-width text-height padding-x padding-y]
+       (def text-x (brshift (+ left right (- text-width)) 1))
+       (def text-y (brshift (+ top bottom (- text-height)) 1))
+       [text-x text-y (+ text-x text-width) (+ text-y text-height)])
+  })
+
+
+(defn draw-label [hdc label rect text-color bg-color border-color shadow-color client-rect font-cache &opt label-scale anchor-fn]
   (default label-scale 1)
+  (default anchor-fn (in TEXT-ANCHOR-FNS :left))
 
   (def [scale-x scale-y] (calc-pixel-scale rect))
 
@@ -153,11 +173,10 @@
     (def right  (- (in rect 2) offset-x))
     (def bottom (- (in rect 3) offset-y))
 
-    # TODO: Anchoring
-    (def text-x (+ left padding-x))
-    (def text-y (brshift (+ top bottom (- text-height)) 1))
-    (def text-right (+ text-x text-width))
-    (def text-bottom (+ text-y text-height))
+    (def [text-x text-y text-right text-bottom]
+      (anchor-fn left top right bottom
+                 text-width text-height
+                 padding-x padding-y))
 
     (def box-x (- text-x padding-x))
     (def box-y (- text-y padding-y))
@@ -202,7 +221,8 @@
                   :highlight-rects highlight-rects
                   :line-width default-line-width
                   :hint-list hint-list
-                  :label-scale label-scale}
+                  :label-scale label-scale
+                  :label-anchor label-anchor}
               global-hint-state)
 
             (def colors (in global-hint-state :colors @{}))
@@ -242,6 +262,13 @@
                                        default-line-width
                                        client-rect)))
 
+              (def anchor-fn
+                (if-let [afn (in TEXT-ANCHOR-FNS label-anchor)]
+                  afn
+                  (do
+                    (log/warning "unknown anchor option %n, using default value" label-anchor)
+                    nil)))
+
               (each [label rect] hint-list
                 (draw-label hdc
                             label
@@ -252,7 +279,8 @@
                             shadow-color
                             client-rect
                             font-cache
-                            label-scale))))))
+                            label-scale
+                            anchor-fn))))))
       0)
 
     WM_CLOSE
@@ -346,7 +374,12 @@
 
 
 (defn handle-show-hint-area [_hwnd _msg wparam _lparam _hook-handler state]
-  (def [hint-list label-scale highlight-rects line-width] (unmarshal-and-free wparam))
+  (def [hint-list
+        label-scale
+        label-anchor
+        highlight-rects
+        line-width]
+    (unmarshal-and-free wparam))
   (def hint-state (in state :hint-state @{}))
 
   (def hint-hwnd
@@ -372,6 +405,7 @@
   (put hint-state :hint-list hint-list)
   (put hint-state :highlight-rects highlight-rects)
   (put hint-state :label-scale label-scale)
+  (put hint-state :label-anchor label-anchor)
   (put hint-state :line-width line-width)
   (put state :hint-state hint-state)
   (set global-hint-state hint-state)
@@ -1169,7 +1203,8 @@
   (log/debug "-- frame-hinter-init --")
 
   (def {:scale scale
-        :color color}
+        :color color
+        :anchor anchor}
     self)
   (def {:context context} ui-hint)
   (def {:window-manager window-man} context)
@@ -1181,6 +1216,7 @@
   (def frame-list (:get-all-leaf-frames cur-lo))
 
   {:label-scale scale
+   :label-anchor anchor
    :colors {:background color}
    :elements (map |(tuple (in $ :rect) $) frame-list)})
 
@@ -1204,19 +1240,21 @@
     :select frame-hinter-select})
 
 
-(defn frame-hinter [&named action-fn scale color]
+(defn frame-hinter [&named action-fn scale color anchor]
   (default action-fn
     (fn [fr]
       (let [wm (:get-window-manager fr)]
         (with-activation-hooks wm
           (:set-focus wm fr)))))
   (default scale 3)
+  (default anchor :top-left)
 
   (table/setproto
    @{# Default settings
      :action-fn action-fn
      :scale scale
-     :color color}
+     :color color
+     :anchor anchor}
    frame-hinter-proto))
 
 
@@ -1226,6 +1264,7 @@
 
 (def ui-hint-settings
   @{:label-scale true
+    :label-anchor true
     :colors (fn [old new] (merge old new))
     :line-width true})
 
@@ -1422,6 +1461,7 @@
         :show-msg show-msg
         :colors-msg colors-msg
         :label-scale label-scale
+        :label-anchor label-anchor
         :line-width line-width}
     self)
   (def {:ui-manager ui-man} context)
@@ -1441,7 +1481,11 @@
          highlight-rects))
   (:post-message ui-man
                  show-msg
-                 (alloc-and-marshal [to-show label-scale hl-info-list line-width])
+                 (alloc-and-marshal [to-show
+                                     label-scale
+                                     label-anchor
+                                     hl-info-list
+                                     line-width])
                  0))
 
 
@@ -1644,6 +1688,7 @@
 
      # Default settings
      :label-scale 1
+     :label-anchor :left
      :colors @{:text 0x505050
                :background 0xf5f5f5
                :border 0x828282
