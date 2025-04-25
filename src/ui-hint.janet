@@ -753,28 +753,31 @@
     # Early return
     (break nil))
 
-  (def [scale-x scale-y] (calc-pixel-scale win-rect))
-  (def box-margins {:left   (math/floor (* line-width scale-x))
-                    :top    (math/floor (* line-width scale-y))
-                    :right  (math/floor (* line-width scale-x))
-                    :bottom (math/floor (* line-width scale-y))})
+  (def hl-rects @[])
+  (def elems @[])
+
+  (def visit-fn
+    (if show-highlights
+      (let [[scale-x scale-y] (calc-pixel-scale win-rect)
+            box-margins {:left   (math/floor (* line-width scale-x))
+                         :top    (math/floor (* line-width scale-y))
+                         :right  (math/floor (* line-width scale-x))
+                         :bottom (math/floor (* line-width scale-y))}]
+        (fn [e]
+          (def r (clip-rect (:get_CachedBoundingRectangle e) win-rect))
+          (array/push hl-rects (expand-rect r box-margins))
+          (array/push elems [r e])))
+      # else
+      (fn [e]
+        (def r (clip-rect (:get_CachedBoundingRectangle e) win-rect))
+        (array/push elems [r e]))))
+
+  (each e elem-list
+    (visit-fn e))
 
   {:colors {:background color}
-   :highlight-rects (if show-highlights
-                      (map (fn [e]
-                             (clip-rect (expand-rect (:get_CachedBoundingRectangle e) box-margins)
-                                        win-rect))
-                           elem-list)
-                      # else
-                      [])
-   :elements (map (fn [e]
-                    (def rect (clip-rect (:get_CachedBoundingRectangle e) win-rect))
-                    [[(in rect :left)
-                      (in rect :top)
-                      (in rect :right)
-                      (in rect :bottom)]
-                     e])
-                  elem-list)})
+   :highlight-rects hl-rects
+   :elements elems})
 
 
 (defn uia-hinter-select [self elem]
@@ -1047,6 +1050,14 @@
         :line-width line-width}
     gradual-uia-hinter)
 
+  (def orig-elem-rect (:get_CachedBoundingRectangle elem))
+
+  (def [scale-x scale-y] (calc-pixel-scale orig-elem-rect))
+  (def box-margins {:left   (math/floor (* line-width scale-x))
+                    :top    (math/floor (* line-width scale-y))
+                    :right  (math/floor (* line-width scale-x))
+                    :bottom (math/floor (* line-width scale-y))})
+
   (def root-rect
     (if-let [root-hwnd (:get_CachedNativeWindowHandle root)]
       (if (not (null? root-hwnd))
@@ -1056,28 +1067,34 @@
       # else
       (:get_CachedBoundingRectangle root)))
 
-  (def elem-rect (clip-rect (:get_CachedBoundingRectangle elem) root-rect))
+  (def elem-rect (clip-rect orig-elem-rect root-rect))
 
-  (def [scale-x scale-y] (calc-pixel-scale elem-rect))
-  (def box-margins {:left   (math/floor (* line-width scale-x))
-                    :top    (math/floor (* line-width scale-y))
-                    :right  (math/floor (* line-width scale-x))
-                    :bottom (math/floor (* line-width scale-y))})
+  (def hl-rects @[])
+  (def elems @[])
+
+  (def visit-fn
+    (if show-highlights
+      (fn [c]
+        (def r (clip-rect (:get_CachedBoundingRectangle c) root-rect))
+        (array/push hl-rects
+                    {:rect  (expand-rect r box-margins)
+                     :color (get-highlight-color gradual-uia-hinter c)
+                     :line-width line-width})
+        (array/push elems [r c]))
+      (fn [c]
+        (def r (clip-rect (:get_CachedBoundingRectangle c) root-rect))
+        (array/push elems [r c]))))
+
+  (each c children
+    (visit-fn c))
 
   (def hint-info
-    {:highlight-rects [;(if show-highlights
-                          (map (fn [c]
-                                 {:rect  (clip-rect (expand-rect (:get_CachedBoundingRectangle c) box-margins) root-rect)
-                                  :color (get-highlight-color gradual-uia-hinter c)
-                                  :line-width line-width})
-                               children)
-                          # else
-                          [])
+    {:highlight-rects [;hl-rects
                        {:rect  (expand-rect elem-rect box-margins)
                         :color (get-highlight-color gradual-uia-hinter elem)
                         :line-width line-width}]
-     :elements (map |(tuple (clip-rect (:get_CachedBoundingRectangle $) root-rect) $)
-                    children)})
+     :elements elems})
+
   (log/debug "calc-hint-info: hint-info = %n" hint-info)
   hint-info)
 
@@ -1446,15 +1463,22 @@
   (case (length filtered)
     1
     # Reached the target
-    (let [target (in filtered (first (keys filtered)))
-          hint-info (:select hinter (last target))]
+    (let [target (in filtered (first (keys filtered)))]
+      (def t1 (os/clock :monotonic))
+      (def hint-info (:select hinter (last target)))
+      (def t2 (os/clock :monotonic))
+      (log/debug "(:select hinter ...) took %n seconds" (- t2 t1))
       (:handle-hint-info self hint-info))
 
     0
     # The prefix does not exist
     (if-let [return-fn (in hinter :return)]
       # The hinter can return to a previous step
-      (let [hint-info (return-fn hinter)]
+      (do
+        (def t1 (os/clock :monotonic))
+        (def hint-info (return-fn hinter))
+        (def t2 (os/clock :monotonic))
+        (log/debug "(:return hinter) took %n seconds" (- t2 t1))
         (:handle-hint-info self hint-info))
       # else, clean up, also cancel the hinter
       (:clean-up self true))
@@ -1537,7 +1561,11 @@
      :uia-manager uia-man}
     context)
 
+  (def t1 (os/clock :monotonic))
   (def hint-info (:init hinter self))
+  (def t2 (os/clock :monotonic))
+  (log/debug "(:init hinter ...) took %n seconds" (- t2 t1))
+
   (def [override-settings elem-list]
     (cond
       (nil? hint-info)
