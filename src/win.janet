@@ -1604,6 +1604,7 @@
              (pointer-to-number (in self :hwnd)))
     (log/debug "restoring dump data for 0x%x to %n" hwnd-num (in self :hwnd)))
 
+  (table/clear (in self :tags))
   (eachp [k v] tags
     (put (in self :tags) k v))
 
@@ -2317,6 +2318,7 @@
 
   # This has to happen before doing anything layout-related,
   # since the tags may contain layout settings (paddings etc.)
+  (table/clear (in self :tags))
   (eachp [k v] tags
     (put (in self :tags) k v))
 
