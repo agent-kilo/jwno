@@ -314,10 +314,22 @@
      (:add-hook hook-man :layout-changed
         (fn [& args]
           (:on-layout-changed self ;args))))
-  (put hook-fns :layout-created
-     (:add-hook hook-man :layout-created
-        (fn [& args]
-          (:on-layout-changed self ;args))))
+
+  #
+  # Currently we don't need this :layout-created hook, since
+  # :layout-created is always triggered by a new window, and
+  # a new window also triggers :layout-changed
+  #
+  # Besides, all top-level frames in the layout will be in their
+  # initial states, with unpopulated :tags, when :layout-created
+  # fires. There's no point in saving this incomplete state.
+  #
+
+  #(put hook-fns :layout-created
+  #   (:add-hook hook-man :layout-created
+  #      (fn [& args]
+  #        (:on-layout-changed self ;args))))
+
   (put hook-fns :shutting-down
      (:add-hook hook-man :shutting-down
         (fn [& _args]
