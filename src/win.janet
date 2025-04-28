@@ -1660,37 +1660,46 @@
       (slice ratios 0 (- n 1))
       ratios))
 
-  (let [[width height] (rect-size (:get-padded-rect self))]
-    (def new-rects
-      (case direction
-        :horizontal
-        (do
-          (table/setproto self horizontal-frame-proto)
-          (:calculate-sub-rects self
-                                (fn [_ i]
-                                  (math/floor (* width (in full-ratios i))))
-                                n))
+  (def [width height] (rect-size (:get-padded-rect self)))
 
-        :vertical
-        (do
-          (table/setproto self vertical-frame-proto)
-          (:calculate-sub-rects self
-                                (fn [_ i]
-                                  (math/floor (* height (in full-ratios i))))
-                                n))))
+  (def new-rects
+    (case direction
+      :horizontal
+      (do
+        (table/setproto self horizontal-frame-proto)
+        (:calculate-sub-rects self
+                              (fn [_ i]
+                                (def r (in full-ratios i))
+                                (if (< r 1)
+                                  (math/floor (* r width))
+                                  # else, it's an absolute value
+                                  r))
+                              n))
 
-    (def new-frames (map |(frame $ self) new-rects))
+      :vertical
+      (do
+        (table/setproto self vertical-frame-proto)
+        (:calculate-sub-rects self
+                              (fn [_ i]
+                                (def r (in full-ratios i))
+                                (if (< r 1)
+                                  (math/floor (* r height))
+                                  # else, it's an absolutely value
+                                  r))
+                              n))))
 
-    (def old-children (in self :children))
-    (def old-active-child (in self :current-child))
-    (put self :children new-frames)
-    (def first-sub-frame (in new-frames 0))
-    # XXX: Always activate the first sub-frame by default
-    (put self :current-child first-sub-frame)
-    # XXX: Move all window children to the first sub-frame by default
-    (each win old-children
-      (:add-child first-sub-frame win))
-    (put first-sub-frame :current-child old-active-child)))
+  (def new-frames (map |(frame $ self) new-rects))
+
+  (def old-children (in self :children))
+  (def old-active-child (in self :current-child))
+  (put self :children new-frames)
+  (def first-sub-frame (in new-frames 0))
+  # XXX: Always activate the first sub-frame by default
+  (put self :current-child first-sub-frame)
+  # XXX: Move all window children to the first sub-frame by default
+  (each win old-children
+    (:add-child first-sub-frame win))
+  (put first-sub-frame :current-child old-active-child))
 
 
 (defn frame-balance [self &opt recursive resized-frames]
