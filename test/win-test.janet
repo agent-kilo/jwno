@@ -89,11 +89,14 @@
   (def rect {:top 10 :left 10 :bottom 110 :right 110})
 
   (var dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+  (var err-raised false)
 
   (try
     (:split dummy-frame :horizontal 1)
     ((err fib)
-     (assert (= err "invalid number of sub-frames"))))
+     (assert (= err "invalid number of sub-frames"))
+     (set err-raised true)))
+  (assert err-raised)
 
   (:split dummy-frame :horizontal)
   (assert (= (length (in dummy-frame :children)) 2))
@@ -110,10 +113,13 @@
   (assert (= (get-in dummy-frame [:children 1 :rect :right]) 110))
   (assert (= (get-in dummy-frame [:children 1 :rect :bottom]) 110))
 
+  (set err-raised false)
   (try
     (:split dummy-frame :vertical)
     ((err fib)
-     (assert (= err "frame is already split"))))
+     (assert (= err "frame is already split"))
+     (set err-raised true)))
+  (assert err-raised)
 
   (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
 
@@ -223,15 +229,22 @@
         {:top 10 :left 10 :bottom 11 :right 11}
         dummy-monitor))
 
+  (set err-raised false)
   (try
     (:split dummy-frame :horizontal 2 [0.5])
     ((err fib)
-     (assert (= err "cannot create zero-width frames"))))
+     (assert (= err "cannot create zero-width frames"))
+     (set err-raised true)))
+  (assert err-raised)
   (assert (= (length (in dummy-frame :children)) 0))
+
+  (set err-raised false)
   (try
     (:split dummy-frame :vertical 2 [0.5])
     ((err fib)
-     (assert (= err "cannot create zero-height frames"))))
+     (assert (= err "cannot create zero-height frames"))
+     (set err-raised true)))
+  (assert err-raised)
   (assert (= (length (in dummy-frame :children)) 0))
 
   (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
@@ -266,7 +279,62 @@
     (assert (= 61 (in rect1 :top)))
     (assert (= 18 (in rect1 :left)))
     (assert (= 103 (in rect1 :bottom)))
-    (assert (= 104 (in rect1 :right)))))
+    (assert (= 104 (in rect1 :right))))
+
+  #### Absolute split sizes ####
+
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
+  (:split dummy-frame :horizontal 2 [29])
+  (assert (= 2 (length (in dummy-frame :children))))
+  (let [rect0 (get-in dummy-frame [:children 0 :rect])
+        rect1 (get-in dummy-frame [:children 1 :rect])]
+    (assert (= 10 (in rect0 :top)))
+    (assert (= 10 (in rect0 :left)))
+    (assert (= 110 (in rect0 :bottom)))
+    (assert (= 39 (in rect0 :right)))
+
+    (assert (= 10 (in rect1 :top)))
+    (assert (= 39 (in rect1 :left)))
+    (assert (= 110 (in rect1 :bottom)))
+    (assert (= 110 (in rect1 :right))))
+
+  #### Mixed split sizes ####
+
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
+  (:split dummy-frame :horizontal 3 [0.4 29])
+  (assert (= 3 (length (in dummy-frame :children))))
+  (let [rect0 (get-in dummy-frame [:children 0 :rect])
+        rect1 (get-in dummy-frame [:children 1 :rect])
+        rect2 (get-in dummy-frame [:children 2 :rect])]
+    (assert (= 10 (in rect0 :top)))
+    (assert (= 10 (in rect0 :left)))
+    (assert (= 110 (in rect0 :bottom)))
+    (assert (= 50 (in rect0 :right)))
+
+    (assert (= 10 (in rect1 :top)))
+    (assert (= 50 (in rect1 :left)))
+    (assert (= 110 (in rect1 :bottom)))
+    (assert (= 79 (in rect1 :right)))
+
+    (assert (= 10 (in rect2 :top)))
+    (assert (= 79 (in rect2 :left)))
+    (assert (= 110 (in rect2 :bottom)))
+    (assert (= 110 (in rect2 :right))))
+
+  #### split sizes that are too big ####
+
+  (set dummy-frame (build-dummy-frame-tree rect dummy-monitor))
+
+  (set err-raised false)
+  (try
+    (:split dummy-frame :horizontal 3 [0.4 60])
+    ((err fib)
+     (assert (= err "cannot create zero-width frames"))
+     (set err-raised true)))
+  (assert err-raised)
+  (assert (= (length (in dummy-frame :children)) 0)))
 
 
 (defn test-frame-close []
@@ -453,6 +521,31 @@
   (assert (= (get-in dummy-frame [:children 4 :rect :right]) 110))
   (assert (= (get-in dummy-frame [:children 4 :rect :bottom]) 110))
 
+  #### Absolute size values ####
+  (:insert-sub-frame dummy-frame 0 9)
+  (assert (= (length (in dummy-frame :children)) 6))
+
+  (assert (= (get-in dummy-frame [:children 0 :rect :left]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :right]) 19))
+  (assert (= (get-in dummy-frame [:children 0 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 5 :rect :right]) 110))
+  (assert (= (get-in dummy-frame [:children 5 :rect :bottom]) 110))
+
+  #### Absolute sizes that are too large ####
+  (var err-raised false)
+  (try
+    (:insert-sub-frame dummy-frame -1 100)
+    ((err fib)
+     (assert (= err "cannot create zero-width frames"))
+     (set err-raised true)))
+  (assert err-raised)
+  (assert (= (length (in dummy-frame :children)) 6))
+  (def total-width
+    (+ ;(map |(- (get-in $ [:rect :right]) (get-in $ [:rect :left]))
+             (in dummy-frame :children))))
+  (assert (= 100 total-width))
 
   (set dummy-frame
        (build-dummy-frame-tree

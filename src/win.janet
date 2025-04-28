@@ -1660,37 +1660,46 @@
       (slice ratios 0 (- n 1))
       ratios))
 
-  (let [[width height] (rect-size (:get-padded-rect self))]
-    (def new-rects
-      (case direction
-        :horizontal
-        (do
-          (table/setproto self horizontal-frame-proto)
-          (:calculate-sub-rects self
-                                (fn [_ i]
-                                  (math/floor (* width (in full-ratios i))))
-                                n))
+  (def [width height] (rect-size (:get-padded-rect self)))
 
-        :vertical
-        (do
-          (table/setproto self vertical-frame-proto)
-          (:calculate-sub-rects self
-                                (fn [_ i]
-                                  (math/floor (* height (in full-ratios i))))
-                                n))))
+  (def new-rects
+    (case direction
+      :horizontal
+      (do
+        (table/setproto self horizontal-frame-proto)
+        (:calculate-sub-rects self
+                              (fn [_ i]
+                                (def r (in full-ratios i))
+                                (if (< r 1)
+                                  (math/floor (* r width))
+                                  # else, it's an absolute value
+                                  r))
+                              n))
 
-    (def new-frames (map |(frame $ self) new-rects))
+      :vertical
+      (do
+        (table/setproto self vertical-frame-proto)
+        (:calculate-sub-rects self
+                              (fn [_ i]
+                                (def r (in full-ratios i))
+                                (if (< r 1)
+                                  (math/floor (* r height))
+                                  # else, it's an absolutely value
+                                  r))
+                              n))))
 
-    (def old-children (in self :children))
-    (def old-active-child (in self :current-child))
-    (put self :children new-frames)
-    (def first-sub-frame (in new-frames 0))
-    # XXX: Always activate the first sub-frame by default
-    (put self :current-child first-sub-frame)
-    # XXX: Move all window children to the first sub-frame by default
-    (each win old-children
-      (:add-child first-sub-frame win))
-    (put first-sub-frame :current-child old-active-child)))
+  (def new-frames (map |(frame $ self) new-rects))
+
+  (def old-children (in self :children))
+  (def old-active-child (in self :current-child))
+  (put self :children new-frames)
+  (def first-sub-frame (in new-frames 0))
+  # XXX: Always activate the first sub-frame by default
+  (put self :current-child first-sub-frame)
+  # XXX: Move all window children to the first sub-frame by default
+  (each win old-children
+    (:add-child first-sub-frame win))
+  (put first-sub-frame :current-child old-active-child))
 
 
 (defn frame-balance [self &opt recursive resized-frames]
@@ -1896,10 +1905,15 @@
           dir (if direction
                 direction
                 (error "frame is not split, but no direction is provided"))
+          other-ratio (if (> 1 ratio)
+                        (- 1 ratio)
+                        # else, ratio is absolute size
+                        (let [width (rect-width (:get-padded-rect self))]
+                          (- width ratio)))
           [move-windows? split-ratio-list] (case index
-                                             -1 [false [(- 1 ratio)]]
+                                             -1 [false [other-ratio]]
                                              0 [true [ratio]]
-                                             1 [false [(- 1 ratio)]]
+                                             1 [false [other-ratio]]
                                              (errorf "expected index in range [-1 1], got %n" index))]
       (:split self dir 2 split-ratio-list)
       (when move-windows?
@@ -1960,12 +1974,25 @@
       (def resize-rect
         (case dir
           :horizontal
-          (let [sub-width (math/floor (* width ratio))]
+          (let [sub-width (if (> 1 ratio)
+                            (math/floor (* width ratio))
+                            # else, ratio is absolute size
+                            ratio)]
             {:left 0 :top 0 :right sub-width :bottom (- (in new-rect :bottom) (in new-rect :top))})
           :vertical
-          (let [sub-height (math/floor (* height ratio))]
+          (let [sub-height (if (> 1 ratio)
+                             (math/floor (* height ratio))
+                             # else, ratio is absolute size
+                             ratio)]
             {:left 0 :top 0 :right (- (in new-rect :right) (in new-rect :left)) :bottom sub-height})))
-      (:resize new-frame resize-rect))))
+      (try
+        (:resize new-frame resize-rect)
+        ((err fib)
+         (log/debug "frame-resize failed, removing inserted empty frame: %n\n%s"
+                    err
+                    (get-stack-trace fib))
+         (:remove-child self new-frame)
+         (error err))))))
 
 
 (defn frame-close [self]

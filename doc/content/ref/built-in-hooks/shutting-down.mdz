@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after Jwno's main event loop has stopped.
+
+The UI thread has also stopped, when this hook fires, so UI manager can't be accessed in @code{hook-fn}.

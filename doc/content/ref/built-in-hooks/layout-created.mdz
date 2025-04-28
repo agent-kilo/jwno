@@ -17,4 +17,6 @@
 
 ### Description
 
-TODO
+Gets triggered after a new layout object (representing a virtual desktop) has been created. @code{new-layout} is the new layout object.
+
+Note that the window manager only creates a layout object when the first window gets managed on a virtual desktop. If no window is ever opened on a virtual desktop, no layout object for that virtual desktop exists.
