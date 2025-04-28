@@ -521,6 +521,31 @@
   (assert (= (get-in dummy-frame [:children 4 :rect :right]) 110))
   (assert (= (get-in dummy-frame [:children 4 :rect :bottom]) 110))
 
+  #### Absolute size values ####
+  (:insert-sub-frame dummy-frame 0 9)
+  (assert (= (length (in dummy-frame :children)) 6))
+
+  (assert (= (get-in dummy-frame [:children 0 :rect :left]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :top]) 10))
+  (assert (= (get-in dummy-frame [:children 0 :rect :right]) 19))
+  (assert (= (get-in dummy-frame [:children 0 :rect :bottom]) 110))
+
+  (assert (= (get-in dummy-frame [:children 5 :rect :right]) 110))
+  (assert (= (get-in dummy-frame [:children 5 :rect :bottom]) 110))
+
+  #### Absolute sizes that are too large ####
+  (var err-raised false)
+  (try
+    (:insert-sub-frame dummy-frame -1 100)
+    ((err fib)
+     (assert (= err "cannot create zero-width frames"))
+     (set err-raised true)))
+  (assert err-raised)
+  (assert (= (length (in dummy-frame :children)) 6))
+  (def total-width
+    (+ ;(map |(- (get-in $ [:rect :right]) (get-in $ [:rect :left]))
+             (in dummy-frame :children))))
+  (assert (= 100 total-width))
 
   (set dummy-frame
        (build-dummy-frame-tree

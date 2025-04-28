@@ -1905,10 +1905,15 @@
           dir (if direction
                 direction
                 (error "frame is not split, but no direction is provided"))
+          other-ratio (if (> 1 ratio)
+                        (- 1 ratio)
+                        # else, ratio is absolute size
+                        (let [width (rect-width (:get-padded-rect self))]
+                          (- width ratio)))
           [move-windows? split-ratio-list] (case index
-                                             -1 [false [(- 1 ratio)]]
+                                             -1 [false [other-ratio]]
                                              0 [true [ratio]]
-                                             1 [false [(- 1 ratio)]]
+                                             1 [false [other-ratio]]
                                              (errorf "expected index in range [-1 1], got %n" index))]
       (:split self dir 2 split-ratio-list)
       (when move-windows?
@@ -1969,12 +1974,25 @@
       (def resize-rect
         (case dir
           :horizontal
-          (let [sub-width (math/floor (* width ratio))]
+          (let [sub-width (if (> 1 ratio)
+                            (math/floor (* width ratio))
+                            # else, ratio is absolute size
+                            ratio)]
             {:left 0 :top 0 :right sub-width :bottom (- (in new-rect :bottom) (in new-rect :top))})
           :vertical
-          (let [sub-height (math/floor (* height ratio))]
+          (let [sub-height (if (> 1 ratio)
+                             (math/floor (* height ratio))
+                             # else, ratio is absolute size
+                             ratio)]
             {:left 0 :top 0 :right (- (in new-rect :right) (in new-rect :left)) :bottom sub-height})))
-      (:resize new-frame resize-rect))))
+      (try
+        (:resize new-frame resize-rect)
+        ((err fib)
+         (log/debug "frame-resize failed, removing inserted empty frame: %n\n%s"
+                    err
+                    (get-stack-trace fib))
+         (:remove-child self new-frame)
+         (error err))))))
 
 
 (defn frame-close [self]
