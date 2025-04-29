@@ -454,6 +454,18 @@
 
 (defn handle-hide-hint-area [_hwnd _msg _wparam _lparam _hook-handler state]
   (def hint-state (in state :hint-state @{}))
+
+  # Clear the states, so that GC can reclaim memory
+  # :hint-list and :highlight-rects can be quite large
+  # see handle-show-hint-area for the list of saved states
+  (put hint-state :area-rect nil)
+  (put hint-state :hint-list nil)
+  (put hint-state :highlight-rects nil)
+  (put hint-state :label-scale nil)
+  (put hint-state :label-anchor nil)
+  (put hint-state :line-width nil)
+  (put state :hint-state hint-state)
+
   (when-let [hint-hwnd (in hint-state :area-hwnd)]
     (ShowWindow hint-hwnd SW_HIDE))
   0)
@@ -1453,7 +1465,7 @@
     true
     (do
       # XXX: Raise an error?
-      (log/warning ":select method from hinter returned: %n" hint-info)
+      (log/warning "hinter returned: %n" hint-info)
       (:clean-up self true))))
 
 
