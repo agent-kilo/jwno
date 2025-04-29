@@ -18,16 +18,16 @@ This module contains code that can change window layouts automatically for the u
     @th{Name} @th{Description}
   }
   @tr{
-    @td{@link[#auto-layout/bsp]{@code{auto-layout/bsp}}} @td{Automatically splits and arranges frames in the good old BSP (binary space partitioning) fasion.}
+    @td{@link[#auto-layout/bsp]{@code{auto-layout/bsp}}} @td{Splits and arranges frames in the good old BSP (binary space partitioning) fasion.}
   }
   @tr{
-    @td{@link[#auto-layout/close-empty-frame]{@code{auto-layout/close-empty-frame}}} @td{Automatically checks for empty frames and closes them, when a window is removed.}
+    @td{@link[#auto-layout/close-empty-frame]{@code{auto-layout/close-empty-frame}}} @td{Checks for empty frames and closes them, when a window is removed.}
   }
   @tr{
-    @td{@link[#auto-layout/rows]{@code{auto-layout/rows}}} @td{Automatically splits and arranges frames into horizontal or vertical rows.}
+    @td{@link[#auto-layout/rows]{@code{auto-layout/rows}}} @td{Splits and arranges frames into horizontal or vertical rows.}
   }
   @tr{
-    @td{@link[#auto-layout/zoom-in]{@code{auto-layout/zoom-in}}} @td{Automatically calls the :zoom-in command, when a frame is activated.}
+    @td{@link[#auto-layout/zoom-in]{@code{auto-layout/zoom-in}}} @td{Calls the :zoom-in command, when a frame is activated.}
   }
 }
 
