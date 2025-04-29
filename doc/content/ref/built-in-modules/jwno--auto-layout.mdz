@@ -7,8 +7,113 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/auto-layout)
+```
 
-### Description
+This module contains code that can change window layouts automatically for the user:
 
-TODO
+@tag[table]{
+  @tr{
+    @th{Name} @th{Description}
+  }
+  @tr{
+    @td{@link[#auto-layout/bsp]{@code{auto-layout/bsp}}} @td{Automatically splits and arranges frames in the good old BSP (binary space partitioning) fasion.}
+  }
+  @tr{
+    @td{@link[#auto-layout/close-empty-frame]{@code{auto-layout/close-empty-frame}}} @td{Automatically checks for empty frames and closes them, when a window is removed.}
+  }
+  @tr{
+    @td{@link[#auto-layout/rows]{@code{auto-layout/rows}}} @td{Automatically splits and arranges frames into horizontal or vertical rows.}
+  }
+  @tr{
+    @td{@link[#auto-layout/zoom-in]{@code{auto-layout/zoom-in}}} @td{Automatically calls the :zoom-in command, when a frame is activated.}
+  }
+}
+
+
+### auto-layout/bsp
+
+To enable it:
+
+@codeblock[janet]```
+(def bsp-layout (auto-layout/bsp jwno/context))
+(:enable bsp-layout)
+```
+
+Then, when a new window appears, @code{bsp-layout} will automatically create a new frame by splitting the active frame, and put the window in that new frame.
+
+To disable it:
+
+@codeblock[janet]```
+(:disable bsp-layout)
+```
+
+And if you want to re-arrange all managed windows on a monitor immediately:
+
+@codeblock[janet]```
+(:refresh bsp-layout)
+```
+
+This works even when the BSP layout is disabled.
+
+### auto-layout/close-empty-frame
+
+To enable it:
+
+@codeblock[janet]```
+(def auto-close-empty-frame (auto-layout/close-empty-frame jwno/context))
+(:enable auto-close-empty-frame)
+```
+
+Then, when a managed window is removed, @code{auto-close-empty-frame} will check whether that window's parent frame is empty, and automatically close the frame in that case.
+
+To disable it:
+
+@codeblock[janet]```
+(:disable auto-close-empty-frame)
+```
+
+### auto-layout/rows
+
+To enable it:
+
+@codeblock[janet]```
+(def rows-layout (auto-layout/rows jwno/context))
+(put rows-layout :direction :horizontal)  # or :vertical, defaults to :horizontal
+(:enable rows-layout)
+```
+
+When a new window appears, @code{rows-layout} will automatically insert a new frame on the right-most or bottom-most side (depending on the @code{:direction} setting) of the active monitor, and put the window in that new frame.
+
+To disable it:
+
+@codeblock[janet]```
+(:disable rows-layout)
+```
+
+And if you want to re-arrange all managed windows on a monitor immediately:
+
+@codeblock[janet]```
+(:refresh rows-layout)
+```
+
+This works even when the rows layout is disabled.
+
+### auto-layout/zoom-in
+
+To enable it:
+
+@codeblock[janet]```
+(def auto-zoom-in (auto-layout/zoom-in jwno/context))
+(put auto-zoom-in :ratio 0.7)  # or any other value that's < 1, defaults to 0.7
+(:enable auto-zoom-in)
+```
+
+When a frame is activated, @code{auto-zoom-in} will automatically call the @link[../built-in-commands/zoom-in.html]{@code{:zoom-in} command}.
+
+To disable it:
+
+@codeblock[janet]```
+(:disable auto-zoom-in)
+```
