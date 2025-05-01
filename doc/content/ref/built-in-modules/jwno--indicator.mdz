@@ -7,8 +7,63 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/indicator)
+```
 
-### Description
+This module shows visual indicators for the active (current) frame.
 
-TODO
+@tag[table]{
+  @tr{
+    @th{Name} @th{Description}
+  }
+  @tr{
+    @td{@link[#indicator/current-frame-area]{@code{indicator/current-frame-area}}}
+    @td{Fills an empty frame with a blank rectangle when it's activated, so that it stands out from emtpy desktop areas nearby.}
+  }
+  @tr{
+    @td{@link[#indicator/current-frame-tooltip]{@code{indicator/current-frame-tooltip}}}
+    @td{Shows a simple tooltip when a frame is activated.}
+  }
+}
+
+
+### indicator/current-frame-area
+
+To enable it:
+
+@codeblock[janet]```
+(def current-frame-area (indicator/current-frame-area jwno/context))
+(put current-frame-area :margin 10)      # Should usually match your window margin setting. Defaults to 0.
+(put current-frame-area :color 0xffffff) # 0xBBGGRR, defaults to a bright white color.
+(put current-frame-area :alpha 64)       # Opaqueness, 255 = fully opaque, 0 = fully transparent. Defaults to 64.
+(:enable current-frame-area)
+```
+
+Then, when you activate an empty frame, a rectangle will be shown in the frame's area. The rectangle won't be shown if there's only one visible frame.
+
+To disable it:
+
+@codeblock[janet]```
+(:disable current-frame-area)
+```
+
+
+### indicator/current-frame-tooltip
+
+To enable it:
+
+@codeblock[janet]```
+(def current-frame-tooltip (indicator/current-frame-tooltip jwno/context))
+(put current-frame-tooltip :text "Current Frame")  # The text shown in the tooltip, defaults to "Current Frame"
+(put current-frame-tooltip :timeout 1500)          # In milliseconds, defaults to 1500 (1.5 seconds)
+(:enable current-frame-tooltip)
+```
+
+When a frame is activated, @code{current-frame-tooltip} will show a small tooltip containing the specified text, in the center of the frame.
+
+To disabled it:
+
+@codeblock[janet]```
+(:disable current-frame-tooltip)
+```
