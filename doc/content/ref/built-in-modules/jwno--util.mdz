@@ -90,6 +90,10 @@ This module contains pre-defined utility code.
     @td{.}
   }
   @tr{
+    @td{@code{(util/merge-settings obj settings &opt mergers)}}
+    @td{.}
+  }
+  @tr{
     @td{@code{(util/pointer-to-number pointer)}}
     @td{.}
   }
