@@ -587,6 +587,6 @@
      :manual false
 
      # default settings
-     :limit 1024
+     :limit 512
      :backing-file nil}
    layout-history-proto))

@@ -21,9 +21,9 @@ To enable layout history:
 @codeblock[janet]```
 (def layout-history (layout-history/layout-history jwno/context))
 #
-# Size limit for the history stack, defaults to 1024 entries
+# Size limit for the history stack, defaults to 512 entries
 #
-(put layout-history :limit 1024)
+(put layout-history :limit 512)
 #
 # Where to save the history entries. If it's a relative path, a file
 # relative to the user config file would be used. If it's an absolute
