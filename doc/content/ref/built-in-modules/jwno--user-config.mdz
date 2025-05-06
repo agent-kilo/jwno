@@ -7,8 +7,23 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/user-config)
+```
+
+This module contains the environment defined in the user config file.
+
 
 ### Description
 
-TODO
+Everything defined publicly in the user config file will be available in this module. Say we have this variable in our config file:
+
+@codeblock[janet]```
+(def the-answer 42)
+```
+
+And we can reference it simply like this, after importing @code{jwno/user-config}:
+
+@codeblock[janet]```
+user-config/the-answer
+```
