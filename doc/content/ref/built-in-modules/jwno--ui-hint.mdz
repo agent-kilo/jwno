@@ -7,8 +7,237 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/ui-hint)
+```
 
-### Description
+This module contains the implementation for the @code{:ui-hint} command and various @em{hinters}.
 
-TODO
+Available hinters:
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Description}
+  }
+  @tr{
+    @td{@link[#ui-hint/frame-hinter]{@code{ui-hint/frame-hinter}}}
+    @td{Shows hints for all visible leaf frames.}
+  }
+  @tr{
+    @td{@link[#ui-hint/gradual-uia-hinter]{@code{ui-hint/gradual-uia-hinter}}}
+    @td{Gradually shows hints for UI elements, starting from the active window. Only direct children of the selected UI element will be shown.}
+  }
+  @tr{
+    @td{@link[#ui-hint/uia-hinter]{@code{ui-hint/uia-hinter}}}
+    @td{Shows hints for all interactable UI elements, which satisfy a simple criteria.}
+  }
+}
+
+
+### :ui-hint Command
+
+To enable the @code{:ui-hint} command:
+
+@codeblock[janet]```
+(def ui-hint (ui-hint/ui-hint jwno/context))
+#
+# The scaling factor for the labels. Defaults to 1.
+#
+(put ui-hint :label-scale 1)
+#
+# The relative position to show the labels. Defaults to :left.
+#
+(put ui-hint :anchor :left)
+#
+# The colors used to draw the labels. If a color is not specified,
+# defaults to the values shown below. All colors are in the format
+# of 0xBBGGRR. The :shadow color can also accept :none, to remove
+# shadows altogether. The :key color is used to draw the transparent
+# background of the window where the labels are drawn, usually it
+# should be different from any other colors.
+#
+(put ui-hint :colors
+  {:text       0x505050
+   :background 0xf5f5f5
+   :border     0x828282
+   :shadow     0x828282
+   :highlight  0x00a1ff
+   :key        0x000000})
+(:enable ui-hint)
+```
+
+The command signagure:
+
+@codeblock[janet]```
+(:ui-hint key-list &opt hinter)
+```
+
+This command shows some hint labels defined by the @code{hinter}, and waits for user input. The user can select a label by typing the text shown in it. The action carried out upon selection is defined by the @code{hinter}. When @code{hinter} is not provided, uses @code{ui-hint/uia-hinter} by default.
+
+@p{@code{key-list} should be a string that contains all possible letters which can be used to generate labels. Only alphabetical characters in ASCII range are supported.}
+
+Note that this command is stateful and non-reentrant, so calling it again when there's already a @code{:ui-hint} command running will do nothing at all.
+
+
+### ui-hint/frame-hinter
+
+To create a frame hinter:
+
+@codeblock[janet]```
+(ui-hint/frame-hinter :action-fn (fn [fr] ...)
+                      :scale ...
+                      :color ...
+                      :anchor ...)
+```
+
+All the arguments @code{ui-hint/frame-hinter} can accept are named. @code{:action-fn} is the action to apply to the selected frame, and defaults to simple activation. @code{:scale} is the scaling factor for the labels, which defaults to 3. @code{:color} is the background color for the labels, in the format of @code{0xBBGGRR}, and defaults to the @code{ui-hint} object's color setting. @code{:anchor} is the position to show the labels, can be @code{:center}, @code{:left}, @code{:top-left}, etc. and defaults to the @code{ui-hint} object's anchor setting. 
+
+For example, to bind a command to activate a frame using this hinter:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + N"
+             [:ui-hint "fjdksleiwocmxz" (ui-hint/frame-hinter)])
+```
+
+And to bind a command to close a frame:
+
+@codeblock[janet]```
+(defn action-close-frame [fr]
+  (:close fr)
+  (:retile (:get-window-manager fr) (in fr :parent)))
+
+(:define-key keymap
+             "Win + Shift + N"
+             [:ui-hint "fjdksleiwocmxz" (ui-hint/frame-hinter :action-fn action-close-frame
+                                                              :color 0x00a1ff)])
+```
+
+
+### ui-hint/gradual-uia-hinter
+
+To create a gradual UIA hinter:
+
+@codeblock[janet]```
+(ui-hint/gradual-uia-hinter :action ...
+                            :colors {:invokable ...
+                                     :focusable ...}
+                            :show-highlights ...
+                            :line-width      ...)
+```
+
+All the arguments @code{ui-hint/gradual-uia-hinter} can accept are named. @code{:action} is the action to apply to the selected UI element. Supported actions:
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Description}
+  }
+  @tr{
+    @td{@code{:invoke}}
+    @td{Invokes the default action according to the type of the UI element. E.g. clicks on a button by default.}
+  }
+  @tr{
+    @td{@code{:focus}}
+    @td{Set input focus to the UI element.}
+  }
+  @tr{
+    @td{@code{:move-cursor}}
+    @td{Moves the mouse cursor to the center of the UI element.}
+  }
+  @tr{
+    @td{@code{:click}}
+    @td{Clicks the mouse at the center of the UI element.}
+  }
+  @tr{
+    @td{@code{:middle-click}}
+    @td{Clicks the middle mouse button at the center of the UI element.}
+  }
+  @tr{
+    @td{@code{:right-click}}
+    @td{Clicks the right mouse button at the center of the UI element.}
+  }
+  @tr{
+    @td{@code{:double-click}}
+    @td{Double-clicks the mouse at the center of the UI element.}
+  }
+}
+
+And @code{:colors} specifies the colors used to highlight UI elements, in the format of @code{0xBBGGRR}. Uses default values if a color is not provided. @code{show-highlights} specifies whether to show highlight boxes for child elements, and defaults to @code{false}. @code{:line-width} is the width for highlight outlines, and defaults to @code{3}.
+
+For example, to bind a command to walk the UI tree using this hinter, with all default settings:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + G"
+             [:ui-hint "fjdksleiwocmxz" (ui-hint/gradual-uia-hinter)])
+```
+
+To move the mouse cursor instead, and show more highlights:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + G"
+             [:ui-hint "fjdksleiwocmxz" (ui-hint/gradual-uia-hinter :action :move-cursor
+                                                                    :show-highlights true)])
+```
+
+
+### ui-hint/uia-hinter
+
+To create a UIA hinter:
+
+@codeblock[janet]```
+(ui-hint/uia-hinter :action          ...
+                    :condition       ...
+                    :color           ...
+                    :show-highlights ...
+                    :line-width      ...)
+```
+
+All the arguments @code{ui-hint/uia-hinter} can accept are named. @code{:action} is the action to apply to the selected UI element, which defaults to @code{:invoke}. See the @link[#ui-hint/gradual-uia-hinter]{@code{ui-hint/gradual-uia-hinter}} section for supported actions. @code{:condition} is the criteria used to filter UI elements, which defaults to all interactable elements. It can reference any of the @link[https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-automation-element-propids]{supported properties}, or any @code{:and}, @code{:or}, @code{:not} combinations of them. @code{:color} is the background color for the labels. Uses the @code{ui-hint} object's color setting, if no color is provided. @code{show-highlights} specifies whether to show highlight boxes for labeled elements, and defaults to @code{false}. @code{:line-width} is the width for highlight outlines, and defaults to @code{3}.
+
+For example, to show hints for all interactable UI elements:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + H"
+             [:ui-hint "fjdksleiwocmxz" (ui-hint/uia-hinter)])
+```
+
+To show hints for all buttons:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + H"
+             [:ui-hint
+              "fjdksleiwocmxz"
+              (ui-hint/uia-hinter
+                :condition [:or
+                             [:property UIA_ControlTypePropertyId UIA_ButtonControlTypeId]
+                             [:property UIA_ControlTypePropertyId UIA_CheckBoxControlTypeId]])])
+```
+
+To show hints for all hyperlinks, with highlight boxes:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + H"
+             [:ui-hint
+              "fjdksleiwocmxz"
+              (ui-hint/uia-hinter
+                :condition       [:property UIA_ControlTypePropertyId UIA_HyperlinkControlTypeId]
+                :show-highlights true)])
+```
+
+To right-click on hyperlinks, with highlight boxes:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + H"
+             [:ui-hint
+              "fjdksleiwocmxz"
+              (ui-hint/uia-hinter
+                :action          :right-click
+                :condition       [:property UIA_ControlTypePropertyId UIA_HyperlinkControlTypeId]
+                :show-highlights true)])
+```
