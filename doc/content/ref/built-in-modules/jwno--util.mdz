@@ -7,8 +7,110 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/util)
+```
 
-### Description
+This module contains pre-defined utility code.
 
-TODO
+
+### Macros
+
+@tag[table]{
+  @tr{
+    @th{Signature} @th{Description}
+  }
+  @tr{
+    @td{@code{(util/rect-center rect)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/rect-width rect)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/rect-height rect)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/rect-size rect)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/rect-same-size? r1 r2)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/with-activation-hooks wm & body)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/with-uia [binding ctor dtor] & body)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/export-to-repl repl-server & syms)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/unset-from-repl repl-server & syms)}}
+    @td{.}
+  }
+}
+
+
+### Functions
+
+@tag[table]{
+  @tr{
+    @th{Signature} @th{Description}
+  }
+  @tr{
+    @td{@code{(util/show-error-and-exit msg exit-code &opt stack-trace)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/get-exe-dir)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/get-stack-trace fib)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/global-ns sym)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/get-pid-path pid)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/get-hwnd-path hwnd)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/pointer-to-number pointer)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/shrink-rect rect amounts)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/expand-rect rect amounts)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(util/combine-rect-border-space & args)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(calc-pixel-scale rect)}}
+    @td{.}
+  }
+  @tr{
+    @td{@code{(hungarian-assignment C)}}
+    @td{.}
+  }
+}
