@@ -91,6 +91,47 @@
     path))
 
 
+(defn merge-settings [obj settings &opt mergers]
+  (def default-merger (fn [orig-v new-v] new-v))
+
+  (def orig-settings @[])
+
+  (def kv-pairs
+    (cond
+      (indexed? settings)
+      settings
+
+      (or (table? settings)
+          (struct? settings))
+      (pairs settings)))
+
+  (each [k v] kv-pairs
+    (def orig-v (in obj k))
+
+    (cond
+      (nil? mergers)
+      (do
+        (array/push orig-settings [k orig-v])
+        (put obj k (default-merger orig-v v)))
+
+      (has-key? mergers k)
+      (do
+        (def m (in mergers k))
+        (cond
+          (or (function? m)
+              (cfunction? m))
+          (do
+            (array/push orig-settings [k orig-v])
+            (put obj k (m orig-v v)))
+
+          (truthy? m)
+          (do
+            (array/push orig-settings [k orig-v])
+            (put obj k (default-merger orig-v v)))))))
+
+  orig-settings)
+
+
 ################## Pointers ##################
 
 (def pointer-peg

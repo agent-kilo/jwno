@@ -527,7 +527,8 @@
     #
     # The default :ui-hint command shows all interactable UI elements
     #
-    (k "RAlt  RAlt" [:ui-hint hint-key-list]
+    (k "RAlt  RAlt"
+       [:ui-hint hint-key-list]
        "Show all interactable elements")
 
     #
@@ -539,51 +540,135 @@
     # want only Button (UIA_ButtonControlTypeId) and CheckBox (UIA_CheckBoxControlTypeId)
     # elements.
     #
-    (k "RAlt  B"    [:ui-hint hint-key-list [:or
-                                             [:property UIA_ControlTypePropertyId UIA_ButtonControlTypeId]
-                                             [:property UIA_ControlTypePropertyId UIA_CheckBoxControlTypeId]]]
+    (k "RAlt  B"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :condition [:or
+                     [:property UIA_ControlTypePropertyId UIA_ButtonControlTypeId]
+                     [:property UIA_ControlTypePropertyId UIA_CheckBoxControlTypeId]])]
        "Show all buttons")
 
     #
     # You can also choose what to do with the selected element. Here
     # we simply :click on it instead of invoking its default action.
     #
-    (k "RAlt  C"    [:ui-hint hint-key-list nil :click]
+    (k "RAlt  C"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :action :click)]
        "Show all interactable elements, and click on the selected one")
 
-    (k "RAlt  D"    [:ui-hint hint-key-list nil :double-click]
+    (k "RAlt  D"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :action :double-click)]
        "Show all interactable elements, and double-click on the selected one")
 
     #
     # More complex property-matching
     #
-    (k "RAlt  E"    [:ui-hint hint-key-list [:and
-                                             [:or
-                                              [:property UIA_ControlTypePropertyId UIA_EditControlTypeId]
-                                              [:property UIA_ControlTypePropertyId UIA_ComboBoxControlTypeId]]
-                                             [:property UIA_IsKeyboardFocusablePropertyId true]]]
+    (k "RAlt  E"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :condition [:and
+                     [:or
+                      [:property UIA_ControlTypePropertyId UIA_EditControlTypeId]
+                      [:property UIA_ControlTypePropertyId UIA_ComboBoxControlTypeId]]
+                     [:property UIA_IsKeyboardFocusablePropertyId true]])]
        "Show all editable fields")
 
-    (k "RAlt  F"    [:ui-hint hint-key-list [:property UIA_IsKeyboardFocusablePropertyId true] :focus]
+    (k "RAlt  F"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :condition [:property UIA_IsKeyboardFocusablePropertyId true]
+         :action :focus)]
        "Show all focusable elements, and set input focus to the selected one")
 
-    (k "RAlt  I"    [:ui-hint hint-key-list [:property UIA_ControlTypePropertyId UIA_ListItemControlTypeId]]
+    (k "RAlt  I"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :condition [:property UIA_ControlTypePropertyId UIA_ListItemControlTypeId])]
        "Show all list item elements")
 
-    (k "RAlt  L"    [:ui-hint hint-key-list [:property UIA_ControlTypePropertyId UIA_HyperlinkControlTypeId]]
+    (k "RAlt  L"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :condition [:property UIA_ControlTypePropertyId UIA_HyperlinkControlTypeId])]
        "Show all hyperlinks")
 
-    (k "RAlt  M"    [:ui-hint hint-key-list nil :middle-click]
+    (k "RAlt  M"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :action :middle-click)]
        "Show all interactable elements, and middle-click on the selected one")
 
-    (k "RAlt  Shift + M" [:ui-hint hint-key-list nil :move-cursor]
+    (k "RAlt  Shift + M"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :action :move-cursor)]
        "Show all interactable elements, and move cursor to the selected one")
 
-    (k "RAlt  R"    [:ui-hint hint-key-list nil :right-click]
+    (k "RAlt  R"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :action :right-click)]
        "Show all interactable elements, and right-click on the selected one")
 
-    (k "RAlt  T"    [:ui-hint hint-key-list [:property UIA_ControlTypePropertyId UIA_TreeItemControlTypeId]]
+    (k "RAlt  T"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/uia-hinter
+         :condition [:property UIA_ControlTypePropertyId UIA_TreeItemControlTypeId])]
        "Show all tree item elements")
+
+    #
+    # We can also display hints for other entities besides UI Automation
+    # elements. Here we use a differen hinter (ui-hint/frame-hinter) to
+    # show all (leaf) frames, and activate the selected one.
+    #
+    (k "RAlt  N"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/frame-hinter)]
+       "Show all frames")
+
+    #
+    # Different hinters allow different sets of customization options.
+    # For example, frame-hinter allows us to specify what we want to
+    # do with the selected frame. Here we choose to close it, along
+    # with all the windows inside. And we give the labels a bright orange
+    # color, to indicate this is a potentially dangerous operation.
+    #
+    (k "RAlt  Shift + N"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/frame-hinter
+         :action-fn (fn [fr]
+                      (def wm (:get-window-manager fr))
+                      (each w (in fr :children)
+                        (:close w))
+                      (:close fr)
+                      (:retile wm (in fr :parent)))
+         # The label color, 0xBBGGRR
+         :color 0x00a1ff)]
+       "Show all frames, and close the selected one")
+
+    (k "RAlt  G"
+       [:ui-hint
+        hint-key-list
+        (ui-hint/gradual-uia-hinter
+         :show-highlights true)]
+       "Gradually walk the UI tree")
 
     (k "RAlt  Esc"   :nop "Cancel")
     (k "RAlt  Enter" :nop "Cancel")
