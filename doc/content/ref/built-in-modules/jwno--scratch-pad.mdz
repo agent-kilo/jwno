@@ -7,8 +7,90 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/scratch-pad)
+```
+
+This module provides a scratch pad implementation. A scratch pad is
+like a hidden "cache" for windows. You can send your selected windows
+there, and show them on top of other windows later.
+
 
 ### Description
 
-TODO
+To enable it:
+
+@codeblock[janet]```
+(def scratch-pad (scratch-pad/scratch-pad jwno/context))
+#
+# The name of this scratch pad instance. Used to distinguish multiple
+# scratch pads. Should be a keyword. Defaults to :scratch-pad.
+#
+(put scratch-pad :name :scratch-pad)
+#
+# Should windows in the scratch pad appear on top of other windows?
+# Defaults to true.
+#
+(put scratch-pad :always-on-top true)
+#
+# When set to true, the scratch pad will automatically resize along with
+# the windows it contains. Otherwise, the windows will always be resized
+# to the size of the scratch pad. Defaults to true.
+#
+(put scratch-pad :auto-transform true)
+#
+# The initial size and position of the scratch pad. Defaults to
+# {:left 100 :top 100 :right 600 :bottom 600}.
+#
+(put scratch-pad :rect {:left 100 :top 100 :right 600 :bottom 600})
+(:enable scratch-pad)
+```
+
+There can be multiple scratch pad instances, and the @code{:name} option
+should be unique among all the instances. The commands an instance provides
+will contain its name, so we need to use the @code{:command-name} method to
+get the actual command for a specific instance. For example, to bind a key
+to call the @code{:show} command for the instance we just defined:
+
+@codeblock[janet]```
+(:define-key keymap
+             "Win + Enter"
+             (:command-name scratch-pad :show)
+             "Show the scratch pad")
+```
+
+Supported commands are:
+
+@tag[table]{
+  @tr{
+    @th{Name} @th{Description}
+  }
+  @tr{
+    @td{@code{:add-to}}
+    @td{Adds the active window to the scratch pad.}
+  }
+  @tr{
+    @td{@code{:hide}}
+    @td{Hides the scratch pad.}
+  }
+  @tr{
+    @td{@code{:remove-all-from}}
+    @td{Removes all the windows from the scratch pad.}
+  }
+  @tr{
+    @td{@code{:remove-from}}
+    @td{Remove the first window from the scratch pad.}
+  }
+  @tr{
+    @td{@code{(:show &opt dir)}}
+    @td{If the scratch pad is not visible, shows it. Otherwise, switches to the next window in the scratch pad. @code{dir} can be @code{:next} or @code{:prev}, when specified, immediately switches to the window in that direction.}
+  }
+  @tr{
+    @td{@code{(:summon-to match-fn &opt timeout & cli)}}
+    @td{Searches for a window in the scratch pad, using @code{match-fn}, which should have a signature like @code{(match-fn hwnd uia-win exe-path)}, and should return @code{true} for matching windows. If a window is found, it will be shown. Otherwise, when @code{cli} is specified, tries to launch the program. @code{timeout} specifies the time to wait for the window to appear after executing @code{cli}, and defaults to @code{nil} \(wait indefinitely).}
+  }
+  @tr{
+    @td{@code{:toggle}}
+    @td{Toggles the visibility of the scratch pad.}
+  }
+}

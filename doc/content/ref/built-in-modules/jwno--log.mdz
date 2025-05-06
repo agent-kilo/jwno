@@ -7,8 +7,32 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/log)
+```
+
+This module provides logging mechanism.
+
 
 ### Description
 
-TODO
+After importing this module, you can generate logs by calling
+@code{(log/<level> ...)}. For example:
+
+@codeblock[janet]```
+(log/debug   "format string" arg0 arg1 ...)  # debug log
+(log/warning "format string" arg0 arg1 ...)  # warning log
+...
+```
+
+The format strings work in the same way as Janet's built-in
+@code{string/format} function. See @link[https://janet-lang.org/api/string.html#string/format]{Janet's docs}
+for details.
+
+Jwno supports these log levels: @code{debug}, @code{info},
+@code{warning}, @code{error} and @code{quiet}. It starts with
+the log level set to @code{quiet} by default.
+
+To see the logs, specify the @code{--log-level} command line
+option when launching Jwno. Logs can also be written to a file.
+See @link[../command-line-options.html]{Command Line Options}.

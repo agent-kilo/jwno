@@ -7,8 +7,63 @@
 
 ### Synopsis
 
-TODO
+@codeblock[janet]```
+(import jwno/layout-history)
+```
+
+This module stores your layout history for each virtual desktop, either in memory or in a backing file, and restores them when needed.
+
 
 ### Description
 
-TODO
+To enable layout history:
+
+@codeblock[janet]```
+(def layout-history (layout-history/layout-history jwno/context))
+#
+# Size limit for the history stack, defaults to 1024 entries
+#
+(put layout-history :limit 1024)
+#
+# Where to save the history entries. If it's a relative path, a file
+# relative to the user config file would be used. If it's an absolute
+# path, a file at the absolute path would be used. If it's nil or not
+# set (the default), the history will only be saved in memory.
+#
+(put layout-history :backing-file "layout-history.jdn")
+#
+# Engage manual mode or not. In normal (automatic) mode, all layout
+# changes will be saved automatically. In manual mode, the current
+# layout can be saved by calling the :push-layout-history command.
+# Defaults to normal (automatic) mode.
+#
+(:set-manual layout-history false)
+#
+# The first "true" argument specifies whether to add layout history
+# commands to the command manager. Defaults to true.
+#
+# The second "true" argument specifies whether to restore the latest
+# layouts in the same user session, when enabling layout history. If
+# you set this argument to true in your config file, and use a backing
+# file, layout-history can restore the last saved layouts when you
+# restart Jwno. This argument defaults to false.
+#
+(:enable layout-history true true)
+```
+
+Then, these new commands will be available:
+
+@tag[table]{
+  @tr{
+    @th{Command} @th{Description}
+  }
+  @tr{
+    @td{@code{:push-layout-history}} @td{Saves the current layout to the history stack. History entries after the current entry will be cleared.}
+  }
+  @tr{
+    @td{@code{:redo-layout-history}} @td{Restores the next layout in the history stack.}
+  }
+  @tr{
+    @td{@code{:undo-layout-history}} @td{Restores the previous layout in the history stack.}
+  }
+}
