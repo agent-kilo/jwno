@@ -29,6 +29,7 @@
 (import jwno/indicator)
 (import jwno/ui-hint)
 (import jwno/scratch-pad)
+(import jwno/layout-history)
 (import jwno/util)
 (import jwno/log)
 
@@ -177,6 +178,20 @@
 #
 (def scratch-pad (scratch-pad/scratch-pad jwno/context))
 (:enable scratch-pad)
+
+#
+# The layout-history module provides support for saving and restoring
+# layout history. See the Layout History Keys section in Key Bindings
+# below.
+#
+(def layout-history (layout-history/layout-history jwno/context))
+#
+# If you want Jwno to remember layouts across restarts, uncomment the
+# following line to use a backing file. The backing file will be saved
+# alongside this config file by default.
+#
+#(put layout-history :backing-file "layout-history.jdn")
+(:enable layout-history true true)
 
 
 #==========================#
@@ -672,6 +687,16 @@
 
     (k "RAlt  Esc"   :nop "Cancel")
     (k "RAlt  Enter" :nop "Cancel")
+
+    #-----------------------#
+    #  Layout History Keys  #
+    #-----------------------#
+
+    (k "Win + Z  U" :undo-layout-history)
+    (k "Win + Z  R" :redo-layout-history)
+    (k "Win + Z  P" :push-layout-history)
+    (k "Win + Z  Esc"   :nop "Cancel")
+    (k "Win + Z  Enter" :nop "Cancel")
 
     keymap))
 
