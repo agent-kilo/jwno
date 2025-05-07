@@ -778,7 +778,40 @@
   (assert (= 61 (get-in dummy-sub-frame2 [:rect :top])))
   (assert (= 28 (get-in dummy-sub-frame2 [:rect :left])))
   (assert (= 100 (get-in dummy-sub-frame2 [:rect :bottom])))
-  (assert (= 94 (get-in dummy-sub-frame2 [:rect :right]))))
+  (assert (= 94 (get-in dummy-sub-frame2 [:rect :right])))
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+         [rect1
+          nil
+          :dummy-hwnd1]
+         [rect2
+          nil
+          :dummy-hwnd2]]
+        dummy-monitor))
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+
+  (put (in dummy-frame :tags) :padding 9)
+  # Re-calculate children geometries after updating :padding
+  (:transform dummy-frame (in dummy-frame :rect))
+
+  (assert (= 19  (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 19  (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 101 (get-in dummy-sub-frame1 [:rect :bottom])))
+  (assert (= 60  (get-in dummy-sub-frame1 [:rect :right])))
+
+  (assert (= 19  (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 60  (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 101 (get-in dummy-sub-frame2 [:rect :bottom])))
+  (assert (= 101 (get-in dummy-sub-frame2 [:rect :right]))))
 
 
 (defn test-frame-balance []

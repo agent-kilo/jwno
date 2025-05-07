@@ -1764,9 +1764,7 @@
 
 
 (defn frame-transform [self new-rect &opt to-dpi resized-frames]
-  (def old-rect (in self :rect))
   (def old-padded-rect (:get-padded-rect self))
-
   (def new-padded-rect
     (if to-dpi
       (let [[new-dpi-x new-dpi-y] (if (number? to-dpi)
@@ -1797,15 +1795,17 @@
       (array/push resized-frames self))
 
     (= :frame (get-in all-children [0 :type]))
-    (let [dx (- (in new-padded-rect :left) (in old-padded-rect :left))
-          dy (- (in new-padded-rect :top) (in old-padded-rect :top))
+    (let [children-rect (union-rect ;(map |(in $ :rect) all-children))
+          dx (- (in new-padded-rect :left) (in children-rect :left))
+          dy (- (in new-padded-rect :top) (in children-rect :top))
           dw (+ (- dx)
                 (- (in new-padded-rect :right)
-                   (in old-padded-rect :right)))
+                   (in children-rect :right)))
           dh (+ (- dy)
                 (- (in new-padded-rect :bottom)
-                   (in old-padded-rect :bottom)))
-          [old-padded-width old-padded-height] (rect-size old-padded-rect)]
+                   (in children-rect :bottom)))
+          [old-padded-width old-padded-height] (rect-size children-rect)]
+      (log/debug "children-rect = %n, old-padded-rect = %n" children-rect old-padded-rect)
       (def calc-fn
         (cond
           (= horizontal-frame-proto (table/getproto self))
