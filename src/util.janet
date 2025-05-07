@@ -196,6 +196,37 @@
    :bottom (if (< bottom top) top bottom)
    :right (if (< right left) left right)})
 
+(defn union-rect [& rect-list]
+  (var ret-left   math/int-max)
+  (var ret-top    math/int-max)
+  (var ret-right  math/int-min)
+  (var ret-bottom math/int-min)
+
+  (defn check-rect [r]
+    (def {:left   left
+          :top    top
+          :right  right
+          :bottom bottom}
+      r)
+    (when (< left ret-left)
+      (set ret-left left))
+    (when (< top ret-top)
+      (set ret-top top))
+    (when (> right ret-right)
+      (set ret-right right))
+    (when (> bottom ret-bottom)
+      (set ret-bottom bottom)))
+
+  (each r rect-list
+    (check-rect r))
+
+  (when (and (<= ret-left ret-right)
+             (<= ret-top ret-bottom))
+    {:left ret-left
+     :top  ret-top
+     :right  ret-right
+     :bottom ret-bottom}))
+
 (defn combine-rect-border-space [& args]
   (def last-arg (last args))
   (def filter-fn

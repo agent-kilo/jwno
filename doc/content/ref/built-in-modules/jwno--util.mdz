@@ -106,6 +106,10 @@ This module contains pre-defined utility code.
     @td{.}
   }
   @tr{
+    @td{@code{(util/union-rect & rect-list)}}
+    @td{.}
+  }
+  @tr{
     @td{@code{(util/combine-rect-border-space & args)}}
     @td{.}
   }
