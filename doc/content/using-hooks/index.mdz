@@ -34,6 +34,6 @@ Hooks are certain points in Jwno's code paths, where you can inject your own cod
     @link[../ref/hook-manager-object.html]{The Hook Manager Object}
   }
   @li{
-    @link[../ref/built-in-hooks.html]{Built-In Hooks}
+    @link[../ref/built-in-hooks/index.html]{Built-In Hooks}
   }
 }
