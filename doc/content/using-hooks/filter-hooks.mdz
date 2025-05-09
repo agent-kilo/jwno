@@ -29,3 +29,27 @@ To define and call a custom @em{or} filter hook:
   (:call-filter-hook (in self :hook-manager) :or :filter-forbidden-planet
                      galaxy system planet))
 ```
+
+It's recommended to properly name the functions registered to filter hooks. For example, do this:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :filter-window
+   (fn my-filter-for-specific-windows [win uia exe desktop]  # Notice the wordy function name
+     ...))
+```
+
+Instead of this:
+
+@codeblock[janet]```
+(:add-hook (in jwno/context :hook-manager) :filter-window
+   (fn [win uia exe desktop]  # There's no function name
+     ...))
+```
+
+Then Jwno can tell you exactly what checks failed in the logs:
+
+@codeblock[text]```
+2025-05-09 10:36:20 [debug] #### calling filter hook in :and mode: :filter-window
+2025-05-09 10:36:20 [debug] result of <function default-window-filter>: true
+2025-05-09 10:36:20 [debug] result of <function my-filter-for-specific-windows>: false
+```

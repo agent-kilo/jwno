@@ -723,8 +723,12 @@
 #
 #     https://learn.microsoft.com/en-us/windows/win32/api/uiautomationclient/nn-uiautomationclient-iuiautomationelement
 #
+# It's recommended to give a name to the function registered to a filter
+# hook, so that we can see in the logs exactly what checks failed when
+# debugging.
+#
 (:add-hook hook-man :filter-forced-window
-   (fn [_hwnd uia-win _exe-path _desktop-info]
+   (fn user-forced-window-filter [_hwnd uia-win _exe-path _desktop-info]
      (or
        (= "Ubisoft Connect" (:get_CachedName uia-win))
        # Add your own rules here
@@ -734,7 +738,7 @@
 # hook to ignore them.
 #
 (:add-hook hook-man :filter-window
-   (fn [_hwnd uia-win exe-path desktop-info]
+   (fn user-window-filter [_hwnd uia-win exe-path desktop-info]
      (def desktop-name (in desktop-info :name))
 
      # Excluded windows

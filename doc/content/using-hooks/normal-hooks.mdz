@@ -4,7 +4,7 @@
  :order 2}
 ---
 
-Most built-in hooks in Jwno are normal hooks. They are used solely for their side effects, and their return values are ignored. The @code{:window-created} hook we saw above is a normal hook.
+Most built-in hooks in Jwno are normal hooks. They are used solely for their side effects, and their return values are ignored. The @code{:window-created} hook we saw in the previous section is a normal hook.
 
 You can define and call a custom normal hook like this:
 
