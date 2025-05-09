@@ -409,7 +409,7 @@
   (set hook-fn
        # Use :filter-forced-window because it has higher priority
        (:add-hook hook-man :filter-forced-window
-          (fn [hwnd uia-win exe-path &]
+          (fn scratch-pad-window-waiter [hwnd uia-win exe-path &]
             (def time (os/clock :monotonic))
             (when (> time deadline)
               (:show-tooltip ui-man :scratch-pad "Scratch Pad: Timed out waiting for new window.")
@@ -559,7 +559,7 @@
 
   (put self :default-filter-hook-fn
      (:add-hook hook-man :filter-scratch-pad-window
-        (fn [& args]
+        (fn scratch-pad-default-window-filter [& args]
           (:do-default-filter self ;args))))
 
   (when add-commands

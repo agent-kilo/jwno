@@ -647,7 +647,7 @@
       (:show-tooltip ui-man :toggle-window-management "Window management enabled."))
     # else
     (do
-      (set wm-pause-hook-fn (:add-hook hook-man :filter-window (fn [&] false)))
+      (set wm-pause-hook-fn (:add-hook hook-man :filter-window (fn wm-pause-window-filter [&] false)))
       (:show-tooltip ui-man :toggle-window-management "Window management disabled."))))
 
 

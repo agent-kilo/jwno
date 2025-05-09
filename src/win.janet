@@ -3329,7 +3329,7 @@
   (put wm-obj :root (virtual-desktop-container wm-obj))
 
   (:add-hook hook-man :filter-window
-     (fn [hwnd uia-win exe-path desktop-info]
+     (fn default-window-filter [hwnd uia-win exe-path desktop-info]
        (match (:filter-hwnd wm-obj hwnd uia-win exe-path desktop-info)
          [false reason]
          (do
