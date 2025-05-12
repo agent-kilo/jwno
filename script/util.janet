@@ -8,6 +8,8 @@
       (error (string/format "failed to create directory %s" name)))))
 
 (defn spawn-and-wait [& args]
+  (when (dyn :verbose)
+    (printf "Running command: %n" args))
   (def os-env (os/environ))
   (put os-env :out :pipe)
   (def proc (os/spawn args :ep os-env))
