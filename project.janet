@@ -9,6 +9,24 @@
 (import ./script/vcs)
 
 
+(def DEBUG-CFLAGS
+  (if (= "debug" (dyn :build-type))
+    ["/Zi" (string "/Fd" (find-build-dir))]
+    []))
+
+# Only used in manually specified compiler commands. In commands generated
+# by JPM, these flags are derived from (dyn :build-type)
+(def OPTIMIZE-CFLAGS
+  (if (= "debug" (dyn :build-type))
+    ["/Od"]
+    ["/O2"]))
+
+(def DEBUG-LDFLAGS
+  (if (= "debug" (dyn :build-type))
+    ["/DEBUG"]
+    []))
+
+
 (defn generate-resource-header [env out-file-name]
   (with [out-file (file/open out-file-name :wn)]
     (eachp [k v] env
@@ -46,7 +64,7 @@
 
 
 (gen-rule (generated "winmain_stub.o") ["c/winmain_stub.c"]
-  (util/spawn-and-wait "cl.exe" "/c" "/nologo" "/MD" "/O2" (string "/Fo" _target) "c/winmain_stub.c"))
+  (util/spawn-and-wait "cl.exe" "/c" ;(dyn :cflags) ;OPTIMIZE-CFLAGS ;DEBUG-CFLAGS (string "/Fo" _target) "c/winmain_stub.c"))
 
 
 (task "embed-manifest" [(generated "jwno.exe")]
@@ -91,6 +109,8 @@
         (generated "resource.obj")
         (generated "winmain_stub.o")]
 
+ :cflags [;(dyn :cflags) ;DEBUG-CFLAGS]
+
  # Cannot embed the manifest directly when linking, or there'll be this warning
  #   warning LNK4078: multiple '.rsrc' sections found with different attributes
  # And the built binary would fail to launch. We put the manifest in with mt.exe
@@ -100,4 +120,4 @@
  #         "/manifest:embed"
  #         "/manifestinput:manifest/jwno.manifest"]
 
- :ldflags [(generated "winmain_stub.o") (generated "resource.obj") "/subsystem:windows"])
+ :ldflags [(generated "winmain_stub.o") (generated "resource.obj") "/subsystem:windows" ;DEBUG-LDFLAGS])
