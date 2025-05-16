@@ -275,7 +275,7 @@
       (ev/with-deadline timeout
         # For threaded supervisor, it's [signal return-value task-id]
         # For non-threaded supervisor, it's [signal fiber task-id]
-        # (See make_superviso function in ev.c)
+        # (See make_supervisor_event function in ev.c)
         (def [sig val task-id] (ev/take sup))
         (when-let [hwnd task-id]
           (put bouncers hwnd nil))
@@ -341,8 +341,30 @@
 (defn on-vd-changed [_name _lo]
   (unless (check-started)
     (break))
-  (ev/spawn
-   (check-for-new-windows)))
+
+  (def {:bouncers bouncers
+        :paused paused
+        :context context}
+    state)
+  (def {:window-manager window-man} context)
+  (def {:vdm-com vdm-com} window-man)
+
+  (def to-pause @[])
+  (def to-unpause @[])
+  (eachp [hwnd chan] bouncers
+    (if (= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+      (array/push to-pause chan)
+      # else
+      (array/push to-unpause chan)))
+
+  (each chan to-pause
+    (ev/give chan :pause))
+
+  (check-for-new-windows)
+
+  (unless paused
+    (each chan to-unpause
+      (ev/give chan :unpause))))
 
 
 (defn on-filter-window [hwnd &]
