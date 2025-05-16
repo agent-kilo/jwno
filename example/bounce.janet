@@ -355,18 +355,18 @@
   (def to-unpause @[])
   (eachp [hwnd chan] bouncers
     (if (= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
-      (array/push to-pause chan)
+      (array/push to-pause [hwnd chan])
       # else
-      (array/push to-unpause chan)))
+      (array/push to-unpause [hwnd chan])))
 
-  (each chan to-pause
-    (ev/give chan :pause))
+  (each [hwnd chan] to-pause
+    (try-to-give hwnd chan :pause))
 
   (check-for-new-windows)
 
   (unless paused
-    (each chan to-unpause
-      (ev/give chan :unpause))))
+    (each [hwnd chan] to-unpause
+      (try-to-give hwnd chan :unpause))))
 
 
 (defn on-filter-window [hwnd &]
@@ -468,7 +468,13 @@
   (if (in state :paused)
     (broadcast-impl (in state :bouncers) :pause)
     # else
-    (broadcast-impl (in state :bouncers) :unpause)))
+    (do
+      (def {:context context} state)
+      (def {:window-manager window-man} context)
+      (def {:vdm-com vdm-com} window-man)
+      (eachp [hwnd chan] (in state :bouncers)
+        (when (not= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+          (try-to-give hwnd chan :unpause))))))
 
 
 (defn poke []
