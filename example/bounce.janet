@@ -121,6 +121,15 @@
                 hwnd err))))
 
 
+(defn take-with-deadline [chan timeout]
+  (try
+    (ev/with-deadline timeout (ev/take chan))
+    ((err fib)
+     (if (= err "deadline expired")
+       nil
+       (propagate err fib)))))
+
+
 (defn broadcast-impl [bouncers msg]
   (eachp [hwnd chan] bouncers
     (try-to-give hwnd chan msg)))
@@ -148,13 +157,8 @@
     # body
     (while (and (not= FALSE (IsWindow hwnd))
                 (not= FALSE (IsWindowVisible hwnd)))
-      (def msg
-        (try
-          (ev/with-deadline INTERVAL (ev/take chan))
-          ((err fib)
-           (if (= err "deadline expired")
-             nil
-             (propagate err fib)))))
+      (def msg (take-with-deadline chan INTERVAL))
+
       (match msg
         nil
         :nop
@@ -270,24 +274,15 @@
 
 
 (defn wait-for-bouncers [bouncers sup timeout]
-  (var stop? false)
-  (while (and (not stop?)
-              (not (empty? bouncers)))
-    (try
-      (ev/with-deadline timeout
-        # For threaded supervisor, it's [signal return-value task-id]
-        # For non-threaded supervisor, it's [signal fiber task-id]
-        # (See make_supervisor_event function in ev.c)
-        (def [sig val task-id] (ev/take sup))
-        (when-let [hwnd task-id]
-          (put bouncers hwnd nil))
-        (unless (= :ok sig)
-          (log/debug "bounce: bouncer %n exited abnormally, sig = %n, val = %n"
-                     task-id sig (if (fiber? val) (fiber/last-value val) val))))
-      ((err fib)
-       (if (= err "deadline expired")
-         (set stop? true)
-         (propagate err fib))))))
+  (var event nil)
+  (while (and (not (empty? bouncers))
+              (not (nil? (set event (take-with-deadline sup timeout)))))
+    (def [sig val task-id] event)
+    (when-let [hwnd task-id]
+      (put bouncers hwnd nil))
+    (unless (= :ok sig)
+      (log/debug "bounce: bouncer %n exited abnormally, sig = %n, val = %n"
+                 task-id sig (if (fiber? val) (fiber/last-value val) val)))))
 
 
 (defn hwnd-to-bouncy-obj [hwnd v]
