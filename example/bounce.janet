@@ -127,6 +127,9 @@
 (defn bouncer [args]
   (def [obj chan] args)
   (def [hwnd v bound] obj)
+
+  (setdyn :task-id hwnd)
+
   (def gx (in G 0))
   (def gy (in G 1))
   (def min-vx (/ (* INTERVAL gx) 2))
@@ -238,13 +241,29 @@
                              SWP_NOREDRAW)))))))
 
 
-(defn spawn-bouncer [obj sup &opt paused]
+(defn spawn-bouncer [obj sup &opt paused spawn-mode]
   (default paused false)
+  (default spawn-mode :thread)
 
-  (def chan (ev/thread-chan))
-  (ev/thread bouncer [obj chan] :nt sup)
+  # It would be better if there's a is-threaded? function
+  # for channel objects....
+  (def chan
+    (case spawn-mode
+      :thread
+      (let [c (ev/thread-chan)]
+        (ev/thread bouncer [obj c] :n sup)
+        c)
+
+      :fiber
+      (let [c (ev/chan)]
+        (ev/go bouncer [obj c] sup)
+        c)
+
+      (errorf "unknown spawn mode: %n" spawn-mode)))
+
   (when paused
     (ev/give chan :pause))
+
   chan)
 
 
@@ -254,14 +273,15 @@
               (not (empty? bouncers)))
     (try
       (ev/with-deadline timeout
-        (def [sig payload args] (ev/take sup))
-        (when args
-          (def [obj chan] args)
-          (def [hwnd _ _] obj)
-          (put bouncers hwnd nil)
-          (unless (= :ok sig)
-            (log/debug "bounce: bouncer for hwnd %n exited abnormally, sig = %n, payload = %n"
-                       hwnd sig payload))))
+        # For threaded supervisor, it's [signal return-value task-id]
+        # For non-threaded supervisor, it's [signal fiber task-id]
+        # (See make_superviso function in ev.c)
+        (def [sig val task-id] (ev/take sup))
+        (when-let [hwnd task-id]
+          (put bouncers hwnd nil))
+        (unless (= :ok sig)
+          (log/debug "bounce: bouncer %n exited abnormally, sig = %n, val = %n"
+                     task-id sig (if (fiber? val) (fiber/last-value val) val))))
       ((err fib)
        (if (= err "deadline expired")
          (set stop? true)
