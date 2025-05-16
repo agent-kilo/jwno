@@ -305,6 +305,7 @@
     (break))
 
   (def {:sup sup
+        :spawn-mode spawn-mode
         :bouncers bouncers
         :paused  paused
         :context context}
@@ -334,7 +335,7 @@
      ))
 
   (each obj obj-list
-    (put bouncers (first obj) (spawn-bouncer obj sup paused))))
+    (put bouncers (first obj) (spawn-bouncer obj sup paused spawn-mode))))
 
 
 (defn on-vd-changed [_name _lo]
@@ -352,6 +353,7 @@
     (break ret))
 
   (def {:sup sup
+        :spawn-mode spawn-mode
         :bouncers bouncers
         :paused paused}
     state)
@@ -362,7 +364,7 @@
 
   (when-let [rand-v [(rand-range INIT-VX-RANGE) (rand-range INIT-VY-RANGE)]
              obj    (hwnd-to-bouncy-obj hwnd rand-v)]
-    (put bouncers hwnd (spawn-bouncer obj sup paused)))
+    (put bouncers hwnd (spawn-bouncer obj sup paused spawn-mode)))
 
   ret)
 
@@ -371,13 +373,21 @@
 (var on-shutting-down nil)
 
 
-(defn start [context]
+(defn start [context &opt spawn-mode]
+  (default spawn-mode :thread)
+
   (when (check-started)
     (break state))
 
   (def {:hook-manager hook-man} context)
 
-  (put state :sup (ev/thread-chan 1024))
+  (def sup
+    (case spawn-mode
+      :thread (ev/thread-chan 1024)
+      :fiber  (ev/chan 1024)
+      (errorf "unknown spawn mode: %n" spawn-mode)))
+  (put state :sup sup)
+  (put state :spawn-mode spawn-mode)
   (put state :bouncers @{})
   (put state :paused false)
   (put state :context context)
