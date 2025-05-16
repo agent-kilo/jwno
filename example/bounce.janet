@@ -61,12 +61,16 @@
   "Time to wait before next update"
   0.008)
 
+(def STOP-TIMEOUT
+  "How long should we wait for threads/fibers when cleaning up"
+  1) # In seconds
+
 
 (def state
-  @{:sup     nil
-    :threads nil
-    :paused  nil
-    :context nil})
+  @{:sup      nil
+    :bouncers nil
+    :paused   nil
+    :context  nil})
 
 
 (defn rand-range [range]
@@ -113,8 +117,8 @@
                 hwnd err))))
 
 
-(defn broadcast-impl [threads msg]
-  (eachp [hwnd chan] threads
+(defn broadcast-impl [bouncers msg]
+  (eachp [hwnd chan] bouncers
     (try-to-give hwnd chan msg)))
 
 
@@ -213,19 +217,19 @@
   chan)
 
 
-(defn wait-for-threads [threads sup timeout]
+(defn wait-for-bouncers [bouncers sup timeout]
   (var stop? false)
   (while (and (not stop?)
-              (not (empty? threads)))
+              (not (empty? bouncers)))
     (try
       (ev/with-deadline timeout
         (def [sig payload args] (ev/take sup))
         (when args
           (def [obj chan] args)
           (def [hwnd _ _] obj)
-          (put threads hwnd nil)
+          (put bouncers hwnd nil)
           (unless (= :ok sig)
-            (log/debug "bounce: thread for hwnd %n exited abnormally, sig = %n, payload = %n"
+            (log/debug "bounce: bouncer for hwnd %n exited abnormally, sig = %n, payload = %n"
                        hwnd sig payload))))
       ((err fib)
        (if (= err "deadline expired")
@@ -250,7 +254,7 @@
     (break))
 
   (def {:sup sup
-        :threads threads
+        :bouncers bouncers
         :paused  paused
         :context context}
     state)
@@ -261,7 +265,7 @@
   (EnumChildWindows
    nil
    (fn [hwnd]
-     (unless (has-key? threads hwnd)
+     (unless (has-key? bouncers hwnd)
        (def filter-result
          (try
            (:filter-hwnd window-man hwnd)
@@ -279,7 +283,7 @@
      ))
 
   (each obj obj-list
-    (put threads (first obj) (spawn-bouncer obj sup paused))))
+    (put bouncers (first obj) (spawn-bouncer obj sup paused))))
 
 
 (defn on-vd-changed [_name _lo]
@@ -297,17 +301,17 @@
     (break ret))
 
   (def {:sup sup
-        :threads threads
+        :bouncers bouncers
         :paused paused}
     state)
 
-  (when (has-key? threads hwnd)
+  (when (has-key? bouncers hwnd)
     # Early return
     (break ret))
 
   (when-let [rand-v [(rand-range INIT-VX-RANGE) (rand-range INIT-VY-RANGE)]
              obj    (hwnd-to-bouncy-obj hwnd rand-v)]
-    (put threads hwnd (spawn-bouncer obj sup paused)))
+    (put bouncers hwnd (spawn-bouncer obj sup paused)))
 
   ret)
 
@@ -323,7 +327,7 @@
   (def {:hook-manager hook-man} context)
 
   (put state :sup (ev/thread-chan 1024))
-  (put state :threads @{})
+  (put state :bouncers @{})
   (put state :paused false)
   (put state :context context)
 
@@ -352,17 +356,14 @@
   (:remove-hook hook-man :shutting-down on-shutting-down)
 
   (def sup (in state :sup))
-  (def threads (in state :threads))
+  (def bouncers (in state :bouncers))
 
-  (put state :sup nil)
-  (put state :threads nil)
-  (put state :paused nil)
-  (put state :context nil)
+  (table/clear state)
 
-  (broadcast-impl threads :stop)
-  (wait-for-threads threads sup 1)
-  
-  threads)
+  (broadcast-impl bouncers :stop)
+  (wait-for-bouncers bouncers sup STOP-TIMEOUT)
+
+  bouncers)
 
 
 (varfn on-shutting-down []
@@ -372,7 +373,7 @@
 (defn broadcast [msg]
   (unless (check-started)
     (break))
-  (broadcast-impl (in state :threads) msg))
+  (broadcast-impl (in state :bouncers) msg))
 
 
 (defn toggle-pause []
@@ -380,9 +381,9 @@
     (break))
   (put state :paused (not (in state :paused)))
   (if (in state :paused)
-    (broadcast-impl (in state :threads) :pause)
+    (broadcast-impl (in state :bouncers) :pause)
     # else
-    (broadcast-impl (in state :threads) :unpause)))
+    (broadcast-impl (in state :bouncers) :unpause)))
 
 
 (defn poke []
