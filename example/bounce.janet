@@ -41,27 +41,29 @@
     :standalone
     :imported))
 
-
-(def G
+#
+# These parameters should be set BEFORE calling (start ...)
+#
+(var G
   "Gravity"
   [0 1000])
-(def ATTENUATION
+(var ATTENUATION
   "How bouncy are the screen edges"
   (- 1 0.1))
-(def FRICTION
+(var FRICTION
   "How much of the velocity should remain after each bounce"
   (- 1 0.1))
-(def INIT-VX-RANGE
+(var INIT-VX-RANGE
   "Range of initial horizontal velocity"
   [-400 400])
-(def INIT-VY-RANGE
+(var INIT-VY-RANGE
   "Range of initial vertical velocity"
   [-600 -300])
-(def INTERVAL
+(var INTERVAL
   "Time to wait before next update"
   0.008)
 
-(def STOP-TIMEOUT
+(var STOP-TIMEOUT
   "How long should we wait for threads/fibers when cleaning up"
   1) # In seconds
 
@@ -81,20 +83,20 @@
 (defn check-collision [rect bound-rect vx vy]
   (def x-col
     (cond
-      (and (> 0 vx)
+      (and (>= 0 vx)
            (<= (in rect :left) (in bound-rect :left)))
       :left
 
-      (and (< 0 vx)
+      (and (<= 0 vx)
            (>= (in rect :right) (in bound-rect :right)))
       :right))
   (def y-col
     (cond
-      (and (> 0 vy)
+      (and (>= 0 vy)
            (<= (in rect :top) (in bound-rect :top)))
       :top
 
-      (and (< 0 vy)
+      (and (<= 0 vy)
            (>= (in rect :bottom) (in bound-rect :bottom)))
       :bottom))
   [x-col y-col])
@@ -125,6 +127,10 @@
 (defn bouncer [args]
   (def [obj chan] args)
   (def [hwnd v bound] obj)
+  (def gx (in G 0))
+  (def gy (in G 1))
+  (def min-vx (/ (* INTERVAL gx) 2))
+  (def min-vy (/ (* INTERVAL gy) 2))
   (var [vx vy] v)
   (var t (os/clock :monotonic))
   (var paused false)
@@ -192,19 +198,44 @@
         (def dt (- now t))
         (set t now)
 
-        (+= vx (* dt (in G 0)))
-        (+= vy (* dt (in G 1)))
+        (+= vx (* dt gx))
+        (cond
+          (and (= x-col :left)
+               (> 0 vx))
+          (set vx 0)
 
-        (def new-coords (calc-movement rect (* vx dt) (* vy dt)))
-        (SetWindowPos hwnd
-                      nil
-                      ;new-coords
-                      0 0
-                      (bor SWP_NOZORDER
-                           SWP_NOACTIVATE
-                           SWP_NOSIZE
-                           SWP_ASYNCWINDOWPOS
-                           SWP_NOREDRAW))))))
+          (and (= x-col :right)
+               (< 0 vx))
+          (set vx 0)
+
+          (> min-vx (math/abs vx))
+          (set vx 0))
+
+        (+= vy (* dt gy))
+        (cond
+          (and (= y-col :top)
+               (> 0 vy))
+          (set vy 0)
+
+          (and (= y-col :bottom)
+               (< 0 vy))
+          (set vy 0)
+
+          (> min-vy (math/abs vy))
+          (set vy 0))
+
+        (when (or (not= 0 vx)
+                  (not= 0 vy))
+          (def new-coords (calc-movement rect (* vx dt) (* vy dt)))
+          (SetWindowPos hwnd
+                        nil
+                        ;new-coords
+                        0 0
+                        (bor SWP_NOZORDER
+                             SWP_NOACTIVATE
+                             SWP_NOSIZE
+                             SWP_ASYNCWINDOWPOS
+                             SWP_NOREDRAW)))))))
 
 
 (defn spawn-bouncer [obj sup &opt paused]
