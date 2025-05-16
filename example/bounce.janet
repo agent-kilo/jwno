@@ -18,6 +18,8 @@
 #        (import bounce)
 #        # To start bouncing:
 #        (bounce/start jwno/context)
+#        # To start bouncing with FIBERS:
+#        (bounce/start jwno/context :fiber)
 #        # To poke at it:
 #        (bounce/poke)
 #        # To pause it:
@@ -490,4 +492,4 @@
 
   (:set-keymap key-man keymap)
 
-  (start jwno/context))
+  (start jwno/context :fiber))
