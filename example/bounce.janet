@@ -44,7 +44,7 @@
 
 (def G
   "Gravity"
-  [0 30])
+  [0 1000])
 (def ATTENUATION
   "How bouncy are the screen edges"
   (- 1 0.1))
@@ -183,12 +183,13 @@
         (when y-col
           (set vy (- (* vy ATTENUATION)))
           (set vx (* vx FRICTION)))
-        (+= vx (in G 0))
-        (+= vy (in G 1))
 
         (def now (os/clock :monotonic))
         (def dt (- now t))
         (set t now)
+
+        (+= vx (* dt (in G 0)))
+        (+= vy (* dt (in G 1)))
 
         (def new-coords (calc-movement rect (* vx dt) (* vy dt)))
         (SetWindowPos hwnd
@@ -214,7 +215,8 @@
 
 (defn wait-for-threads [threads sup timeout]
   (var stop? false)
-  (while (not stop?)
+  (while (and (not stop?)
+              (not (empty? threads)))
     (try
       (ev/with-deadline timeout
         (def [sig payload args] (ev/take sup))
