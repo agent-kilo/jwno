@@ -1328,8 +1328,23 @@
     :line-width true})
 
 
+(def UI-HINT-KEYS-PEG
+  (peg/compile ~(at-least 2 (choice (range "az") (range "AZ") (range "09")))))
+
 (defn normalize-key-list [key-list]
-  (string/ascii-upper key-list))
+  (unless (or (string? key-list)
+              (buffer? key-list)
+              (symbol? key-list)
+              (keyword? key-list))
+    (errorf "invalid key list: %n" key-list))
+
+  (def unique-keys @"")
+  (each k key-list
+    (unless (find |(= $ k) unique-keys)
+      (buffer/push-byte unique-keys k)))
+  (unless (peg/match UI-HINT-KEYS-PEG unique-keys)
+    (errorf "invalid key list: %n" key-list))
+  (string/ascii-upper unique-keys))
 
 
 (defn calc-label-len [elem-count key-count]
@@ -1564,6 +1579,8 @@
     (log/debug "aborting nested :ui-hint command")
     (break))
 
+  (def normalized-keys (normalize-key-list raw-key-list))
+
   (def {:context context
         :show-msg show-msg}
     self)
@@ -1603,7 +1620,7 @@
     (break))
 
   (put self :hinter hinter)
-  (put self :key-list (normalize-key-list raw-key-list))
+  (put self :key-list normalized-keys)
   (put self :labeled-elems (generate-labels elem-list (in self :key-list)))
   (put self :current-keys @"")
   (put self :orig-settings (merge-settings self override-settings ui-hint-settings))
