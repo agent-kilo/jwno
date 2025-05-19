@@ -59,10 +59,10 @@
             grid-rects))
   (def [label-scale line-width]
     (cond
-      (< 400 min-rect-height) [4 4]
-      (< 100 min-rect-height) [2 3]
-      (< 50 min-rect-height)  [1 2]
-      true                    [0.7 2]))
+      (< 400 min-rect-height) [4 3]
+      (< 100 min-rect-height) [2 2]
+      (< 50 min-rect-height)  [1 1]
+      true                    [0.7 1]))
   {:highlight-rects grid-rects
    :elements (map |(tuple $ $) grid-rects)
    :label-scale label-scale

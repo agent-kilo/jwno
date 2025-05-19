@@ -54,8 +54,8 @@
 
   (def orig-pen (SelectObject hdc (GetStockObject NULL_PEN)))
 
-  (def line-width (math/floor (* virt-line-width scale-x)))
-  (def half-line-width (brshift line-width 1))
+  # The lines will vanish when line-width is < 1
+  (def line-width (max 1 (math/floor (* virt-line-width scale-x))))
   (def shadow-offset (math/floor (* 2 scale-x)))
 
   (def offset-x (in client-rect :left))
@@ -75,21 +75,21 @@
         (Rectangle hdc
                    left
                    top
-                   (+ left line-width shadow-offset)
+                   (+ left line-width 1 shadow-offset) # Plus 1 for the null border of the rectangle
                    bottom)
         (Rectangle hdc
                    left
                    top
                    right
-                   (+ top line-width shadow-offset))
+                   (+ top line-width 1 shadow-offset))
         (Rectangle hdc
-                   (- right line-width shadow-offset)
+                   (- right line-width 1 shadow-offset)
                    top
                    right
                    bottom)
         (Rectangle hdc
                    left
-                   (- bottom line-width shadow-offset)
+                   (- bottom line-width 1 shadow-offset)
                    right
                    bottom))
 
@@ -98,21 +98,21 @@
       (Rectangle hdc
                  left
                  top
-                 (+ left line-width)
+                 (+ left line-width 1)
                  bottom)
       (Rectangle hdc
                  left
                  top
                  right
-                 (+ top line-width))
+                 (+ top line-width 1))
       (Rectangle hdc
-                 (- right line-width)
+                 (- right line-width 1)
                  top
                  right
                  bottom)
       (Rectangle hdc
                  left
-                 (- bottom line-width)
+                 (- bottom line-width 1)
                  right
                  bottom))))
 
@@ -789,6 +789,7 @@
     (visit-fn e))
 
   {:colors {:background color}
+   :line-width line-width
    :highlight-rects hl-rects
    :elements elems})
 
@@ -942,7 +943,7 @@
      [:property UIA_IsInvokePatternAvailablePropertyId true]])
   (default action :invoke)
   (default show-highlights false)
-  (default line-width 3)
+  (default line-width 2)
 
   (table/setproto
    @{:action-handlers @{:invoke       handle-action-invoke
@@ -1233,7 +1234,7 @@
   (default action :invoke)
   (default colors {})
   (default show-highlights false)
-  (default line-width 3)
+  (default line-width 2)
 
   (def default-colors
     {:invokable 0x30e400
@@ -1782,6 +1783,6 @@
                :shadow 0x828282
                :highlight 0x00a1ff
                :key 0x000000}
-     :line-width 3
+     :line-width 2
     }
    ui-hint-proto))

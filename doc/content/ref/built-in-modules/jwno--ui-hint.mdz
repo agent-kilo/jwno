@@ -162,7 +162,7 @@ All the arguments @code{ui-hint/gradual-uia-hinter} can accept are named. @code{
   }
 }
 
-And @code{:colors} specifies the colors used to highlight UI elements, in the format of @code{0xBBGGRR}. Uses default values if a color is not provided. @code{show-highlights} specifies whether to show highlight boxes for child elements, and defaults to @code{false}. @code{:line-width} is the width for highlight outlines, and defaults to @code{3}.
+And @code{:colors} specifies the colors used to highlight UI elements, in the format of @code{0xBBGGRR}. Uses default values if a color is not provided. @code{show-highlights} specifies whether to show highlight boxes for child elements, and defaults to @code{false}. @code{:line-width} is the width for highlight outlines, and defaults to @code{2}.
 
 For example, to bind a command to walk the UI tree using this hinter, with all default settings:
 
@@ -194,7 +194,7 @@ To create a UIA hinter:
                     :line-width      ...)
 ```
 
-All the arguments @code{ui-hint/uia-hinter} can accept are named. @code{:action} is the action to apply to the selected UI element, which defaults to @code{:invoke}. See the @link[#ui-hint/gradual-uia-hinter]{@code{ui-hint/gradual-uia-hinter}} section for supported actions. @code{:condition} is the criteria used to filter UI elements, which defaults to all interactable elements. It can reference any of the @link[https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-automation-element-propids]{supported properties}, or any @code{:and}, @code{:or}, @code{:not} combinations of them. @code{:color} is the background color for the labels. Uses the @code{ui-hint} object's color setting, if no color is provided. @code{show-highlights} specifies whether to show highlight boxes for labeled elements, and defaults to @code{false}. @code{:line-width} is the width for highlight outlines, and defaults to @code{3}.
+All the arguments @code{ui-hint/uia-hinter} can accept are named. @code{:action} is the action to apply to the selected UI element, which defaults to @code{:invoke}. See the @link[#ui-hint/gradual-uia-hinter]{@code{ui-hint/gradual-uia-hinter}} section for supported actions. @code{:condition} is the criteria used to filter UI elements, which defaults to all interactable elements. It can reference any of the @link[https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-automation-element-propids]{supported properties}, or any @code{:and}, @code{:or}, @code{:not} combinations of them. @code{:color} is the background color for the labels. Uses the @code{ui-hint} object's color setting, if no color is provided. @code{show-highlights} specifies whether to show highlight boxes for labeled elements, and defaults to @code{false}. @code{:line-width} is the width for highlight outlines, and defaults to @code{2}.
 
 For example, to show hints for all interactable UI elements:
 
