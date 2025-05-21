@@ -222,6 +222,9 @@
     (set cur-elem parent)
     (set parent (get-uia-direct-parent cur-elem walker cr)))
 
+  (when parent
+    (:Release parent))
+
   ret)
 
 
