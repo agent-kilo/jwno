@@ -293,11 +293,6 @@
 # See the definitions for `Win + ,` and `Win + .` key bindings
 # below.
 #
-# But please note, due to the limitation of Jwno's threading
-# model and keymap handling logic, these functions cannot make
-# reference to mutable states outside of their body scopes,
-# or those mutable states will not get updated properly.
-#
 (defn move-window-after-split [frame]
   (def all-sub-frames (in frame :children))
   (def all-wins (in (first all-sub-frames) :children))
