@@ -7,7 +7,35 @@
 # daily use. It's heavily commented, you can skim through the
 # comments and then focus on the parts you're interested in.
 #
-# To try it out, download this file, then drag-n-drop it to
+# Features enabled here:
+#
+#   * Most of the built-in commands are mapped to key bindings.
+#     (See the "Key Bindings (Keymaps)" section below.)
+#   * auto-layout/close-empty-frame:  Automatically closes an empty frame when a window is closed.
+#   * indicator/current-frame-area:   Highlights an empty frame.
+#   * ui-hint/ui-hint:                Interacts with UI elements using the keyboard.
+#   * scratch-pad/scratch-pad:        Hides windows and summons them later.
+#   * layout-history/layout-history:  Saves and restores frame layouts.
+#   * Some demo code showcasing hook usage.
+#     (See the "Using Hooks" section.)
+#   * Some demo code showcasing custom commands.
+#     (See the "Custom Commands" section.)
+#
+# Some quirks of this example config that may surprise you:
+#
+#   * It ignores all windows coming from a virtual desktop named "Desktop 2".
+#     (See the user-window-filter function.)
+#   * It sets an alpha value to Emacs, Windows Terminal, and console windows,
+#     making them transparent. (See the :window-created hook below.)
+#   * It treats an application from a certain French game company specially.
+#     (See the user-forced-window-filter function.)
+#   * It binds all ui-hint features to the RAlt key, but your keyboard may
+#     have an AltGr key on the right instead. In that case, you need to modify
+#     the key bindings and choose another leading key.
+#   * It sometimes grants you infinite lives. Please don't take it seriously
+#     and do anything dangerous.
+#
+# To try out this example config, download this file, then drag-n-drop it to
 # jwno.exe.
 #
 
