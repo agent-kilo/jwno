@@ -30,3 +30,5 @@ Similarly, this means @em{hold @code{Ctrl} and @code{Alt}, then press and releas
 ```
 
 They are equivalent to the two key specs with white-spaces we've seen above.
+
+Note that the @code{AltGr} key is special, please see the @link[../ref/key-names.html#Modifier-Keys]{key name reference page} for details.

@@ -19,6 +19,8 @@ To use a key in a @link[../defining-key-bindings/key-specs.html]{key spec}, writ
 
 ### Modifier Keys
 
+@p{@strong{About the @code{AltGr} key}: The @link[https://en.wikipedia.org/wiki/AltGr_key]{@code{AltGr} key} is in fact not a single modifier, but emits @code{Ctrl + Alt} instead, so it cannot be used as a "trigger key". If you want to use @code{AltGr} as a modifier in a key spec, write @code{Ctrl + Alt} instead, e.g. @code{AltGr + N} should become @code{Ctrl + Alt + N}.}
+
 @tag[table]{
   @tr{
     @th{Name} @th{Key Code} @th{Description}
