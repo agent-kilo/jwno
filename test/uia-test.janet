@@ -6,6 +6,17 @@
 (use ../src/util)
 
 
+(def dummy-elem-proto
+  @{:AddRef  (fn [self] (put self :_ref (+ (in self :_ref) 1)))
+    :Release (fn [self] (put self :_ref (- (in self :_ref) 1)))
+    :get_CachedControlType (fn [self] (in self :_ctype))
+    :get_CachedIsOffscreen (fn [self] FALSE)
+    :get_CachedNativeWindowHandle (fn [self] (in self :_hwnd))})
+
+(defn dummy-elem [hwnd ctype &opt parent sibling]
+  (table/setproto @{:_ref 0 :_hwnd hwnd :_ctype ctype :_parent parent :_sibling sibling} dummy-elem-proto))
+
+
 (defn test-with-uia []
   (var release-called-with nil)
   (var body-called-with nil)
@@ -63,15 +74,6 @@
 
 
 (defn test-uia-manager-get-parent-window []
-  (def dummy-elem-proto
-    @{:AddRef  (fn [self] (put self :_ref (+ (in self :_ref) 1)))
-      :Release (fn [self] (put self :_ref (- (in self :_ref) 1)))
-      :get_CachedControlType (fn [self] (in self :_ctype))
-      :get_CachedIsOffscreen (fn [self] FALSE)
-      :get_CachedNativeWindowHandle (fn [self] (in self :_hwnd))})
-  (defn dummy-elem [hwnd ctype parent]
-    (table/setproto @{:_ref 0 :_hwnd hwnd :_ctype ctype :_parent parent} dummy-elem-proto))
-
   (def hwnd1 (ffi/malloc 1))
   (def hwnd2 (ffi/malloc 1))
   (def hwnd3 (ffi/malloc 1))
@@ -101,7 +103,8 @@
     @{:Release (fn [self] 0)
       :GetParentElementBuildCache (fn [_self elem _cr]
                                     (def p (in elem :_parent))
-                                    (:AddRef p)
+                                    (when p
+                                      (:AddRef p))
                                     p)})
 
   (CoInitializeEx nil COINIT_MULTITHREADED)
@@ -132,6 +135,59 @@
   (ffi/free hwnd5))
 
 
+(defn test-uia-manager-enumerate-children []
+  (def dummy-sib-4
+    (dummy-elem :hwnd4 nil nil nil))
+  (def dummy-sib-3
+    (dummy-elem :hwnd3 nil nil dummy-sib-4))
+  (def dummy-sib-2
+    (dummy-elem :hwnd2 nil nil dummy-sib-3))
+  (def dummy-sib-1
+    (dummy-elem :hwnd1 nil nil dummy-sib-2))
+
+  (def dummy-walker
+    @{:_ref 0
+      :AddRef  (fn [self] (put self :_ref (+ (in self :_ref) 1)))
+      :Release (fn [self] (put self :_ref (- (in self :_ref) 1)))
+      :GetFirstChildElement  (fn [_self _elem]
+                               (:AddRef dummy-sib-1)
+                               dummy-sib-1)
+      :GetNextSiblingElement (fn [_self elem]
+                               (def sib (in elem :_sibling))
+                               (when sib
+                                 (:AddRef sib))
+                               sib)})
+
+  (CoInitializeEx nil COINIT_MULTITHREADED)
+  (def uia-man (uia-manager))
+
+  (def seen @{})
+
+  (:enumerate-children
+     uia-man
+     :dummy-elem
+     (fn [c]
+       (put seen (in c :_hwnd) true)
+       true)
+     dummy-walker)
+
+  (assert (= 0 (in dummy-walker :_ref)))
+  (assert (= 0 (in dummy-sib-1 :_ref)))
+  (assert (= 0 (in dummy-sib-2 :_ref)))
+  (assert (= 0 (in dummy-sib-3 :_ref)))
+  (assert (= 0 (in dummy-sib-4 :_ref)))
+
+  (assert (= 4 (length seen)))
+  (assert (has-key? seen :hwnd1))
+  (assert (has-key? seen :hwnd2))
+  (assert (has-key? seen :hwnd3))
+  (assert (has-key? seen :hwnd4))
+
+  (:destroy uia-man)
+  (CoUninitialize))
+
+
 (defn main [&]
   (test-with-uia)
-  (test-uia-manager-get-parent-window))
+  (test-uia-manager-get-parent-window)
+  (test-uia-manager-enumerate-children))
