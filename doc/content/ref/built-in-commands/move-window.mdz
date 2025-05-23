@@ -14,4 +14,11 @@
 ### Description
 
 Moves a window in the specified direction. Dir can be :left,
-:right, :up or :down.
+:right, :up, :down, or a tuple in the form of [dx dy].
+
+When dir is a direction keyword, the window is moved between
+adjacent frames.
+
+When dir is a tuple, the window is moved freely, unconstrained
+by frames. Dx and dy are distances (in physical pixels) to move
+the window on the horizontal and vertical axes, respectively.

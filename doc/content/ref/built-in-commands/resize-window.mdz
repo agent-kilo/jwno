@@ -1,0 +1,20 @@
+{:title ":resize-window"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 23
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:resize-window dw dh)
+```
+
+### Description
+
+Resizes the focused window. Dw and dh are the deltas of width
+and height, respectively. Both of them are in physical pixels.
+
+Note that this command resizes a single window. To resize all
+windows contained in a frame, use the :resize-frame command.

@@ -252,16 +252,56 @@
 
 
 (defn cmd-move-window [wm dir]
-  (when-let [cur-frame (:get-current-frame (in wm :root))
-             cur-win (:get-current-window cur-frame)
-             adj-fr (:get-adjacent-frame cur-frame dir)]
-    (with-activation-hooks wm
-      (:add-child adj-fr cur-win)
-      (:layouts-changed wm [(:get-layout cur-frame)])
-      (:transform cur-win (:get-padded-rect adj-fr) nil wm)
-      # The focus is still on cur-win, so focus-changed event will not
-      # fire, we need to activate its new parent frame manually here
-      (:activate cur-win))))
+  (cond
+    (find |(= $ dir) [:left :right :up :down])
+    (when-let [cur-frame (:get-current-frame (in wm :root))
+               cur-win (:get-current-window cur-frame)
+               adj-fr (:get-adjacent-frame cur-frame dir)]
+      (with-activation-hooks wm
+        (:add-child adj-fr cur-win)
+        (:layouts-changed wm [(:get-layout cur-frame)])
+        (:transform cur-win (:get-padded-rect adj-fr) nil wm)
+        # The focus is still on cur-win, so focus-changed event will not
+        # fire, we need to activate its new parent frame manually here
+        (:activate cur-win)))
+
+    (and (indexed? dir)
+         (= 2 (length dir)))
+    (when-let [hwnd (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+                      (when uia-win
+                        (:get_CachedNativeWindowHandle uia-win)))]
+      (def [dx dy] dir)
+      (def [gwr-ret rect] (GetWindowRect hwnd))
+      (when (= FALSE gwr-ret)
+        (errorf "failed to get bounding rectangle for window %n" hwnd))
+      (SetWindowPos hwnd
+                    nil
+                    (+ dx (in rect :left))
+                    (+ dy (in rect :top))
+                    0
+                    0
+                    (bor SWP_NOZORDER SWP_NOSIZE)))
+
+    true
+    (errorf "invalid direction: %n" dir)))
+
+
+(defn cmd-resize-window [wm dw dh]
+  (def hwnd
+    (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
+      (when uia-win
+        (:get_CachedNativeWindowHandle uia-win))))
+  (when hwnd
+    (def [gwr-ret rect] (GetWindowRect hwnd))
+    (when (= FALSE gwr-ret)
+      (errorf "failed to get bounding rectangle for window %n" hwnd))
+    (SetWindowPos hwnd
+                  nil
+                  (in rect :left)
+                  (in rect :top)
+                  (+ dw (rect-width rect))
+                  (+ dh (rect-height rect))
+                  (bor SWP_NOZORDER))))
 
 
 (defn cmd-resize-frame [wm dw dh]
@@ -922,6 +962,9 @@
 
      Resizes the current frame. Dw and dh are the deltas of width and
      height, respectively. Both of them are in physical pixels.
+
+     Note that this command also resizes all windows contained in the
+     frame. To resize a single window, use the :resize-window command.
      ```)
   (:add-command command-man :close-frame
      (fn [] (cmd-close-frame wm))
@@ -1046,7 +1089,25 @@
      (:move-window dir)
 
      Moves a window in the specified direction. Dir can be :left,
-     :right, :up or :down.
+     :right, :up, :down, or a tuple in the form of [dx dy].
+
+     When dir is a direction keyword, the window is moved between
+     adjacent frames.
+
+     When dir is a tuple, the window is moved freely, unconstrained
+     by frames. Dx and dy are distances (in physical pixels) to move
+     the window on the horizontal and vertical axes, respectively.
+     ```)
+  (:add-command command-man :resize-window
+     (fn [dw dh] (cmd-resize-window wm dw dh))
+     ```
+     (:resize-window dw dh)
+
+     Resizes the focused window. Dw and dh are the deltas of width
+     and height, respectively. Both of them are in physical pixels.
+
+     Note that this command resizes a single window. To resize all
+     windows contained in a frame, use the :resize-frame command.
      ```)
   (:add-command command-man :close-window
      (fn [] (cmd-close-window wm ui-man))

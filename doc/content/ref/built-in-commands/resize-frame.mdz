@@ -15,3 +15,6 @@
 
 Resizes the current frame. Dw and dh are the deltas of width and
 height, respectively. Both of them are in physical pixels.
+
+Note that this command also resizes all windows contained in the
+frame. To resize a single window, use the :resize-window command.

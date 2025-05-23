@@ -34,6 +34,7 @@ These are the commands available in Jwno by default.
 @li{@link[quit.html]{:quit}}
 @li{@link[repl.html]{:repl}}
 @li{@link[resize-frame.html]{:resize-frame}}
+@li{@link[resize-window.html]{:resize-window}}
 @li{@link[retile.html]{:retile}}
 @li{@link[reverse-sibling-frames.html]{:reverse-sibling-frames}}
 @li{@link[rotate-sibling-frames.html]{:rotate-sibling-frames}}
