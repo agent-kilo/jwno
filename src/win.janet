@@ -534,6 +534,18 @@
          :virtual-desktop desktop-info}))))
 
 
+(defn- get-hwnd-rect [hwnd &opt no-frame?]
+  (default no-frame? false)
+
+  (if no-frame?
+    (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+    # else
+    (let [[gwr-ret rect] (GetWindowRect hwnd)]
+      (when (= FALSE gwr-ret)
+        (errorf "GetWindowRect failed for window %n" hwnd))
+      rect)))
+
+
 (defn- window-purge-pred [win wm layout]
   (def hwnd (in win :hwnd))
   (or (not (:alive? win))
@@ -1578,6 +1590,10 @@
   (get-hwnd-dwm-border-margins hwnd bounding-rect))
 
 
+(defn window-get-rect [self &opt no-frame?]
+  (get-hwnd-rect (in self :hwnd) no-frame?))
+
+
 (defn window-set-focus [self &opt wm]
   (default wm (:get-window-manager self))
   (def uia-man (in wm :uia-manager))
@@ -1630,6 +1646,7 @@
      :get-info window-get-info
      :get-margins window-get-margins
      :get-dwm-border-margins window-get-dwm-border-margins
+     :get-rect window-get-rect
      :set-focus window-set-focus
      :dump window-dump
      :load window-load}
@@ -2810,6 +2827,10 @@
   (get-hwnd-info hwnd? (in self :uia-manager) (in self :vdm-com) uia-win?))
 
 
+(defn wm-get-hwnd-rect [self hwnd &opt no-frame?]
+  (get-hwnd-rect hwnd no-frame?))
+
+
 (defn wm-should-manage-hwnd? [self hwnd-info]
   (def {:hwnd hwnd
         :uia-element uia-win
@@ -3289,6 +3310,7 @@
     :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
     :get-hwnd-uia-element wm-get-hwnd-uia-element
     :get-hwnd-info wm-get-hwnd-info
+    :get-hwnd-rect wm-get-hwnd-rect
     :hwnd-alive? wm-hwnd-alive?
     :hwnd-process-elevated? wm-hwnd-process-elevated?
 
