@@ -167,14 +167,22 @@
        nil))))
 
 
-(defn get-hwnd-dwm-border-margins [hwnd &opt outer-rect]
-  (default outer-rect
+(defn- get-hwnd-rect [hwnd &opt no-frame?]
+  (default no-frame? false)
+
+  (if no-frame?
+    (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+    # else
     (let [[gwr-ret rect] (GetWindowRect hwnd)]
       (when (= FALSE gwr-ret)
-        (errorf "failed to get bounding rectangle for window %n" hwnd))
-      rect))
+        (errorf "GetWindowRect failed for window %n" hwnd))
+      rect)))
 
-  (def inner-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+
+(defn get-hwnd-dwm-border-margins [hwnd &opt outer-rect]
+  (default outer-rect (get-hwnd-rect hwnd false))
+
+  (def inner-rect (get-hwnd-rect hwnd true))
 
   (log/debug "outer-rect = %n" outer-rect)
   (log/debug "inner-rect = %n" inner-rect)
@@ -280,9 +288,7 @@
             # XXX: When dealing with QT windows, the bounding rectangle returned by
             # uia-win will be incorrect, and I have absolutely no idea why. GetWindowRect
             # returns the right values though, so that's what we use here.
-            (def [gwr-ret win-rect] (GetWindowRect hwnd))
-            (when (= FALSE gwr-ret)
-              (errorf "failed to get bounding rectangle for window %n" hwnd))
+            (def win-rect (get-hwnd-rect hwnd))
 
             (def scale (calc-pixel-scale orig-rect))
             (def cur-scale (calc-pixel-scale win-rect))
@@ -532,18 +538,6 @@
          :uia-element uia-win
          :exe-path exe-path
          :virtual-desktop desktop-info}))))
-
-
-(defn- get-hwnd-rect [hwnd &opt no-frame?]
-  (default no-frame? false)
-
-  (if no-frame?
-    (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
-    # else
-    (let [[gwr-ret rect] (GetWindowRect hwnd)]
-      (when (= FALSE gwr-ret)
-        (errorf "GetWindowRect failed for window %n" hwnd))
-      rect)))
 
 
 (defn- window-purge-pred [win wm layout]
@@ -1404,10 +1398,10 @@
                 (in win-info :exe-path))
         (printf "%sRect: {l:%d,t:%d,r:%d,b:%d}"
                 more-indent
-                ;(unwrap-rect (:get_CachedBoundingRectangle (in win-info :uia-element))))
+                ;(unwrap-rect (get-hwnd-rect hwnd false)))
         (printf "%sExtended Frame Bounds: {l:%d,t:%d,r:%d,b:%d}"
                 more-indent
-                ;(unwrap-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)))
+                ;(unwrap-rect (get-hwnd-rect hwnd true)))
         (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
         (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
         (printf "%sDPI Awareness: %n" more-indent dpi-awareness)
@@ -1573,11 +1567,8 @@
   (def margins
     (get-margins-or-paddings-from-tags (in self :tags) :margin :margins))
   (if scaled
-    (let [hwnd (in self :hwnd)
-          [ret win-rect] (GetWindowRect hwnd)
+    (let [win-rect (get-hwnd-rect (in self :hwnd))
           [scale-x scale-y] (calc-pixel-scale win-rect)]
-      (when (= ret FALSE)
-        (errorf "failed to get bounding rectangle for window %n" hwnd))
       {:top (filter-fn (* scale-y (in margins :top)))
        :left (filter-fn (* scale-x (in margins :left)))
        :bottom (filter-fn (* scale-y (in margins :bottom)))

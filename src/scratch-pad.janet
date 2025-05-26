@@ -60,7 +60,8 @@
 
 
 (defn snap-to-window [scratch-pad hwnd]
-  (def efb-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+  (def wm (in scratch-pad :window-manager))
+  (def efb-rect (:get-hwnd-rect wm hwnd true))
   (put scratch-pad :rect efb-rect))
 
 

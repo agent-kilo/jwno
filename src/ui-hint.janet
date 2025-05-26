@@ -728,7 +728,9 @@
         :line-width line-width}
     self)
   (def {:context context} ui-hint)
-  (def {:uia-manager uia-man} context)
+  (def {:uia-manager uia-man
+        :window-manager window-man}
+    context)
 
   (when-let [elem-list (in self :elem-list)]
     # Early return
@@ -756,7 +758,7 @@
                              [:property UIA_IsEnabledPropertyId true]
                              cond-spec]
                             cr)
-         (DwmGetWindowAttribute win-hwnd DWMWA_EXTENDED_FRAME_BOUNDS)])))
+         (:get-hwnd-rect window-man win-hwnd true)])))
 
   (log/debug "Found %n UI elements" (length elem-list))
 
@@ -1060,7 +1062,8 @@
   (def [root _] (first stack))
   (def [elem children] (last stack))
 
-  (def {:show-highlights show-highlights
+  (def {:window-manager window-man
+        :show-highlights show-highlights
         :line-width line-width}
     gradual-uia-hinter)
 
@@ -1075,7 +1078,7 @@
   (def root-rect
     (if-let [root-hwnd (:get_CachedNativeWindowHandle root)]
       (if (not (null? root-hwnd))
-        (DwmGetWindowAttribute root-hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+        (:get-hwnd-rect window-man root-hwnd true)
         # else
         (:get_CachedBoundingRectangle root))
       # else
@@ -1117,7 +1120,9 @@
   (log/debug "-- gradual-uia-hinter-init --")
 
   (def {:context context} ui-hint)
-  (def {:uia-manager uia-man} context)
+  (def {:uia-manager uia-man
+        :window-manager window-man}
+    context)
 
   (when-let [stack (in self :stack)]
     (unless (empty? stack)
@@ -1133,6 +1138,7 @@
       (def [elem children] (strip-nested-elements uia-win uia-man cr))
       (put self :stack @[[elem children]])
       (put self :uia-manager uia-man)
+      (put self :window-manager window-man)
 
       (calc-hint-info self (in self :stack)))))
 

@@ -271,9 +271,7 @@
                       (when uia-win
                         (:get_CachedNativeWindowHandle uia-win)))]
       (def [dx dy] dir)
-      (def [gwr-ret rect] (GetWindowRect hwnd))
-      (when (= FALSE gwr-ret)
-        (errorf "failed to get bounding rectangle for window %n" hwnd))
+      (def rect (:get-hwnd-rect wm hwnd))
       (SetWindowPos hwnd
                     nil
                     (+ dx (in rect :left))
@@ -292,9 +290,7 @@
       (when uia-win
         (:get_CachedNativeWindowHandle uia-win))))
   (when hwnd
-    (def [gwr-ret rect] (GetWindowRect hwnd))
-    (when (= FALSE gwr-ret)
-      (errorf "failed to get bounding rectangle for window %n" hwnd))
+    (def rect (:get-hwnd-rect wm hwnd))
     (SetWindowPos hwnd
                   nil
                   (in rect :left)
@@ -518,7 +514,7 @@
   (when-let [cur-frame (:get-current-frame (in wm :root))
              cur-win (:get-current-window cur-frame)]
     (def win-rect
-      (DwmGetWindowAttribute (in cur-win :hwnd) DWMWA_EXTENDED_FRAME_BOUNDS))
+      (:get-rect cur-win true))
 
     (def border-space
       (combine-rect-border-space (:get-margins cur-win)
@@ -604,12 +600,12 @@
             (def {:exe-path exe-path
                   :virtual-desktop desktop-info}
               win-info)
-            (def rect (:get_CachedBoundingRectangle uia-win))
+            (def rect (:get-hwnd-rect wm hwnd))
             (def efb-rect
               (try
-                (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS)
+                (:get-hwnd-rect wm hwnd true)
                 ((err fib)
-                 (log/debug "DwmGetWindowAttribute failed for %n: %n" hwnd err)
+                 (log/debug ":get-hwnd-rect failed for %n: %n" hwnd err)
                  nil)))
             (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
             (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))

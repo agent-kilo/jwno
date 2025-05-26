@@ -368,7 +368,7 @@
 
   (each hwnd hwnd-list
     (when-let [win (in win-map hwnd)]
-      (def hwnd-rect (DwmGetWindowAttribute hwnd DWMWA_EXTENDED_FRAME_BOUNDS))
+      (def hwnd-rect (:get-rect win true))
       (def [found-fr _ dist]
         (win/find-closest-frame hwnd-rect all-leaves))
       (def target-fr
