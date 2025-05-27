@@ -1467,10 +1467,9 @@
     # The hinter returned new hints and override settings
     (do
       (def override-settings hint-info)
-      (def elem-list (in hint-info :elements))
+      (def elem-list (in hint-info :elements []))
       (def highlight-rects (in hint-info :highlight-rects))
-      (if (and (or (nil? elem-list)
-                   (empty? elem-list))
+      (if (and (empty? elem-list)
                (or (nil? highlight-rects)
                    (empty? highlight-rects)))
         # The hinter finished its work
@@ -1613,7 +1612,7 @@
       
       (or (table? hint-info)
           (struct? hint-info))
-      [hint-info (in hint-info :elements)]
+      [hint-info (in hint-info :elements [])]
 
       true
       (errorf ":init method from hinter returned invalid value: %n" hint-info)))
