@@ -13,6 +13,11 @@ A silly desktop toy to make your windows bouncy.
 A comprehensive example config, introducing almost all of Jwno's
 features.
 
+## `minimal-config.janet`
+
+A minimal example config, that has only limited built-in commands
+enabled. Showcases Jwno's default behavior.
+
 ## `mouse-grid.janet`
 
 An example *hinter* implementation, inspirend by [Grid Mode](https://github.com/rvaiya/warpd#grid-mode-alt-meta-g)

@@ -1,5 +1,27 @@
+#
+# minimal-config.janet
+#
+# This is a minimal example config file for jwno (https://github.com/agent-kilo/jwno).
+# Only basic window/frame operations are bound in the root keymap.
+# No extra features are enabled, except current-frame-area shown
+# below. You can take this config as a "baseline", and use it to
+# explore Jwno's default behavior.
+#
+# It assumes you have the US QWERTY keyboard layout.
+#
+# Please see the docs for details on a command:
+# https://agent-kilo.github.io/jwno/ref/built-in-commands/index.html
+#
+# To try it out, download this file, then drag-n-drop it to jwno.exe.
+#
+
+
 (import jwno/indicator)
 
+#
+# The current-frame-area indicator highlights the active frame,
+# if it's empty.
+#
 (def current-frame-area
   (indicator/current-frame-area jwno/context))
 (:enable current-frame-area)
