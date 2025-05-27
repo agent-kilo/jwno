@@ -4,4 +4,48 @@
  :order 6}
 ---
 
-⚠️🚨🚧 UNDER CONSTRUCTION 🚧🚨⚠️
+Layout nodes represent physical monitor arrangements on virtual desktops. They can only contain top-level frames. Every virtual desktop that's managed by Jwno has a corresponding layout node.
+
+Note that layout nodes are created @em{lazily}: They are only created when the first manageable window appears on a virtual desktop. So the layout node for a specific virtual desktop may not always exist.
+
+When a new monitor is connected, top-level frames for the new monitor will be added to every layout node, and the @link[../ref/built-in-hooks/monitor-updated.html]{@code{:monitor-updated} hook} will fire for every top-level frame. Similarly, when a monitor is disconnected, top-level frames for the monitor will be removed from all layout nodes.
+
+There are currently two layout-specific properties, and one container-specific property, in a layout object.
+
+Layout-specific properties: @code{:id} and @code{:name}.
+
+Container-specific property: @code{:current-child}.
+
+
+### @code{:id} Property
+
+This is the unique ID of the underlying virtual desktop. For example, to print the ID of the current virtual desktop in the REPL:
+
+@codeblock[janet]```
+(def lo (:get-current-layout (get-in jwno/context [:window-manager :root])))
+(pp (in lo :id))
+```
+
+
+### @code{:name} Property
+
+This is the name of the underlying virtual desktop. For example, to print the name of the current virtual desktop in the REPL:
+
+@codeblock[janet]```
+(def lo (:get-current-layout (get-in jwno/context [:window-manager :root])))
+(pp (in lo :name))
+```
+
+@p{@em{Jwno expects all virtual desktops to have unique names. It gets confused if multiple virtual desktops share the same name.}}
+
+
+### @code{:current-child} Property
+
+This property points to the current (active) top-level frame, which represents the active monitor. This property cannot be @code{nil}. When a layout node is created, it points to the top-level frame on the primary monitor by default.
+
+For example, to get some info about the current monitor in the REPL:
+
+@codeblock[janet]```
+(def lo (:get-current-layout (get-in jwno/context [:window-manager :root])))
+(pp (get-in lo [:current-child :monitor]))
+```

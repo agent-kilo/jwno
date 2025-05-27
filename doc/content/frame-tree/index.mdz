@@ -26,6 +26,9 @@ The rectangular screen areas managed by Jwno are called @em{frames}, and they ar
   @li{
     @link[layout-nodes.html]{Layout Nodes}
   }
+  @li{
+    @link[the-virtual-desktop-container-node.html]{The Virtual Desktop Container Node}
+  }
 }
 
 ### Next Step
