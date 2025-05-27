@@ -1270,7 +1270,9 @@
 
   (def {:scale scale
         :color color
-        :anchor anchor}
+        :anchor anchor
+        :show-highlights show-highlights
+        :line-width line-width}
     self)
   (def {:context context} ui-hint)
   (def {:window-manager window-man} context)
@@ -1284,7 +1286,9 @@
   {:label-scale scale
    :label-anchor anchor
    :colors {:background color}
-   :elements (map |(tuple (in $ :rect) $) frame-list)})
+   :elements (map |(tuple (in $ :rect) $) frame-list)
+   :line-width (when show-highlights line-width)
+   :highlight-rects (when show-highlights (map |(in $ :rect) frame-list))})
 
 
 (defn frame-hinter-select [self fr]
@@ -1306,7 +1310,7 @@
     :select frame-hinter-select})
 
 
-(defn frame-hinter [&named action-fn scale color anchor]
+(defn frame-hinter [&named action-fn scale color anchor show-highlights line-width]
   (default action-fn
     (fn [fr]
       (let [wm (:get-window-manager fr)]
@@ -1314,13 +1318,17 @@
           (:set-focus wm fr)))))
   (default scale 3)
   (default anchor :top-left)
+  (default show-highlights false)
+  (default line-width 2)
 
   (table/setproto
    @{# Default settings
      :action-fn action-fn
      :scale scale
      :color color
-     :anchor anchor}
+     :anchor anchor
+     :show-highlights show-highlights
+     :line-width line-width}
    frame-hinter-proto))
 
 
