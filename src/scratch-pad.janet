@@ -216,7 +216,7 @@
   (when visible
     (:show self))
   (:show-window-on-current-vd self hwnd)
-  (:set-focus-to-window uia-man hwnd))
+  (:set-focus-to-hwnd wm hwnd))
 
 
 (defn scratch-pad-remove-all-windows [self]
@@ -246,7 +246,7 @@
 
   (when cur-hwnd
     (:show-window-on-current-vd self cur-hwnd)
-    (:set-focus-to-window uia-man cur-hwnd)))
+    (:set-focus-to-hwnd wm cur-hwnd)))
 
 
 (defn uia-win-visible? [uia-win uia-man]
@@ -364,7 +364,7 @@
                       z-hwnd
                       0 0 0 0
                       (bor SWP_NOACTIVATE SWP_NOSIZE SWP_NOMOVE))
-        (:set-focus-to-window uia-man cur-hwnd))
+        (:set-focus-to-hwnd wm cur-hwnd))
       # else
       (log/debug "---- scratch pad: :show-window-on-current-vd failed"))))
 
@@ -374,15 +374,15 @@
   (each hwnd (:get-win-list self)
     (ShowWindow hwnd SW_HIDE))
 
-  (def {:window-manager wm
-        :uia-manager uia-man}
-    self)
+  (def {:window-manager wm} self)
 
-  (when-let [cur-win (:get-current-window (in wm :root))]
+  (if-let [cur-win (:get-current-window (in wm :root))]
     (if (:on-current-virtual-desktop? cur-win wm)
       (:set-focus cur-win wm)
       # else
-      (:set-focus-to-desktop uia-man))))
+      (:set-focus-to-desktop wm))
+    # else
+    (:set-focus-to-desktop wm)))
 
 
 (defn scratch-pad-get-current-hwnd [self]

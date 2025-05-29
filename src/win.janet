@@ -1587,13 +1587,12 @@
 
 (defn window-set-focus [self &opt wm]
   (default wm (:get-window-manager self))
-  (def uia-man (in wm :uia-manager))
   (def old-v-state (:reset-visual-state self true false wm))
   (def parent (in self :parent))
   (when (and parent
              (= old-v-state WindowVisualState_Minimized))
     (:transform self (:get-padded-rect parent) nil wm))
-  (:set-focus-to-window uia-man (in self :hwnd)))
+  (:set-focus-to-hwnd wm (in self :hwnd)))
 
 
 (defn window-dump [self]
@@ -3182,11 +3181,9 @@
 
 
 (defn wm-set-focus [self node]
-  (def uia-man (in self :uia-manager))
-
   (cond
     (nil? node)
-    (:set-focus-to-desktop uia-man)
+    (:set-focus-to-desktop self)
 
     (= :window (in node :type))
     (:set-focus node self)
@@ -3197,7 +3194,7 @@
       (:set-focus cur-win self)
       (do
         (:activate node)
-        (:set-focus-to-desktop uia-man)))))
+        (:set-focus-to-desktop self)))))
 
 
 (defn wm-set-focus-to-hwnd [self hwnd]
