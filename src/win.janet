@@ -2789,6 +2789,17 @@
     elevated))
 
 
+(defn wm-get-focused-hwnd [self &opt top-level?]
+  (default top-level? true)
+
+  (with-uia [uia-win (:get-focused-window (in self :uia-manager) top-level?)]
+    (when uia-win
+      (when-let [hwnd (:get_CachedNativeWindowHandle uia-win)]
+        (if (null? hwnd)
+          nil
+          hwnd)))))
+
+
 (defn wm-get-hwnd-path [self hwnd]
   (get-hwnd-path hwnd))
 
@@ -3292,6 +3303,7 @@
     :retile wm-retile
     :set-focus wm-set-focus
 
+    :get-focused-hwnd wm-get-focused-hwnd
     :get-hwnd-path wm-get-hwnd-path
     :get-hwnd-virtual-desktop-id wm-get-hwnd-virtual-desktop-id
     :get-hwnd-virtual-desktop wm-get-hwnd-virtual-desktop
