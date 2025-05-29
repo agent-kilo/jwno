@@ -267,9 +267,7 @@
 
     (and (indexed? dir)
          (= 2 (length dir)))
-    (when-let [hwnd (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
-                      (when uia-win
-                        (:get_CachedNativeWindowHandle uia-win)))]
+    (when-let [hwnd (:get-focused-hwnd wm)]
       (def [dx dy] dir)
       (def rect (:get-hwnd-rect wm hwnd))
       (SetWindowPos hwnd
@@ -285,11 +283,7 @@
 
 
 (defn cmd-resize-window [wm dw dh]
-  (def hwnd
-    (with-uia [uia-win (:get-focused-window (in wm :uia-manager))]
-      (when uia-win
-        (:get_CachedNativeWindowHandle uia-win))))
-  (when hwnd
+  (when-let [hwnd (:get-focused-hwnd wm)]
     (def rect (:get-hwnd-rect wm hwnd))
     (SetWindowPos hwnd
                   nil

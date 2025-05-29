@@ -239,14 +239,8 @@
     (pointer-to-number last-ts-ptr)))
 
 
-(defn load-last-history-entries [layout-states manual-state session-ts window-man uia-man]
-  (def focused-hwnd
-    (with-uia [uia-win (:get-focused-window uia-man)]
-      (when uia-win
-        (def hwnd? (:get_CachedNativeWindowHandle uia-win))
-        (if (null? hwnd?)
-          nil
-          hwnd?))))
+(defn load-last-history-entries [layout-states manual-state session-ts window-man]
+  (def focused-hwnd (:get-focused-hwnd window-man))
 
   (with-activation-hooks window-man
     (def root (in window-man :root))
@@ -304,8 +298,7 @@
     (load-last-history-entries (in self :layout-states)
                                manual-state
                                session-ts
-                               window-man
-                               uia-man)
+                               window-man)
 
     # Otherwise, start with saved history, but don't restore last layouts
     )
@@ -384,15 +377,9 @@
       (:add-child target-fr win))))
 
 
-(defn load-layout [lo dump wm uia-man]
+(defn load-layout [lo dump wm]
   (def [_ts dump-data] dump)
-  (def focused-hwnd
-    (with-uia [uia-win (:get-focused-window uia-man)]
-      (when uia-win
-        (def hwnd? (:get_CachedNativeWindowHandle uia-win))
-        (if (null? hwnd?)
-          nil
-          hwnd?))))
+  (def focused-hwnd (:get-focused-hwnd wm))
   (def win-list (:get-all-windows lo))
 
   (with-activation-hooks wm
@@ -414,9 +401,7 @@
   (def {:context context
         :manual manual-state}
     self)
-  (def {:window-manager window-man
-        :uia-manager uia-man}
-    context)
+  (def {:window-manager window-man} context)
   (def lo-id (in lo :id))
   (def lo-state (get-in self [:layout-states lo-id]))
   (unless lo-state
@@ -443,16 +428,14 @@
       (history-stack-undo history)))
   (when dump
     (put lo-state :unsaved-changes nil)
-    (load-layout lo dump window-man uia-man)))
+    (load-layout lo dump window-man)))
 
 
 (defn layout-history-redo [self lo]
   (def {:context context
         :manual manual-state}
     self)
-  (def {:window-manager window-man
-        :uia-manager uia-man}
-    context)
+  (def {:window-manager window-man} context)
   (def lo-id (in lo :id))
   (def lo-state (get-in self [:layout-states lo-id]))
   (unless lo-state
@@ -479,7 +462,7 @@
       (history-stack-redo history)))
   (when dump
     (put lo-state :unsaved-changes nil)
-    (load-layout lo dump window-man uia-man)))
+    (load-layout lo dump window-man)))
 
 
 (defn layout-history-set-manual [self manual?]

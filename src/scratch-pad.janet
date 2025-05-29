@@ -475,19 +475,11 @@
 
 
 (defn scratch-pad-add-commands [self]
-  (def {:uia-manager uia-man
-        :command-manager command-man}
-    self)
-
-  (def get-focused-hwnd
-    (fn []
-      (with-uia [uia-win (:get-focused-window uia-man)]
-        (when uia-win
-          (:get_CachedNativeWindowHandle uia-win)))))
+  (def {:command-manager command-man} self)
 
   (:add-command command-man (:command-name self :add-to)
                 (fn []
-                  (when-let [hwnd (get-focused-hwnd)]
+                  (when-let [hwnd (:get-focused-hwnd (in self :window-manager))]
                     (:add-window self hwnd))))
 
   (:add-command command-man (:command-name self :remove-from)
