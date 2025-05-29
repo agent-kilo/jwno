@@ -3200,6 +3200,14 @@
         (:set-focus-to-desktop uia-man)))))
 
 
+(defn wm-set-focus-to-hwnd [self hwnd]
+  (:set-focus-to-window (in self :uia-manager) hwnd))
+
+
+(defn wm-set-focus-to-desktop [self]
+  (:set-focus-to-desktop (in self :uia-manager)))
+
+
 (defn wm-retile [self &opt fr]
   (cond
     (nil? fr)
@@ -3302,6 +3310,8 @@
     :reset-hwnd-visual-state wm-reset-hwnd-visual-state
     :retile wm-retile
     :set-focus wm-set-focus
+    :set-focus-to-hwnd wm-set-focus-to-hwnd
+    :set-focus-to-desktop wm-set-focus-to-desktop
 
     :get-focused-hwnd wm-get-focused-hwnd
     :get-hwnd-path wm-get-hwnd-path
