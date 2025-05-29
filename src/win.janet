@@ -2789,10 +2789,6 @@
     elevated))
 
 
-(defn wm-get-pid-path [self pid]
-  (get-pid-path pid))
-
-
 (defn wm-get-hwnd-path [self hwnd]
   (get-hwnd-path hwnd))
 
@@ -3315,7 +3311,6 @@
 
     :close-hwnd wm-close-hwnd
 
-    :get-pid-path wm-get-pid-path
     :enumerate-monitors wm-enumerate-monitors
     :jwno-process-elevated? wm-jwno-process-elevated?
 
