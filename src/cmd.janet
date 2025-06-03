@@ -786,6 +786,7 @@
         (:start-server repl-man host port))
       (do
         (:show-tooltip ui-man :repl "REPL is not running.")
+        # Early return
         (break))))
 
   (def repl (:get-default-server repl-man))
@@ -794,7 +795,15 @@
   (def argv0 (first argv))
   (def env (os/environ))
 
-  (def exe-path (string (QueryFullProcessImageName (GetCurrentProcess) 0)))
+  (def exe-buf (QueryFullProcessImageName (GetCurrentProcess) 0))
+  (unless exe-buf
+    (def err-code (GetLastError))
+    (log/error "repl: failed to locate process image: %n" err-code)
+    (:show-tooltip ui-man :repl (string/format "Failed to locate Jwno executable file: %n" err-code))
+    # Early return
+    (break))
+
+  (def exe-path (string exe-buf))
   (def [repl-host repl-port] (in repl :address))
   (def cmd-path (string (in env "SystemRoot") "\\system32\\cmd.exe"))
 
