@@ -812,8 +812,8 @@
     (if (or (string/has-suffix? "/main.janet" argv0)
             (string/has-suffix? "\\main.janet" argv0))
       # Call cmd.exe to give the REPL client a new console
-      [cmd-path "/c" "start" exe-path argv0 "-C" "--repl" (string/format "%s:%d" repl-host repl-port)]
-      [cmd-path "/c" "start" exe-path "-C" "--repl" (string/format "%s:%d" repl-host repl-port)]))
+      [cmd-path "/c" "start" exe-path exe-path argv0 "-C" "--repl" (string/format "%s:%d" repl-host repl-port)]
+      [cmd-path "/c" "start" exe-path exe-path "-C" "--repl" (string/format "%s:%d" repl-host repl-port)]))
 
   (log/debug "repl-cli = %n" repl-cli)
   (os/execute repl-cli))
