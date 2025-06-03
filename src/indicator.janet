@@ -123,7 +123,10 @@
     (errorf "window class registration failed: 0x%x" (GetLastError)))
 
   (def new-hwnd
-    (CreateWindowEx (bor WS_EX_LAYERED WS_EX_TOOLWINDOW WS_EX_NOACTIVATE)
+    (CreateWindowEx (bor WS_EX_LAYERED
+                         WS_EX_TRANSPARENT
+                         WS_EX_TOOLWINDOW
+                         WS_EX_NOACTIVATE)
                     FRAME-AREA-WINDOW-CLASS-NAME
                     ""
                     (bor WS_POPUP)
