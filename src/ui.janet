@@ -172,9 +172,20 @@
   (log/debug "dwExtraInfo = %n" (hook-struct :dwExtraInfo)))
 
 
-(defn- suppress-start-menu [mod-states key-up? extra-info]
-  (when (or (in mod-states :lwin)
-            (in mod-states :rwin))
+(defn- suppress-modifier-key-action [mod-states key-up? extra-info]
+  #
+  # Some applications interpret modifier key-down events without a
+  # trigger key specially, e.g.:
+  #
+  # 1. The Start menu pops up when only the `Win` key is pressed;
+  # 2. The input focus for a window moves to the menu bar when only
+  #    the `Alt` key is pressed.
+  #
+  # This code is to send a dummy trigger key, when the actual trigger
+  # key gets intercepted by us, so that applications don't see the
+  # modifier keys as pressed alone.
+  #
+  (unless (empty? mod-states)
     # Send a dummy key event to stop the Start Menu from popping up
     (send-input (keyboard-input VK_DUMMY
                                 (if key-up? :up :down)
@@ -221,12 +232,12 @@
     (if pass-through?
       (break (CallNextHookEx nil code wparam (hook-struct :address)))
       (do
-        (suppress-start-menu mod-states key-up extra-info)
+        (suppress-modifier-key-action mod-states key-up extra-info)
         (break 1))))
 
   (if-let [binding (:find-binding handler hook-struct mod-states)]
     (do
-      (suppress-start-menu mod-states key-up extra-info)
+      (suppress-modifier-key-action mod-states key-up extra-info)
       (when-let [msg (:handle-binding handler hook-struct binding)]
         (ev/give ev-chan msg))
       1) # !!! IMPORTANT
