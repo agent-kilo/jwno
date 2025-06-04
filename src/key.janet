@@ -27,7 +27,8 @@
       (or (keyword? key) (symbol? key))
       (eval (symbol "VK_" (string/ascii-upper (string/replace-all "-" "_" key))))
 
-      (string? key)
+      (or (string? key)
+          (buffer? key))
       (ascii (string/ascii-upper key))
 
       true
@@ -228,7 +229,8 @@
 
 (defn keymap-parse-key [self key-spec]
   (cond
-    (string? key-spec)
+    (or (string? key-spec)
+        (buffer? key-spec))
     (if-let [matched (peg/match key-spec-peg (string/ascii-lower key-spec))]
       (map |(let [[mods key-code] $]
               (key key-code mods))
@@ -241,7 +243,8 @@
 
 (defn keymap-define-key [self key-seq command-or-keymap &opt doc]
   (if-not (indexed? key-seq)
-    (if (string? key-seq)
+    (if (or (string? key-seq)
+            (buffer? key-seq))
       (break (keymap-define-key self (keymap-parse-key self key-seq) command-or-keymap doc))
       # A single key spec
       (break (keymap-define-key self [key-seq] command-or-keymap doc))))

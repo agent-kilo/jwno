@@ -236,6 +236,10 @@
   (assert (deep= (:parse-key keymap "enter e")
                  @[(key VK_RETURN [])
                    (key (ascii "E") [])]))
+
+  (assert (deep= (:parse-key keymap @"enter e")
+                 @[(key VK_RETURN [])
+                   (key (ascii "E") [])]))
   )
 
 
