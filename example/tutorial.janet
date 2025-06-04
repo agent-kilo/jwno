@@ -140,17 +140,17 @@
 
 
 (defn build-slide-keymap []
-  (let [keymap (:new-keymap key-man *acc-keymap*)]
-    # XXX: *mod-key* not available when this function is called
+  (:new-keymap key-man *acc-keymap*))
+
+
+(defn set-slide-keymap [keymap]
+  (when *mod-key*
     (:define-key keymap
-                 "Alt + Shift + /"
+                 (string *mod-key* " + Shift + /")
                  [:show-keymap keymap]
-                 "Show current keymap")
-    (:define-key keymap
-                 "Win + Shift + /"
-                 [:show-keymap keymap]
-                 "Show current keymap")
-    keymap))
+                 "Show current keymap"))
+  (:set-keymap key-man keymap)
+  keymap)
 
 
 (defn build-slide-list []
@@ -317,7 +317,7 @@
   [id total keymap]
 
   (def [_next-key next-cmd] (disable-continue-key keymap))
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   # Pause window management
   (:add-hook hook-man :filter-window negative-window-filter)
@@ -358,7 +358,7 @@ First things first, let's choose a primary modifier key. Please press either Win
 
   (define-common-keys *mod-key*)
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -376,7 +376,7 @@ First things first, let's choose a primary modifier key. Please press either Win
   {:slide 3}
   [id total keymap]
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -398,7 +398,7 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
   {:slide 4}
   [id total keymap]
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (EnumChildWindows
    nil
@@ -438,7 +438,7 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
   {:slide 5}
   [id total keymap]
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   # Enable window management
   (:remove-hook hook-man :filter-window negative-window-filter)
@@ -480,7 +480,7 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
   (:define-key *acc-keymap*
                (string *mod-key* " + ,")
                [:split-frame :horizontal 2 [0.5] move-window-after-split])
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:call-command command-man :retile)
 
@@ -631,7 +631,7 @@ A frame can be activated in one of these ways:
   {:slide 11}
   [id total keymap]
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -661,7 +661,7 @@ Internally, frames are organized in a tree-like structure, and :enum-frame can h
   (:define-key *acc-keymap*
                (string *mod-key* " + I")
                [:enum-frame :prev])
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -687,7 +687,7 @@ After activating a frame, you can restore your minimized windows, or open new wi
   {:slide 13}
   [id total keymap]
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
   
   (:show-tooltip
      ui-man
@@ -724,7 +724,7 @@ It just does what it says: activating an adjacent frame. You can specify a direc
   (:define-key *acc-keymap*
                (string *mod-key* " + Ctrl + O")
                [:adjacent-frame :right])
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
   
   (:show-tooltip
      ui-man
@@ -750,7 +750,7 @@ Now that we have a bunch of keys to remember, you can press %s + Shift + / (the 
   {:slide 15}
   [id total keymap]
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (def layout (:get-layout (:get-current-frame (in window-man :root))))
   (def text
@@ -913,7 +913,7 @@ They're still there, but covered by the new window, as you would have expected. 
   (:define-key *acc-keymap*
                (string *mod-key* " + Y")
                [:enum-window-in-frame :prev])
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -944,7 +944,7 @@ Remember, you can still use %s + U or %s + I to switch the "book" you want to re
   (:define-key *acc-keymap*
                (string *mod-key* " + P")
                :cascade-windows-in-frame)
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -995,7 +995,7 @@ To fit the windows to their frames again, press %s + R to :retile.```
                (string *mod-key* " + S")
                [:push-keymap resize-mode-keymap] "Resize mode")
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -1028,7 +1028,7 @@ Please try this out. First select a window you want to resize, then press %s + S
   (:define-key *acc-keymap*
                (string *mod-key* " + Shift + S")
                :frame-to-window-size)
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -1060,7 +1060,7 @@ Some windows have minimum size requirements, but Jwno's frames don't have that l
   (:define-key *acc-keymap*
                (string *mod-key* " + Shift + C")
                :close-window-or-frame)
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -1092,7 +1092,7 @@ To try it out, first activate the window or frame you wan to close, then press %
   (enable-command :split-frame)
   (enable-command :repl)
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
@@ -1118,7 +1118,7 @@ Remember to use %s + Shift + / (the slash key) to see the list of defined keys.`
   {:slide 26}
   [id total keymap]
 
-  (:set-keymap key-man keymap)
+  (set-slide-keymap keymap)
 
   (:show-tooltip
      ui-man
