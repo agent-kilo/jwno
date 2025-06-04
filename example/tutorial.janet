@@ -113,33 +113,39 @@
 (:add-command command-man :show-keymap cmd-show-keymap)
 
 
-(def *common-keymap*
-  (let [keymap (:new-keymap key-man)]
-    (:define-key keymap
-                 "Win + Shift + Q"
-                 :quit
-                 "Stop this tutorial and quit Jwno")
+(var *mod-key* nil)
 
-    (:define-key keymap
-                 "Win + Enter Enter"
-                 :nop
-                 "Cancel")
-    (:define-key keymap
-                 "Win + Enter Esc"
-                 :nop
-                 "Cancel")
-    (:define-key keymap
-                 "Win + Enter R"
-                 [:repl true "127.0.0.1" 9999]
-                 "Launch Jwno REPL")
-    keymap))
+(def *common-keymap* (:new-keymap key-man))
 
+(defn define-common-keys [mod-key]
+  (:define-key *common-keymap*
+               (string mod-key " + Shift + Q")
+               :quit
+               "Stop this tutorial and quit Jwno")
+  (:define-key *common-keymap*
+               (string mod-key " + Enter  Enter")
+               :nop
+               "Cancel")
+  (:define-key *common-keymap*
+               (string mod-key " + Enter  Esc")
+               :nop
+               "Cancel")
+  (:define-key *common-keymap*
+               (string mod-key " + Enter  R")
+               [:repl true "127.0.0.1" 9999]
+               "Launch Jwno REPL")
+  *common-keymap*)
 
 (def *acc-keymap* (:new-keymap key-man *common-keymap*))
 
 
 (defn build-slide-keymap []
   (let [keymap (:new-keymap key-man *acc-keymap*)]
+    # XXX: *mod-key* not available when this function is called
+    (:define-key keymap
+                 "Alt + Shift + /"
+                 [:show-keymap keymap]
+                 "Show current keymap")
     (:define-key keymap
                  "Win + Shift + /"
                  [:show-keymap keymap]
@@ -275,6 +281,34 @@
   (:activate move-to-frame))
 
 
+(var *mod-key-selection-hook-fn* nil)
+
+(defn mod-key-selection-hook-cleanup [next-cmd]
+  (:set-key-mode key-man :command)
+  (when *mod-key-selection-hook-fn*
+    (:remove-hook hook-man :key-pressed *mod-key-selection-hook-fn*))
+  (ev/spawn
+   (:call-command command-man next-cmd)))
+
+(defn mod-key-selection-hook [key next-cmd]
+  (def key-code (in key :key))
+  (cond
+    (or (= key-code VK_LMENU)
+        (= key-code VK_RMENU))
+    (do
+      (set *mod-key* "Alt")
+      (mod-key-selection-hook-cleanup next-cmd))
+
+    (or (= key-code VK_LWIN)
+        (= key-code VK_RWIN))
+    (do
+      (set *mod-key* "Win")
+      (mod-key-selection-hook-cleanup next-cmd))
+
+    true
+    (:show-tooltip ui-man :mod-key-selection "Please press either Win or Alt key." nil nil 1500 :center)))
+
+
 # ================== Slides goes here ==================
 
 
@@ -282,10 +316,17 @@
   {:slide 1}
   [id total keymap]
 
+  (def [_next-key next-cmd] (disable-continue-key keymap))
   (:set-keymap key-man keymap)
 
   # Pause window management
   (:add-hook hook-man :filter-window negative-window-filter)
+
+  (set *mod-key-selection-hook-fn*
+       (:add-hook hook-man :key-pressed
+          (fn [key]
+            (mod-key-selection-hook key next-cmd))))
+  (:set-key-mode key-man :raw)
 
   (:show-tooltip
      ui-man
@@ -301,16 +342,38 @@ Jwno is a keyboard-centric tiling window manager, we'll be using your keyboard a
 
 Note that Jwno has no key bindings defined by default. The keys we'll use here are the same keys defined in example-config.janet. After going through this tutorial, you should be able to use that config file directly, or as a starting point for your own config.
 
-Press Win + Shift + Q or right click on Jwno's system tray icon at any time to stop this tutorial and exit.```
+You can right-click on Jwno's system tray icon at any time to stop this tutorial and exit.
 
-      )
+First things first, let's choose a primary modifier key. Please press either Win or Alt on your keyboard.```
+
+      false)
+     nil nil
+     0
+     :center))
+
+
+(defn confirm-mod-key
+  {:slide 2}
+  [id total keymap]
+
+  (define-common-keys *mod-key*)
+
+  (:set-keymap key-man keymap)
+
+  (:show-tooltip
+     ui-man
+     :tutorial
+     (format-slide-text
+      id total
+
+      (string/format "The primary modifier key is set to %s." *mod-key*))
      nil nil
      0
      :center))
 
 
 (defn before-cleanup-desktop
-  {:slide 2}
+  {:slide 3}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -332,7 +395,7 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
 
 
 (defn cleanup-desktop
-  {:slide 3}
+  {:slide 4}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -372,7 +435,7 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
 
 
 (defn spawn-windows
-  {:slide 4}
+  {:slide 5}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -409,12 +472,14 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
 
 
 (defn tile-windows-in-top-frame
-  {:slide 5}
+  {:slide 6}
   [id total keymap]
 
   # We'll activate the next slide automatically, so disable the continue key
   (def [next-key next-cmd] (disable-continue-key keymap))
-  (:define-key *acc-keymap* "win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + ,")
+               [:split-frame :horizontal 2 [0.5] move-window-after-split])
   (:set-keymap key-man keymap)
 
   (:call-command command-man :retile)
@@ -429,13 +494,15 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
      (format-slide-text
       id total
 
+      (string/format
 ```Jwno calls the screen areas it manages "frames." A top-level frame that covers the whole desktop area is allocated for each monitor by default.
 
 The area now occupied by the Notepad window is our top frame for this monitor.
 
 To help us visualize frame borders, I configured Jwno to show a gap of 20 pixels around the windows in this tutorial.
 
-Try Pressing Win + , (the comma key) on your keyboard ;)```
+Try Pressing %s + , (the comma key) on your keyboard ;)```
+      *mod-key*)
 
       false)
      nil nil
@@ -444,13 +511,15 @@ Try Pressing Win + , (the comma key) on your keyboard ;)```
 
 
 (defn split-top-frame
-  {:slide 6}
+  {:slide 7}
   [id total keymap]
 
   (disable-command :split-frame)
 
   (def [next-key next-cmd] (disable-continue-key keymap))
-  (:define-key *acc-keymap* "win + ." [:split-frame :vertical 2 [0.5] move-window-after-split])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + .")
+               [:split-frame :vertical 2 [0.5] move-window-after-split])
   (:set-keymap key-man keymap)
 
   (enable-command :split-frame (fn [_cmd [dir & _rest]] (= dir :vertical)))
@@ -462,6 +531,7 @@ Try Pressing Win + , (the comma key) on your keyboard ;)```
      (format-slide-text
       id total
 
+      (string/format
 ```We just called the :split-frame command and have the top frame split into two child frames.
 
 Every frame can be split into multiple children. And the children can be split again. And again. And again if you like. Just don't tell anyone we're splitting children in half.
@@ -470,7 +540,8 @@ Every frame can be split into multiple children. And the children can be split a
 
 (Don't worry about the colon(:) in front of the command name. Just knowing that some names in Jwno start with a colon is sufficient for this tutorial.)
 
-Now try Win + . (the period key).```
+Now try %s + . (the period key).```
+      *mod-key*)
 
       false)
      nil nil
@@ -479,7 +550,7 @@ Now try Win + . (the period key).```
 
 
 (defn about-vertical-split-and-empty-frames
-  {:slide 7}
+  {:slide 8}
   [id total keymap]
 
   (disable-command :split-frame)
@@ -505,7 +576,7 @@ And if we open a new window... (I'll spawn an Explorer window for you.)```
 
 
 (defn spawn-window-into-empty-frame
-  {:slide 8}
+  {:slide 9}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -531,7 +602,7 @@ And if we open a new window... (I'll spawn an Explorer window for you.)```
 
 
 (defn about-active-frames
-  {:slide 9}
+  {:slide 10}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -557,7 +628,7 @@ A frame can be activated in one of these ways:
 
 
 (defn about-enumerating-frames
-  {:slide 10}
+  {:slide 11}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -579,13 +650,17 @@ Internally, frames are organized in a tree-like structure, and :enum-frame can h
 
 
 (defn enumerating-frames
-  {:slide 11}
+  {:slide 12}
   [id total keymap]
 
   (enable-command :enum-frame)
 
-  (:define-key *acc-keymap* "Win + U" [:enum-frame :next])
-  (:define-key *acc-keymap* "Win + I" [:enum-frame :prev])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + U")
+               [:enum-frame :next])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + I")
+               [:enum-frame :prev])
   (:set-keymap key-man keymap)
 
   (:show-tooltip
@@ -594,11 +669,13 @@ Internally, frames are organized in a tree-like structure, and :enum-frame can h
      (format-slide-text
       id total
 
-```You can now use Win + U and Win + I to call the :enum-frame command and activate the next/prev frame. The actual commands we bound to these keys will be shown in the top-left corner of your current monitor.
+      (string/format
+```You can now use %s + U and %s + I to call the :enum-frame command and activate the next/prev frame. The actual commands we bound to these keys will be shown in the top-left corner of your current monitor.
 
 Use those keys, or click on the managed windows, to observe the activation of frames. There will be a small tooltip appearing in the center of the activated frame.
 
 After activating a frame, you can restore your minimized windows, or open new windows, to see how Jwno takes them under management.```
+      *mod-key* *mod-key*)
 
       )
      nil nil
@@ -607,7 +684,7 @@ After activating a frame, you can restore your minimized windows, or open new wi
 
 
 (defn about-adjacent-frames
-  {:slide 12}
+  {:slide 13}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -629,16 +706,24 @@ It just does what it says: activating an adjacent frame. You can specify a direc
 
 
 (defn moving-to-adjacent-frames
-  {:slide 13}
+  {:slide 14}
   [id total keymap]
 
   (enable-command :show-keymap)
   (enable-command :adjacent-frame)
 
-  (:define-key *acc-keymap* "Win + Ctrl + Y" [:adjacent-frame :left])
-  (:define-key *acc-keymap* "Win + Ctrl + U" [:adjacent-frame :down])
-  (:define-key *acc-keymap* "Win + Ctrl + I" [:adjacent-frame :up])
-  (:define-key *acc-keymap* "Win + Ctrl + O" [:adjacent-frame :right])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Ctrl + Y")
+               [:adjacent-frame :left])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Ctrl + U")
+               [:adjacent-frame :down])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Ctrl + I")
+               [:adjacent-frame :up])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Ctrl + O")
+               [:adjacent-frame :right])
   (:set-keymap key-man keymap)
   
   (:show-tooltip
@@ -647,11 +732,13 @@ It just does what it says: activating an adjacent frame. You can specify a direc
      (format-slide-text
       id total
 
-```The Win + Ctrl + Y/U/I/O keys are now bound to moving the focus left/down/up/right.
+      (string/format
+```The %s + Ctrl + Y/U/I/O keys are now bound to moving the focus left/down/up/right.
 
-Please try them out, and maybe compare them with Win + U and Win + I.
+Please try them out, and maybe compare them with %s + U and %s + I.
 
-Now that we have a bunch of keys to remember, you can press Win + Shift + / (the slash key) to see a list of all defined keys. But some of those commands are now disabled to keep us oriented.```
+Now that we have a bunch of keys to remember, you can press %s + Shift + / (the slash key) to see a list of all defined keys. But some of those commands are now disabled to keep us oriented.```
+      *mod-key* *mod-key* *mod-key* *mod-key*)
 
       )
      nil nil
@@ -660,7 +747,7 @@ Now that we have a bunch of keys to remember, you can press Win + Shift + / (the
 
 
 (defn about-multi-monitor-support
-  {:slide 14}
+  {:slide 15}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -693,7 +780,7 @@ In other words, you can generally treat your monitors as normal frames.```
 
 
 (defn about-enforcing-window-geometries
-  {:slide 15}
+  {:slide 16}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -722,12 +809,14 @@ You can now freely move or resize any managed windows on the screen. I'll retile
 
 
 (defn about-retiling
-  {:slide 16}
+  {:slide 17}
   [id total keymap]
 
   (enable-command :retile)
 
-  (:define-key *acc-keymap* "Win + R" :retile)
+  (:define-key *acc-keymap*
+               (string *mod-key* " + R")
+               :retile)
   (:set-keymap key-man keymap)
 
   (:call-command command-man :retile)
@@ -738,9 +827,11 @@ You can now freely move or resize any managed windows on the screen. I'll retile
      (format-slide-text
       id total
 
+      (string/format
 ```There! The windows are back to where they should be.
 
-We just called the :retile command. From now on, you can press Win + R if the window layout got messed up and you want to retile.```
+We just called the :retile command. From now on, you can press %s + R if the window layout got messed up and you want to retile.```
+      *mod-key*)
 
       )
      nil nil
@@ -749,15 +840,23 @@ We just called the :retile command. From now on, you can press Win + R if the wi
 
 
 (defn about-moving-windows
-  {:slide 17}
+  {:slide 18}
   [id total keymap]
 
   (enable-command :move-window)
 
-  (:define-key *acc-keymap* "Win + Shift + Y" [:move-window :left])
-  (:define-key *acc-keymap* "Win + Shift + U" [:move-window :down])
-  (:define-key *acc-keymap* "Win + Shift + I" [:move-window :up])
-  (:define-key *acc-keymap* "Win + Shift + O" [:move-window :right])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Shift + Y")
+               [:move-window :left])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Shift + U")
+               [:move-window :down])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Shift + I")
+               [:move-window :up])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Shift + O")
+               [:move-window :right])
   (:set-keymap key-man keymap)
 
   (:show-tooltip
@@ -766,11 +865,13 @@ We just called the :retile command. From now on, you can press Win + R if the wi
      (format-slide-text
       id total
 
+      (string/format
 ```Now it's time to move our windows around.
 
-Select a window, and try Win + Shift + Y/U/I/O ;)
+Select a window, and try %s + Shift + Y/U/I/O ;)
 
 These keys are now bound to window movement commands. They also work across monitors, like the frame selection commands.```
+      *mod-key*)
 
       )
      nil nil
@@ -779,7 +880,7 @@ These keys are now bound to window movement commands. They also work across moni
 
 
 (defn about-overlapping-windows
-  {:slide 18}
+  {:slide 19}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -801,13 +902,17 @@ They're still there, but covered by the new window, as you would have expected. 
 
 
 (defn trying-out-enum-window-in-frame
-  {:slide 19}
+  {:slide 20}
   [id total keymap]
 
   (enable-command :enum-window-in-frame)
 
-  (:define-key *acc-keymap* "Win + O" [:enum-window-in-frame :next])
-  (:define-key *acc-keymap* "Win + Y" [:enum-window-in-frame :prev])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + O")
+               [:enum-window-in-frame :next])
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Y")
+               [:enum-window-in-frame :prev])
   (:set-keymap key-man keymap)
 
   (:show-tooltip
@@ -816,11 +921,13 @@ They're still there, but covered by the new window, as you would have expected. 
      (format-slide-text
       id total
 
-```Let's try it out - move multiple windows into one frame with the window movement keys, or simply open some new windows, then imagine that frame is a book. Win + O will bring you to the next page, and Win + Y to the previous page.
+      (string/format
+```Let's try it out - move multiple windows into one frame with the window movement keys, or simply open some new windows, then imagine that frame is a book. %s + O will bring you to the next page, and %s + Y to the previous page.
 
-Remember, you can still use Win + U or Win + I to switch the "book" you want to read.
+Remember, you can still use %s + U or %s + I to switch the "book" you want to read.
 
 (This book analogy is the main reason these keys are arranged like this. You don't like it? No worries! Jwno is quite customizable, just define your own keys.)```
+      *mod-key* *mod-key* *mod-key* *mod-key*)
 
       )
      nil nil
@@ -829,12 +936,14 @@ Remember, you can still use Win + U or Win + I to switch the "book" you want to 
 
 
 (defn about-cascading-windows-in-frame
-  {:slide 20}
+  {:slide 21}
   [id total keymap]
 
   (enable-command :cascade-windows-in-frame)
 
-  (:define-key *acc-keymap* "Win + P" :cascade-windows-in-frame)
+  (:define-key *acc-keymap*
+               (string *mod-key* " + P")
+               :cascade-windows-in-frame)
   (:set-keymap key-man keymap)
 
   (:show-tooltip
@@ -843,11 +952,13 @@ Remember, you can still use Win + U or Win + I to switch the "book" you want to 
      (format-slide-text
       id total
 
+      (string/format
 ```Sometimes it's too slow to flip through a thick book. Luckily we have the :cascade-windows-in-frame command.
 
-Activate a frame containing multiple windows, then press Win + P to see it in action ;)
+Activate a frame containing multiple windows, then press %s + P to see it in action ;)
 
-To fit the windows to their frames again, press Win + R to :retile.```
+To fit the windows to their frames again, press %s + R to :retile.```
+      *mod-key* *mod-key*)
 
       )
      nil nil
@@ -856,7 +967,7 @@ To fit the windows to their frames again, press Win + R to :retile.```
 
 
 (defn transient-keymaps-and-resizing-windows
-  {:slide 21}
+  {:slide 22}
   [id total keymap]
 
   (enable-command :resize-frame)
@@ -880,7 +991,9 @@ To fit the windows to their frames again, press Win + R to :retile.```
       (:define-key km "Enter" :pop-keymap)
       (:define-key km "Esc" :pop-keymap)
       km))
-  (:define-key *acc-keymap* "Win + S" [:push-keymap resize-mode-keymap] "Resize mode")
+  (:define-key *acc-keymap*
+               (string *mod-key* " + S")
+               [:push-keymap resize-mode-keymap] "Resize mode")
 
   (:set-keymap key-man keymap)
 
@@ -890,13 +1003,15 @@ To fit the windows to their frames again, press Win + R to :retile.```
      (format-slide-text
       id total
 
+      (string/format
 ```And of course, we have commands to resize windows too. Here we defined our window resizing keys in a Transient Keymap.
 
 Jwno's keymaps work like a stack. When you want to temporarily switch to another keymap, use the special :push-keymap command. After you're done with the transient keymap, use the :pop-keymap command to bring back the normal keymap.
 
 When a transient keymap is in effect, Jwno will automatically show the keys defined in the top-left corner.
 
-Please try this out. First select a window you want to resize, then press Win + S. After that you can resize the window with only the Y/U/I/O keys. Press the Enter key when you're done.```
+Please try this out. First select a window you want to resize, then press %s + S. After that you can resize the window with only the Y/U/I/O keys. Press the Enter key when you're done.```
+        *mod-key*)
 
       false)
      nil nil
@@ -905,12 +1020,14 @@ Please try this out. First select a window you want to resize, then press Win + 
 
 
 (defn more-about-resizing-windows
-  {:slide 22}
+  {:slide 23}
   [id total keymap]
 
   (enable-command :frame-to-window-size)
 
-  (:define-key *acc-keymap* "Win + Shift + S" :frame-to-window-size)
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Shift + S")
+               :frame-to-window-size)
   (:set-keymap key-man keymap)
 
   (:show-tooltip
@@ -919,9 +1036,11 @@ Please try this out. First select a window you want to resize, then press Win + 
      (format-slide-text
       id total
 
+      (string/format
 ```When you're resizing a window, you're actually resizing the frame it belongs to, and all other windows in the same frame. You can see that from the command's name: it's actually called :resize-frame.
 
-Some windows have minimum size requirements, but Jwno's frames don't have that limitation. So sometimes windows will "overflow" from the designated frame area. Unfortunately Jwno has no control over this. In that case, you can switch to the overflowing window, and use Win + Shift + S to make its parent frame large enough to contain it.```
+Some windows have minimum size requirements, but Jwno's frames don't have that limitation. So sometimes windows will "overflow" from the designated frame area. Unfortunately Jwno has no control over this. In that case, you can switch to the overflowing window, and use %s + Shift + S to make its parent frame large enough to contain it.```
+        *mod-key*)
 
       )
      nil nil
@@ -930,7 +1049,7 @@ Some windows have minimum size requirements, but Jwno's frames don't have that l
 
 
 (defn closing-windows-and-frames
-  {:slide 23}
+  {:slide 24}
   [id total keymap]
 
   # Start removing empty frames
@@ -938,7 +1057,9 @@ Some windows have minimum size requirements, but Jwno's frames don't have that l
 
   (enable-command :close-window-or-frame)
 
-  (:define-key *acc-keymap* "Win + Shift + C" :close-window-or-frame)
+  (:define-key *acc-keymap*
+               (string *mod-key* " + Shift + C")
+               :close-window-or-frame)
   (:set-keymap key-man keymap)
 
   (:show-tooltip
@@ -947,13 +1068,15 @@ Some windows have minimum size requirements, but Jwno's frames don't have that l
      (format-slide-text
       id total
 
+      (string/format
 ```To close a window, use the :close-window-or-frame command.
 
 If there's a focused window, that command will close it. Otherwise, if the active frame is empty, it'll close the frame instead.
 
 Note that the example config added a hook to automatically close empty frames after closing a window, so we'll include the same behavior here, but it's not Jwno's default behavior.
 
-To try it out, first activate the window or frame you wan to close, then press Win + Shift + C.```
+To try it out, first activate the window or frame you wan to close, then press %s + Shift + C.```
+        *mod-key*)
 
       )
      nil nil
@@ -962,7 +1085,7 @@ To try it out, first activate the window or frame you wan to close, then press W
 
 
 (defn concluding
-  {:slide 24}
+  {:slide 25}
   [id total keymap]
 
   # Enable all disabled commands
@@ -977,11 +1100,13 @@ To try it out, first activate the window or frame you wan to close, then press W
      (format-slide-text
       id total
 
+      (string/format
 ```Alright! We have walked through Jwno's most important commands. Now I have enabled them all, and they're yours to play with ;)
 
 Or, you can check out example-config.janet and try to launch Jwno with it. There're extra goodies there. 
 
-Remember to use Win + Shift + / (the slash key) to see the list of defined keys.```
+Remember to use %s + Shift + / (the slash key) to see the list of defined keys.```
+        *mod-key*)
 
       )
      nil nil
@@ -990,7 +1115,7 @@ Remember to use Win + Shift + / (the slash key) to see the list of defined keys.
 
 
 (defn cleanup-tutorial
-  {:slide 25}
+  {:slide 26}
   [id total keymap]
 
   (:set-keymap key-man keymap)
@@ -1001,11 +1126,13 @@ Remember to use Win + Shift + / (the slash key) to see the list of defined keys.
      (format-slide-text
       id total
 
+      (string/format
 ```Please try out the keys/commands.
 
-Win + Shift + / to show all keys.
+%s + Shift + / to show all keys.
 
-Win + Shift + Q to exit Jwno.```
+%s + Shift + Q to exit Jwno.```
+        *mod-key* *mod-key*)
 
       false)
      nil nil
