@@ -495,6 +495,17 @@
           {:id desktop-id :name desktop-name})))))
 
 
+#
+# Give hwnd-info objects a prototype, so that they can
+# be used with with-uia macro.
+#
+(def hwnd-info-proto
+  {:AddRef  (fn hwnd-info-addref [self]
+              (:AddRef (in self :uia-element)))
+   :Release (fn hwnd-info-release [self]
+              (:Release (in self :uia-element)))})
+
+
 (defn- get-hwnd-info [hwnd? uia-man vdm-com &opt uia-win?]
   (def [hwnd uia-win]
     (normalize-hwnd-and-uia-element hwnd?
@@ -534,10 +545,11 @@
         # callers' responsibility to :Release all the UIA elements
         # they get.
         (:AddRef uia-win)
-        {:hwnd hwnd
-         :uia-element uia-win
-         :exe-path exe-path
-         :virtual-desktop desktop-info}))))
+        (struct/with-proto hwnd-info-proto
+                           :hwnd hwnd
+                           :uia-element uia-win
+                           :exe-path exe-path
+                           :virtual-desktop desktop-info)))))
 
 
 (defn- window-purge-pred [win wm layout]
@@ -2848,40 +2860,52 @@
     :ignored))
 
 
-(defn wm-add-hwnd [self hwnd-info &opt manage-state]
+(defn wm-add-hwnd [self hwnd-or-info &opt manage-state no-check]
   (default manage-state :normal)
+  (default no-check false)
 
-  (def {:hwnd hwnd
-        :uia-element uia-win
-        :exe-path exe-path
-        :virtual-desktop desktop-info}
-    hwnd-info)
+  (with-uia [hwnd-info (if (= :pointer (type hwnd-or-info))
+                         # It's an hwnd
+                         (:get-hwnd-info self hwnd-or-info)
+                         # else, assume it's an hwnd-info object
+                         (do
+                           (:AddRef hwnd-or-info)
+                           hwnd-or-info))]
+    (when hwnd-info
+      (def {:hwnd hwnd
+            :uia-element uia-win
+            :exe-path exe-path
+            :virtual-desktop desktop-info}
+        hwnd-info)
 
-  (log/debug "new window: %n" hwnd)
+      (unless no-check
+        (when-let [w (:find-hwnd (in self :root) hwnd)]
+          # out of with-uia
+          (break w)))
 
-  (def new-win (window hwnd))
-  (when (= :forced manage-state)
-    (put (in new-win :tags) :forced true))
+      (log/debug "new window: %n" hwnd)
 
-  (:call-hook (in self :hook-manager) :window-created
-     new-win uia-win exe-path desktop-info)
+      (def new-win (window hwnd))
+      (when (= :forced manage-state)
+        (put (in new-win :tags) :forced true))
 
-  (def tags (in new-win :tags))
+      (:call-hook (in self :hook-manager) :window-created
+         new-win uia-win exe-path desktop-info)
 
-  # TODO: floating windows?
+      (def tags (in new-win :tags))
 
-  (def frame-found
-    (if-let [override-frame (in tags :frame)]
-      (do 
-        (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
-        (:get-current-frame override-frame))
-      (:get-current-frame-on-desktop (in self :root) desktop-info)))
+      (def frame-found
+        (if-let [override-frame (in tags :frame)]
+          (do 
+            (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
+            (:get-current-frame override-frame))
+          (:get-current-frame-on-desktop (in self :root) desktop-info)))
 
-  (:add-child frame-found new-win)
-  (:layouts-changed self [(:get-layout frame-found)])
-  (:transform new-win (:get-padded-rect frame-found) nil self)
+      (:add-child frame-found new-win)
+      (:layouts-changed self [(:get-layout frame-found)])
+      (:transform new-win (:get-padded-rect frame-found) nil self)
 
-  new-win)
+      new-win)))
 
 
 (defn wm-remove-hwnd [self hwnd]
@@ -2890,6 +2914,10 @@
     (:remove-child parent-fr w)
     (:call-hook (in self :hook-manager) :window-removed w)
     w))
+
+
+(defn wm-find-hwnd [self hwnd]
+  (:find-hwnd (in self :root) hwnd))
 
 
 (defn wm-filter-hwnd [self hwnd &opt uia-win? _exe-path? desktop-info?]
@@ -3065,26 +3093,22 @@
         (:activate win))
       (break))
 
-    (def hwnd-info
-      (get-hwnd-info hwnd
-                     (in self :uia-manager)
-                     (in self :vdm-com)
-                     uia-win))
-    (when (nil? hwnd-info)
-      # Bad window
-      (break))
+    (with-uia [hwnd-info (get-hwnd-info hwnd
+                                        (in self :uia-manager)
+                                        (in self :vdm-com)
+                                        uia-win)]
+      (when hwnd-info
+        (def manage-state (:should-manage-hwnd? self hwnd-info))
+        (log/debug "manage-state = %n" manage-state)
 
-    (with-uia [_uia-win (in hwnd-info :uia-element)]
-      (def manage-state (:should-manage-hwnd? self hwnd-info))
-      (log/debug "manage-state = %n" manage-state)
+        (when (= :ignored manage-state)
+          (log/debug "Ignoring window: %n" hwnd)
+          # out of with-uia
+          (break))
 
-      (when (= :ignored manage-state)
-        (log/debug "Ignoring window: %n" hwnd)
-        (break))
-
-      (if-let [new-win (:add-hwnd self hwnd-info manage-state)]
-        (with-activation-hooks self
-          (:activate new-win))))))
+        (if-let [new-win (:add-hwnd self hwnd-info manage-state true)]
+          (with-activation-hooks self
+            (:activate new-win)))))))
 
 
 (defn wm-window-opened [self hwnd]
@@ -3092,31 +3116,27 @@
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break))
 
-  (def hwnd-info
-    (get-hwnd-info hwnd
-                   (in self :uia-manager)
-                   (in self :vdm-com)))
-  (when (nil? hwnd-info)
-    (log/debug "Window %n vanished?" hwnd)
-    (break))
+  (with-uia [hwnd-info (get-hwnd-info hwnd
+                                      (in self :uia-manager)
+                                      (in self :vdm-com))]
+    (when hwnd-info
+      (def manage-state (:should-manage-hwnd? self hwnd-info))
+      (log/debug "manage-state = %n" manage-state)
 
-  (with-uia [_uia-win (in hwnd-info :uia-element)]
-    (def manage-state (:should-manage-hwnd? self hwnd-info))
-    (log/debug "manage-state = %n" manage-state)
+      (when (= :ignored manage-state)
+        (log/debug "Ignoring window: %n" hwnd)
+        # out of with-uia
+        (break))
 
-    (when (= :ignored manage-state)
-      (log/debug "Ignoring window: %n" hwnd)
-      (break))
-
-    (if-let [new-win (:add-hwnd self hwnd-info manage-state)
-             fg-hwnd (GetForegroundWindow)]
-      # Some windows only send one window-opened event, but no focus-changed
-      # event, when they firt appear, even though they have input focus
-      # (e.g. Windows Terminal). We need to explicitly activate their nodes
-      # here if they're opened in the foreground.
-      (when (= hwnd fg-hwnd)
-        (with-activation-hooks self
-          (:activate new-win))))))
+      (if-let [new-win (:add-hwnd self hwnd-info manage-state true)
+               fg-hwnd (GetForegroundWindow)]
+        # Some windows only send one window-opened event, but no focus-changed
+        # event, when they firt appear, even though they have input focus
+        # (e.g. Windows Terminal). We need to explicitly activate their nodes
+        # here if they're opened in the foreground.
+        (when (= hwnd fg-hwnd)
+          (with-activation-hooks self
+            (:activate new-win)))))))
 
 
 (defn wm-desktop-name-changed [self vd-name]
@@ -3323,6 +3343,7 @@
     :should-manage-hwnd? wm-should-manage-hwnd?
     :add-hwnd wm-add-hwnd
     :remove-hwnd wm-remove-hwnd
+    :find-hwnd wm-find-hwnd
     :filter-hwnd wm-filter-hwnd
     :ignore-hwnd wm-ignore-hwnd
     :do-not-ignore-hwnd wm-do-not-ignore-hwnd
