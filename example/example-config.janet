@@ -4,7 +4,14 @@
 # This is an example config file for Jwno (https://github.com/agent-kilo/jwno).
 # The features introduced here are quite exhaustive, you may
 # want to customize/simplify it a bit before adopting it for
-# daily use. It's heavily commented, you can skim through the
+# daily use. Specifically, these variables (in the Global Definitions
+# section) are meant to be changed by the user, according to
+# their preferences:
+#
+#   * mod-key
+#   * keyboard-layout
+#
+# The code is heavily commented, you can skim through the
 # comments and then focus on the parts you're interested in.
 #
 # Features enabled here:
@@ -29,14 +36,15 @@
 #     making them transparent. (See the :window-created hook below.)
 #   * It treats an application from a certain French game company specially.
 #     (See the user-forced-window-filter function.)
-#   * It binds all ui-hint features to the RAlt key, but your keyboard may
-#     have an AltGr key on the right instead. In that case, you need to modify
-#     the key bindings and choose another leading key.
+#   * When mod-key is set to "Win" (the default), it binds all ui-hint features
+#     to the `RAlt` key, but your keyboard may have an `AltGr` key on the right
+#     instead. In that case, you need to change the hint-key variable manually
+#     to choose another leading key.
 #   * It sometimes grants you infinite lives. Please don't take it seriously
 #     and do anything dangerous.
 #
-# To try out this example config, download this file, then drag-n-drop it to
-# jwno.exe.
+# To try out this example config, download this file, make adjustments as
+# needed, then drag-n-drop it to jwno.exe.
 #
 
 
@@ -86,23 +94,46 @@
 #======================#
 
 #
+# A convenience provided by this config, to set the primary modifier
+# key. Most of the key bindings defined in the root keymap contains
+# the mod-key as a modifier. Only "Win" and "Alt" are supported here.
+#
+# Note that Jwno tries to treat all modifier keys equally, and has
+# no concept of a "mod key". All mod-key related code is implemented
+# in this config file only. We use ${MOD} as a placeholder for the
+# mod-key here.
+#
+(def mod-key "Win")
+
+(unless (find |(= $ (string/ascii-lower mod-key)) ["win" "alt"])
+  (errorf "unsupported mod key: %n" mod-key))
+
+#
 # A convenience provided by this config to set the navigation keys
-# according to the keyboard layout. You can copy this config file,
-# change the keyboard-layout into something you prefer, and off you
-# go. Check dir-keys below for layouts supported by this config.
+# according to the keyboard layout. Check dir-keys below for layouts
+# supported here.
 #
 (def keyboard-layout :qwerty)
 
 (def dir-keys
   (case keyboard-layout
     :qwerty
-    # Sorry, no HJKL for QWERTY, since `Win + L` means "Lock the Screen", and it
-    # cannot be overridden. If you really want to use `Win + L`, check out
-    # https://agent-kilo.github.io/jwno/cookbook/bind-win-l-to-something-else.html
-    {:left  "Y"
-     :down  "U"
-     :up    "I"
-     :right "O"}
+    (case (string/ascii-lower mod-key)
+      "win"
+      # Sorry, no HJKL for QWERTY, when mod-key is set to "Win", since
+      # `Win + L` means "Lock the Screen", and it cannot be overridden.
+      # If you really want to use `Win + L`, check out
+      # https://agent-kilo.github.io/jwno/cookbook/bind-win-l-to-something-else.html
+      {:left  "Y"
+       :down  "U"
+       :up    "I"
+       :right "O"}
+
+      "alt"
+      {:left  "H"
+       :down  "J"
+       :up    "K"
+       :right "L"})
 
     :colemak
     {:left  "H"
@@ -123,6 +154,11 @@
      :right "N"}
 
     (errorf "unsupported layout: %n" keyboard-layout)))
+
+(def hint-key
+  (case (string/ascii-lower mod-key)
+    "win" "RAlt"
+    "alt" "RWin"))
 
 (def hint-key-list
   (case keyboard-layout
@@ -149,11 +185,20 @@
   jwno/context)
 
 #
+# Replace the key placeholders with the actual key names
+#
+(defmacro $ [str]
+  ~(->> ,str
+        (peg/replace-all "${MOD}"  ,mod-key)
+        (peg/replace-all "${HINT}" ,hint-key)
+        (string)))
+
+#
 # A macro to simplify key map definitions. Of course you can call
 # :define-key method from the keymap object directly instead.
 #
 (defmacro k [key-seq cmd &opt doc]
-  ~(:define-key keymap ,key-seq ,cmd ,doc))
+  ~(:define-key keymap ($ ,key-seq) ,cmd ,doc))
 
 
 #==============================#
@@ -234,7 +279,7 @@
 #
 # Transient keymaps are activated by :push-keymap commands, and
 # deactivated by :pop-keymap commands. See the definition for
-# `Win + S` key binding below.
+# `${MOD} + S` key binding below.
 #
 (def resize-mode-keymap
   (let [keymap (:new-keymap key-man)]
@@ -257,7 +302,7 @@
 
 #
 # A transient keymap for moving windows around. See the
-# definition for `Win + K` key binding below.
+# definition for `${MOD} + C` key binding below.
 #
 (def yank-mode-keymap
   (let [keymap (:new-keymap key-man)]
@@ -271,7 +316,7 @@
 
 #
 # A transient keymap for adjusting transparency for the
-# current window. See the definition for `Win + A` key
+# current window. See the definition for `${MOD} + A` key
 # binding below.
 #
 (def alpha-mode-keymap
@@ -290,7 +335,7 @@
 # to adjust windows/frames after the splitting is done. Below
 # is such a function to move the activated window into the
 # new empty frame, and activate (move focus to) that frame.
-# See the definitions for `Win + ,` and `Win + .` key bindings
+# See the definitions for `${MOD} + ,` and `${MOD} + .` key bindings
 # below.
 #
 (defn move-window-after-split [frame]
@@ -304,7 +349,7 @@
 #
 # Here's another function to automatically move the focused
 # window to a new frame, after :insert-frame command. See the
-# definitions for `Win + Q  I` and `Win + Q  Shift + I` key
+# definitions for `${MOD} + Q  I` and `${MOD} + Q  Shift + I` key
 # bindings below.
 #
 (defn move-window-after-insert [dir frame]
@@ -343,80 +388,80 @@
     #  Basic Commands #
     #-----------------#
 
-    (k "Win + Shift + /" :show-root-keymap)
-    (k "Win + Shift + Q" :quit)
-    (k "Win + R"         :retile)
+    (k "${MOD} + Shift + /" :show-root-keymap)
+    (k "${MOD} + Shift + Q" :quit)
+    (k "${MOD} + R"         :retile)
 
     #-------------------------------#
     #  Window And Frame Operations  #
     #-------------------------------#
 
-    (k "Win + Shift + C" :close-window-or-frame)
-    (k "Win + Shift + F" :close-frame)
+    (k "${MOD} + Shift + C" :close-window-or-frame)
+    (k "${MOD} + Shift + F" :close-frame)
 
-    (k "Win + ," [:split-frame :horizontal 2 [0.5] move-window-after-split]
+    (k "${MOD} + ," [:split-frame :horizontal 2 [0.5] move-window-after-split]
        "Split current frame horizontally")
-    (k "Win + ." [:split-frame :vertical   2 [0.5] move-window-after-split]
+    (k "${MOD} + ." [:split-frame :vertical   2 [0.5] move-window-after-split]
        "Split current frame vertically")
-    (k "Win + =" :balance-frames)
-    (k "Win + ;"         [:zoom-in 0.7])
-    (k "Win + Shift + ;" [:zoom-in 0.3])
-    (k "Win + F" :fill-monitor)
+    (k "${MOD} + =" :balance-frames)
+    (k "${MOD} + ;"         [:zoom-in 0.7])
+    (k "${MOD} + Shift + ;" [:zoom-in 0.3])
+    (k "${MOD} + F" :fill-monitor)
 
-    (k "Win + P" :cascade-windows-in-frame)
+    (k "${MOD} + P" :cascade-windows-in-frame)
 
-    (k (string "Win + " (in dir-keys :down))  [:enum-frame :next])
-    (k (string "Win + " (in dir-keys :up))    [:enum-frame :prev])
-    (k (string "Win + " (in dir-keys :left))  [:enum-window-in-frame :prev])
-    (k (string "Win + " (in dir-keys :right)) [:enum-window-in-frame :next])
+    (k (string "${MOD} + " (in dir-keys :down))  [:enum-frame :next])
+    (k (string "${MOD} + " (in dir-keys :up))    [:enum-frame :prev])
+    (k (string "${MOD} + " (in dir-keys :left))  [:enum-window-in-frame :prev])
+    (k (string "${MOD} + " (in dir-keys :right)) [:enum-window-in-frame :next])
 
     (each dir [:down :up :left :right]
-      (k (string "Win + Ctrl + "  (in dir-keys dir)) [:adjacent-frame dir])
-      (k (string "Win + Shift + " (in dir-keys dir)) [:move-window dir]))
+      (k (string "${MOD} + Ctrl + "  (in dir-keys dir)) [:adjacent-frame dir])
+      (k (string "${MOD} + Shift + " (in dir-keys dir)) [:move-window dir]))
 
-    (k "Win + S" [:push-keymap resize-mode-keymap]
+    (k "${MOD} + S" [:push-keymap resize-mode-keymap]
        "Resize mode")
-    (k "Win + K" [:push-keymap yank-mode-keymap]
+    (k "${MOD} + C" [:push-keymap yank-mode-keymap]
        "Yank mode")
 
-    (k "Win + Shift + S" :frame-to-window-size)
+    (k "${MOD} + Shift + S" :frame-to-window-size)
 
-    (k "Win + A" [:push-keymap alpha-mode-keymap]
+    (k "${MOD} + A" [:push-keymap alpha-mode-keymap]
        "Alpha mode")
 
     #
     # Below are less frequently used commands, grouped by prefix keys
     #
-    # Window-specific commands start with `Win + W`
+    # Window-specific commands start with `${MOD} + W`
     #
-    (k "Win + W  Esc"   :nop "Cancel")
-    (k "Win + W  Enter" :nop "Cancel")
-    (k "Win + W  D" :describe-window)
-    (k "Win + W  M" :manage-window)
-    (k "Win + W  I" :ignore-window)
+    (k "${MOD} + W  Esc"   :nop "Cancel")
+    (k "${MOD} + W  Enter" :nop "Cancel")
+    (k "${MOD} + W  D" :describe-window)
+    (k "${MOD} + W  M" :manage-window)
+    (k "${MOD} + W  I" :ignore-window)
 
     #
-    # Frame-specific commands start with `Win + Q`
+    # Frame-specific commands start with `${MOD} + Q`
     #
-    (k "Win + Q  Esc"   :nop "Cancel")
-    (k "Win + Q  Enter" :nop "Cancel")
-    (k "Win + Q  C"     :close-frame)
-    (k "Win + Q  F"     :flatten-parent)
-    (k "Win + Q  I"         [:insert-frame :after  (fn [fr] (move-window-after-insert :after fr))]
+    (k "${MOD} + Q  Esc"   :nop "Cancel")
+    (k "${MOD} + Q  Enter" :nop "Cancel")
+    (k "${MOD} + Q  C"     :close-frame)
+    (k "${MOD} + Q  F"     :flatten-parent)
+    (k "${MOD} + Q  I"         [:insert-frame :after  (fn [fr] (move-window-after-insert :after fr))]
        "Insert a new frame after the current frame")
-    (k "Win + Q  Shift + I" [:insert-frame :before (fn [fr] (move-window-after-insert :before fr))]
+    (k "${MOD} + Q  Shift + I" [:insert-frame :before (fn [fr] (move-window-after-insert :before fr))]
        "Insert a new frame before the current frame")
-    (k "Win + Q  R"         :rotate-sibling-frames
+    (k "${MOD} + Q  R"         :rotate-sibling-frames
        "Rotate sibling frames")
-    (k "Win + Q  Shift + R" [:rotate-sibling-frames nil nil 0]
+    (k "${MOD} + Q  Shift + R" [:rotate-sibling-frames nil nil 0]
        "Rotate monitors")
-    (k "Win + Q  V"         :reverse-sibling-frames
+    (k "${MOD} + Q  V"         :reverse-sibling-frames
        "Reverse sibling frames")
-    (k "Win + Q  Shift + V" [:reverse-sibling-frames 0]
+    (k "${MOD} + Q  Shift + V" [:reverse-sibling-frames 0]
        "Reverse monitors")
-    (k "Win + Q  D"         :toggle-parent-direction
+    (k "${MOD} + Q  D"         :toggle-parent-direction
        "Toggle parent direction")
-    (k "Win + Q  Shift + D" [:toggle-parent-direction true 1]
+    (k "${MOD} + Q  Shift + D" [:toggle-parent-direction true 1]
        "Toggle monitor direction (flip layout)")
 
     #----------------------------#
@@ -429,7 +474,7 @@
     # key combo, and the keys defined in the next level will be shown in
     # the top-left corner of your current monitor by default.
     #
-    # Here we're using `Win + Enter` as a "launcher prefix", to group all
+    # Here we're using `${MOD} + Enter` as a "launcher prefix", to group all
     # our tool-launching key bindings together.
     #
 
@@ -437,9 +482,9 @@
     # The :nop command does... nothing. It's usually used to cancel a
     # multi-level keymap.
     #
-    (k "Win + Enter  Esc" :nop
+    (k "${MOD} + Enter  Esc" :nop
        "Cancel")
-    (k "Win + Enter  Enter" :nop
+    (k "${MOD} + Enter  Enter" :nop
        "Cancel")
 
     #
@@ -447,10 +492,10 @@
     # matches the rules we specified. It launches a program by running
     # the provided command line if no matching window can be found.
     #
-    (k "Win + Enter  T" [:summon
-                         (match-exe-name "WindowsTerminal.exe")
-                         true
-                         "wt.exe"]
+    (k "${MOD} + Enter  T" [:summon
+                            (match-exe-name "WindowsTerminal.exe")
+                            true
+                            "wt.exe"]
        "Summon Terminal")
 
     #
@@ -460,17 +505,17 @@
     #
     (def emacs-cmd
       ["pwsh.exe" "-Command" "Start-Process runemacs.exe"])
-    (k "Win + Enter  E" [:summon
-                         (match-exe-name "emacs.exe")
-                         true
-                         ;emacs-cmd]
+    (k "${MOD} + Enter  E" [:summon
+                            (match-exe-name "emacs.exe")
+                            true
+                            ;emacs-cmd]
        "Summon Emacs")
 
     #
     # When no command line is provided, :summon only searches for the
     # window, and shows a message if no matching window can be found.
     #
-    (k "Win + Enter  F" [:summon (match-exe-name "firefox.exe")]
+    (k "${MOD} + Enter  F" [:summon (match-exe-name "firefox.exe")]
        "Summon Firefox")
 
     #
@@ -478,18 +523,18 @@
     #
     (def dev-shell-cmd
       ["wt.exe" "pwsh.exe" "-NoExit" "-Command" "& \"$Env:VS_TOOLS_DIR\\Launch-VsDevShell.ps1\" -Arch amd64 -SkipAutomaticLocation"])
-    (k "Win + Enter  D" [:exec
-                         true
-                         ;dev-shell-cmd]
+    (k "${MOD} + Enter  D" [:exec
+                            true
+                            ;dev-shell-cmd]
        "Launch VS Dev Shell")
 
-    (k "Win + Enter  R" [:repl true "127.0.0.1" 9999]
+    (k "${MOD} + Enter  R" [:repl true "127.0.0.1" 9999]
        "Launch Jwno REPL")
 
     #
     # Ahem, nothing interesting here. Move on.
     #
-    (let [win-enter-key (first (:parse-key keymap "Win + Enter"))
+    (let [win-enter-key (first (:parse-key keymap ($ "${MOD} + Enter")))
           win-enter-map (:get-key-binding keymap win-enter-key)]
       (:define-key win-enter-map
                    "Up Up Down Down Left Right Left Right B A"
@@ -508,12 +553,12 @@
     # scratch pad's :command-name method here to get the unique command
     # for manipulating this specific scratch pad instance.
     #
-    (k "Win + Enter  N" [(:command-name scratch-pad :summon-to)
-                         (fn [_hwnd _uia exe]
-                           (string/has-suffix? "\\notepad.exe" exe))
-                         10
-                         "notepad.exe"]
-       "Summon Notepad to scratch pad")
+    (k "${MOD} + Enter  N" [(:command-name scratch-pad :summon-to)
+                            (fn [_hwnd _uia exe]
+                              (string/has-suffix? "\\notepad.exe" exe))
+                            10
+                            "notepad.exe"]
+       "Summon Notepad to scratch_ pad")
 
     #
     # Here's a more complex example. Edge web app windows show different
@@ -530,32 +575,32 @@
           (string/has-suffix? "\\msedge.exe" exe))))
     (def google-translate-cmd
       ["C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe" "--app=https://translate.google.com"])
-    (k "Win + Enter  G" [(:command-name scratch-pad :summon-to)
-                         google-translate-match-fn
-                         10
-                         ;google-translate-cmd]
+    (k "${MOD} + Enter  G" [(:command-name scratch-pad :summon-to)
+                            google-translate-match-fn
+                            10
+                            ;google-translate-cmd]
        "Summon Google Translate to scratch pad")
 
     #
     # More key bindings for scratch-pad
     #
-    (k "Win + Enter  H"    (:command-name scratch-pad :hide)
+    (k "${MOD} + Enter  H"    (:command-name scratch-pad :hide)
        "Hide scratch pad")
-    (k "Win + Enter  S  S" (:command-name scratch-pad :show)
+    (k "${MOD} + Enter  S  S" (:command-name scratch-pad :show)
        "Show scratch pad")
-    (k "Win + Enter  S  N" [(:command-name scratch-pad :show) :next]
+    (k "${MOD} + Enter  S  N" [(:command-name scratch-pad :show) :next]
        "Next window in scratch pad")
-    (k "Win + Enter  S  P" [(:command-name scratch-pad :show) :prev]
+    (k "${MOD} + Enter  S  P" [(:command-name scratch-pad :show) :prev]
        "Previous window in scratch pad")
-    (k "Win + Enter  S  H" (:command-name scratch-pad :hide)
+    (k "${MOD} + Enter  S  H" (:command-name scratch-pad :hide)
        "Hide scratch pad")
-    (k "Win + Enter  S  T" (:command-name scratch-pad :toggle)
+    (k "${MOD} + Enter  S  T" (:command-name scratch-pad :toggle)
        "Toggle scratch pad")
-    (k "Win + Enter  S  A" (:command-name scratch-pad :add-to)
+    (k "${MOD} + Enter  S  A" (:command-name scratch-pad :add-to)
        "Add current window to scratch pad")
-    (k "Win + Enter  S  R" (:command-name scratch-pad :remove-from)
+    (k "${MOD} + Enter  S  R" (:command-name scratch-pad :remove-from)
        "Remove the first window from scratch pad")
-    (k "Win + Enter  S  Shift + R" (:command-name scratch-pad :remove-all-from)
+    (k "${MOD} + Enter  S  Shift + R" (:command-name scratch-pad :remove-all-from)
        "Remove all windows from scratch pad")
 
     #----------------#
@@ -565,7 +610,7 @@
     #
     # The default :ui-hint command shows all interactable UI elements
     #
-    (k "RAlt  RAlt"
+    (k "${HINT}  ${HINT}"
        [:ui-hint hint-key-list]
        "Show all interactable elements")
 
@@ -578,7 +623,7 @@
     # want only Button (UIA_ButtonControlTypeId) and CheckBox (UIA_CheckBoxControlTypeId)
     # elements.
     #
-    (k "RAlt  B"
+    (k "${HINT}  B"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
@@ -591,14 +636,14 @@
     # You can also choose what to do with the selected element. Here
     # we simply :click on it instead of invoking its default action.
     #
-    (k "RAlt  C"
+    (k "${HINT}  C"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
          :action :click)]
        "Show all interactable elements, and click on the selected one")
 
-    (k "RAlt  D"
+    (k "${HINT}  D"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
@@ -608,7 +653,7 @@
     #
     # More complex property-matching
     #
-    (k "RAlt  E"
+    (k "${HINT}  E"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
@@ -619,7 +664,7 @@
                      [:property UIA_IsKeyboardFocusablePropertyId true]])]
        "Show all editable fields")
 
-    (k "RAlt  F"
+    (k "${HINT}  F"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
@@ -627,42 +672,42 @@
          :action :focus)]
        "Show all focusable elements, and set input focus to the selected one")
 
-    (k "RAlt  I"
+    (k "${HINT}  I"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
          :condition [:property UIA_ControlTypePropertyId UIA_ListItemControlTypeId])]
        "Show all list item elements")
 
-    (k "RAlt  L"
+    (k "${HINT}  L"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
          :condition [:property UIA_ControlTypePropertyId UIA_HyperlinkControlTypeId])]
        "Show all hyperlinks")
 
-    (k "RAlt  M"
+    (k "${HINT}  M"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
          :action :middle-click)]
        "Show all interactable elements, and middle-click on the selected one")
 
-    (k "RAlt  Shift + M"
+    (k "${HINT}  Shift + M"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
          :action :move-cursor)]
        "Show all interactable elements, and move cursor to the selected one")
 
-    (k "RAlt  R"
+    (k "${HINT}  R"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
          :action :right-click)]
        "Show all interactable elements, and right-click on the selected one")
 
-    (k "RAlt  T"
+    (k "${HINT}  T"
        [:ui-hint
         hint-key-list
         (ui-hint/uia-hinter
@@ -674,7 +719,7 @@
     # elements. Here we use a differen hinter (ui-hint/frame-hinter) to
     # show all (leaf) frames, and activate the selected one.
     #
-    (k "RAlt  N"
+    (k "${HINT}  N"
        [:ui-hint
         hint-key-list
         (ui-hint/frame-hinter)]
@@ -687,7 +732,7 @@
     # with all the windows inside. And we give the labels a bright orange
     # color, to indicate this is a potentially dangerous operation.
     #
-    (k "RAlt  Shift + N"
+    (k "${HINT}  Shift + N"
        [:ui-hint
         hint-key-list
         (ui-hint/frame-hinter
@@ -701,25 +746,25 @@
          :color 0x00a1ff)]
        "Show all frames, and close the selected one")
 
-    (k "RAlt  G"
+    (k "${HINT}  G"
        [:ui-hint
         hint-key-list
         (ui-hint/gradual-uia-hinter
          :show-highlights true)]
        "Gradually walk the UI tree")
 
-    (k "RAlt  Esc"   :nop "Cancel")
-    (k "RAlt  Enter" :nop "Cancel")
+    (k "${HINT}  Esc"   :nop "Cancel")
+    (k "${HINT}  Enter" :nop "Cancel")
 
     #-----------------------#
     #  Layout History Keys  #
     #-----------------------#
 
-    (k "Win + Z  U" :undo-layout-history)
-    (k "Win + Z  R" :redo-layout-history)
-    (k "Win + Z  P" :push-layout-history)
-    (k "Win + Z  Esc"   :nop "Cancel")
-    (k "Win + Z  Enter" :nop "Cancel")
+    (k "${MOD} + Z  U" :undo-layout-history)
+    (k "${MOD} + Z  R" :redo-layout-history)
+    (k "${MOD} + Z  P" :push-layout-history)
+    (k "${MOD} + Z  Esc"   :nop "Cancel")
+    (k "${MOD} + Z  Enter" :nop "Cancel")
 
     keymap))
 
@@ -786,7 +831,7 @@
        #
        # Here we make some windows transparent, filtering by their
        # class names. You can see a window's class name using the
-       # `Win + W  D` key binding (if you are using this example
+       # `${MOD} + W  D` key binding (if you are using this example
        # config, see the key binding for :describe-window command
        # above).
        #
