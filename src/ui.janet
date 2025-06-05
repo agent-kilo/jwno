@@ -186,7 +186,6 @@
   # modifier keys as pressed alone.
   #
   (unless (empty? mod-states)
-    # Send a dummy key event to stop the Start Menu from popping up
     (send-input (keyboard-input VK_DUMMY
                                 (if key-up? :up :down)
                                 (bor KEI-FLAG-PASSTHROUGH extra-info)))))
