@@ -35,7 +35,7 @@
       (error (string/format "unknown key: %n" key))))
 
   {:key normalized-key
-   :modifiers [;(sort (array ;modifiers))]})
+   :modifiers [;(sort (distinct modifiers))]})
 
 
 (defmacro- async-key-state-down? [vkey-code]
