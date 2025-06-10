@@ -14,6 +14,6 @@ Use the @code{:filter-forced-window} hook for this:
 
 Here we are checking a window's exe file path, to see if we should force it.
 
-To determine if a window is suitable for forced management, you can invoke the @code{:manage-window} command on it, and see how it reacts. This command is bound to @code{Win + W  M} in the example config.
+To determine if a window is suitable for forced management, you can invoke the @code{:manage-window} command on it, and see how it reacts. This command is bound to @code{Win + W  M} or @code{Alt + W  M} in the example config.
 
 The @code{:filter-forced-window} hook will override the @code{:filter-window} hook.

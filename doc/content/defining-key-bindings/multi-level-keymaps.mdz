@@ -12,4 +12,4 @@ One of the most powerful features from Jwno's key binding system is that, you ca
 
 This means @em{press and release @code{Win + Enter} first, then press and release @code{Ctrl + A}, and finally just tap the @code{B} key}. You can use any keys @link[../ref/key-names.html]{recognizable by Jwno} in any level of the keymaps, including all the modifiers.
 
-A typical use case for multi-level keymaps is to group similar commands together, and give them the same "prefix". For example, in the @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{example config}, all the infrequently used window commands begin with @code{Win + W}.
+A typical use case for multi-level keymaps is to group similar commands together, and give them the same "prefix". For example, in the @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{example config}, all the infrequently used window commands begin with @code{Win + W} or @code{Alt + W}.

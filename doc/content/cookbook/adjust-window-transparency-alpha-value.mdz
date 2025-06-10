@@ -4,7 +4,7 @@
  :order 6}
 ---
 
-Just invoke the @code{:change-window-alpha} command on your window. Pass a negative argument to decrease the alpha value (increase transparency), or a positive argument to increase the alpha value (decrease transparency). This command is bound in a @em{transient} keymap, enabled by @code{Win + A}, in the example config.
+Just invoke the @code{:change-window-alpha} command on your window. Pass a negative argument to decrease the alpha value (increase transparency), or a positive argument to increase the alpha value (decrease transparency). This command is bound in a @em{transient} keymap, enabled by @code{Win + A} or @code{Alt + A}, in the example config.
 
 To automatically set the alpha value for selected windows:
 

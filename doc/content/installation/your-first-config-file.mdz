@@ -25,8 +25,11 @@ Here are some examples:
     @link[https://github.com/agent-kilo/jwno/blob/master/example/tutorial.janet]{Tutorial.janet} is an interactive tutorial implemented as a single config file. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/tutorial.janet]{Download})
   }
   @li{
-    @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{Example-config.janet} contains some practical config suitable for daily use. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/example-config.janet]{Download})
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/example-config.janet]{Example-config.janet} contains comprehensive practical config suitable for daily use. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/example-config.janet]{Download})
+  }
+  @li{
+    @link[https://github.com/agent-kilo/jwno/blob/master/example/minimal-config.janet]{Minimal-config.janet} showcases only the most basic operations, without any optional features. (@link[https://github.com/agent-kilo/jwno/raw/refs/heads/master/example/minimal-config.janet]{Download})
   }
 }
 
-To try out either of them, just download the file, then drag-n-drop it to @code{jwno.exe}. I recommend going through the tutorial first, before trying out @code{example-config.janet}. You can build your own config based on @code{example-config.janet} afterwards.
+To try out any of them, just download the file, then drag-n-drop it to @link[https://github.com/agent-kilo/jwno/releases]{@code{jwno.exe}}. I recommend going through the tutorial first, before trying out @code{example-config.janet} or @code{minimal-config.janet}.
