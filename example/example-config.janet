@@ -11,6 +11,10 @@
 #   * mod-key
 #   * keyboard-layout
 #
+# Depending on your mod-key setting, You can press
+# `Win + Shift + /` (the slash key) or `Alt + Shift + /` to
+# show all defined key bindings.
+#
 # The code is heavily commented, you can skim through the
 # comments and then focus on the parts you're interested in.
 #
