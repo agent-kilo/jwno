@@ -2790,14 +2790,30 @@
   (hwnd-process-elevated? hwnd))
 
 
-(defn wm-jwno-process-elevated? [self]
+(defn wm-own-process-elevated? [self]
   (with [[ret token]
          (OpenProcessToken (GetCurrentProcess) TOKEN_QUERY)
          (fn [[_ token]] (CloseHandle token))]
     (when (= 0 ret)
+      (log/warning "failed to open own process token: 0x%x" (GetLastError))
       (break false))
-    (def [_gti-ret elevated] (GetTokenInformation token TokenElevation))
+    (def [gti-ret elevated] (GetTokenInformation token TokenElevation))
+    (when (= 0 gti-ret)
+      (log/warning "GetTokenInformation for TokenElevation failed: 0x%x" (GetLastError)))
     elevated))
+
+
+(defn wm-has-uiaccess? [self]
+  (with [[ret token]
+         (OpenProcessToken (GetCurrentProcess) TOKEN_QUERY)
+         (fn [[_ token]] (CloseHandle token))]
+    (when (= 0 ret)
+      (log/warning "failed to open own process token: 0x%x" (GetLastError))
+      (break false))
+    (def [gti-ret ua] (GetTokenInformation token TokenUIAccess))
+    (when (= 0 gti-ret)
+      (log/warning "GetTokenInformation for TokenUIAccess failed: 0x%x" (GetLastError)))
+    ua))
 
 
 (defn wm-get-focused-hwnd [self &opt top-level?]
@@ -2991,7 +3007,8 @@
                    0))))
       [false :cloaked-window]
 
-      (and (not (:jwno-process-elevated? self))
+      (and (not (:own-process-elevated? self))
+           (not (:has-uiaccess? self))
            (hwnd-process-elevated? hwnd))
       [false :elevated-window]
 
@@ -3352,7 +3369,8 @@
     :close-hwnd wm-close-hwnd
 
     :enumerate-monitors wm-enumerate-monitors
-    :jwno-process-elevated? wm-jwno-process-elevated?
+    :own-process-elevated? wm-own-process-elevated?
+    :has-uiaccess? wm-has-uiaccess?
 
     :with-activation-hooks wm-with-activation-hooks
 
