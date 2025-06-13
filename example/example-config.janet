@@ -557,6 +557,8 @@
        "Remove the first window from scratch pad")
     (k "Win + Enter  S  Shift + R" (:command-name scratch-pad :remove-all-from)
        "Remove all windows from scratch pad")
+    (k "Win + Enter  S  Esc"   :nop "Cancel")
+    (k "Win + Enter  S  Enter" :nop "Cancel")
 
     #----------------#
     #  UI Hint Keys  #
