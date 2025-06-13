@@ -1,0 +1,47 @@
+{:title "Manage Elevated Windows"
+ :template "main.html"
+ :back-to ["Cookbook" "index.html"]
+ :order 17}
+---
+
+Elevated applications usually run in a higher @em{integrity level} than Jwno. As per Windows security requirements, Jwno cannot manage their windows by default. There're two ways to mitigate this though.
+
+### 1. Run Jwno With a Higher Integrity Level
+
+@p{@strong{(This method is strongly discouraged, due to its security implications.)}}
+
+The first method is to simply start Jwno using @em{Run as administrator}. But since Jwno has a full scripting runtime built-in, when its process gets compromised, an attacker may easily use it to execute malicious code.
+
+And, Jwno does not voluntarily drop its elevated state when launching other applications/commands, so everything Jwno launches will have administrative power.
+
+### 2. Grant Jwno the uiAccess Permission
+
+The @link[https://learn.microsoft.com/en-us/windows/win32/winauto/uiauto-securityoverview]{uiAccess} setting is a flag checked by Windows, to allow assistive applications to interact with UIs in higher integrity levels. Granting Jwno the @code{uiAccess} permission won't elevate its process, so it's relatively safer. But you'll need to make use of some external tools (@link[https://learn.microsoft.com/en-us/windows/win32/sbscs/mt-exe]{@code{mt.exe}} and @link[https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe]{@code{signtool.exe}}), and generate a self-signed certificate yourself.
+
+To grant Jwno @code{uiAccess} permission, follow these steps:
+
+@ol{
+  @li{
+    Download @link[https://github.com/agent-kilo/jwno/blob/master/manifest/jwno.manifest]{this manifest file}, locate the line containing @code{uiAccess="false"}, and change @code{false} into @code{true}.
+  }
+  @li{
+    Run @code```mt.exe -manifest path\to\jwno.manifest -outputresource:path\to\jwno.exe;#1```
+  }
+  @li{
+    Generate a self-signed certificate by running this in Powersell: @code```New-SelfSignedCertificate -Type 'Custom' -Subject 'App Signing for Jwno' -KeyAlgorithm 'RSA' -KeyLength 4096 -CertStoreLocation 'Cert:\CurrentUser\My' -FriendlyName 'App Signing for Jwno'```
+  }
+  @li{
+    Sign @code{jwno.exe} with the certificate we just generated: @code```signtool.exe sign /a /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /n "App Signing for Jwno" path\to\jwno.exe```
+  }
+  @li{
+    Right-click on @code{jwno.exe}, select @em{Properties} -> @em{Digital Signatures} -> @em{App Signing for Jwno} -> @em{Details} -> @em{View Certificate} -> @em{Install Certificate...}
+  }
+  @li{
+    Move the signed @code{jwno.exe} to a directory in your @code```Program Files``` directory, for example @code```C:\Program Files\Jwno\jwno.exe```.
+  }
+  @li{
+    Launch your signed exe file, and evaluate @code```(:has-uiaccess? (in jwno/context :window-manager))``` in Jwno's REPL. Jwno can now manage elevated windows, if the code returns @code{true}.
+  }
+}
+
+To remove the self-signed certificate, when it's not needed any more, open the @em{Run} dialog (e.g. by pressing @code{Win + X} then @code{R}), and launch @code{certmgr.msc}. The certificate can be found in the @code```Personal\Certificates``` and @code```Trusted Root Certification Authorities\Certificates``` nodes, unless you selected other locations when generating or installing the certificate. Just search for the name @code{App Signing for Jwno}.

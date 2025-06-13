@@ -56,6 +56,9 @@ This page is a collection of recipes for some @html```<del>&nbsp;funny tricks&nb
   @li{
     @link[pause-key-binding-handling.html]{Pause Key Binding Handling}
   }
+  @li{
+    @link[manage-elevated-windows.html]{Manage Elevated Windows}
+  }
 }
 
 ### Next Step
