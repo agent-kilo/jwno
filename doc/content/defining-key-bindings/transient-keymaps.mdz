@@ -19,10 +19,10 @@ For example, we can define a simple transient keymap only for moving windows aro
     keymap))
 ```
 
-And then enable it when we press @code{Win + K}:
+And then enable it when we press @code{Win + C}:
 
 @codeblock[janet]```
-(:define-key root-keymap "Win + K" [:push-keymap yank-mode-keymap]
+(:define-key root-keymap "Win + C" [:push-keymap yank-mode-keymap]
              "Yank mode")
 ```
 
