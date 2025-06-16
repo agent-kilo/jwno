@@ -431,6 +431,28 @@
               (:GetNextSiblingElementBuildCache walker child cr))))))))
 
 
+(defn- add-ref [e]
+  (:AddRef e)
+  e)
+
+(defn uia-manager-walk-tree [self elem visit-fn &opt cr? walker? level]
+  (default level 0)
+
+  (with-uia [walker (if walker?
+                      (add-ref walker?)
+                      (:create-raw-view-walker self))]
+    (with-uia [cr (when cr? (add-ref cr?))]
+      (visit-fn elem
+                level
+                (fn []
+                  # XXX: Use direct function call for improved performance?
+                  (:enumerate-children self
+                                       elem
+                                       |(:walk-tree self $ visit-fn cr walker (+ 1 level))
+                                       walker
+                                       cr))))))
+
+
 (defn- init-event-handlers [uia-com element chan]
   (def window-opened-handler
     # Can't use `with` here, or there will be a "can't marshal alive fiber" error
@@ -539,6 +561,7 @@
     :create-content-view-walker uia-manager-create-content-view-walker
     :create-raw-view-walker uia-manager-create-raw-view-walker
     :enumerate-children uia-manager-enumerate-children
+    :walk-tree uia-manager-walk-tree
     :init-event-handlers uia-manager-init-event-handlers
     :destroy uia-manager-destroy})
 

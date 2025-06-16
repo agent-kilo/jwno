@@ -187,7 +187,67 @@
   (CoUninitialize))
 
 
+(defn test-uia-manager-walk-tree []
+  (def dummy-parent
+    (dummy-elem :hwnd0 nil nil nil))
+
+  (def dummy-sib-3
+    (dummy-elem :hwnd3 nil dummy-parent nil))
+  (def dummy-sib-2
+    (dummy-elem :hwnd2 nil dummy-parent dummy-sib-3))
+  (def dummy-sib-1
+    (dummy-elem :hwnd1 nil dummy-parent dummy-sib-2))
+
+  (def dummy-sib-2-1
+    (dummy-elem :hwnd2-1 nil dummy-sib-2 nil))
+
+  (put dummy-sib-2 :_first-child dummy-sib-2-1)
+  (put dummy-parent :_first-child dummy-sib-1)
+
+  (def dummy-walker
+    @{:_ref 0
+      :AddRef  (fn [self] (put self :_ref (+ (in self :_ref) 1)))
+      :Release (fn [self] (put self :_ref (- (in self :_ref) 1)))
+      :GetFirstChildElement  (fn [_self elem]
+                               (when-let [fc (in elem :_first-child)]
+                                 (:AddRef fc)
+                                 fc))
+      :GetNextSiblingElement (fn [_self elem]
+                               (def sib (in elem :_sibling))
+                               (when sib
+                                 (:AddRef sib))
+                               sib)})
+
+  (CoInitializeEx nil COINIT_MULTITHREADED)
+  (def uia-man (uia-manager))
+
+  (def seen @[])
+
+  (:walk-tree
+     uia-man
+     dummy-parent
+     (fn [e lv walk-children]
+       (array/push seen [(in e :_hwnd) lv])
+       (walk-children)
+       true)
+     nil
+     dummy-walker)
+
+  (assert (= 0 (in dummy-walker :_ref)))
+  (assert (= 0 (in dummy-parent :_ref)))
+  (assert (= 0 (in dummy-sib-1 :_ref)))
+  (assert (= 0 (in dummy-sib-2 :_ref)))
+  (assert (= 0 (in dummy-sib-2-1 :_ref)))
+  (assert (= 0 (in dummy-sib-3 :_ref)))
+
+  (assert (deep= seen @[[:hwnd0 0] [:hwnd1 1] [:hwnd2 1] [:hwnd2-1 2] [:hwnd3 1]]))
+
+  (:destroy uia-man)
+  (CoUninitialize))
+
+
 (defn main [&]
   (test-with-uia)
   (test-uia-manager-get-parent-window)
-  (test-uia-manager-enumerate-children))
+  (test-uia-manager-enumerate-children)
+  (test-uia-manager-walk-tree))
