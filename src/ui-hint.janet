@@ -536,6 +536,7 @@
       UIA_ControlTypePropertyId
       UIA_BoundingRectanglePropertyId
       UIA_IsInvokePatternAvailablePropertyId
+      UIA_IsKeyboardFocusablePropertyId
       UIA_IsOffscreenPropertyId
       UIA_IsEnabledPropertyId]
      [UIA_InvokePatternId]))
@@ -719,13 +720,81 @@
   elem-list)
 
 
+(defn expand-cond-spec [elem-sym cond-spec]
+  (match cond-spec
+    :true
+    true
+
+    :false
+    false
+
+    [:property prop-id prop-val]
+    (cond
+      (= prop-val true)
+      ~(not= 0 (:GetCachedPropertyValue ,elem-sym ,prop-id))
+
+      (= prop-val false)
+      ~(= 0 (:GetCachedPropertyValue ,elem-sym ,prop-id))
+
+      true
+      ~(= ,prop-val (:GetCachedPropertyValue ,elem-sym ,prop-id)))
+
+    [:not spec]
+    ~(not ,(expand-cond-spec elem-sym spec))
+
+    [:and & specs]
+    ~(and ,;(map (fn [s] (expand-cond-spec elem-sym s)) specs))
+
+    [:or & specs]
+    ~(or ,;(map (fn [s] (expand-cond-spec elem-sym s)) specs))
+
+    bad-spec
+    (errorf "bad condition spec: %n" bad-spec)))
+
+
+(defn compile-cond-spec [cond-spec]
+  (def expanded (expand-cond-spec 'e cond-spec))
+  (log/debug "cond-spec = %n" cond-spec)
+  (log/debug "expanded cond-spec = %n" expanded)
+  (def thunk (compile ~(fn [e] ,expanded)))
+  (thunk))
+
+
+(defn find-uia-elements-by-walk [uia-man uia-win cond-fn &opt cr? max-level]
+  (def acc @[])
+
+  (defn visit [elem level walk-children]
+    (when (and (not= 0 (:get_CachedIsEnabled elem))
+               (= 0 (:get_CachedIsOffscreen elem)))
+      (when (cond-fn elem)
+        (:AddRef elem)
+        (array/push acc elem))
+      (if (nil? max-level)
+        (walk-children)
+        (when (>= max-level level)
+          (walk-children))))
+    true)
+
+  (with-uia [cr (if cr?
+                  (do
+                    (:AddRef cr?)
+                    cr?)
+                  (:create-cache-request uia-man [UIA_IsOffscreenPropertyId
+                                                  UIA_IsEnabledPropertyId]))]
+    (with-uia [cached-uia-win (:BuildUpdatedCache uia-win cr)]
+      (:walk-tree uia-man cached-uia-win visit cr)))
+
+  acc)
+
+
 (defn uia-hinter-init [self ui-hint]
   (log/debug "-- uia-hinter-init --")
 
   (def {:cond-spec cond-spec
         :color color
         :show-highlights show-highlights
-        :line-width line-width}
+        :line-width line-width
+        :findall-fix-filter-fn findall-fix-filter-fn}
     self)
   (def {:context context} ui-hint)
   (def {:uia-manager uia-man
@@ -750,15 +819,25 @@
           # Out of with-uia
           (break [[] nil]))
 
-        [(find-uia-elements uia-man
-                            uia-win
-                            # Always ignore disabled and off-screen elements
-                            [:and
-                             [:property UIA_IsOffscreenPropertyId false]
-                             [:property UIA_IsEnabledPropertyId true]
-                             cond-spec]
-                            cr)
-         (:get-hwnd-rect window-man win-hwnd true)])))
+        (def elist
+          # See findall-fix-filter-fn in uia-hinter function
+          (if (and findall-fix-filter-fn
+                   (findall-fix-filter-fn uia-win))
+            (find-uia-elements-by-walk uia-man
+                                       uia-win
+                                       (compile-cond-spec cond-spec)
+                                       cr)
+            # else, no fix
+            (find-uia-elements uia-man
+                               uia-win
+                               # Always ignore disabled and off-screen elements
+                               [:and
+                                [:property UIA_IsOffscreenPropertyId false]
+                                [:property UIA_IsEnabledPropertyId true]
+                                cond-spec]
+                               cr)))
+
+        [elist (:get-hwnd-rect window-man win-hwnd true)])))
 
   (log/debug "Found %n UI elements" (length elem-list))
 
@@ -938,7 +1017,7 @@
               (mouse-button-input :left :up)))
 
 
-(defn uia-hinter [&named condition action color show-highlights line-width]
+(defn uia-hinter [&named condition action color show-highlights line-width findall-fix-filter-fn]
   (default condition
     [:or
      [:property UIA_IsKeyboardFocusablePropertyId true]
@@ -946,6 +1025,17 @@
   (default action :invoke)
   (default show-highlights false)
   (default line-width 2)
+  # This is to fix an issue where FindAll() in Win 11 sometimes
+  # doesn't return all matching UI elements for explorer.exe
+  # CabinetWClass windows. When a window is matched by this
+  # function, the code will use :walk-tree method from uia-manager,
+  # instead of FindAll(), to search for matching UI elements.
+  #
+  # Note that the :walk-tree method is much slower than FindAll().
+  (default findall-fix-filter-fn
+    |(and (= UIA_WindowControlTypeId (:get_CachedControlType $))
+          (= "Win32" (:get_CachedFrameworkId $))
+          (= "CabinetWClass" (:get_CachedClassName $))))
 
   (table/setproto
    @{:action-handlers @{:invoke       handle-action-invoke
@@ -959,7 +1049,8 @@
      :action action
      :color color
      :show-highlights show-highlights
-     :line-width line-width}
+     :line-width line-width
+     :findall-fix-filter-fn findall-fix-filter-fn}
    uia-hinter-proto))
 
 
