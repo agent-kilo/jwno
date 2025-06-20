@@ -373,7 +373,8 @@
 (defn match-exe-name [exe-name]
   (fn [win]
     (if-let [win-exe (:get-exe-path win)]
-      (string/has-suffix? (string "\\" exe-name) win-exe)
+      (string/has-suffix? (string "\\" (string/ascii-lower exe-name))
+                          (string/ascii-lower win-exe))
       false)))
 
 #
@@ -559,7 +560,7 @@
     #
     (k "${MOD} + Enter  N" [(:command-name scratch-pad :summon-to)
                             (fn [_hwnd _uia exe]
-                              (string/has-suffix? "\\notepad.exe" exe))
+                              (string/has-suffix? "\\notepad.exe" (string/ascii-lower exe)))
                             10
                             "notepad.exe"]
        "Summon Notepad to scratch_ pad")
@@ -576,7 +577,7 @@
           (or
             (string/has-prefix? "translate.google.com" name)
             (= name "Google Translate"))
-          (string/has-suffix? "\\msedge.exe" exe))))
+          (string/has-suffix? "\\msedge.exe" (string/ascii-lower exe)))))
     (def google-translate-cmd
       ["C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe" "--app=https://translate.google.com"])
     (k "${MOD} + Enter  G" [(:command-name scratch-pad :summon-to)
