@@ -3394,6 +3394,24 @@
      window-manager-proto))
   (put wm-obj :root (virtual-desktop-container wm-obj))
 
+  # Some windows sometimes don't have their virtual desktop info ready
+  # when they're open. This hook function is to check for these windows,
+  # and re-schedule a :window-opened event, so that they can be managed
+  # properly when ready.
+  #
+  # Currently only Windows Terminal exhibits this behavior.
+  (:add-hook hook-man :filter-forced-window
+     (fn slow-vd-fix [hwnd uia-win exe-path desktop-info]
+       (when (nil? (in desktop-info :id))
+         (when (and (= "CASCADIA_HOSTING_WINDOW_CLASS" (:get_CachedClassName uia-win))
+                    (string/has-suffix? "\\WindowsTerminal.exe" exe-path))
+           (log/debug "Virtual desktop info not yet initialized for window %n, scheduling retry..." hwnd)
+           (ev/spawn
+            # XXX: Arbitrary value
+            (ev/sleep 0.2)
+            (:window-opened wm-obj hwnd))))
+       false))
+
   (:add-hook hook-man :filter-window
      (fn default-window-filter [hwnd uia-win exe-path desktop-info]
        (match (:filter-hwnd wm-obj hwnd uia-win exe-path desktop-info)
