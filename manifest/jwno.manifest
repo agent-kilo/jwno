@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
-  <assemblyIdentity type="win32" name="studio.chibidou.jwno" version="0.9.13.0"/>
+  <assemblyIdentity type="win32" name="studio.chibidou.jwno" version="0.9.14.0"/>
   <asmv3:trustInfo>
     <security>
       <requestedPrivileges>
