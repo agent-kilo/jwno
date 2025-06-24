@@ -89,7 +89,7 @@
                       (:make-env server-obj name stream))
                     nil
                     (fn [name]
-                      (if (= name const/DEFAULT-REPL-EVAL-CLIENT-NAME)
+                      (if (string/has-prefix? const/DEFAULT-REPL-EVAL-CLIENT-NAME name)
                         nil
                         # else
                         "Welcome to Jwno REPL!\n"))))
