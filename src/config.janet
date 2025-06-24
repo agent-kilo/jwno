@@ -87,6 +87,11 @@
            (if-let [repl-addr (peg/match repl-addr-peg addr-str)]
              repl-addr
              (errorf "Malformed REPL address: %n" addr-str)))}
+
+   "eval"
+   {:short "e"
+    :help "\nEvaluates some Janet code through a REPL connection.\n"
+    :kind :accumulate}
    ))
 
 

@@ -1,4 +1,8 @@
 (import spork/netrepl)
+(import spork/msg)
+
+(use jw32/_winuser)
+(use jw32/_util)
 
 (use ./util)
 
@@ -84,7 +88,11 @@
                     (fn [name stream]
                       (:make-env server-obj name stream))
                     nil
-                    "Welcome to Jwno REPL!\n"))
+                    (fn [name]
+                      (if (= name const/DEFAULT-REPL-EVAL-CLIENT-NAME)
+                        nil
+                        # else
+                        "Welcome to Jwno REPL!\n"))))
   (put server-obj :stream stream)
 
   (log/debug "REPL server running at %s:%d" host port)
@@ -138,3 +146,95 @@
      :default-env default-env
      :servers @[]}
    repl-manager-proto))
+
+
+######### Other helper functions #########
+
+(defn run-repl-client [cli-args]
+  (def repl-addr (in cli-args "repl"))
+  (when (nil? repl-addr)
+    (show-error-and-exit "Jwno is started in client mode, but REPL address is not specified." 1))
+  (try
+    (do
+      (alloc-console-and-reopen-streams)
+      (netrepl/client ;repl-addr))
+    ((err fib)
+     (show-error-and-exit err 1 (get-stack-trace fib)))))
+
+
+(def eval-error-peg
+  (peg/compile ~{:err-prefix "error:"
+                 :err-msg (any (if-not "\n" 1))
+                 :st-function (any (if-not :s 1))
+                 :st-filename (sequence "[" (thru "]"))
+                 :st-tailcall "(tail call)"
+                 :st-location (sequence "line" :s+ :d+ "," :s+ "column" :s+ :d+)
+                 :st-line (sequence :s+ "in" :s+ :st-function :s+ :st-filename (opt (sequence :s+ :st-tailcall)) :s+ "on" :s+ :st-location "\n")
+                 :main (sequence :err-prefix :s+ :err-msg "\n" (any :st-line))}))
+
+(def repl-error-peg
+  (peg/compile ~{:repl-prefix "repl:"
+                 :location (sequence :d+ ":" :d+)
+                 :err-type (sequence (some :S) :s+ "error:")
+                 :err-msg (some (if-not "\n" 1))
+                 :main (sequence :repl-prefix :location ":" :s+ :err-type :s+ :err-msg "\n")}))
+
+
+#
+# Adopted from spork/netrepl
+#
+(defn make-repl-eval-recv-client [stream out-buf]
+  (def recvraw (msg/make-recv stream))
+
+  (fn recv []
+    (def buf (recvraw))
+    (case (first buf)
+      0xFF  # REPL stdout
+      (do
+        (def text (string/slice buf 1))
+        (log/debug "recv: %n" text)
+        (buffer/push-string out-buf text)
+        (recv))
+
+      0xFE  # REPL prompt
+      (string/slice buf 1)
+
+      buf)))
+
+
+(defn run-repl-eval [eval-list cli-args]
+  (def [repl-host repl-port]
+    (if-let [addr (in cli-args "repl")]
+      addr
+      # else
+      @[const/DEFAULT-REPL-HOST const/DEFAULT-REPL-PORT]))
+
+  (try
+    (with [stream (net/connect repl-host repl-port)]
+      (def buf @"")
+      (def recv (make-repl-eval-recv-client stream buf))
+      (def send (msg/make-send stream))
+      (send (string/format "\xFF%j"
+                           {:auto-flush true
+                            :name const/DEFAULT-REPL-EVAL-CLIENT-NAME}))
+      (when-let [_p (recv)]
+        (each line eval-list
+          (send line)
+          (def p (recv))
+          (when (or (peg/find repl-error-peg buf)
+                    (peg/find eval-error-peg buf))
+            (if (log/check-log-level :error)
+              (log/error "REPL returned:\n%s" buf)
+              (MessageBox nil
+                          (string/format "REPL returned:\n%s" buf)
+                          "Error"
+                          (bor MB_ICONEXCLAMATION)))
+            (os/exit 1))
+          (unless p (break))))
+      (log/info "REPL output:\n%s" buf))
+    
+    ((err fib)
+     (if (log/check-log-level :error)
+       (log/error "REPL evaluation failed: %n\n%s"
+                  err (get-stack-trace fib))
+       (show-error-and-exit err 1 (get-stack-trace fib))))))
