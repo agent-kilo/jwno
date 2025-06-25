@@ -150,18 +150,6 @@
 
 ######### Other helper functions #########
 
-(defn run-repl-client [cli-args]
-  (def repl-addr (in cli-args "repl"))
-  (when (nil? repl-addr)
-    (show-error-and-exit "Jwno is started in client mode, but REPL address is not specified." 1))
-  (try
-    (do
-      (alloc-console-and-reopen-streams)
-      (netrepl/client ;repl-addr))
-    ((err fib)
-     (show-error-and-exit err 1 (get-stack-trace fib)))))
-
-
 (def eval-error-peg
   (peg/compile ~{:err-prefix "error:"
                  :err-msg (any (if-not "\n" 1))
@@ -179,27 +167,22 @@
                  :err-msg (some (if-not "\n" 1))
                  :main (sequence :repl-prefix :location ":" :s+ :err-type :s+ :err-msg "\n")}))
 
+(def repl-prompt-peg
+  (peg/compile ~{:sep ":"
+                 :client-name (capture (sequence ,const/DEFAULT-REPL-EVAL-CLIENT-NAME (any (if-not :sep 1))))
+                 :line-no (capture :d+)
+                 :open-delimiters  (capture (any :S))
+                 :main (sequence :client-name :sep :line-no :sep :open-delimiters :s+ -1)}))
 
-#
-# Adopted from spork/netrepl
-#
-(defn make-repl-eval-recv-client [stream out-buf]
-  (def recvraw (msg/make-recv stream))
 
-  (fn recv []
-    (def buf (recvraw))
-    (case (first buf)
-      0xFF  # REPL stdout
-      (do
-        (def text (string/slice buf 1))
-        (log/debug "recv: %n" text)
-        (buffer/push-string out-buf text)
-        (recv))
-
-      0xFE  # REPL prompt
-      (string/slice buf 1)
-
-      buf)))
+(defn- check-prompt-string [prmpt]
+  (log/debug "repl prompt: %n" prmpt)
+  (when (nil? prmpt)
+    (error "no prompt received"))
+  (def matched (peg/match repl-prompt-peg prmpt))
+  (unless matched
+    (errorf "unrecognized prompt: %n" prmpt))
+  matched)
 
 
 (defn run-repl-eval [eval-list cli-args]
@@ -211,30 +194,60 @@
 
   (try
     (with [stream (net/connect repl-host repl-port)]
-      (def buf @"")
-      (def recv (make-repl-eval-recv-client stream buf))
-      (def send (msg/make-send stream))
-      (send (string/format "\xFF%j"
-                           {:auto-flush true
-                            :name const/DEFAULT-REPL-EVAL-CLIENT-NAME}))
-      (when-let [_p (recv)]
-        (each line eval-list
-          (send line)
-          (def p (recv))
-          (when (or (peg/find repl-error-peg buf)
-                    (peg/find eval-error-peg buf))
-            (if (log/check-log-level :error)
-              (log/error "REPL returned:\n%s" buf)
-              (MessageBox nil
-                          (string/format "REPL returned:\n%s" buf)
-                          "Error"
-                          (bor MB_ICONEXCLAMATION)))
-            (os/exit 1))
-          (unless p (break))))
-      (log/info "REPL output:\n%s" buf))
-    
+      (def unpack
+        |(if (= 0xFE (first $))
+           # Drop the 0xFE byte, see comments at the top of spork/netrepl
+           (string/slice $ 1)
+           # else
+           (string $)))
+
+      (def [send recv] (msg/make-proto stream nil unpack))
+
+      (def settings
+        {:auto-flush false
+         :name const/DEFAULT-REPL-EVAL-CLIENT-NAME})
+      (log/debug "repl settings: %n" settings)
+      (send (string/format "\xFF%j" settings))
+
+      (var prmpt (check-prompt-string (recv)))
+
+      (each line eval-list
+        (log/debug "repl input: %n" line)
+        (send (string line "\n"))
+        (def res (recv))
+        (log/debug "repl result: %n" res)
+
+        (when (and (not (nil? res))
+                   (or (peg/find repl-error-peg res)
+                       (peg/find eval-error-peg res)))
+          (if (log/check-log-level :error)
+            (log/error "REPL returned:\n%s" res)
+            (MessageBox nil
+                        (string/format "REPL returned:\n%s" res)
+                        "Error"
+                        (bor MB_ICONEXCLAMATION)))
+          (os/exit 1))
+
+        (set prmpt (check-prompt-string (recv))))
+
+      (def open-delimiters (in prmpt 2))
+      (unless (empty? open-delimiters)
+        (error "incomplete expression")))
+
     ((err fib)
      (if (log/check-log-level :error)
        (log/error "REPL evaluation failed: %n\n%s"
                   err (get-stack-trace fib))
        (show-error-and-exit err 1 (get-stack-trace fib))))))
+
+
+(defn run-repl-client [cli-args]
+  (def repl-addr (in cli-args "repl"))
+  (when (nil? repl-addr)
+    (show-error-and-exit "Jwno is started in client mode, but REPL address is not specified." 1))
+  (try
+    (do
+      (alloc-console-and-reopen-streams)
+      (netrepl/client ;repl-addr))
+    ((err fib)
+     (show-error-and-exit err 1 (get-stack-trace fib)))))
