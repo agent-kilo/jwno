@@ -150,6 +150,12 @@
 
 ######### Other helper functions #########
 
+#
+# Runtime error and stacktrace returned by the REPL. Example:
+#
+# error: exploded
+#   in thunk [repl] (tail call) on line 1, column 1
+#
 (def eval-error-peg
   (peg/compile ~{:err-prefix "error:"
                  :err-msg (any (if-not "\n" 1))
@@ -160,6 +166,12 @@
                  :st-line (sequence :s+ "in" :s+ :st-function :s+ :st-filename (opt (sequence :s+ :st-tailcall)) :s+ "on" :s+ :st-location "\n")
                  :main (sequence :err-prefix :s+ :err-msg "\n" (any :st-line))}))
 
+#
+# Parse/compile error returned by the REPL. Examples:
+#
+# repl:1:1: compile error: unknown symbol abc
+# repl:1:4: parse error: unexpected closing delimiter )
+#
 (def repl-error-peg
   (peg/compile ~{:repl-prefix "repl:"
                  :location (sequence :d+ ":" :d+)
@@ -167,6 +179,12 @@
                  :err-msg (some (if-not "\n" 1))
                  :main (sequence :repl-prefix :location ":" :s+ :err-type :s+ :err-msg "\n")}))
 
+#
+# Prompt string sent by the REPL. Examples (Note the trailing whitespaces):
+#
+# jwno-repl-eval:1: 
+# jwno-repl-eval:2:( 
+#
 (def repl-prompt-peg
   (peg/compile ~{:sep ":"
                  :client-name (capture (sequence ,const/DEFAULT-REPL-EVAL-CLIENT-NAME (any (if-not :sep 1))))
