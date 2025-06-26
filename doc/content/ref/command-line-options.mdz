@@ -14,6 +14,14 @@
       The config file to run. Uses @code{jwno-config.janet} in the same directory as @code{jwno.exe} by default.
   }
   @li{
+      @code{-e <expressions>}, @code{--eval <expressions>} @html```<br/>```
+      Evaluates some Janet code through a REPL connection, then exit.
+  }
+  @li{
+      @code{-x <command>}, @code{--execute <command>} @html```<br/>```
+      Executes a command through a REPL connection, then exit.
+  }
+  @li{
       @code{-h}, @code{--help} @html```<br/>```
       Shows a help message.
   }
