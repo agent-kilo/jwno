@@ -22,6 +22,10 @@
       Executes a command through a REPL connection, then exit.
   }
   @li{
+      @code{-E}, @code{--export-all} @html```<br/>```
+      After processing the @code{--eval} option to evaluate Janet code, exports all symbols in the REPL environment.
+  }
+  @li{
       @code{-h}, @code{--help} @html```<br/>```
       Shows a help message.
   }

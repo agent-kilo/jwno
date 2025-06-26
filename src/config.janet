@@ -64,6 +64,11 @@
     :help "\nExecutes a command through a REPL connection.\n"
     :kind :accumulate}
 
+   "export-all"
+   {:short "E"
+    :help "\nAfter processing the --eval option to evaluate Janet code, exports all symbols in the REPL environment.\n"
+    :kind :flag}
+
    # "help" "h"
 
    "log-file"

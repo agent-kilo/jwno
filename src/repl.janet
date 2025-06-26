@@ -203,12 +203,49 @@
   matched)
 
 
+(defn- check-repl-result [res]
+  (log/debug "repl result: %n" res)
+  (cond
+    (nil? res) # May be incomplete input
+    true
+
+    (or (peg/find repl-error-peg res)
+        (peg/find eval-error-peg res))
+    (do
+      (if (log/check-log-level :error)
+        (log/error "REPL returned:\n%s" res)
+        (MessageBox nil
+                    (string/format "REPL returned:\n%s" res)
+                    "Error"
+                    (bor MB_ICONEXCLAMATION)))
+      false)
+
+    # default
+    true))
+
+
+(defn- export-repl-env [send recv]
+  (def remote-code
+    ~(->> (curenv)
+          (pairs)
+          (filter (fn [[k v]] (and (symbol? k) (table? v) (not= '_ k))))
+          (flatten)
+          (splice)
+          (:export jwno/repl-server)))
+  (send (string/format "%j\n" remote-code))
+  (unless (check-repl-result (recv))
+    (os/exit 1))
+  (check-prompt-string (recv)))
+
+
 (defn run-repl-eval [eval-list cli-args]
   (def [repl-host repl-port]
     (if-let [addr (in cli-args "repl")]
       addr
       # else
       @[const/DEFAULT-REPL-HOST const/DEFAULT-REPL-PORT]))
+
+  (def export-all (truthy? (in cli-args "export-all")))
 
   (try
     (with [stream (net/connect repl-host repl-port)]
@@ -218,39 +255,31 @@
            (string/slice $ 1)
            # else
            (string $)))
+      (def pack
+        |(do
+           (log/debug "repl input: %n" $)
+           (string $)))
 
-      (def [send recv] (msg/make-proto stream nil unpack))
+      (def [send recv] (msg/make-proto stream pack unpack))
 
       (def settings
         {:auto-flush false
          :name const/DEFAULT-REPL-EVAL-CLIENT-NAME})
-      (log/debug "repl settings: %n" settings)
       (send (string/format "\xFF%j" settings))
 
       (var prmpt (check-prompt-string (recv)))
-
       (each line eval-list
-        (log/debug "repl input: %n" line)
         (send (string line "\n"))
-        (def res (recv))
-        (log/debug "repl result: %n" res)
-
-        (when (and (not (nil? res))
-                   (or (peg/find repl-error-peg res)
-                       (peg/find eval-error-peg res)))
-          (if (log/check-log-level :error)
-            (log/error "REPL returned:\n%s" res)
-            (MessageBox nil
-                        (string/format "REPL returned:\n%s" res)
-                        "Error"
-                        (bor MB_ICONEXCLAMATION)))
+        (unless (check-repl-result (recv))
           (os/exit 1))
-
         (set prmpt (check-prompt-string (recv))))
 
-      (def open-delimiters (in prmpt 2))
+      (def [_client-name _line-no open-delimiters] prmpt)
       (unless (empty? open-delimiters)
-        (error "incomplete expression")))
+        (error "incomplete expression"))
+
+      (when export-all
+        (export-repl-env send recv)))
 
     ((err fib)
      (if (log/check-log-level :error)
