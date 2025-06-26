@@ -7,7 +7,7 @@
 @ul{
   @li{
       @code{-C}, @code{--client} @html```<br/>```
-      Starts in REPL client mode. Connects to the REPL address specified by the @code{--repl} option.
+      Starts in REPL client mode. Connects to the REPL address specified by the @code{--repl} option. Uses @code{127.0.0.1:9999} if no address is specified.
   }
   @li{
       @code{-c <file name>}, @code{--config <file name>} @html```<br/>```
@@ -15,15 +15,15 @@
   }
   @li{
       @code{-e <expressions>}, @code{--eval <expressions>} @html```<br/>```
-      Evaluates some Janet code through a REPL connection, then exit.
+      Evaluates some Janet code through a REPL connection, then exit. Only shows the output from the REPL when there's an error. To see all REPL output, set @code{--log-level} to @code{debug}.
   }
   @li{
       @code{-x <command>}, @code{--execute <command>} @html```<br/>```
-      Executes a command through a REPL connection, then exit.
+      Executes a command through a REPL connection, then exit. The colon (@code{:}) in front of a command name can be omitted, but all arguments must be in correct Janet syntax. For example, in this command @code{jwno.exe -x ":move-window :left"}, the first colon can be omitted, but the second colon is needed for Jwno to parse the keyword argument correctly.
   }
   @li{
       @code{-E}, @code{--export-all} @html```<br/>```
-      After processing the @code{--eval} option to evaluate Janet code, exports all symbols in the REPL environment.
+      After processing the @code{--eval} option to evaluate Janet code, exports all symbols in the REPL environment. This option essentially "saves" the environment modified by the evaluated code, and makes it available to other REPL connections.
   }
   @li{
       @code{-h}, @code{--help} @html```<br/>```
