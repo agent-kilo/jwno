@@ -298,9 +298,12 @@
 
 
 (defn run-repl-client [cli-args]
-  (def repl-addr (in cli-args "repl"))
-  (when (nil? repl-addr)
-    (show-error-and-exit "Jwno is started in client mode, but REPL address is not specified." 1))
+  (def repl-addr
+    (if-let [addr (in cli-args "repl")]
+      addr
+      # else
+      @[const/DEFAULT-REPL-HOST const/DEFAULT-REPL-PORT]))
+
   (try
     (do
       (alloc-console-and-reopen-streams)
