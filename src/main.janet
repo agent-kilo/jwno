@@ -265,7 +265,8 @@
   (log/debug "cli-args = %n" cli-args)
 
   (when-let [eval-list (in cli-args "eval")]
-    (run-repl-eval eval-list cli-args))
+    (run-repl-eval eval-list cli-args)
+    (os/exit 0))
 
   (when-let [cmd-list (in cli-args "execute")]
     (run-repl-command cmd-list cli-args)
