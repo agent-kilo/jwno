@@ -92,6 +92,11 @@
    {:short "e"
     :help "\nEvaluates some Janet code through a REPL connection.\n"
     :kind :accumulate}
+
+   "execute"
+   {:short "x"
+    :help "\nExecutes a command through a REPL connection.\n"
+    :kind :accumulate}
    ))
 
 

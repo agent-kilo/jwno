@@ -259,6 +259,44 @@
        (show-error-and-exit err 1 (get-stack-trace fib))))))
 
 
+(defn- normalize-cmd-name [cmd-name]
+  (cond
+    (keyword? cmd-name)
+    cmd-name
+
+    (or (symbol? cmd-name)
+        (string? cmd-name))
+    (keyword cmd-name)
+
+    true
+    (errorf "invalid command name: %n" cmd-name)))
+
+
+(defn run-repl-command [cmd-list cli-args]
+  (def eval-list
+    (try
+      (->> cmd-list
+           # Parse and normalize command names
+           (map |(when-let [parsed (parse-all $)
+                            cmd-name (first parsed)]
+                   (set (parsed 0) (normalize-cmd-name cmd-name))
+                   parsed))
+           # Remove empty commands
+           (filter |(not (nil? $)))
+           # Generate (:call-command ...) code
+           (map |(quasiquote (:call-command (in jwno/context :command-manager) ,;$)))
+           # Format generated code
+           (map |(string/format "%j" $)))
+
+      ((err fib)
+       (if (log/check-log-level :error)
+         (log/error "failed to parse command: %n\n%s"
+                    err (get-stack-trace fib))
+         (show-error-and-exit err 1 (get-stack-trace fib))))))
+
+  (run-repl-eval eval-list cli-args))
+
+
 (defn run-repl-client [cli-args]
   (def repl-addr (in cli-args "repl"))
   (when (nil? repl-addr)
