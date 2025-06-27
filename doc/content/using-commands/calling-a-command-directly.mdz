@@ -4,7 +4,7 @@
  :order 2}
 ---
 
-Note that there's no way to call a Jwno command in the system command line (@code{cmd.exe} or PowerShell) at the moment. This page is about calling a command in your Janet code, or the REPL.
+This page is about calling a command in your Janet code, or the REPL. To run a command from system command line, see @link[running-a-command-from-system-command-line.html]{Running a Command From System Command Line}.
 
 To directly call a command in your Janet code, use the @code{:call-command} method from the command manager object, and pass the command's name and its arguments @em{separately}. Take the @code{:split-frame} command from the previous section as an example again:
 

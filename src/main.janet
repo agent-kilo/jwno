@@ -4,7 +4,6 @@
 (use jw32/_winuser)
 (use jw32/_libloaderapi)
 (use jw32/_combaseapi)
-(use jw32/_util)
 
 (use ./repl)
 (use ./key)
@@ -228,18 +227,6 @@
   cli-args)
 
 
-(defn run-repl-client [cli-args]
-  (def repl-addr (in cli-args "repl"))
-  (when (nil? repl-addr)
-    (show-error-and-exit "Jwno is started in client mode, but REPL address is not specified." 1))
-  (try
-    (do
-      (alloc-console-and-reopen-streams)
-      (netrepl/client ;repl-addr))
-    ((err fib)
-     (show-error-and-exit err 1 (get-stack-trace fib)))))
-
-
 (defn init-log [cli-args]
   (def loggers @[])
 
@@ -275,8 +262,15 @@
     (os/exit 0))
 
   (init-log cli-args)
-
   (log/debug "cli-args = %n" cli-args)
+
+  (when-let [eval-list (in cli-args "eval")]
+    (run-repl-eval eval-list cli-args)
+    (os/exit 0))
+
+  (when-let [cmd-list (in cli-args "execute")]
+    (run-repl-command cmd-list cli-args)
+    (os/exit 0))
 
   (init-com)
 

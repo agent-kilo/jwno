@@ -1,4 +1,8 @@
 (import spork/netrepl)
+(import spork/msg)
+
+(use jw32/_winuser)
+(use jw32/_util)
 
 (use ./util)
 
@@ -84,7 +88,11 @@
                     (fn [name stream]
                       (:make-env server-obj name stream))
                     nil
-                    "Welcome to Jwno REPL!\n"))
+                    (fn [name]
+                      (if (string/has-prefix? const/DEFAULT-REPL-EVAL-CLIENT-NAME name)
+                        nil
+                        # else
+                        "Welcome to Jwno REPL!\n"))))
   (put server-obj :stream stream)
 
   (log/debug "REPL server running at %s:%d" host port)
@@ -138,3 +146,196 @@
      :default-env default-env
      :servers @[]}
    repl-manager-proto))
+
+
+######### Other helper functions #########
+
+#
+# Runtime error and stacktrace returned by the REPL. Example:
+#
+# error: exploded
+#   in thunk [repl] (tail call) on line 1, column 1
+#
+(def eval-error-peg
+  (peg/compile ~{:err-prefix "error:"
+                 :err-msg (any (if-not "\n" 1))
+                 :st-function (any (if-not :s 1))
+                 :st-filename (sequence "[" (thru "]"))
+                 :st-tailcall "(tail call)"
+                 :st-location (sequence "line" :s+ :d+ "," :s+ "column" :s+ :d+)
+                 :st-line (sequence :s+ "in" :s+ :st-function :s+ :st-filename (opt (sequence :s+ :st-tailcall)) :s+ "on" :s+ :st-location "\n")
+                 :main (sequence :err-prefix :s+ :err-msg "\n" (any :st-line))}))
+
+#
+# Parse/compile error returned by the REPL. Examples:
+#
+# repl:1:1: compile error: unknown symbol abc
+# repl:1:4: parse error: unexpected closing delimiter )
+#
+(def repl-error-peg
+  (peg/compile ~{:repl-prefix "repl:"
+                 :location (sequence :d+ ":" :d+)
+                 :err-type (sequence (some :S) :s+ "error:")
+                 :err-msg (some (if-not "\n" 1))
+                 :main (sequence :repl-prefix :location ":" :s+ :err-type :s+ :err-msg "\n")}))
+
+#
+# Prompt string sent by the REPL. Examples (Note the trailing whitespaces):
+#
+# jwno-repl-eval:1: 
+# jwno-repl-eval:2:( 
+#
+(def repl-prompt-peg
+  (peg/compile ~{:sep ":"
+                 :client-name (capture (sequence ,const/DEFAULT-REPL-EVAL-CLIENT-NAME (any (if-not :sep 1))))
+                 :line-no (capture :d+)
+                 :open-delimiters  (capture (any :S))
+                 :main (sequence :client-name :sep :line-no :sep :open-delimiters :s+ -1)}))
+
+
+(defn- check-prompt-string [prmpt]
+  (log/debug "repl prompt: %n" prmpt)
+  (when (nil? prmpt)
+    (error "no prompt received"))
+  (def matched (peg/match repl-prompt-peg prmpt))
+  (unless matched
+    (errorf "unrecognized prompt: %n" prmpt))
+  matched)
+
+
+(defn- check-repl-result [res]
+  (log/debug "repl result: %n" res)
+  (cond
+    (nil? res) # May be incomplete input
+    true
+
+    (or (peg/find repl-error-peg res)
+        (peg/find eval-error-peg res))
+    (do
+      (if (log/check-log-level :error)
+        (log/error "REPL returned:\n%s" res)
+        (MessageBox nil
+                    (string/format "REPL returned:\n%s" res)
+                    "Error"
+                    (bor MB_ICONEXCLAMATION)))
+      false)
+
+    # default
+    true))
+
+
+(defn- export-repl-env [send recv]
+  (def remote-code
+    ~(->> (curenv)
+          (pairs)
+          (filter (fn [[k v]] (and (symbol? k) (table? v) (not= '_ k))))
+          (flatten)
+          (splice)
+          (:export jwno/repl-server)))
+  (send (string/format "%j\n" remote-code))
+  (unless (check-repl-result (recv))
+    (os/exit 1))
+  (check-prompt-string (recv)))
+
+
+(defn run-repl-eval [eval-list cli-args]
+  (def [repl-host repl-port]
+    (if-let [addr (in cli-args "repl")]
+      addr
+      # else
+      @[const/DEFAULT-REPL-HOST const/DEFAULT-REPL-PORT]))
+
+  (def export-all (truthy? (in cli-args "export-all")))
+
+  (try
+    (with [stream (net/connect repl-host repl-port)]
+      (def unpack
+        |(if (= 0xFE (first $))
+           # Drop the 0xFE byte, see comments at the top of spork/netrepl
+           (string/slice $ 1)
+           # else
+           (string $)))
+      (def pack
+        |(do
+           (log/debug "repl input: %n" $)
+           (string $)))
+
+      (def [send recv] (msg/make-proto stream pack unpack))
+
+      (def settings
+        {:auto-flush false
+         :name const/DEFAULT-REPL-EVAL-CLIENT-NAME})
+      (send (string/format "\xFF%j" settings))
+
+      (var prmpt (check-prompt-string (recv)))
+      (each line eval-list
+        (send (string line "\n"))
+        (unless (check-repl-result (recv))
+          (os/exit 1))
+        (set prmpt (check-prompt-string (recv))))
+
+      (def [_client-name _line-no open-delimiters] prmpt)
+      (unless (empty? open-delimiters)
+        (error "incomplete expression"))
+
+      (when export-all
+        (export-repl-env send recv)))
+
+    ((err fib)
+     (if (log/check-log-level :error)
+       (log/error "REPL evaluation failed: %n\n%s"
+                  err (get-stack-trace fib))
+       (show-error-and-exit err 1 (get-stack-trace fib))))))
+
+
+(defn- normalize-cmd-name [cmd-name]
+  (cond
+    (keyword? cmd-name)
+    cmd-name
+
+    (or (symbol? cmd-name)
+        (string? cmd-name))
+    (keyword cmd-name)
+
+    true
+    (errorf "invalid command name: %n" cmd-name)))
+
+
+(defn run-repl-command [cmd-list cli-args]
+  (def eval-list
+    (try
+      (->> cmd-list
+           # Parse and normalize command names
+           (map |(when-let [parsed (parse-all $)
+                            cmd-name (first parsed)]
+                   (set (parsed 0) (normalize-cmd-name cmd-name))
+                   parsed))
+           # Remove empty commands
+           (filter |(not (nil? $)))
+           # Generate (:call-command ...) code
+           (map |(quasiquote (:call-command (in jwno/context :command-manager) ,;$)))
+           # Format generated code
+           (map |(string/format "%j" $)))
+
+      ((err fib)
+       (if (log/check-log-level :error)
+         (log/error "failed to parse command: %n\n%s"
+                    err (get-stack-trace fib))
+         (show-error-and-exit err 1 (get-stack-trace fib))))))
+
+  (run-repl-eval eval-list cli-args))
+
+
+(defn run-repl-client [cli-args]
+  (def repl-addr
+    (if-let [addr (in cli-args "repl")]
+      addr
+      # else
+      @[const/DEFAULT-REPL-HOST const/DEFAULT-REPL-PORT]))
+
+  (try
+    (do
+      (alloc-console-and-reopen-streams)
+      (netrepl/client ;repl-addr))
+    ((err fib)
+     (show-error-and-exit err 1 (get-stack-trace fib)))))

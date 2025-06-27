@@ -54,10 +54,22 @@
     :help (string "\nThe config file to run. Default: " default-config-file-path "\n")
     :kind :accumulate}
 
-   "version"
-   {:short "v"
-    :help (string "\nShows version info then exit.\n")
+   "eval"
+   {:short "e"
+    :help "\nEvaluates some Janet code through a REPL connection.\n"
+    :kind :accumulate}
+
+   "execute"
+   {:short "x"
+    :help "\nExecutes a command through a REPL connection.\n"
+    :kind :accumulate}
+
+   "export-all"
+   {:short "E"
+    :help "\nAfter processing the --eval option to evaluate Janet code, exports all symbols in the REPL environment.\n"
     :kind :flag}
+
+   # "help" "h"
 
    "log-file"
    {:help "\nSpecifies a log file to write to. No log file will be generated if this option is omitted.\n"
@@ -69,15 +81,15 @@
     :kind :option
     :map keyword}
 
-   "no-console"
-   {:help "\nSupress console output, when log-level is not quiet.\n"
-    :default false
-    :kind :flag}
-
    "mod-path"
    {:short "m"
     :help "\nA custom path to load modules from.\n"
     :kind :accumulate}
+
+   "no-console"
+   {:help "\nSupress console output, when log-level is not quiet.\n"
+    :default false
+    :kind :flag}
 
    "repl"
    {:short "r"
@@ -87,6 +99,11 @@
            (if-let [repl-addr (peg/match repl-addr-peg addr-str)]
              repl-addr
              (errorf "Malformed REPL address: %n" addr-str)))}
+
+   "version"
+   {:short "v"
+    :help (string "\nShows version info then exit.\n")
+    :kind :flag}
    ))
 
 
