@@ -17,6 +17,9 @@ Some Commands can accept arguments, but the syntaxes to pass arguments to them d
     @link[calling-a-command-directly.html]{Calling a Command Directly}
   }
   @li{
+    @link[running-a-command-from-system-command-line.html]{Running a Command From System Command Line}
+  }
+  @li{
     @link[defining-a-command.html]{Defining a Command}
   }
 }

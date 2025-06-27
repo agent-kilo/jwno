@@ -1,0 +1,37 @@
+{:title "Running a Command From System Command Line"
+ :template "main.html"
+ :back-to ["Using Commands" "index.html"]
+ :order 3}
+---
+
+One can use the @code{--execute} (or @code{-x} for short) command line option from @code{jwno.exe} to run commands from the system command line (either PowerShell or @code{cmd.exe}). It's a shortcut for evaluating @code{(:call-command ...)} through a REPL connection, so @em{a @link[../repl/the-repl-server.html]{REPL server} needs to be running}.
+
+For example, to run the @code{:toggle-parent-direction} command:
+
+@codeblock[text]```
+jwno.exe -x :toggle-parent-direction
+```
+
+Colon characters (@code{:}) in front of command names can be omitted, so this is equivalent:
+
+@codeblock[text]```
+jwno.exe -x toggle-parent-direction
+```
+
+Commands with arguments must be quoted. For example, to move a window to the left:
+
+@codeblock[text]```
+jwno.exe -x "move-window :left"
+```
+
+Command arguments can be anything, as long as they have correct Janet syntax. If we want to move a window in pixels instead, we can pass a tuple as @code{:move-window}'s argument:
+
+@codeblock[text]```
+jwno.exe -x "move-window [100 100]"
+```
+
+We can even pass functions. Here a @link[https://janet-lang.org/api/index.html#short-fn]{@code{short-fn}} is passed to the @code{:insert-frame} command, to activate the new frame after insertion:
+
+@codeblock[text]```
+jwno.exe -x "insert-frame :after |(:activate $)"
+```
