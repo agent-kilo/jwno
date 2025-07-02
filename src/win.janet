@@ -1664,6 +1664,17 @@
 
 ######### Frame object #########
 
+(defn frame-get-viewport [self]
+  (if-let [vp (in self :viewport)]
+    vp
+    #else
+    (in self :rect)))
+
+
+(defn frame-constrained? [self]
+  (not (has-key? self :viewport)))
+
+
 (defn frame-split [self direction &opt n ratios]
   (default n 2)
   (default ratios (array/new-filled (- n 1) (/ 1 n)))
@@ -1754,7 +1765,7 @@
              all-children
              new-rects)
         (map (fn [sub-fr rect]
-               (:transform sub-fr rect nil resized-frames))
+               (:transform sub-fr rect resized-frames))
              all-children
              new-rects))))
   resized-frames)
@@ -1782,25 +1793,55 @@
   (table/setproto self frame-proto))
 
 
-(defn frame-transform [self new-rect &opt to-dpi resized-frames]
-  (def old-padded-rect (:get-padded-rect self))
-  (def new-padded-rect
-    (if to-dpi
-      (let [[new-dpi-x new-dpi-y] (if (number? to-dpi)
-                                    [to-dpi to-dpi]
-                                    to-dpi)
-            new-scale-x (/ new-dpi-x const/USER-DEFAULT-SCREEN-DPI)
-            new-scale-y (/ new-dpi-y const/USER-DEFAULT-SCREEN-DPI)
-            virt-paddings (:get-paddings self false)
-            new-paddings {:top (* new-scale-y (in virt-paddings :top))
-                          :left (* new-scale-x (in virt-paddings :left))
-                          :bottom (* new-scale-y (in virt-paddings :bottom))
-                          :right (* new-scale-x (in virt-paddings :right))}]
-        (shrink-rect new-rect new-paddings))
-      (let [new-paddings (:get-paddings self)]
-        (shrink-rect new-rect new-paddings))))
+(defn calc-viewport-transform [old-viewport new-viewport old-rect direction]
+  (def [old-vp-width old-vp-height] (rect-size old-viewport))
+  (def [old-vp-center-x old-vp-center-y] (rect-center old-viewport))
+  (def [new-vp-width new-vp-height] (rect-size new-viewport))
+  (def [new-vp-center-x new-vp-center-y] (rect-center new-viewport))
+  (def [old-rc-width old-rc-height] (rect-size old-rect))
+  (def old-top-len (- old-vp-center-y (in old-rect :top)))
+  (def old-bottom-len (- (in old-rect :bottom) old-vp-center-y))
+  (def old-left-len (- old-vp-center-x (in old-rect :left)))
+  (def old-right-len (- (in old-rect :right) old-vp-center-x))
+  (def rx (/ new-vp-width old-vp-width))
+  (def ry (/ new-vp-height old-vp-height))
 
-  (put self :rect new-rect)
+  (case direction
+    :horizontal
+    {:left (- new-vp-center-x (math/floor (* old-left-len rx)))
+     :top (in new-viewport :top)
+     :right (+ new-vp-center-x (math/floor (* old-right-len rx)))
+     :bottom (in new-viewport :bottom)}
+
+    :vertical
+    {:left (in new-viewport :left)
+     :top (- new-vp-center-y (math/floor (* old-top-len ry)))
+     :right (in new-viewport :right)
+     :bottom (+ new-vp-center-y (math/floor (* old-bottom-len ry)))}
+
+    nil
+    {:left (- new-vp-center-x (math/floor (* old-left-len rx)))
+     :top (- new-vp-center-y (math/floor (* old-top-len ry)))
+     :right (+ new-vp-center-x (math/floor (* old-right-len rx)))
+     :bottom (+ new-vp-center-y (math/floor (* old-bottom-len ry)))}))
+
+
+(defn frame-transform [self rect &opt resized-frames]
+  (def old-padded-rect (:get-padded-rect self))
+
+  (if (:constrained? self)
+    (put self :rect rect)
+    # else, transform the viewport instead
+    (do
+      (def new-rect
+        (calc-viewport-transform (in self :viewport)
+                                 rect
+                                 (in self :rect)
+                                 (:get-direction self)))
+      (put self :viewport rect)
+      (put self :rect new-rect)))
+
+  (def new-padded-rect (:get-padded-rect self))
 
   (def all-children (in self :children))
   (cond
@@ -1814,7 +1855,7 @@
       (array/push resized-frames self))
 
     (= :frame (get-in all-children [0 :type]))
-    (let [children-rect (union-rect ;(map |(in $ :rect) all-children))
+    (let [children-rect (union-rect ;(map |(:get-viewport $) all-children))
           dx (- (in new-padded-rect :left) (in children-rect :left))
           dy (- (in new-padded-rect :top) (in children-rect :top))
           dw (+ (- dx)
@@ -1829,22 +1870,22 @@
         (cond
           (= horizontal-frame-proto (table/getproto self))
           (fn [sub-fr _i]
-            (let [w (rect-width (in sub-fr :rect))
+            (let [w (rect-width (:get-viewport sub-fr))
                   wr (/ w old-padded-width)
                   sub-dw (math/floor (* wr dw))]
               (+ w sub-dw)))
 
           (= vertical-frame-proto (table/getproto self))
           (fn [sub-fr _i]
-            (let [h (rect-height (in sub-fr :rect))
+            (let [h (rect-height (:get-viewport sub-fr))
                   hr (/ h old-padded-height)
                   sub-dh (math/floor (* hr dh))]
               (+ h sub-dh)))))
       (def new-rects (:calculate-sub-rects self calc-fn nil new-padded-rect))
       (map (fn [sub-fr rect]
              (if (rect-same-size? rect (in sub-fr :rect))
-               (:transform sub-fr rect to-dpi nil)
-               (:transform sub-fr rect to-dpi resized-frames)))
+               (:transform sub-fr rect nil)
+               (:transform sub-fr rect resized-frames)))
            all-children
            new-rects)))
   resized-frames)
@@ -1854,13 +1895,42 @@
   (def parent (in self :parent))
   (when (= :layout (in parent :type))
     # This is a toplevel frame, which tracks the monitor
-    # geometries and cannot be resized
+    # geometries. Only unconstrained toplevel frames can
+    # be resized.
+    (unless (:constrained? self)
+      (let [[new-width new-height] (rect-size new-rect)
+            old-rect (in self :rect)]
+        (def adjusted-rect
+          (cond
+            (= horizontal-frame-proto (table/getproto self))
+            {:left (in old-rect :left)
+             :top (in old-rect :top)
+             :right (+ new-width (in old-rect :left))
+             :bottom (in old-rect :bottom)}
+
+            (= vertical-frame-proto (table/getproto self))
+            {:left (in old-rect :left)
+             :top (in old-rect :top)
+             :right (in old-rect :right)
+             :bottom (+ new-height (in old-rect :top))}
+
+            true
+            # An unconstrained leaf frame, resize freely
+            {:left (in old-rect :left)
+             :top (in old-rect :top)
+             :right (+ new-width (in old-rect :left))
+             :bottom (+ new-height (in old-rect :top))}))
+        (:transform self adjusted-rect)))
+
+    # Early return
     (break))
 
   (let [all-siblings (in parent :children)
         parent-rect (in parent :rect)
+        parent-viewport (:get-viewport parent)
         parent-padded-rect (:get-padded-rect parent)
-        [old-width old-height] (rect-size (in self :rect))
+        parent-constrained (:constrained? parent)
+        [old-width old-height] (rect-size (:get-viewport self))
         [new-width new-height] (rect-size new-rect)
         [parent-width parent-height] (rect-size parent-padded-rect)
         dw (- new-width old-width)
@@ -1869,46 +1939,76 @@
         avail-w (- parent-width old-width)]
     (cond
       (= vertical-frame-proto (table/getproto parent))
-      (let [new-rects (:calculate-sub-rects
-                         parent
-                         (fn [sib-fr _i]
-                           (def sib-height (rect-height (in sib-fr :rect)))
-                           (def sib-dh
-                             (if (= sib-fr self)
-                               dh
-                               (math/floor (* (- dh) (/ sib-height avail-h)))))
-                           (+ sib-height sib-dh)))]
+      (do
+        (unless parent-constrained
+          (put parent :rect {:left (in parent-rect :left)
+                             :top (in parent-rect :top)
+                             :right (in parent-rect :right)
+                             :bottom (+ dh (in parent-rect :bottom))}))
+        (def new-rects
+          (if parent-constrained
+            (:calculate-sub-rects
+               parent
+               (fn [sib-fr _i]
+                 (def sib-height (rect-height (in sib-fr :rect)))
+                 (def sib-dh
+                   (if (= sib-fr self)
+                     dh
+                     (math/floor (* (- dh) (/ sib-height avail-h)))))
+                 (+ sib-height sib-dh)))
+            # else
+            (:calculate-sub-rects
+               parent
+               (fn [sib-fr _i]
+                 (if (= sib-fr self)
+                   new-height
+                   (rect-height (:get-viewport sib-fr)))))))
         (map (fn [sib-fr rect]
                (:transform sib-fr rect))
              all-siblings
              new-rects)
         (unless (= dw 0)
           (:resize parent
-                   {:left (in parent-rect :left)
-                    :top (in parent-rect :top)
-                    :right (+ dw (in parent-rect :right))
-                    :bottom (in parent-rect :bottom)})))
+                   {:left (in parent-viewport :left)
+                    :top (in parent-viewport :top)
+                    :right (+ dw (in parent-viewport :right))
+                    :bottom (in parent-viewport :bottom)})))
 
       (= horizontal-frame-proto (table/getproto parent))
-      (let [new-rects (:calculate-sub-rects
-                         parent
-                         (fn [sib-fr _i]
-                           (def sib-width (rect-width (in sib-fr :rect)))
-                           (def sib-dw
-                             (if (= sib-fr self)
-                               dw
-                               (math/floor (* (- dw) (/ sib-width avail-w)))))
-                           (+ sib-width sib-dw)))]
+      (do
+        (unless parent-constrained
+          (put parent :rect {:left (in parent-rect :left)
+                             :top (in parent-rect :top)
+                             :right (+ dw (in parent-rect :right))
+                             :bottom (in parent-rect :bottom)}))
+        (def new-rects
+          (if parent-constrained
+            (:calculate-sub-rects
+               parent
+               (fn [sib-fr _i]
+                 (def sib-width (rect-width (in sib-fr :rect)))
+                 (def sib-dw
+                   (if (= sib-fr self)
+                     dw
+                     (math/floor (* (- dw) (/ sib-width avail-w)))))
+                 (+ sib-width sib-dw)))
+            # else
+            (:calculate-sub-rects
+               parent
+               (fn [sib-fr _i]
+                 (if (= sib-fr self)
+                   new-width
+                   (rect-width (:get-viewport sib-fr)))))))
         (map (fn [sib-fr rect]
                (:transform sib-fr rect))
              all-siblings
              new-rects)
         (unless (= dh 0)
           (:resize parent
-                   {:left (in parent-rect :left)
-                    :top (in parent-rect :top)
-                    :right (in parent-rect :right)
-                    :bottom (+ dh (in parent-rect :bottom))}))))))
+                   {:left (in parent-viewport :left)
+                    :top (in parent-viewport :top)
+                    :right (in parent-viewport :right)
+                    :bottom (+ dh (in parent-viewport :bottom))}))))))
 
 
 (defn frame-insert-sub-frame [self index &opt size-ratio direction]
@@ -2028,34 +2128,64 @@
     (or (empty? children)
         (= :window (in (first children) :type)))
     (let [all-siblings (in parent :children)
-          [width height] (rect-size (in self :rect))
+          [width height] (rect-size (:get-viewport self))
           [parent-width parent-height] (rect-size (:get-padded-rect parent))
           cur-win (:get-current-window self)
-          is-active? (= self (in parent :current-child))]
+          is-active? (= self (in parent :current-child))
+          parent-constrained (:constrained? parent)]
       (if (> (length all-siblings) 2)
         (do
           (:remove-child parent self)
 
-          (def calc-fn
-            (cond
-              (= horizontal-frame-proto (table/getproto parent))
-              (let [rest-width (- parent-width width)]
-                (fn [sib-fr _]
-                  (let [sib-width (rect-width (in sib-fr :rect))
-                        ratio (/ sib-width rest-width)]
-                    (math/floor (* ratio parent-width)))))
+          (if parent-constrained
+            (do
+              (def calc-fn
+                (cond
+                  (= horizontal-frame-proto (table/getproto parent))
+                  (let [rest-width (- parent-width width)]
+                    (fn [sib-fr _]
+                      (let [sib-width (rect-width (in sib-fr :rect))
+                            ratio (/ sib-width rest-width)]
+                        (math/floor (* ratio parent-width)))))
 
-              (= vertical-frame-proto (table/getproto parent))
-              (let [rest-height (- parent-height height)]
-                (fn [sib-fr _]
-                  (let [sib-height (rect-height (in sib-fr :rect))
-                        ratio (/ sib-height rest-height)]
-                    (math/floor (* ratio parent-height)))))))
-          (def new-rects (:calculate-sub-rects parent calc-fn))
-          (map (fn [sib-fr rect]
-                 (:transform sib-fr rect))
-               (in parent :children)
-               new-rects)
+                  (= vertical-frame-proto (table/getproto parent))
+                  (let [rest-height (- parent-height height)]
+                    (fn [sib-fr _]
+                      (let [sib-height (rect-height (in sib-fr :rect))
+                            ratio (/ sib-height rest-height)]
+                        (math/floor (* ratio parent-height)))))))
+              (def new-rects (:calculate-sub-rects parent calc-fn))
+              (map (fn [sib-fr rect]
+                     (:transform sib-fr rect))
+                   (in parent :children)
+                   new-rects))
+            # else
+            (do
+              (def parent-rect (in parent :rect))
+              (def [parent-new-rect calc-fn]
+                (cond
+                  (= horizontal-frame-proto (table/getproto parent))
+                  [{:left (in parent-rect :left)
+                    :top (in parent-rect :top)
+                    :right (- (in parent-rect :right) width)
+                    :bottom (in parent-rect :bottom)}
+                   (fn [sib-fr _]
+                     (rect-width (:get-viewport sib-fr)))]
+
+                  (= vertical-frame-proto (table/getproto parent))
+                  [{:left (in parent-rect :left)
+                    :top (in parent-rect :top)
+                    :right (in parent-rect :right)
+                    :bottom (- (in parent-rect :bottom) height)}
+                   (fn [sib-fr _]
+                     (rect-height (:get-viewport sib-fr)))]))
+              (put parent :rect parent-new-rect)
+              (def new-rects (:calculate-sub-rects parent calc-fn))
+              (map (fn [sib-fr rect]
+                     (:transform sib-fr rect))
+                   (in parent :children)
+                   new-rects))
+)
 
           (def cur-frame (:get-current-frame parent))
           (each child children
@@ -2067,8 +2197,9 @@
           # Remove that child too, and move all children to the parent,
           # so that the tree stays consistent.
           (def sibling (:get-next-sibling self))
-          (def sibling-rect (in sibling :rect))
-          (def [sibling-width sibling-height] (rect-size sibling-rect))
+          (def [sibling-width sibling-height]
+            (rect-size (:get-padded-rect sibling)))
+          (def sibling-viewport (:get-viewport sibling))
 
           (def to-frame (:get-current-frame sibling))
           (each child children
@@ -2081,6 +2212,20 @@
             (put child :parent nil)
             (:add-child parent child))
           (put parent :current-child (in sibling :current-child))
+          # Copy viewport state
+          (unless (:constrained? sibling)
+            # TODO: Adjust parent-viewport when the parent is unconstrained (And test for this case)
+            (def parent-viewport (:get-viewport parent))
+            (def parent-new-rect
+              (calc-viewport-transform sibling-viewport
+                                       parent-viewport
+                                       (in sibling :rect)
+                                       (:get-direction sibling)))
+            (put parent :viewport parent-viewport) # In case parent is a constrained frame
+            (put parent :rect parent-new-rect))
+
+          (def [parent-new-width parent-new-height]
+            (rect-size (:get-padded-rect parent)))
 
           (cond
             (empty? (in parent :children))
@@ -2096,15 +2241,15 @@
                 (cond
                   (= horizontal-frame-proto (table/getproto parent))
                   (fn [sub-fr _]
-                    (let [sub-width (rect-width (in sub-fr :rect))
+                    (let [sub-width (rect-width (:get-viewport sub-fr))
                           ratio (/ sub-width sibling-width)]
-                      (math/floor (* ratio parent-width))))
+                      (math/floor (* ratio parent-new-width))))
 
                   (= vertical-frame-proto (table/getproto parent))
                   (fn [sub-fr _]
-                    (let [sub-height (rect-height (in sub-fr :rect))
+                    (let [sub-height (rect-height (:get-viewport sub-fr))
                           ratio (/ sub-height sibling-height)]
-                      (math/floor (* ratio parent-height))))))
+                      (math/floor (* ratio parent-new-height))))))
 
               (def new-rects (:calculate-sub-rects parent calc-fn))
               (map (fn [sib-fr rect]
@@ -2383,7 +2528,9 @@
 
 (set frame-proto
      (table/setproto
-      @{:split frame-split
+      @{:get-viewport frame-get-viewport
+        :constrained? frame-constrained?
+        :split frame-split
         :balance frame-balance
         :flatten frame-flatten
         :transform frame-transform
@@ -2505,7 +2652,7 @@
       (var updated false)
       (map (fn [fr mon]
              (unless (= mon (in fr :monitor))
-               (:transform fr (in mon :work-area) (in mon :dpi))
+               (:transform fr (in mon :work-area))
                (put fr :monitor mon)
                (:monitor-updated wm fr)
                (set updated true)))
@@ -2523,7 +2670,7 @@
       (var main-fr (first alive-frames))
       (map (fn [fr mon]
              (unless (= mon (in fr :monitor))
-               (:transform fr (in mon :work-area) (in mon :dpi))
+               (:transform fr (in mon :work-area))
                (put fr :monitor mon)
                (:monitor-updated wm fr))
              # Find the frame closest to the origin
@@ -2557,7 +2704,7 @@
                           new-mons)]
       (map (fn [fr mon]
              (unless (= mon (in fr :monitor))
-               (:transform fr (in mon :work-area) (in mon :dpi))
+               (:transform fr (in mon :work-area))
                (put fr :monitor mon)
                (:monitor-updated wm fr)))
            top-frames

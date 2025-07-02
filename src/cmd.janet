@@ -112,6 +112,12 @@
   (def [old-width old-height] (rect-size old-rect))
 
   (cond
+    (not= :frame (get-in frame [:parent :type]))
+    # A top-level frame
+    (when (or (not= new-width old-width)
+              (not= new-height old-height))
+      (:frames-resized wm [frame]))
+
     (and (not= new-width old-width)
          (not= new-height old-height))
     (:frames-resized wm (get-in frame [:parent :parent :children]))
@@ -296,9 +302,7 @@
 
 (defn cmd-resize-frame [wm dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (when (or (nil? cur-frame)
-            # Skip top-level frames
-            (in cur-frame :monitor))
+  (when (nil? cur-frame)
     (break))
 
   (def rect (in cur-frame :rect))
