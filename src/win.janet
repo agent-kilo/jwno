@@ -2184,8 +2184,7 @@
               (map (fn [sib-fr rect]
                      (:transform sib-fr rect))
                    (in parent :children)
-                   new-rects))
-)
+                   new-rects)))
 
           (def cur-frame (:get-current-frame parent))
           (each child children
@@ -2212,9 +2211,9 @@
             (put child :parent nil)
             (:add-child parent child))
           (put parent :current-child (in sibling :current-child))
-          # Copy viewport state
+
+          # Copy sibling viewport state
           (unless (:constrained? sibling)
-            # TODO: Adjust parent-viewport when the parent is unconstrained (And test for this case)
             (def parent-viewport (:get-viewport parent))
             (def parent-new-rect
               (calc-viewport-transform sibling-viewport

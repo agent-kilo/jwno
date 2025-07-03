@@ -577,6 +577,71 @@
   (assert (= 120 (get-in dummy-sub-frame22 [:rect :bottom]))))
 
 
+(defn test-frame-close-with-unconstrained-parent-and-sibling []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
+  (def rect {:top 10 :left 10 :bottom 110 :right 130})
+  (def vp-rect {:top 10 :left 10 :bottom 110 :right 110})
+
+  #
+  # dummy-frame -+- dummy-sub-frame1
+  #              |
+  #              +- dummy-sub-frame2 -+- dummy-sub-frame21
+  #                                   |
+  #                                   +- dummy-sub-frame22
+  #
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 70})
+  (def vp-rect2 {:top 10 :left 70 :bottom 110 :right 130})
+  (def rect2 {:top 0 :left 70 :bottom 120 :right 130})
+  (def rect21 {:top 0 :left 70 :bottom 60 :right 130})
+  (def rect22 {:top 60 :left 70 :bottom 120 :right 130})
+
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1 nil]
+        [rect2
+         vertical-frame-proto
+           [rect21 nil]
+           [rect22 nil]]]
+     dummy-monitor))
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame21 (get-in dummy-sub-frame2 [:children 0]))
+  (def dummy-sub-frame22 (get-in dummy-sub-frame2 [:children 1]))
+
+  (put dummy-frame :viewport vp-rect)
+  (put dummy-sub-frame2 :viewport vp-rect2)
+
+  (:close dummy-sub-frame1)
+
+  (assert (= 2 (length (in dummy-frame :children))))
+  (assert (and (= dummy-sub-frame21 (get-in dummy-frame [:children 0]))
+               (= dummy-sub-frame22 (get-in dummy-frame [:children 1]))))
+
+  (assert (= 10 (get-in dummy-frame [:rect :left])))
+  (assert (= 0 (get-in dummy-frame [:rect :top])))
+  (assert (= 110 (get-in dummy-frame [:rect :right])))
+  (assert (= 120 (get-in dummy-frame [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-frame [:viewport :left])))
+  (assert (= 10 (get-in dummy-frame [:viewport :top])))
+  (assert (= 110 (get-in dummy-frame [:viewport :right])))
+  (assert (= 110 (get-in dummy-frame [:viewport :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame21 [:rect :left])))
+  (assert (= 0 (get-in dummy-sub-frame21 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame21 [:rect :right])))
+  (assert (= 60 (get-in dummy-sub-frame21 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame22 [:rect :left])))
+  (assert (= 60 (get-in dummy-sub-frame22 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame22 [:rect :right])))
+  (assert (= 120 (get-in dummy-sub-frame22 [:rect :bottom]))))
+
+
 (defn test-frame-insert-sub-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (def rect {:top 10 :left 10 :bottom 110 :right 110})
@@ -1446,6 +1511,7 @@
   (test-frame-close)
   (test-frame-close-with-unconstrained-parent)
   (test-frame-close-with-unconstrained-sibling)
+  (test-frame-close-with-unconstrained-parent-and-sibling)
   (test-frame-insert-sub-frame)
   (test-frame-find-hwnd)
   (test-frame-get-current-frame)
