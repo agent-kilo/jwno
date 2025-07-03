@@ -2043,7 +2043,47 @@
 
     (and direction
          (not= direction (:get-direction self)))
-    (error "directions don't match")
+    (do
+      (def cur-child (in self :current-child))
+      (def viewport (in self :viewport))
+      (def rect (in self :rect))
+      (def proto (table/getproto self))
+
+      (put self :children @[])
+      (put self :current-child nil)
+      (put self :viewport nil)
+      (when viewport
+        (put self :rect viewport))
+      (table/setproto self frame-proto)
+
+      (def ratio
+        (if size-ratio
+          size-ratio
+          0.5))
+      (def other-ratio
+        (if (> 1 ratio)
+          (- 1 ratio)
+          # else, ratio is absolute size
+          (let [width (rect-width (:get-padded-rect self))]
+            (- width ratio))))
+      (def [move-to-idx split-ratio-list]
+        (case index
+          -1 [0 [other-ratio]]
+          0 [1 [ratio]]
+          1 [0 [other-ratio]]
+          (errorf "expected index in range [-1 1], got %n" index)))
+
+      (:split self direction 2 split-ratio-list)
+
+      (def move-to-fr (get-in self [:children move-to-idx]))
+      (def move-to-rect (in move-to-fr :rect))
+      (put move-to-fr :rect rect)
+      (put move-to-fr :viewport viewport)
+      (put move-to-fr :current-child cur-child)
+      (each c all-children
+        (:add-child move-to-fr c))
+      (table/setproto move-to-fr proto)
+      (:transform move-to-fr move-to-rect))
 
     true
     # children are sub-frames

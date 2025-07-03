@@ -758,7 +758,28 @@
   (def win-list (get-in dummy-frame [:children 1 :children]))
   (assert (= 2 (length win-list)))
   (assert (= dummy-window1 (in win-list 0)))
-  (assert (= dummy-window2 (in win-list 1))))
+  (assert (= dummy-window2 (in win-list 1)))
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame3 (get-in dummy-frame [:children 2]))
+
+  # Inserting with a direction that's different from the frame's current direction
+  (:insert-sub-frame dummy-frame 0 nil :horizontal)
+  (assert (= 2 (length (in dummy-frame :children))))
+  (assert (= 0 (length (get-in dummy-frame [:children 0 :children]))))
+  (assert (= 3 (length (get-in dummy-frame [:children 1 :children]))))
+  (assert (= dummy-sub-frame1 (get-in dummy-frame [:children 1 :children 0])))
+  (assert (= dummy-sub-frame2 (get-in dummy-frame [:children 1 :children 1])))
+  (assert (= dummy-sub-frame3 (get-in dummy-frame [:children 1 :children 2])))
+  (assert (= {:left 10 :top 10 :right 60 :bottom 110}
+             (get-in dummy-frame [:children 0 :rect])))
+  (assert (= {:left 60 :top 10 :right 110 :bottom 43}
+             (get-in dummy-frame [:children 1 :children 0 :rect])))
+  (assert (= {:left 60 :top 43 :right 110 :bottom 76}
+             (get-in dummy-frame [:children 1 :children 1 :rect])))
+  (assert (= {:left 60 :top 76 :right 110 :bottom 110}
+             (get-in dummy-frame [:children 1 :children 2 :rect]))))
 
 
 (defn test-tree-node-activate []
