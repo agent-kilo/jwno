@@ -143,63 +143,53 @@
       (:frames-resized wm (get-in frame [:parent :children])))))
 
 
-(defn cmd-insert-frame [wm location &opt after-insertion-fn depth?]
+(defn cmd-insert-frame [wm location &opt after-insertion-fn direction depth?]
   (def cur-frame (get-current-frame-of-depth wm depth?))
-  (when (or (nil? cur-frame)
-            (nil? (in cur-frame :parent)))
+  (when (nil? cur-frame)
     (break))
 
-  (def insert-params
-    (if (and (in cur-frame :monitor)
-             (or (empty? (in cur-frame :children))
-                 (= :window (get-in cur-frame [:children 0 :type]))))
-      (do
-        (def [mon-width mon-height] (get-in cur-frame [:monitor :work-area]))
-        (def dir
-          (if (< mon-width mon-height)
-            :vertical
-            :horizontal))
-        (def insert-idx
-          (case location
-            :before 0
-            :after 1
-            (errorf "unknown location to insert: %n" location)))
-        [cur-frame insert-idx nil dir])
+  (when (in cur-frame :monitor)
+    # Don't do top-level frames
+    (break))
 
+  (when (nil? (in cur-frame :parent))
+    (break))
+
+  (def insert-to (in cur-frame :parent))
+  (def dir
+    (if direction
+      direction
       # else
+      (if-let [d (:get-direction insert-to)]
+        d
+        # else, try to guess from the shape of the frame
+        (let [[vp-w vp-h] (rect-size (:get-viewport insert-to))]
+          (if (< vp-w vp-h) :vertical :horizontal)))))
+  (def insert-idx
+    (if (= dir (:get-direction insert-to))
       (do
-        (when (in cur-frame :monitor)
-          # Don't handle non-empty top-level frames
-          (break nil))
+        (def cur-idx (find-index |(= $ cur-frame) (in insert-to :children)))
+        (case location
+          :before cur-idx
+          :after (+ cur-idx 1)
+          (errorf "unknown location to insert: %n" location)))
+      # else
+      (case location
+        :before 0
+        :after 1
+        (errorf "unknown location to insert: %n" location))))
 
-        (def parent (in cur-frame :parent))
-        (def cur-idx (find-index |(= $ cur-frame) (in parent :children)))
-        (def insert-idx
-          (case location
-            :before cur-idx
-            :after (+ cur-idx 1)
-            (errorf "unknown location to insert: %n" location)))
-        [parent insert-idx])))
+  (with-activation-hooks wm
+    (:insert-sub-frame insert-to insert-idx nil dir)
+    (def new-frame (get-in insert-to [:children insert-idx]))
+    (def siblings (filter |(not= $ new-frame) (in insert-to :children)))
+    (:frames-resized wm siblings)
 
-  (when insert-params
-    (with-activation-hooks wm
-      (:insert-sub-frame ;insert-params)
+    (when after-insertion-fn
+      (after-insertion-fn new-frame))
 
-      (def insert-parent (in insert-params 0))
-      (def insert-idx (in insert-params 1))
-      (def new-frame (get-in insert-parent [:children insert-idx]))
-
-      (if (= cur-frame insert-parent)
-        (:frames-resized wm (in insert-parent :children))
-        (do
-          (def siblings (filter |(not= $ new-frame) (in insert-parent :children)))
-          (:frames-resized wm siblings)))
-
-      (when after-insertion-fn
-        (after-insertion-fn new-frame))
-
-      (:retile wm insert-parent)
-      (:set-focus wm insert-parent))))
+    (:retile wm insert-to)
+    (:set-focus wm insert-to)))
 
 
 (defn cmd-flatten-parent [wm]
@@ -968,18 +958,28 @@
      are 0.1, 0.3 and 0.6 of the original frame height, respectively.
      ```)
   (:add-command command-man :insert-frame
-     (fn [location &opt after-insertion-fn depth]
-       (cmd-insert-frame wm location after-insertion-fn depth))
+     (fn [location &opt after-insertion-fn direction depth]
+       (cmd-insert-frame wm location after-insertion-fn direction depth))
      ```
-     (:insert-frame location &opt after-insertion-fn depth)
+     (:insert-frame location &opt after-insertion-fn direction depth)
 
-     Inserts a new frame and adjusts its sibling frames' sizes as needed.
+     Inserts a new frame and adjusts its sibling or parent frames' sizes
+     as needed.
+
      Location is relative to the current frame in the level specified by
-     depth, can be :before or :after. After-insertion-fn is a function
-     accepting the new inserted frame object as its sole argument, and it
-     will be called after the insertion. Depth specifies in which level
-     the new frame should be inserted, and 1 means to insert a child frame
-     to the current top-level frame.
+     depth, can be :before or :after.
+
+     After-insertion-fn is a function accepting the new inserted frame
+     object as its sole argument, and it will be called after the
+     insertion.
+
+     Direction is the direction to insert the new frame in. Can be
+     :horizontal or :vertical. Uses the parent frame's current direction
+     if not provided.
+
+     Depth specifies in which level the new frame should be inserted, and
+     1 means to insert a child frame to the current top-level frame.
+     Defaults to the depth of the current frame.
      ```)
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm))
