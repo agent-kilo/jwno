@@ -8,13 +8,15 @@
 ### Synopsis
 
 @codeblock[janet]```
-(:insert-frame location &opt after-insertion-fn)
+(:insert-frame location &opt after-insertion-fn depth)
 ```
 
 ### Description
 
 Inserts a new frame and adjusts its sibling frames' sizes as needed.
-Location is relative to the current frame, can be :before or :after.
-After-insertion-fn is a function accepting the new inserted frame
-object as its sole argument, and it will be called after the insertion.
-If the current frame is a top-level frame, this command does nothing.
+Location is relative to the current frame in the level specified by
+depth, can be :before or :after. After-insertion-fn is a function
+accepting the new inserted frame object as its sole argument, and it
+will be called after the insertion. Depth specifies in which level
+the new frame should be inserted, and 1 means to insert a child frame
+to the current top-level frame.

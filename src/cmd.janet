@@ -143,33 +143,63 @@
       (:frames-resized wm (get-in frame [:parent :children])))))
 
 
-(defn cmd-insert-frame [wm location &opt after-insertion-fn]
-  (def cur-frame (:get-current-frame (in wm :root)))
+(defn cmd-insert-frame [wm location &opt after-insertion-fn depth?]
+  (def cur-frame (get-current-frame-of-depth wm depth?))
   (when (or (nil? cur-frame)
-            (in cur-frame :monitor)
             (nil? (in cur-frame :parent)))
     (break))
 
-  (def parent (in cur-frame :parent))
-  (def cur-idx (find-index |(= $ cur-frame) (in parent :children)))
-  (def insert-idx
-    (case location
-      :before cur-idx
-      :after (+ cur-idx 1)
-      (errorf "unknown location to insert: %n" location)))
+  (def insert-params
+    (if (and (in cur-frame :monitor)
+             (or (empty? (in cur-frame :children))
+                 (= :window (get-in cur-frame [:children 0 :type]))))
+      (do
+        (def [mon-width mon-height] (get-in cur-frame [:monitor :work-area]))
+        (def dir
+          (if (< mon-width mon-height)
+            :vertical
+            :horizontal))
+        (def insert-idx
+          (case location
+            :before 0
+            :after 1
+            (errorf "unknown location to insert: %n" location)))
+        [cur-frame insert-idx nil dir])
 
-  (with-activation-hooks wm
-    (:insert-sub-frame parent insert-idx)
+      # else
+      (do
+        (when (in cur-frame :monitor)
+          # Don't handle non-empty top-level frames
+          (break nil))
 
-    (def new-frame (get-in parent [:children insert-idx]))
-    (def siblings (filter |(not= $ new-frame) (in parent :children)))
-    (:frames-resized wm siblings)
+        (def parent (in cur-frame :parent))
+        (def cur-idx (find-index |(= $ cur-frame) (in parent :children)))
+        (def insert-idx
+          (case location
+            :before cur-idx
+            :after (+ cur-idx 1)
+            (errorf "unknown location to insert: %n" location)))
+        [parent insert-idx])))
 
-    (when after-insertion-fn
-      (after-insertion-fn new-frame))
+  (when insert-params
+    (with-activation-hooks wm
+      (:insert-sub-frame ;insert-params)
 
-    (:retile wm parent)
-    (:set-focus wm parent)))
+      (def insert-parent (in insert-params 0))
+      (def insert-idx (in insert-params 1))
+      (def new-frame (get-in insert-parent [:children insert-idx]))
+
+      (if (= cur-frame insert-parent)
+        (:frames-resized wm (in insert-parent :children))
+        (do
+          (def siblings (filter |(not= $ new-frame) (in insert-parent :children)))
+          (:frames-resized wm siblings)))
+
+      (when after-insertion-fn
+        (after-insertion-fn new-frame))
+
+      (:retile wm insert-parent)
+      (:set-focus wm insert-parent))))
 
 
 (defn cmd-flatten-parent [wm]
@@ -938,16 +968,18 @@
      are 0.1, 0.3 and 0.6 of the original frame height, respectively.
      ```)
   (:add-command command-man :insert-frame
-     (fn [location &opt after-insertion-fn]
-       (cmd-insert-frame wm location after-insertion-fn))
+     (fn [location &opt after-insertion-fn depth]
+       (cmd-insert-frame wm location after-insertion-fn depth))
      ```
-     (:insert-frame location &opt after-insertion-fn)
+     (:insert-frame location &opt after-insertion-fn depth)
 
      Inserts a new frame and adjusts its sibling frames' sizes as needed.
-     Location is relative to the current frame, can be :before or :after.
-     After-insertion-fn is a function accepting the new inserted frame
-     object as its sole argument, and it will be called after the insertion.
-     If the current frame is a top-level frame, this command does nothing.
+     Location is relative to the current frame in the level specified by
+     depth, can be :before or :after. After-insertion-fn is a function
+     accepting the new inserted frame object as its sole argument, and it
+     will be called after the insertion. Depth specifies in which level
+     the new frame should be inserted, and 1 means to insert a child frame
+     to the current top-level frame.
      ```)
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm))
