@@ -1020,7 +1020,52 @@
   (assert (= 19  (get-in dummy-sub-frame2 [:rect :top])))
   (assert (= 60  (get-in dummy-sub-frame2 [:rect :left])))
   (assert (= 101 (get-in dummy-sub-frame2 [:rect :bottom])))
-  (assert (= 101 (get-in dummy-sub-frame2 [:rect :right]))))
+  (assert (= 101 (get-in dummy-sub-frame2 [:rect :right])))
+
+  (def dummy-rect    {:top -10 :left 10 :bottom 90 :right 70})
+  (def dummy-vp-rect {:top 10  :left 10 :bottom 70 :right 70})
+  (def dummy-rect1   {:top -10 :left 10 :bottom 40 :right 70})
+  (def dummy-rect2   {:top 40  :left 10 :bottom 90 :right 70})
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [dummy-rect
+         vertical-frame-proto
+         [dummy-rect1
+          nil
+          :dummy-hwnd1]
+         [dummy-rect2
+          nil
+          :dummy-hwnd2]]
+        dummy-monitor))
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+
+  (put dummy-frame :viewport dummy-vp-rect)
+
+  # Transforming with viewport
+  (def transform-rect {:left 20 :top 20 :right 140 :bottom 140})
+  (:transform dummy-frame transform-rect)
+
+  (assert (= transform-rect (in dummy-frame :viewport)))
+  (assert (= 20 (get-in dummy-frame [:rect :left])))
+  (assert (= -20 (get-in dummy-frame [:rect :top])))
+  (assert (= 140 (get-in dummy-frame [:rect :right])))
+  (assert (= 180 (get-in dummy-frame [:rect :bottom])))
+
+  (assert (= 20 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= -20 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 140 (get-in dummy-sub-frame1 [:rect :right])))
+  (assert (= 80 (get-in dummy-sub-frame1 [:rect :bottom])))
+
+  (assert (= 20 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 80 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 140 (get-in dummy-sub-frame2 [:rect :right])))
+  (assert (= 180 (get-in dummy-sub-frame2 [:rect :bottom]))))
 
 
 (defn test-frame-balance []
