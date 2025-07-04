@@ -1207,7 +1207,109 @@
   (assert (= 10 (get-in dummy-sub-frame4 [:rect :top])))
   (assert (= 35 (get-in dummy-sub-frame4 [:rect :left])))
   (assert (= 110 (get-in dummy-sub-frame4 [:rect :bottom])))
-  (assert (= 60 (get-in dummy-sub-frame4 [:rect :right]))))
+  (assert (= 60 (get-in dummy-sub-frame4 [:rect :right])))
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -+- dummy-sub-frame3
+  #              |                    |
+  #              +- dummy-sub-frame2  +- dummy-sub-frame4
+  #
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           [{:top 0 :left 10 :bottom 120 :right 50}
+            vertical-frame-proto
+              {:top 0 :left 10 :bottom 50 :right 30}
+              {:top 50 :left 10 :bottom 120 :right 50}]
+           {:top 10 :left 50 :bottom 110 :right 110}]
+        dummy-monitor))
+
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (set dummy-sub-frame3 (get-in dummy-sub-frame1 [:children 0]))
+  (set dummy-sub-frame4 (get-in dummy-sub-frame1 [:children 1]))
+
+  (put dummy-sub-frame1 :viewport {:top 10 :left 10 :bottom 110 :right 50})
+
+  # Balance with an unconstrained child frame
+  (:balance dummy-frame)
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:viewport :left])))
+  (assert (= 10 (get-in dummy-sub-frame1 [:viewport :top])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:viewport :right])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:viewport :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 0 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:rect :right])))
+  (assert (= 120 (get-in dummy-sub-frame1 [:rect :bottom])))
+
+  (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame3 [:rect :left])))
+  (assert (= 0 (get-in dummy-sub-frame3 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame3 [:rect :right])))
+  (assert (= 50 (get-in dummy-sub-frame3 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame4 [:rect :left])))
+  (assert (= 50 (get-in dummy-sub-frame4 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame4 [:rect :right])))
+  (assert (= 120 (get-in dummy-sub-frame4 [:rect :bottom])))
+
+  #
+  # dummy-frame -+- dummy-sub-frame1 -+- dummy-sub-frame3
+  #              |                    |
+  #              +- dummy-sub-frame2  +- dummy-sub-frame4
+  #
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [rect
+         horizontal-frame-proto
+           [{:top 0 :left 10 :bottom 120 :right 50}
+            vertical-frame-proto
+              {:top 0 :left 10 :bottom 50 :right 30}
+              {:top 50 :left 10 :bottom 120 :right 50}]
+           {:top 10 :left 50 :bottom 110 :right 110}]
+        dummy-monitor))
+
+  (set dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (set dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (set dummy-sub-frame3 (get-in dummy-sub-frame1 [:children 0]))
+  (set dummy-sub-frame4 (get-in dummy-sub-frame1 [:children 1]))
+
+  (put dummy-sub-frame1 :viewport {:top 10 :left 10 :bottom 110 :right 50})
+
+  # Recursively balance with an unconstrained child frame
+  (:balance dummy-frame true)
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:viewport :left])))
+  (assert (= 10 (get-in dummy-sub-frame1 [:viewport :top])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:viewport :right])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:viewport :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 0 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame1 [:rect :right])))
+  (assert (= 120 (get-in dummy-sub-frame1 [:rect :bottom])))
+
+  (assert (= 60 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame3 [:rect :left])))
+  (assert (= 0 (get-in dummy-sub-frame3 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame3 [:rect :right])))
+  (assert (= 60 (get-in dummy-sub-frame3 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame4 [:rect :left])))
+  (assert (= 60 (get-in dummy-sub-frame4 [:rect :top])))
+  (assert (= 60 (get-in dummy-sub-frame4 [:rect :right])))
+  (assert (= 120 (get-in dummy-sub-frame4 [:rect :bottom]))))
 
 
 (defn test-frame-rotate-children []

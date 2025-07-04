@@ -1675,6 +1675,39 @@
   (not (has-key? self :viewport)))
 
 
+(defn calc-viewport-transform [old-viewport new-viewport old-rect direction]
+  (def [old-vp-width old-vp-height] (rect-size old-viewport))
+  (def [old-vp-center-x old-vp-center-y] (rect-center old-viewport))
+  (def [new-vp-width new-vp-height] (rect-size new-viewport))
+  (def [new-vp-center-x new-vp-center-y] (rect-center new-viewport))
+  (def [old-rc-width old-rc-height] (rect-size old-rect))
+  (def old-top-len (- old-vp-center-y (in old-rect :top)))
+  (def old-bottom-len (- (in old-rect :bottom) old-vp-center-y))
+  (def old-left-len (- old-vp-center-x (in old-rect :left)))
+  (def old-right-len (- (in old-rect :right) old-vp-center-x))
+  (def rx (/ new-vp-width old-vp-width))
+  (def ry (/ new-vp-height old-vp-height))
+
+  (case direction
+    :horizontal
+    {:left (- new-vp-center-x (math/floor (* old-left-len rx)))
+     :top (in new-viewport :top)
+     :right (+ new-vp-center-x (math/floor (* old-right-len rx)))
+     :bottom (in new-viewport :bottom)}
+
+    :vertical
+    {:left (in new-viewport :left)
+     :top (- new-vp-center-y (math/floor (* old-top-len ry)))
+     :right (in new-viewport :right)
+     :bottom (+ new-vp-center-y (math/floor (* old-bottom-len ry)))}
+
+    nil
+    {:left (- new-vp-center-x (math/floor (* old-left-len rx)))
+     :top (- new-vp-center-y (math/floor (* old-top-len ry)))
+     :right (+ new-vp-center-x (math/floor (* old-right-len rx)))
+     :bottom (+ new-vp-center-y (math/floor (* old-bottom-len ry)))}))
+
+
 (defn frame-split [self direction &opt n ratios]
   (default n 2)
   (default ratios (array/new-filled (- n 1) (/ 1 n)))
@@ -1755,12 +1788,22 @@
       (def new-rects (:calculate-sub-rects self (fn [_sub-fr _i] balanced-len)))
       (if recursive
         (map (fn [sub-fr rect]
-               (def old-rect (in sub-fr :rect))
-               (put sub-fr :rect rect)
+               (def old-rect (:get-viewport sub-fr))
+               (if (:constrained? sub-fr)
+                 (put sub-fr :rect rect)
+                 (do
+                   (def new-rect
+                     (calc-viewport-transform old-rect
+                                              rect
+                                              (in sub-fr :rect)
+                                              (:get-direction sub-fr)))
+                   (put sub-fr :rect new-rect)
+                   (put sub-fr :viewport rect)))
                # Only keep track of leaf frames that actually have their rects altered
                (unless (or (rect-same-size? rect old-rect)
                            (= :frame (get-in sub-fr [:children 0 :type])))
-                 (array/push resized-frames sub-fr))
+                 (when resized-frames
+                   (array/push resized-frames sub-fr)))
                (:balance sub-fr recursive resized-frames))
              all-children
              new-rects)
@@ -1791,39 +1834,6 @@
        (first all-windows)))
   # Clear vertical/horizontal settings
   (table/setproto self frame-proto))
-
-
-(defn calc-viewport-transform [old-viewport new-viewport old-rect direction]
-  (def [old-vp-width old-vp-height] (rect-size old-viewport))
-  (def [old-vp-center-x old-vp-center-y] (rect-center old-viewport))
-  (def [new-vp-width new-vp-height] (rect-size new-viewport))
-  (def [new-vp-center-x new-vp-center-y] (rect-center new-viewport))
-  (def [old-rc-width old-rc-height] (rect-size old-rect))
-  (def old-top-len (- old-vp-center-y (in old-rect :top)))
-  (def old-bottom-len (- (in old-rect :bottom) old-vp-center-y))
-  (def old-left-len (- old-vp-center-x (in old-rect :left)))
-  (def old-right-len (- (in old-rect :right) old-vp-center-x))
-  (def rx (/ new-vp-width old-vp-width))
-  (def ry (/ new-vp-height old-vp-height))
-
-  (case direction
-    :horizontal
-    {:left (- new-vp-center-x (math/floor (* old-left-len rx)))
-     :top (in new-viewport :top)
-     :right (+ new-vp-center-x (math/floor (* old-right-len rx)))
-     :bottom (in new-viewport :bottom)}
-
-    :vertical
-    {:left (in new-viewport :left)
-     :top (- new-vp-center-y (math/floor (* old-top-len ry)))
-     :right (in new-viewport :right)
-     :bottom (+ new-vp-center-y (math/floor (* old-bottom-len ry)))}
-
-    nil
-    {:left (- new-vp-center-x (math/floor (* old-left-len rx)))
-     :top (- new-vp-center-y (math/floor (* old-top-len ry)))
-     :right (+ new-vp-center-x (math/floor (* old-right-len rx)))
-     :bottom (+ new-vp-center-y (math/floor (* old-bottom-len ry)))}))
 
 
 (defn frame-transform [self rect &opt resized-frames]
