@@ -1654,6 +1654,177 @@
   (assert (= dummy-window2 (get-in dummy-frame [:children 1]))))
 
 
+(defn test-frame-resize-with-unconstrained-top-level []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
+  (def dummy-rect    {:top 0 :left 10 :bottom 120 :right 110})
+  (def dummy-vp-rect {:top 10  :left 10 :bottom 110 :right 110})
+  (def dummy-rect1   {:top 0 :left 10 :bottom 60 :right 110})
+  (def dummy-rect2   {:top 60  :left 10 :bottom 120 :right 110})
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [dummy-rect
+      vertical-frame-proto
+      [dummy-rect1
+       nil
+       :dummy-hwnd1]
+      [dummy-rect2
+       nil
+       :dummy-hwnd2]]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+
+  (put dummy-frame :viewport dummy-vp-rect)
+
+  (:resize dummy-frame {:top 0 :left 0 :bottom 80 :right 80})
+
+  # Viewport should remain the same
+  (assert (= dummy-vp-rect (in dummy-frame :viewport)))
+  # The rect should only be resized on the Y axis, since the frame
+  # is vertically unconstrained
+  (assert (= {:left 10 :top 0 :right 110 :bottom 80} (in dummy-frame :rect)))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 0 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:rect :right])))
+  (assert (= 40 (get-in dummy-sub-frame1 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 40 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+  (assert (= 80 (get-in dummy-sub-frame2 [:rect :bottom]))))
+
+
+(defn test-frame-resize-with-unconstrained-parent []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
+  (def dummy-rect    {:top 0 :left 10 :bottom 120 :right 110})
+  (def dummy-vp-rect {:top 10  :left 10 :bottom 110 :right 110})
+  (def dummy-rect1   {:top 0 :left 10 :bottom 60 :right 110})
+  (def dummy-rect2   {:top 60  :left 10 :bottom 120 :right 110})
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [dummy-rect
+      vertical-frame-proto
+      [dummy-rect1
+       nil
+       :dummy-hwnd1]
+      [dummy-rect2
+       nil
+       :dummy-hwnd2]]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+
+  (put dummy-frame :viewport dummy-vp-rect)
+
+  (:resize dummy-sub-frame1 {:top 0 :left 0 :bottom 40 :right 40})
+
+  (assert (= dummy-vp-rect (in dummy-frame :viewport)))
+  # The rect should only be resized on the Y axis, since the frame
+  # is vertically unconstrained
+  (assert (= {:left 10 :top 0 :right 110 :bottom 100} (in dummy-frame :rect)))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 0 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:rect :right])))
+  (assert (= 40 (get-in dummy-sub-frame1 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 40 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+  (assert (= 100 (get-in dummy-sub-frame2 [:rect :bottom]))))
+
+
+(defn test-frame-resize-with-unconstrained-sibling []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
+  (def dummy-rect    {:top 10 :left 10 :bottom 130 :right 110})
+  (def dummy-rect1   {:top 10 :left 10 :bottom 90 :right 110})
+  (def dummy-rect2   {:top 80 :left 10 :bottom 120 :right 110})
+  (def dummy-vp-rect2 {:top 90  :left 10 :bottom 110 :right 110})
+  (def dummy-rect21  {:top 80 :left 10 :bottom 100 :right 110})
+  (def dummy-rect22  {:top 100 :left 10 :bottom 120 :right 110})
+  (def dummy-rect3   {:top 110 :left 10 :bottom 130 :right 110})
+  #
+  # dummy-frame -+- dummy-sub-frame1 
+  #              |
+  #              +- dummy-sub-frame2 -+- dummy-sub-frame21
+  #              |                    |
+  #              |                    +- dummy-sub-frame22
+  #              +- dummy-sub-frame3
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [dummy-rect
+      vertical-frame-proto
+        [dummy-rect1 nil]
+        [dummy-rect2
+         vertical-frame-proto
+           [dummy-rect21 nil]
+           [dummy-rect22 nil]]
+        [dummy-rect3 nil]]
+     dummy-monitor))
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame3 (get-in dummy-frame [:children 2]))
+
+  (def dummy-sub-frame21 (get-in dummy-sub-frame2 [:children 0]))
+  (def dummy-sub-frame22 (get-in dummy-sub-frame2 [:children 1]))
+
+  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+
+  (put dummy-sub-frame2 :viewport dummy-vp-rect2)
+
+  (:resize dummy-sub-frame1 {:top 0 :left 0 :bottom 40 :right 40})
+
+  (assert (= dummy-rect (in dummy-frame :rect)))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame1 [:rect :right])))
+  (assert (= 50 (get-in dummy-sub-frame1 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:viewport :left])))
+  (assert (= 50 (get-in dummy-sub-frame2 [:viewport :top])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:viewport :right])))
+  (assert (= 90 (get-in dummy-sub-frame2 [:viewport :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 30 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :right])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame21 [:rect :left])))
+  (assert (= 30 (get-in dummy-sub-frame21 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame21 [:rect :right])))
+  (assert (= 70 (get-in dummy-sub-frame21 [:rect :bottom])))
+  
+  (assert (= 10 (get-in dummy-sub-frame22 [:rect :left])))
+  (assert (= 70 (get-in dummy-sub-frame22 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame22 [:rect :right])))
+  (assert (= 110 (get-in dummy-sub-frame22 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame3 [:rect :left])))
+  (assert (= 90 (get-in dummy-sub-frame3 [:rect :top])))
+  (assert (= 110 (get-in dummy-sub-frame3 [:rect :right])))
+  (assert (= 130 (get-in dummy-sub-frame3 [:rect :bottom]))))
+
+
 (defn test-layout-get-adjacent-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -1729,5 +1900,8 @@
   (test-frame-set-direction)
   (test-frame-toggle-direction)
   (test-frame-flatten-with-viewport)
+  (test-frame-resize-with-unconstrained-top-level)
+  (test-frame-resize-with-unconstrained-parent)
+  (test-frame-resize-with-unconstrained-sibling)
   (test-layout-get-adjacent-frame)
   (test-tree-node-attached?))

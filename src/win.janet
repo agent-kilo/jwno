@@ -1937,7 +1937,13 @@
              :top (in old-rect :top)
              :right (+ new-width (in old-rect :left))
              :bottom (+ new-height (in old-rect :top))}))
-        (:transform self adjusted-rect)))
+        (def viewport (in self :viewport))
+        (defer
+          (put self :viewport viewport)
+          # body, temporarily disable the viewport, to transform
+          # self's actual rect
+          (put self :viewport nil)
+          (:transform self adjusted-rect))))
 
     # Early return
     (break))
@@ -1967,7 +1973,7 @@
             (:calculate-sub-rects
                parent
                (fn [sib-fr _i]
-                 (def sib-height (rect-height (in sib-fr :rect)))
+                 (def sib-height (rect-height (:get-viewport sib-fr)))
                  (def sib-dh
                    (if (= sib-fr self)
                      dh
@@ -2003,7 +2009,7 @@
             (:calculate-sub-rects
                parent
                (fn [sib-fr _i]
-                 (def sib-width (rect-width (in sib-fr :rect)))
+                 (def sib-width (rect-width (:get-viewport sib-fr)))
                  (def sib-dw
                    (if (= sib-fr self)
                      dw
