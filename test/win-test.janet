@@ -1615,6 +1615,45 @@
   (assert (= rect4 (in dummy-sub-frame4 :rect))))
 
 
+(defn test-frame-flatten-with-viewport []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+
+  (def dummy-rect    {:top 0 :left 10 :bottom 120 :right 110})
+  (def dummy-vp-rect {:top 10  :left 10 :bottom 110 :right 110})
+  (def dummy-rect1   {:top 0 :left 10 :bottom 60 :right 110})
+  (def dummy-rect2   {:top 60  :left 10 :bottom 120 :right 110})
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [dummy-rect
+      vertical-frame-proto
+      [dummy-rect1
+       nil
+       :dummy-hwnd1]
+      [dummy-rect2
+       nil
+       :dummy-hwnd2]]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-window1 (get-in dummy-sub-frame1 [:children 0]))
+  (def dummy-window2 (get-in dummy-sub-frame2 [:children 0]))
+
+  (put dummy-frame :viewport dummy-vp-rect)
+
+  (:flatten dummy-frame)
+
+  (assert (:constrained? dummy-frame))
+  (assert (= dummy-vp-rect (in dummy-frame :rect)))
+  (assert (= 2 (length (in dummy-frame :children))))
+  (assert (= dummy-window1 (get-in dummy-frame [:children 0])))
+  (assert (= dummy-window2 (get-in dummy-frame [:children 1]))))
+
+
 (defn test-layout-get-adjacent-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -1689,5 +1728,6 @@
   (test-frame-reverse-children)
   (test-frame-set-direction)
   (test-frame-toggle-direction)
+  (test-frame-flatten-with-viewport)
   (test-layout-get-adjacent-frame)
   (test-tree-node-attached?))

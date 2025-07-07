@@ -1664,17 +1664,6 @@
 
 ######### Frame object #########
 
-(defn frame-get-viewport [self]
-  (if-let [vp (in self :viewport)]
-    vp
-    #else
-    (in self :rect)))
-
-
-(defn frame-constrained? [self]
-  (not (has-key? self :viewport)))
-
-
 (defn calc-viewport-transform [old-viewport new-viewport old-rect direction]
   (def [old-vp-width old-vp-height] (rect-size old-viewport))
   (def [old-vp-center-x old-vp-center-y] (rect-center old-viewport))
@@ -1706,6 +1695,35 @@
      :top (- new-vp-center-y (math/floor (* old-top-len ry)))
      :right (+ new-vp-center-x (math/floor (* old-right-len rx)))
      :bottom (+ new-vp-center-y (math/floor (* old-bottom-len ry)))}))
+
+
+(defn frame-get-viewport [self]
+  (if-let [vp (in self :viewport)]
+    vp
+    #else
+    (in self :rect)))
+
+
+(defn frame-set-viewport [self viewport]
+  (def old-viewport (:get-viewport self))
+  (def old-rect (in self :rect))
+  (def direction (:get-direction self))
+  (when (nil? direction)
+    (error "cannot set viewport to a leaf frame"))
+  (def new-rect (calc-viewport-transform old-viewport viewport old-rect direction))
+  (put self :rect new-rect)
+  (put self :viewport viewport))
+
+
+(defn frame-remove-viewport [self]
+  (unless (:constrained? self)
+    (def viewport (in self :viewport))
+    (put self :viewport nil)
+    (:transform self viewport)))
+
+
+(defn frame-constrained? [self]
+  (not (has-key? self :viewport)))
 
 
 (defn frame-split [self direction &opt n ratios]
@@ -1791,14 +1809,8 @@
                (def old-rect (:get-viewport sub-fr))
                (if (:constrained? sub-fr)
                  (put sub-fr :rect rect)
-                 (do
-                   (def new-rect
-                     (calc-viewport-transform old-rect
-                                              rect
-                                              (in sub-fr :rect)
-                                              (:get-direction sub-fr)))
-                   (put sub-fr :rect new-rect)
-                   (put sub-fr :viewport rect)))
+                 # else
+                 (:set-viewport sub-fr rect))
                # Only keep track of leaf frames that actually have their rects altered
                (unless (or (rect-same-size? rect old-rect)
                            (= :frame (get-in sub-fr [:children 0 :type])))
@@ -1833,7 +1845,9 @@
        true
        (first all-windows)))
   # Clear vertical/horizontal settings
-  (table/setproto self frame-proto))
+  (table/setproto self frame-proto)
+  # Leaf frames with viewports are...weird, remove them
+  (:remove-viewport self))
 
 
 (defn frame-transform [self rect &opt resized-frames]
@@ -1842,14 +1856,7 @@
   (if (:constrained? self)
     (put self :rect rect)
     # else, transform the viewport instead
-    (do
-      (def new-rect
-        (calc-viewport-transform (in self :viewport)
-                                 rect
-                                 (in self :rect)
-                                 (:get-direction self)))
-      (put self :viewport rect)
-      (put self :rect new-rect)))
+    (:set-viewport self rect))
 
   (def new-padded-rect (:get-padded-rect self))
 
@@ -2578,6 +2585,8 @@
 (set frame-proto
      (table/setproto
       @{:get-viewport frame-get-viewport
+        :set-viewport frame-set-viewport
+        :remove-viewport frame-remove-viewport
         :constrained? frame-constrained?
         :split frame-split
         :balance frame-balance
