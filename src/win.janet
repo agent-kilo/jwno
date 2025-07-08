@@ -2400,6 +2400,32 @@
     true (errorf "unknown frame proto: %n" proto)))
 
 
+(defn change-viewport-direction [viewport rect dir]
+  (def [vp-width vp-height] (rect-size viewport))
+  (def [vp-center-x vp-center-y] (rect-center viewport))
+  (def [width height] (rect-size rect))
+
+  (def top-len (- vp-center-y (in rect :top)))
+  (def bottom-len (- (in rect :bottom) vp-center-y))
+  (def left-len (- vp-center-x (in rect :left)))
+  (def right-len (- (in rect :right) vp-center-x))
+
+  (case dir
+    :horizontal # :vertical -> :horizontal
+    {:left (- vp-center-x (math/floor (* top-len (/ vp-width vp-height))))
+     :top (in viewport :top)
+     :right (+ vp-center-x (math/floor (* bottom-len (/ vp-width vp-height))))
+     :bottom (in viewport :bottom)}
+
+    :vertical # :horizontal -> :vertical
+    {:left (in viewport :left)
+     :top (- vp-center-y (math/floor (* left-len (/ vp-height vp-width))))
+     :right (in viewport :right)
+     :bottom (+ vp-center-y (math/floor (* right-len (/ vp-height vp-width))))}
+
+    (errorf "invalid direction: %n" dir)))
+
+
 (defn frame-set-direction [self dir &opt recursive]
   (default recursive false)
 
@@ -2438,14 +2464,19 @@
     # :vertical -> :horizontal
     (do
       (def padded-rect (:get-padded-rect self))
-      (def [width height] (rect-size (in self :rect)))
-      (def ratios (map |(/ (rect-height (in $ :rect)) height) children))
+      (def [width height] (rect-size padded-rect))
+      (def ratios (map |(/ (rect-height (:get-viewport $)) height) children))
       (table/setproto self horizontal-frame-proto)
+      (unless (:constrained? self)
+        (put self :rect (change-viewport-direction (in self :viewport)
+                                                   (in self :rect)
+                                                   :horizontal)))
+      (def new-width (rect-width (:get-padded-rect self)))
       (def new-rects
         (:calculate-sub-rects
            self
            (fn [_ i]
-             (math/floor (* width (in ratios i))))))
+             (math/floor (* new-width (in ratios i))))))
       (map update-child-rect children new-rects))
 
     (and (= cur-dir :horizontal)
@@ -2453,14 +2484,19 @@
     # :horizontal -> :vertical
     (do
       (def padded-rect (:get-padded-rect self))
-      (def [width height] (rect-size (in self :rect)))
-      (def ratios (map |(/ (rect-width (in $ :rect)) width) children))
+      (def [width height] (rect-size padded-rect))
+      (def ratios (map |(/ (rect-width (:get-viewport $)) width) children))
       (table/setproto self vertical-frame-proto)
+      (unless (:constrained? self)
+        (put self :rect (change-viewport-direction (in self :viewport)
+                                                   (in self :rect)
+                                                   :vertical)))
+      (def new-height (rect-height (:get-padded-rect self)))
       (def new-rects
         (:calculate-sub-rects
            self
            (fn [_ i]
-             (math/floor (* height (in ratios i))))))
+             (math/floor (* new-height (in ratios i))))))
       (map update-child-rect children new-rects))
 
     true

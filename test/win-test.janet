@@ -1609,6 +1609,46 @@
              {:top 10 :left 35 :bottom 110 :right 60})))
 
 
+(defn test-frame-set-direction-unconstrained []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 0 :bottom 110 :right 120})
+  (def vp-rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def rect1 {:top 10 :left 0 :bottom 110 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 120})
+
+  #
+  # dummy-frame -+- dummy-sub-frame1
+  #              |
+  #              +- dummy-sub-frame2
+  #
+  (var dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        rect1
+        rect2]
+     dummy-monitor))
+  (var dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (var dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+
+  (put dummy-frame :viewport vp-rect)
+
+  (:set-direction dummy-frame :vertical)
+
+  (assert (= (in dummy-frame :rect)
+             {:top 0 :left 10 :bottom 120 :right 110}))
+  (assert (= (in dummy-sub-frame1 :rect)
+             {:top 0 :left 10 :bottom 60 :right 110}))
+  (assert (= (in dummy-sub-frame2 :rect)
+             {:top 60 :left 10 :bottom 120 :right 110}))
+
+  (:set-direction dummy-frame :horizontal)
+
+  (assert (= rect (in dummy-frame :rect)))
+  (assert (= rect1 (in dummy-sub-frame1 :rect)))
+  (assert (= rect2 (in dummy-sub-frame2 :rect))))
+
+
 (defn test-frame-toggle-direction []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (def rect {:top 10 :left 10 :bottom 110 :right 110})
@@ -1962,6 +2002,7 @@
   (test-frame-rotate-children)
   (test-frame-reverse-children)
   (test-frame-set-direction)
+  (test-frame-set-direction-unconstrained)
   (test-frame-toggle-direction)
   (test-frame-flatten-with-viewport)
   (test-frame-resize-with-unconstrained-top-level)
