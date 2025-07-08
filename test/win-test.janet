@@ -779,7 +779,30 @@
   (assert (= {:left 60 :top 43 :right 110 :bottom 76}
              (get-in dummy-frame [:children 1 :children 1 :rect])))
   (assert (= {:left 60 :top 76 :right 110 :bottom 110}
-             (get-in dummy-frame [:children 1 :children 2 :rect]))))
+             (get-in dummy-frame [:children 1 :children 2 :rect])))
+
+  (set dummy-frame
+       (build-dummy-frame-tree
+        [{:left 10 :top 10 :right 90 :bottom 110} nil]
+        dummy-monitor))
+
+  # Insert into a frame that's not already split, with an absolute size
+  (:insert-sub-frame dummy-frame 1 60 :vertical)
+
+  (assert (= 2 (length (in dummy-frame :children))))
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :left])))
+  (assert (= 10 (get-in dummy-sub-frame1 [:rect :top])))
+  (assert (= 90 (get-in dummy-sub-frame1 [:rect :right])))
+  (assert (= 50 (get-in dummy-sub-frame1 [:rect :bottom])))
+
+  (assert (= 10 (get-in dummy-sub-frame2 [:rect :left])))
+  (assert (= 50 (get-in dummy-sub-frame2 [:rect :top])))
+  (assert (= 90 (get-in dummy-sub-frame2 [:rect :right])))
+  (assert (= 110 (get-in dummy-sub-frame2 [:rect :bottom]))))
 
 
 (defn test-tree-node-activate []
