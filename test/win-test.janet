@@ -511,7 +511,48 @@
   (assert (= 50 (get-in dummy-sub-frame3 [:rect :left])))
   (assert (= 10 (get-in dummy-sub-frame3 [:rect :top])))
   (assert (= 90 (get-in dummy-sub-frame3 [:rect :right])))
-  (assert (= 110 (get-in dummy-sub-frame3 [:rect :bottom]))))
+  (assert (= 110 (get-in dummy-sub-frame3 [:rect :bottom])))
+
+  (def rect {:top 10 :left 10 :bottom 130 :right 110})
+  (def vp-rect {:top 35 :left 10 :bottom 85 :right 110})
+  #
+  # dummy-frame -+- dummy-sub-frame1 -- dummy-window1
+  #              |
+  #              +- dummy-sub-frame2 -- dummy-window2
+  #
+  (def rect1 {:top 10 :left 10 :bottom 70 :right 110})
+  (def rect2 {:top 70 :left 10 :bottom 130 :right 110})
+
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      vertical-frame-proto
+        [rect1
+         nil
+           :dummy-hwnd1]
+        [rect2
+         nil
+           :dummy-hwnd2]]
+     dummy-monitor))
+
+  (put dummy-frame :viewport vp-rect)
+
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-window1 (get-in dummy-sub-frame1 [:children 0]))
+  (def dummy-window2 (get-in dummy-sub-frame2 [:children 0]))
+
+  (:activate dummy-window1)
+  # Closing a frame that has a sole constrained sibling
+  (:close dummy-sub-frame1)
+
+  (assert (:constrained? dummy-frame))
+  (assert (= vp-rect (in dummy-frame :rect)))
+  (assert (= 2 (length (in dummy-frame :children))))
+  (assert (= dummy-window1 (in dummy-frame :current-child)))
+  (def hwnds (map |(in $ :hwnd) (in dummy-frame :children)))
+  (assert (or (deep= hwnds @[:dummy-hwnd1 :dummy-hwnd2])
+              (deep= hwnds @[:dummy-hwnd2 :dummy-hwnd1]))))
 
 
 (defn test-frame-close-with-unconstrained-sibling []

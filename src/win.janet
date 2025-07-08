@@ -2278,16 +2278,22 @@
             (:add-child parent child))
           (put parent :current-child (in sibling :current-child))
 
-          # Copy sibling viewport state
-          (unless (:constrained? sibling)
-            (def parent-viewport (:get-viewport parent))
-            (def parent-new-rect
-              (calc-viewport-transform sibling-viewport
-                                       parent-viewport
-                                       (in sibling :rect)
-                                       (:get-direction sibling)))
-            (put parent :viewport parent-viewport) # In case parent is a constrained frame
-            (put parent :rect parent-new-rect))
+          (def parent-viewport (:get-viewport parent))
+          (if (:constrained? sibling)
+            (do
+              # Remove parent's viewport
+              (put parent :viewport nil)
+              (put parent :rect parent-viewport))
+            # else
+            (do
+              # Copy and scale sibling's viewport
+              (def parent-new-rect
+                (calc-viewport-transform sibling-viewport
+                                         parent-viewport
+                                         (in sibling :rect)
+                                         (:get-direction sibling)))
+              (put parent :viewport parent-viewport) # In case parent is a constrained frame
+              (put parent :rect parent-new-rect)))
 
           (def [parent-new-width parent-new-height]
             (rect-size (:get-padded-rect parent)))
