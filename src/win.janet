@@ -2210,14 +2210,14 @@
                   (= horizontal-frame-proto (table/getproto parent))
                   (let [rest-width (- parent-width width)]
                     (fn [sib-fr _]
-                      (let [sib-width (rect-width (in sib-fr :rect))
+                      (let [sib-width (rect-width (:get-viewport sib-fr))
                             ratio (/ sib-width rest-width)]
                         (math/floor (* ratio parent-width)))))
 
                   (= vertical-frame-proto (table/getproto parent))
                   (let [rest-height (- parent-height height)]
                     (fn [sib-fr _]
-                      (let [sib-height (rect-height (in sib-fr :rect))
+                      (let [sib-height (rect-height (:get-viewport sib-fr))
                             ratio (/ sib-height rest-height)]
                         (math/floor (* ratio parent-height)))))))
               (def new-rects (:calculate-sub-rects parent calc-fn))
