@@ -2034,6 +2034,29 @@
                     :bottom (+ dh (in parent-viewport :bottom))}))))))
 
 
+(defn calc-insert-split-params [fr index ratio-or-size direction]
+  (def rs
+    (if ratio-or-size
+      ratio-or-size
+      # else, defaults to half of fr
+      0.5))
+  (def other-rs
+    (if (> 1 rs)
+      (- 1 rs)
+      # else, rs is absolute size, in pixels
+      (let [fr-rect (:get-padded-rect fr)
+            fr-size (case direction
+                      :horizontal (rect-width  fr-rect)
+                      :vertical   (rect-height fr-rect)
+                      (errorf "invalid direction: %n" direction))]
+        (- fr-size rs))))
+  (case index
+    -1 [0 [other-rs]]
+    0  [1 [rs]]
+    1  [0 [other-rs]]
+    (errorf "expected index in range [-1 1], got %n" index)))
+
+
 (defn frame-insert-sub-frame [self index &opt size-ratio direction]
   (def all-children (in self :children))
   (def child-count (length all-children))
@@ -2042,24 +2065,12 @@
     (or (empty? all-children)
         (= :window (get-in all-children [0 :type])))
     # A leaf frame, split it
-    (let [ratio (if size-ratio
-                  size-ratio
-                  0.5)
-          dir (if direction
+    (let [dir (if direction
                 direction
                 (error "frame is not split, but no direction is provided"))
-          other-ratio (if (> 1 ratio)
-                        (- 1 ratio)
-                        # else, ratio is absolute size
-                        (let [width (rect-width (:get-padded-rect self))]
-                          (- width ratio)))
-          [move-windows? split-ratio-list] (case index
-                                             -1 [false [other-ratio]]
-                                             0 [true [ratio]]
-                                             1 [false [other-ratio]]
-                                             (errorf "expected index in range [-1 1], got %n" index))]
+          [move-to-idx split-ratio-list] (calc-insert-split-params self index size-ratio dir)]
       (:split self dir 2 split-ratio-list)
-      (when move-windows?
+      (unless (= 0 move-to-idx)
         (def to-frame (get-in self [:children 1]))
         (each w all-children
           (:add-child to-frame w))))
@@ -2079,23 +2090,8 @@
         (put self :rect viewport))
       (table/setproto self frame-proto)
 
-      (def ratio
-        (if size-ratio
-          size-ratio
-          0.5))
-      (def other-ratio
-        (if (> 1 ratio)
-          (- 1 ratio)
-          # else, ratio is absolute size
-          (let [width (rect-width (:get-padded-rect self))]
-            (- width ratio))))
       (def [move-to-idx split-ratio-list]
-        (case index
-          -1 [0 [other-ratio]]
-          0 [1 [ratio]]
-          1 [0 [other-ratio]]
-          (errorf "expected index in range [-1 1], got %n" index)))
-
+        (calc-insert-split-params self index size-ratio direction))
       (:split self direction 2 split-ratio-list)
 
       (def move-to-fr (get-in self [:children move-to-idx]))
@@ -2111,9 +2107,16 @@
     true
     # children are sub-frames
     (let [dir (:get-direction self)
-          ratio (if size-ratio
+          ratio (cond
                   size-ratio
-                  (/ 1 (+ 1 child-count)))
+                  size-ratio
+
+                  (:constrained? self)
+                  (/ 1 (+ 1 child-count))
+
+                  # unconstrained frame, default to half of the viewport size
+                  true
+                  0.5)
           idx (if (< index 0)
                 (+ 1 index child-count) # -1 means insert to the end of the array
                 index)
@@ -2152,8 +2155,8 @@
 
       (def new-frame (frame new-rect self))
       (array/insert all-children idx new-frame)
-      (def padded-rect (:get-padded-rect self))
-      (def [width height] (rect-size padded-rect))
+      (def padded-viewport (:get-padded-viewport self))
+      (def [width height] (rect-size padded-viewport))
       (def resize-rect
         (case dir
           :horizontal
@@ -2372,6 +2375,13 @@
 
   (def paddings (:get-paddings self scaled))
   (shrink-rect (in self :rect) paddings))
+
+
+(defn frame-get-padded-viewport [self &opt scaled]
+  (default scaled true)
+
+  (def paddings (:get-paddings self scaled))
+  (shrink-rect (:get-viewport self) paddings))
 
 
 (defn frame-get-direction [self]
@@ -2604,6 +2614,7 @@
         :sync-current-window frame-sync-current-window
         :get-paddings frame-get-paddings
         :get-padded-rect frame-get-padded-rect
+        :get-padded-viewport frame-get-padded-viewport
         :get-direction frame-get-direction
         :set-direction frame-set-direction
         :toggle-direction frame-toggle-direction
