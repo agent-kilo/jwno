@@ -158,7 +158,10 @@
   (def insert-to (in cur-frame :parent))
   (def dir
     (if direction
-      direction
+      (if (or (= :horizontal direction)
+              (= :vertical direction))
+        direction
+        (errorf "invalid direction: %n" direction))
       # else
       (if-let [d (:get-direction insert-to)]
         d
