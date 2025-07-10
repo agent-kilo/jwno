@@ -2111,7 +2111,52 @@
   (assert (= 0 (get-in loaded-frame [:children 0 :children 1 :rect :left])))
   (assert (= 120 (get-in loaded-frame [:children 0 :children 1 :rect :top])))
   (assert (= 120 (get-in loaded-frame [:children 0 :children 1 :rect :right])))
-  (assert (= 220 (get-in loaded-frame [:children 0 :children 1 :rect :bottom]))))
+  (assert (= 220 (get-in loaded-frame [:children 0 :children 1 :rect :bottom])))
+
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def vp-rect1 {:top 10 :left 10 :bottom 110 :right 60})
+  (def rect1 {:top 0 :left 10 :bottom 120 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 110})
+  (def rect11 {:top 0 :left 10 :bottom 60 :right 60})
+  (def rect12 {:top 60 :left 10 :bottom 120 :right 60})
+  #
+  # (horizontal)       (vertical)
+  # dummy-frame --+- dummy-sub-frame1 --+- dummy-sub-frame11
+  #               |                     |
+  #               +- dummy-sub-frame2   +- dummy-sub-frame12
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         vertical-frame-proto
+           rect11
+           rect12]
+        rect2]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+
+  (put dummy-sub-frame1 :viewport vp-rect1)
+
+  (def dumped (:dump dummy-frame))
+
+  (def loaded-frame
+    (build-dummy-frame-tree [rect nil] dummy-monitor))
+
+  # Load unaligned sub frames
+  (:load loaded-frame dumped)
+
+  (assert (= rect (in loaded-frame :rect)))
+  (assert (= 2 (length (in loaded-frame :children))))
+  (assert (= 2 (length (get-in loaded-frame [:children 0 :children]))))
+
+  (assert (= rect1 (get-in loaded-frame [:children 0 :rect])))
+  (assert (= vp-rect1 (get-in loaded-frame [:children 0 :viewport])))
+  (assert (= rect2 (get-in loaded-frame [:children 1 :rect])))
+
+  (assert (= rect11 (get-in loaded-frame [:children 0 :children 0 :rect])))
+  (assert (= rect12 (get-in loaded-frame [:children 0 :children 1 :rect]))))
 
 
 (defn test-layout-get-adjacent-frame []

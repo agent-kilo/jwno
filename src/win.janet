@@ -652,6 +652,16 @@
   hwnd-list)
 
 
+(defn get-dumped-viewport [dumped-frame]
+  (def [tp rect viewport _tags _children] dumped-frame)
+  (unless (= tp :frame)
+    (errorf "no viewport for dumped type %n" tp))
+  # Fallback to rect when viewport is not set
+  (if (nil? viewport)
+    rect
+    viewport))
+
+
 (defn calc-loading-split-params [dumped-children]
   (var direction nil)
   (var last-rect nil)
@@ -674,7 +684,7 @@
 
       :frame
       (do
-        (def [_ rect _tags] c)
+        (def rect (get-dumped-viewport c))
         (def [width height] (rect-size rect))
         (array/push child-widths width)
         (array/push child-heights height)
@@ -690,11 +700,16 @@
                (in last-rect :left))
             (do
               (set direction :vertical)
-              (+= total-height height)))
+              (+= total-height height))
+
+            true
+            (errorf "unaligned child frames in dumped data: %n, %n" rect last-rect))
+
           # else
           (do
             (set total-width width)
             (set total-height height)))
+
         (set last-rect rect))
 
       (errorf "unknown child node type: %n" child-type)))
@@ -707,7 +722,7 @@
   (def ratios
     (case direction
       :horizontal
-       (map |(/ $ total-width) child-widths)
+      (map |(/ $ total-width) child-widths)
 
       :vertical
       (map |(/ $ total-height) child-heights)))
@@ -1294,9 +1309,18 @@
 
 
 (defn tree-node-get-layout [self]
-  (if (or (nil? self) (= :layout (in self :type)))
+  (cond
+    (nil? self)
+    nil
+
+    (= :layout (in self :type))
     self
-    (:get-layout (in self :parent))))
+
+    (has-key? self :parent)
+    (:get-layout (in self :parent))
+
+    true
+    nil))
 
 
 (defn tree-node-get-root [self]
@@ -2897,11 +2921,7 @@
   (def all-top-frames (array/slice (in self :children)))
 
   (def frame-rects (map |(:get-viewport $) all-top-frames))
-  (def dumped-rects (map |(if-let [vp (in $ 2)] # check viewport
-                            vp
-                            # else, fallback to rect when viewport is nil
-                            (in $ 1))
-                         children))
+  (def dumped-rects (map |(get-dumped-viewport $) children))
 
   (if (<= (length frame-rects)
           (length dumped-rects))
