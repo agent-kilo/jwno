@@ -1750,6 +1750,74 @@
   (not (has-key? self :viewport)))
 
 
+(defn frame-move-into-viewport [self]
+  (def parent (in self :parent))
+  (when (or (nil? parent)
+            (not= :frame (in parent :type)))
+    # Early return
+    (break))
+
+  (:move-into-viewport parent)
+
+  (when (:constrained? parent)
+    # Position in parent is fixed, early return
+    (break))
+
+  (def parent-viewport (in parent :viewport))
+  (def self-viewport (:get-viewport self))
+  (when (= self-viewport (intersect-rect self-viewport parent-viewport))
+    # self is already fully visible, early return
+    (break))
+
+  (def [parent-vp-center-x parent-vp-center-y] (rect-center parent-viewport))
+  (def [self-vp-center-x self-vp-center-y] (rect-center self-viewport))
+
+  (def parent-rect (in parent :rect))
+  (def parent-new-rect
+    (case (:get-direction parent)
+      :horizontal
+      (let [dx (- self-vp-center-x parent-vp-center-x)]
+        (if (< 0 dx)
+          # self is on the right side of parent's viewport
+          (do
+            (def dist (- (in self-viewport :right) (in parent-viewport :right)))
+            {:left (- (in parent-rect :left) dist)
+             :top (in parent-rect :top)
+             :right (- (in parent-rect :right) dist)
+             :bottom (in parent-rect :bottom)})
+          # else, self is on the left side
+          (do
+            (def dist (- (in parent-viewport :left) (in self-viewport :left)))
+            {:left (+ (in parent-rect :left) dist)
+             :top (in parent-rect :top)
+             :right (+ (in parent-rect :right) dist)
+             :bottom (in parent-rect :bottom)})))
+
+      :vertical
+      (let [dy (- self-vp-center-y parent-vp-center-y)]
+        (if (< 0 dy)
+          # self is on the bottom side of parent's viewport
+          (do
+            (def dist (- (in self-viewport :bottom) (in parent-viewport :bottom)))
+            {:left (in parent-rect :left)
+             :top (- (in parent-rect :top) dist)
+             :right (in parent-rect :right)
+             :bottom (- (in parent-rect :bottom) dist)})
+          # else, self is on the top side
+          (do
+            (def dist (- (in parent-viewport :top) (in self-viewport :top)))
+            {:left (in parent-rect :left)
+             :top (+ (in parent-rect :top) dist)
+             :right (in parent-rect :right)
+             :bottom (+ (in parent-rect :bottom) dist)})))
+
+      (error "inconsistent states for frame tree")))
+
+  (put parent :rect parent-new-rect)
+  # Re-calculate children rects
+  (:transform parent parent-viewport))
+
+
 (defn frame-split [self direction &opt n ratios]
   (default n 2)
   (default ratios (array/new-filled (- n 1) (/ 1 n)))
@@ -2682,6 +2750,7 @@
         :set-viewport frame-set-viewport
         :remove-viewport frame-remove-viewport
         :constrained? frame-constrained?
+        :move-into-viewport frame-move-into-viewport
         :split frame-split
         :balance frame-balance
         :flatten frame-flatten
