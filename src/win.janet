@@ -709,8 +709,8 @@
       :horizontal
        (map |(/ $ total-width) child-widths)
 
-       :vertical
-       (map |(/ $ total-height) child-heights)))
+      :vertical
+      (map |(/ $ total-height) child-heights)))
 
   [direction ratios])
 
@@ -2547,7 +2547,7 @@
     (do
       (rotate-array! children direction)
       # refresh children's rects
-      (:transform self (in self :rect)))
+      (:transform self (:get-viewport self)))
 
     (error "inconsistent states for frame tree")))
 
@@ -2570,7 +2570,7 @@
     (do
       (reverse! children)
       # refresh children's rects
-      (:transform self (in self :rect)))
+      (:transform self (:get-viewport self)))
 
     (error "inconsistent states for frame tree")))
 
@@ -2578,12 +2578,13 @@
 (defn frame-dump [self]
   [:frame
    (in self :rect)
+   (in self :viewport)
    (dump-tags (in self :tags))
    (tuple/slice (map |(:dump $) (in self :children)))])
 
 
 (defn frame-load [self dumped &opt hwnd-list]
-  (def [dump-type rect tags children] dumped)
+  (def [dump-type rect viewport tags children] dumped)
   (unless (= :frame dump-type)
     (errorf "can not restore dump type to a frame: %n" dump-type))
 
@@ -2593,6 +2594,7 @@
   (def hwnd-map (hwnd-list-to-map hwnd-list))
 
   (:clear-children self)
+  (:remove-viewport self)
 
   # This has to happen before doing anything layout-related,
   # since the tags may contain layout settings (paddings etc.)
@@ -2604,11 +2606,21 @@
     (do
       # The frame is not empty, and the children are sub-frames
       (def [direction ratios] split-params)
+      (when viewport
+        (def cur-viewport (:get-viewport self))
+        (def new-rect
+          (calc-viewport-transform viewport
+                                   cur-viewport
+                                   rect
+                                   direction))
+        (put self :viewport cur-viewport)
+        (put self :rect new-rect))
       (:split self direction (length children) ratios)
       (map (fn [sub-fr d]
              (:load sub-fr d hwnd-map))
            (in self :children)
            children))
+
     # else
     (unless (empty? children)
       # The frame is not empty, and the children are windows
@@ -2884,8 +2896,8 @@
 
   (def all-top-frames (array/slice (in self :children)))
 
-  (def frame-rects (map |(in $ :rect) all-top-frames))
-  (def dumped-rects (map |(in $ 1) children))
+  (def frame-rects (map |(:get-viewport $) all-top-frames))
+  (def dumped-rects (map |(in $ 2) children)) # children's viewports
 
   (if (<= (length frame-rects)
           (length dumped-rects))

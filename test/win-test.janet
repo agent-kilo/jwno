@@ -1929,6 +1929,191 @@
   (assert (= 130 (get-in dummy-sub-frame3 [:rect :bottom]))))
 
 
+(defn test-frame-dump-and-load []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def rect1 {:top 10 :left 10 :bottom 110 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 110})
+  (def rect11 {:top 10 :left 10 :bottom 60 :right 60})
+  (def rect12 {:top 60 :left 10 :bottom 110 :right 60})
+
+  #
+  # (horizontal)       (vertical)
+  # dummy-frame --+- dummy-sub-frame1 --+- dummy-sub-frame11
+  #               |                     |
+  #               +- dummy-sub-frame2   +- dummy-sub-frame12
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         vertical-frame-proto
+           rect11
+           rect12]
+        rect2]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+
+  (def dumped (:dump dummy-frame))
+  (def dumped1 (:dump dummy-sub-frame1))
+
+  (def loaded-frame
+    (build-dummy-frame-tree [rect nil] dummy-monitor))
+
+  # Load into a top-level frame with the same rect
+  (:load loaded-frame dumped [])
+
+  (assert (= rect (in loaded-frame :rect)))
+  (assert (= rect1 (get-in loaded-frame [:children 0 :rect])))
+  (assert (= rect2 (get-in loaded-frame [:children 1 :rect])))
+  (assert (= rect11 (get-in loaded-frame [:children 0 :children 0 :rect])))
+  (assert (= rect12 (get-in loaded-frame [:children 0 :children 1 :rect])))
+
+  (def loaded-sub-frame (get-in loaded-frame [:children 0]))
+  (:clear-children loaded-sub-frame)
+  (assert (empty? (in loaded-sub-frame :children)))
+
+  # Load into a sub frame with the same rect
+  (:load loaded-sub-frame dumped1 [])
+  (assert (= rect1 (in loaded-sub-frame :rect)))
+  (assert (= rect11 (get-in loaded-sub-frame [:children 0 :rect])))
+  (assert (= rect12 (get-in loaded-sub-frame [:children 1 :rect])))
+
+  (def loaded-frame
+    (build-dummy-frame-tree [{:left 20 :top 20 :right 220 :bottom 220} nil] dummy-monitor))
+
+  # Load into a frame with a different rect
+  (:load loaded-frame dumped [])
+
+  (assert (= {:left 20 :top 20 :right 220 :bottom 220} (in loaded-frame :rect)))
+
+  (assert (= 20 (get-in loaded-frame [:children 0 :rect :left])))
+  (assert (= 20 (get-in loaded-frame [:children 0 :rect :top])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :rect :right])))
+  (assert (= 220 (get-in loaded-frame [:children 0 :rect :bottom])))
+
+  (assert (= 120 (get-in loaded-frame [:children 1 :rect :left])))
+  (assert (= 20 (get-in loaded-frame [:children 1 :rect :top])))
+  (assert (= 220 (get-in loaded-frame [:children 1 :rect :right])))
+  (assert (= 220 (get-in loaded-frame [:children 1 :rect :bottom])))
+
+  (assert (= 20 (get-in loaded-frame [:children 0 :children 0 :rect :left])))
+  (assert (= 20 (get-in loaded-frame [:children 0 :children 0 :rect :top])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 0 :rect :right])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 0 :rect :bottom])))
+
+  (assert (= 20 (get-in loaded-frame [:children 0 :children 1 :rect :left])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 1 :rect :top])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 1 :rect :right])))
+  (assert (= 220 (get-in loaded-frame [:children 0 :children 1 :rect :bottom])))
+
+  (def loaded-sub-frame (get-in loaded-frame [:children 0]))
+  (:clear-children loaded-sub-frame)
+  (assert (empty? (in loaded-sub-frame :children)))
+
+  # Load into a sub frame with a different rect
+  (:load loaded-sub-frame dumped1 [])
+
+  (assert (= 20 (get-in loaded-sub-frame [:rect :left])))
+  (assert (= 20 (get-in loaded-sub-frame [:rect :top])))
+  (assert (= 120 (get-in loaded-sub-frame [:rect :right])))
+  (assert (= 220 (get-in loaded-sub-frame [:rect :bottom])))
+
+  (assert (= 20 (get-in loaded-sub-frame [:children 0 :rect :left])))
+  (assert (= 20 (get-in loaded-sub-frame [:children 0 :rect :top])))
+  (assert (= 120 (get-in loaded-sub-frame [:children 0 :rect :right])))
+  (assert (= 120 (get-in loaded-sub-frame [:children 0 :rect :bottom])))
+
+  (assert (= 20 (get-in loaded-sub-frame [:children 1 :rect :left])))
+  (assert (= 120 (get-in loaded-sub-frame [:children 1 :rect :top])))
+  (assert (= 120 (get-in loaded-sub-frame [:children 1 :rect :right])))
+  (assert (= 220 (get-in loaded-sub-frame [:children 1 :rect :bottom])))
+
+  (def loaded-frame
+    (build-dummy-frame-tree [rect nil] dummy-monitor))
+  (put loaded-frame :viewport (in loaded-frame :rect))
+
+  # Load into an unconstrained frame
+  (:load loaded-frame dumped [])
+
+  (assert (:constrained? loaded-frame)))
+
+
+(defn test-frame-dump-and-load-with-viewport []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def vp-rect {:top 10 :left 10 :bottom 110 :right 110})
+  (def rect {:top 10 :left 0 :bottom 110 :right 120})
+  (def rect1 {:top 10 :left 0 :bottom 110 :right 60})
+  (def rect2 {:top 10 :left 60 :bottom 110 :right 120})
+  (def rect11 {:top 10 :left 0 :bottom 60 :right 60})
+  (def rect12 {:top 60 :left 0 :bottom 110 :right 60})
+
+  #
+  # (horizontal)       (vertical)
+  # dummy-frame --+- dummy-sub-frame1 --+- dummy-sub-frame11
+  #               |                     |
+  #               +- dummy-sub-frame2   +- dummy-sub-frame12
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1
+         vertical-frame-proto
+           rect11
+           rect12]
+        rect2]
+     dummy-monitor))
+  (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
+
+  (put dummy-frame :viewport vp-rect)
+
+  (def dumped (:dump dummy-frame))
+
+  (def loaded-frame
+    (build-dummy-frame-tree [vp-rect nil] dummy-monitor))
+
+  # Load into a constrained frame with the same rect
+  (:load loaded-frame dumped [])
+
+  (assert (= rect (in loaded-frame :rect)))
+  (assert (= vp-rect (in loaded-frame :viewport)))
+  (assert (= rect1 (get-in loaded-frame [:children 0 :rect])))
+  (assert (= rect2 (get-in loaded-frame [:children 1 :rect])))
+  (assert (= rect11 (get-in loaded-frame [:children 0 :children 0 :rect])))
+  (assert (= rect12 (get-in loaded-frame [:children 0 :children 1 :rect])))
+
+  (def loaded-frame
+    (build-dummy-frame-tree [{:left 20 :top 20 :right 220 :bottom 220} nil] dummy-monitor))
+
+  # Load into a constrained frame with a different rect
+  (:load loaded-frame dumped [])
+
+  (assert (= {:left 20 :top 20 :right 220 :bottom 220} (in loaded-frame :viewport)))
+  (assert (= {:left 0 :top 20 :right 240 :bottom 220} (in loaded-frame :rect)))
+
+  (assert (= 0 (get-in loaded-frame [:children 0 :rect :left])))
+  (assert (= 20 (get-in loaded-frame [:children 0 :rect :top])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :rect :right])))
+  (assert (= 220 (get-in loaded-frame [:children 0 :rect :bottom])))
+
+  (assert (= 120 (get-in loaded-frame [:children 1 :rect :left])))
+  (assert (= 20 (get-in loaded-frame [:children 1 :rect :top])))
+  (assert (= 240 (get-in loaded-frame [:children 1 :rect :right])))
+  (assert (= 220 (get-in loaded-frame [:children 1 :rect :bottom])))
+
+  (assert (= 0 (get-in loaded-frame [:children 0 :children 0 :rect :left])))
+  (assert (= 20 (get-in loaded-frame [:children 0 :children 0 :rect :top])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 0 :rect :right])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 0 :rect :bottom])))
+
+  (assert (= 0 (get-in loaded-frame [:children 0 :children 1 :rect :left])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 1 :rect :top])))
+  (assert (= 120 (get-in loaded-frame [:children 0 :children 1 :rect :right])))
+  (assert (= 220 (get-in loaded-frame [:children 0 :children 1 :rect :bottom]))))
+
+
 (defn test-layout-get-adjacent-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -2008,5 +2193,7 @@
   (test-frame-resize-with-unconstrained-top-level)
   (test-frame-resize-with-unconstrained-parent)
   (test-frame-resize-with-unconstrained-sibling)
+  (test-frame-dump-and-load)
+  (test-frame-dump-and-load-with-viewport)
   (test-layout-get-adjacent-frame)
   (test-tree-node-attached?))
