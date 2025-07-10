@@ -2897,7 +2897,11 @@
   (def all-top-frames (array/slice (in self :children)))
 
   (def frame-rects (map |(:get-viewport $) all-top-frames))
-  (def dumped-rects (map |(in $ 2) children)) # children's viewports
+  (def dumped-rects (map |(if-let [vp (in $ 2)] # check viewport
+                            vp
+                            # else, fallback to rect when viewport is nil
+                            (in $ 1))
+                         children))
 
   (if (<= (length frame-rects)
           (length dumped-rects))
