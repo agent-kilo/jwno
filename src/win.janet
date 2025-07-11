@@ -1763,7 +1763,7 @@
     # Position in parent is fixed, early return
     (break))
 
-  (def parent-viewport (in parent :viewport))
+  (def parent-viewport (:get-padded-viewport parent))
   (def self-viewport (:get-viewport self))
   (when (= self-viewport (intersect-rect self-viewport parent-viewport))
     # self is already fully visible, early return
@@ -1815,7 +1815,7 @@
 
   (put parent :rect parent-new-rect)
   # Re-calculate children rects
-  (:transform parent parent-viewport))
+  (:transform parent (in parent :viewport)))
 
 
 (defn frame-split [self direction &opt n ratios]
