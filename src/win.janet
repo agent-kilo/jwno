@@ -1755,19 +1755,19 @@
   (when (or (nil? parent)
             (not= :frame (in parent :type)))
     # Early return
-    (break))
+    (break nil))
 
-  (:move-into-viewport parent)
+  (def moved (:move-into-viewport parent))
 
   (when (:constrained? parent)
     # Position in parent is fixed, early return
-    (break))
+    (break moved))
 
   (def parent-viewport (:get-padded-viewport parent))
   (def self-viewport (:get-viewport self))
   (when (= self-viewport (intersect-rect self-viewport parent-viewport))
     # self is already fully visible, early return
-    (break))
+    (break moved))
 
   (def [parent-vp-center-x parent-vp-center-y] (rect-center parent-viewport))
   (def [self-vp-center-x self-vp-center-y] (rect-center self-viewport))
@@ -1814,8 +1814,9 @@
       (error "inconsistent states for frame tree")))
 
   (put parent :rect parent-new-rect)
-  # Re-calculate children rects
-  (:transform parent (in parent :viewport)))
+  # Re-calculate children rects, including self
+  (:transform parent (in parent :viewport))
+  (or moved parent))
 
 
 (defn frame-split [self direction &opt n ratios]
