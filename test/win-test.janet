@@ -1,5 +1,6 @@
 (use ../src/win)
 
+(import ../src/util)
 (import ../src/const)
 
 
@@ -2159,6 +2160,55 @@
   (assert (= rect12 (get-in loaded-frame [:children 0 :children 1 :rect]))))
 
 
+(defn test-frame-move-into-viewport []
+  (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
+  (def vp-rect {:left 10 :top 10 :right 130 :bottom 110})   # 120x100
+  (def rect {:left 10 :top 10 :right 210 :bottom 110})      # 200x100
+  (def rect1 {:left 10 :top 10 :right 110 :bottom 110})     # 100x100, In dummy-frame viewport
+  (def vp-rect2 {:left 110 :top 10 :right 210 :bottom 110}) # 100x100
+  (def rect2 {:left 110 :top -50 :right 210 :bottom 110})   # 100x160, Out of dummy-frame viewport
+  (def rect21 {:left 110 :top -50 :right 210 :bottom 30})   # 100x80, Out of dummy-sub-frame2 viewport
+  (def rect22 {:left 110 :top 30 :right 210 :bottom 110})   # 100x80, In dummy-sub-frame2 viewport
+  #
+  # (horizontal)   
+  # dummy-frame --+- dummy-sub-frame1
+  #               |
+  #               |    (vertical)
+  #               +- dummy-sub-frame2 --+- dummy-sub-frame21
+  #                                     |
+  #                                     +- dummy-sub-frame22
+  #
+  (def dummy-frame
+    (build-dummy-frame-tree
+     [rect
+      horizontal-frame-proto
+        [rect1 nil]
+        [rect2
+         vertical-frame-proto
+           rect21
+           rect22]]
+     dummy-monitor))
+  (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
+  (def dummy-sub-frame21 (get-in dummy-sub-frame2 [:children 0]))
+
+  (put dummy-frame :viewport vp-rect)
+  (put dummy-sub-frame2 :viewport vp-rect2)
+
+  (:move-into-viewport dummy-sub-frame21)
+
+  (assert (= (in dummy-sub-frame21 :rect)
+             (util/intersect-rect (in dummy-sub-frame21 :rect)
+                                  (in dummy-sub-frame2 :viewport))))
+  (assert (= (in dummy-sub-frame21 :rect)
+             (util/intersect-rect (in dummy-sub-frame21 :rect)
+                                  (in dummy-frame :viewport))))
+
+  (assert (= 30 (get-in dummy-sub-frame21 [:rect :left])))
+  (assert (= 10 (get-in dummy-sub-frame21 [:rect :top])))
+  (assert (= 130 (get-in dummy-sub-frame21 [:rect :right])))
+  (assert (= 90 (get-in dummy-sub-frame21 [:rect :bottom]))))
+
+
 (defn test-layout-get-adjacent-frame []
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
@@ -2240,5 +2290,6 @@
   (test-frame-resize-with-unconstrained-sibling)
   (test-frame-dump-and-load)
   (test-frame-dump-and-load-with-viewport)
+  (test-frame-move-into-viewport)
   (test-layout-get-adjacent-frame)
   (test-tree-node-attached?))
