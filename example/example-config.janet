@@ -468,6 +468,8 @@
        "Toggle parent direction")
     (k "${MOD} + Q  Shift + D" [:toggle-parent-direction true 1]
        "Toggle monitor direction (flip layout)")
+    (k "${MOD} + Q  P"         :toggle-parent-viewport
+       "Toggle parent viewport")
 
     #----------------------------#
     #  Launching External Tools  #
