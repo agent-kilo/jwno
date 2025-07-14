@@ -1115,9 +1115,9 @@
 
 (defn- find-closest-child [children reference rect-key]
   (var found (first children))
-  (var min-dist (math/abs (- (get-in found [:rect rect-key]) reference)))
+  (var min-dist (math/abs (- (in (:get-viewport found) rect-key) reference)))
   (each child (slice children 1)
-    (def dist (math/abs (- (get-in child [:rect rect-key]) reference)))
+    (def dist (math/abs (- (in (:get-viewport child) rect-key) reference)))
     (when (< dist min-dist)
       (set min-dist dist)
       (set found child)))
@@ -1126,7 +1126,8 @@
 
 (defn- get-adjacent-frame-impl-descent [orig-node node dir]
   (def children (in node :children))
-  (def {:top orig-top :left orig-left} (in orig-node :rect))
+  (def orig-node-vp (:get-viewport orig-node))
+  (def {:top orig-top :left orig-left} orig-node-vp)
 
   (cond
     (empty? children)
@@ -1175,30 +1176,36 @@
                  (error "inconsistent states for frame tree"))]
     (var adj-fr nil)
 
+    (def node-vp (:get-viewport node))
+
     (if (not= :layout (in parent :type))
       (case dir
         :left
         (loop [i :down-to [(- fr-idx 1) 0]]
           (def sibling (in all-siblings i))
-          (when (< (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (def sibling-vp (:get-viewport sibling))
+          (when (< (in sibling-vp :left) (in node-vp :left))
             (set adj-fr sibling)
             (break)))
         :right
         (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
           (def sibling (in all-siblings i))
-          (when (> (get-in sibling [:rect :left]) (get-in node [:rect :left]))
+          (def sibling-vp (:get-viewport sibling))
+          (when (> (in sibling-vp :left) (in node-vp :left))
             (set adj-fr sibling)
             (break)))
         :up
         (loop [i :down-to [(- fr-idx 1) 0]]
           (def sibling (in all-siblings i))
-          (when (< (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (def sibling-vp (:get-viewport sibling))
+          (when (< (in sibling-vp :top) (in node-vp :top))
             (set adj-fr sibling)
             (break)))
         :down
         (loop [i :range [(+ fr-idx 1) (length all-siblings)]]
           (def sibling (in all-siblings i))
-          (when (> (get-in sibling [:rect :top]) (get-in node [:rect :top]))
+          (def sibling-vp (:get-viewport sibling))
+          (when (> (in sibling-vp :top) (in node-vp :top))
             (set adj-fr sibling)
             (break))))
 
@@ -1212,10 +1219,11 @@
             :down [:bottom :top <=]))
         (var min-dist math/int-max)
         (each sibling all-siblings
-          (def sib-prop-val (get-in sibling [:rect sib-dist-prop]))
-          (def node-prop-val (get-in node [:rect node-dist-prop]))
+          (def sibling-vp (:get-viewport sibling))
+          (def sib-prop-val (in sibling-vp sib-dist-prop))
+          (def node-prop-val (in node-vp node-dist-prop))
           (when (and (not= sibling node)
-                     (cmp-op node-prop-val sib-prop-val ))
+                     (cmp-op node-prop-val sib-prop-val))
             (def cur-dist (math/abs (- node-prop-val sib-prop-val)))
             (when (< cur-dist min-dist)
               (set min-dist cur-dist)
