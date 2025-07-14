@@ -902,7 +902,7 @@
      (when cur-win
        (def cur-frame (in cur-win :parent))
        (def mon-frame (:get-top-frame cur-frame))
-       (def rect (:get-padded-rect mon-frame))
+       (def rect (:get-padded-viewport mon-frame))
        (:transform cur-win rect)))
    ```
    (:fill-monitor)
