@@ -1,0 +1,22 @@
+{:title ":toggle-parent-viewport"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 30
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:toggle-parent-viewport &opt depth)
+```
+
+### Description
+
+Enable or disable viewport for a parent frame. The parent frame
+becomes unconstrained when its viewport is enabled.
+
+Depth specifies which level of frame's viewport should be toggled.
+1 means to toggle top-level frames, 2 means to toggle children of
+top-level frames, etc. Defaults to the parent of the current active
+leaf frame.

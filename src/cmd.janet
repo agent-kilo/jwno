@@ -497,6 +497,21 @@
       (:retile wm parent))))
 
 
+(defn cmd-toggle-parent-viewport [wm &opt depth]
+  (when-let [fr (get-current-frame-of-depth wm depth)
+             parent (in fr :parent)]
+    (unless (= :frame (in parent :type))
+      (break))
+
+    (if (:constrained? parent)
+      (:set-viewport parent (in parent :rect))
+      # else
+      (:remove-viewport parent))
+
+    (:frames-resized wm [parent])
+    (:retile wm parent)))
+
+
 (defn cmd-close-frame [wm &opt cur-frame]
   (default cur-frame (:get-current-frame (in wm :root)))
 
@@ -1070,6 +1085,19 @@
      :horizontal, it becomes :vertical, and vice versa.
 
      Depth specifies which level of frame's direction should be toggled.
+     1 means to toggle top-level frames, 2 means to toggle children of
+     top-level frames, etc. Defaults to the parent of the current active
+     leaf frame.
+     ```)
+  (:add-command command-man :toggle-parent-viewport
+     (fn [&opt depth] (cmd-toggle-parent-viewport wm depth))
+     ```
+     (:toggle-parent-viewport &opt depth)
+
+     Enable or disable viewport for a parent frame. The parent frame
+     becomes unconstrained when its viewport is enabled.
+
+     Depth specifies which level of frame's viewport should be toggled.
      1 means to toggle top-level frames, 2 means to toggle children of
      top-level frames, etc. Defaults to the parent of the current active
      leaf frame.
