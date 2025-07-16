@@ -1,7 +1,7 @@
 {:title ":toggle-parent-viewport"
  :template "main.html"
  :back-to ["Built-In Commands" "index.html"]
- :order 30
+ :order 31
  :generated true}
 ---
 
@@ -13,7 +13,7 @@
 
 ### Description
 
-Enable or disable viewport for a parent frame. The parent frame
+Enables or disables viewport for a parent frame. The parent frame
 becomes unconstrained when its viewport is enabled.
 
 Depth specifies which level of frame's viewport should be toggled.

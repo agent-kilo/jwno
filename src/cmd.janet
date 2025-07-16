@@ -512,6 +512,39 @@
     (:retile wm parent)))
 
 
+(defn cmd-scroll-parent [wm distance &opt depth]
+  (when-let [fr (get-current-frame-of-depth wm depth)
+             parent (in fr :parent)]
+    (unless (= :frame (in parent :type))
+      (break))
+
+    (when (:constrained? parent)
+      (break))
+
+    (def parent-dir (:get-direction parent))
+    (def rect (in parent :rect))
+    (def new-rect
+      (case parent-dir
+        :horizontal
+        {:left   (- (in rect :left) distance)
+         :right  (- (in rect :right) distance)
+         :top    (in rect :top)
+         :bottom (in rect :bottom)}
+
+        :vertical
+        {:left   (in rect :left)
+         :right  (in rect :right)
+         :top    (- (in rect :top) distance)
+         :bottom (- (in rect :bottom) distance)}
+
+        (errorf "unknown direction: %n" parent-dir)))
+
+    (put parent :rect new-rect)
+    (:transform parent (in parent :viewport))
+    (:frames-resized wm [parent])
+    (:retile wm parent)))
+
+
 (defn cmd-close-frame [wm &opt cur-frame]
   (default cur-frame (:get-current-frame (in wm :root)))
 
@@ -1094,13 +1127,29 @@
      ```
      (:toggle-parent-viewport &opt depth)
 
-     Enable or disable viewport for a parent frame. The parent frame
+     Enables or disables viewport for a parent frame. The parent frame
      becomes unconstrained when its viewport is enabled.
 
      Depth specifies which level of frame's viewport should be toggled.
      1 means to toggle top-level frames, 2 means to toggle children of
      top-level frames, etc. Defaults to the parent of the current active
      leaf frame.
+     ```)
+  (:add-command command-man :scroll-parent
+     (fn [distance &opt depth] (cmd-scroll-parent wm distance depth))
+     ```
+     (:scroll-parent distance &opt depth)
+
+     Scrolls an unconstained parent frame by the amount specified by
+     distance (in pixels). Use a positive distance to scroll forward,
+     or a negative distance to scroll backward.
+
+     Depth specifies which level of frames should be affected. 1 means
+     to scroll top-level frames, and 2 means to scroll children of
+     top-level frames, etc. Defaults to the parent of the current active
+     leaf frame.
+
+     Does nothing if the parent frame is constrained.
      ```)
   (:add-command command-man :zoom-in
      (fn [ratio] (cmd-zoom-in wm ratio))

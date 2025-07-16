@@ -3806,8 +3806,7 @@
        (:update-work-area ui-man (in (:get-top-frame fr) :rect))
        # "Scroll" unconstrained frames. Should mostly be nop for
        # constrained frames
-       (def to-retile (:move-into-viewport fr))
-       (when to-retile
+       (when-let [to-retile (:move-into-viewport fr)]
          (:retile wm-obj to-retile))))
 
   # This hook is needed for commands like :rotate-sibling-frames,

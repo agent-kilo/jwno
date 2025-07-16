@@ -38,6 +38,7 @@ These are the commands available in Jwno by default.
 @li{@link[retile.html]{:retile}}
 @li{@link[reverse-sibling-frames.html]{:reverse-sibling-frames}}
 @li{@link[rotate-sibling-frames.html]{:rotate-sibling-frames}}
+@li{@link[scroll-parent.html]{:scroll-parent}}
 @li{@link[split-frame.html]{:split-frame}}
 @li{@link[summon.html]{:summon}}
 @li{@link[toggle-parent-direction.html]{:toggle-parent-direction}}
