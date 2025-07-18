@@ -468,6 +468,8 @@
        "Toggle parent direction")
     (k "${MOD} + Q  Shift + D" [:toggle-parent-direction true 1]
        "Toggle monitor direction (flip layout)")
+    (k "${MOD} + Q  P"         :toggle-parent-viewport
+       "Toggle parent viewport")
 
     #----------------------------#
     #  Launching External Tools  #
@@ -900,7 +902,7 @@
      (when cur-win
        (def cur-frame (in cur-win :parent))
        (def mon-frame (:get-top-frame cur-frame))
-       (def rect (:get-padded-rect mon-frame))
+       (def rect (:get-padded-viewport mon-frame))
        (:transform cur-win rect)))
    ```
    (:fill-monitor)

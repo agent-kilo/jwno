@@ -227,6 +227,41 @@
      :right  ret-right
      :bottom ret-bottom}))
 
+(defn intersect-rect [& rect-list]
+  (var ret-left   math/int-min)
+  (var ret-top    math/int-min)
+  (var ret-right  math/int-max)
+  (var ret-bottom math/int-max)
+
+  (defn check-rect [r]
+    (def {:left   left
+          :top    top
+          :right  right
+          :bottom bottom}
+      r)
+    (when (> left ret-left)
+      (set ret-left left))
+    (when (> top ret-top)
+      (set ret-top top))
+    (when (< right ret-right)
+      (set ret-right right))
+    (when (< bottom ret-bottom)
+      (set ret-bottom bottom)))
+
+  (each r rect-list
+    (check-rect r))
+
+  (when (and (not= ret-left math/int-min)
+             (not= ret-right math/int-max)
+             (<= ret-left ret-right)
+             (not= ret-top math/int-min)
+             (not= ret-bottom math/int-max)
+             (<= ret-top ret-bottom))
+    {:left ret-left
+     :top  ret-top
+     :right  ret-right
+     :bottom ret-bottom}))
+
 (defn combine-rect-border-space [& args]
   (def last-arg (last args))
   (def filter-fn

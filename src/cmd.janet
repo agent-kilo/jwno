@@ -112,6 +112,12 @@
   (def [old-width old-height] (rect-size old-rect))
 
   (cond
+    (not= :frame (get-in frame [:parent :type]))
+    # A top-level frame
+    (when (or (not= new-width old-width)
+              (not= new-height old-height))
+      (:frames-resized wm [frame]))
+
     (and (not= new-width old-width)
          (not= new-height old-height))
     (:frames-resized wm (get-in frame [:parent :parent :children]))
@@ -137,33 +143,56 @@
       (:frames-resized wm (get-in frame [:parent :children])))))
 
 
-(defn cmd-insert-frame [wm location &opt after-insertion-fn]
-  (def cur-frame (:get-current-frame (in wm :root)))
-  (when (or (nil? cur-frame)
-            (in cur-frame :monitor)
-            (nil? (in cur-frame :parent)))
+(defn cmd-insert-frame [wm location &opt after-insertion-fn direction depth?]
+  (def cur-frame (get-current-frame-of-depth wm depth?))
+  (when (nil? cur-frame)
     (break))
 
-  (def parent (in cur-frame :parent))
-  (def cur-idx (find-index |(= $ cur-frame) (in parent :children)))
+  (when (in cur-frame :monitor)
+    # Don't do top-level frames
+    (break))
+
+  (when (nil? (in cur-frame :parent))
+    (break))
+
+  (def insert-to (in cur-frame :parent))
+  (def dir
+    (if direction
+      (if (or (= :horizontal direction)
+              (= :vertical direction))
+        direction
+        (errorf "invalid direction: %n" direction))
+      # else
+      (if-let [d (:get-direction insert-to)]
+        d
+        # else, try to guess from the shape of the frame
+        (let [[vp-w vp-h] (rect-size (:get-viewport insert-to))]
+          (if (< vp-w vp-h) :vertical :horizontal)))))
   (def insert-idx
-    (case location
-      :before cur-idx
-      :after (+ cur-idx 1)
-      (errorf "unknown location to insert: %n" location)))
+    (if (= dir (:get-direction insert-to))
+      (do
+        (def cur-idx (find-index |(= $ cur-frame) (in insert-to :children)))
+        (case location
+          :before cur-idx
+          :after (+ cur-idx 1)
+          (errorf "unknown location to insert: %n" location)))
+      # else
+      (case location
+        :before 0
+        :after 1
+        (errorf "unknown location to insert: %n" location))))
 
   (with-activation-hooks wm
-    (:insert-sub-frame parent insert-idx)
-
-    (def new-frame (get-in parent [:children insert-idx]))
-    (def siblings (filter |(not= $ new-frame) (in parent :children)))
+    (:insert-sub-frame insert-to insert-idx nil dir)
+    (def new-frame (get-in insert-to [:children insert-idx]))
+    (def siblings (filter |(not= $ new-frame) (in insert-to :children)))
     (:frames-resized wm siblings)
 
     (when after-insertion-fn
       (after-insertion-fn new-frame))
 
-    (:retile wm parent)
-    (:set-focus wm parent)))
+    (:retile wm insert-to)
+    (:set-focus wm insert-to)))
 
 
 (defn cmd-flatten-parent [wm]
@@ -296,9 +325,7 @@
 
 (defn cmd-resize-frame [wm dw dh]
   (def cur-frame (:get-current-frame (in wm :root)))
-  (when (or (nil? cur-frame)
-            # Skip top-level frames
-            (in cur-frame :monitor))
+  (when (nil? cur-frame)
     (break))
 
   (def rect (in cur-frame :rect))
@@ -468,6 +495,54 @@
       (:toggle-direction parent recursive)
       (:frames-resized wm (slice (in parent :children)))
       (:retile wm parent))))
+
+
+(defn cmd-toggle-parent-viewport [wm &opt depth]
+  (when-let [fr (get-current-frame-of-depth wm depth)
+             parent (in fr :parent)]
+    (unless (= :frame (in parent :type))
+      (break))
+
+    (if (:constrained? parent)
+      (:set-viewport parent (in parent :rect))
+      # else
+      (:remove-viewport parent))
+
+    (:frames-resized wm [parent])
+    (:retile wm parent)))
+
+
+(defn cmd-scroll-parent [wm distance &opt depth]
+  (when-let [fr (get-current-frame-of-depth wm depth)
+             parent (in fr :parent)]
+    (unless (= :frame (in parent :type))
+      (break))
+
+    (when (:constrained? parent)
+      (break))
+
+    (def parent-dir (:get-direction parent))
+    (def rect (in parent :rect))
+    (def new-rect
+      (case parent-dir
+        :horizontal
+        {:left   (- (in rect :left) distance)
+         :right  (- (in rect :right) distance)
+         :top    (in rect :top)
+         :bottom (in rect :bottom)}
+
+        :vertical
+        {:left   (in rect :left)
+         :right  (in rect :right)
+         :top    (- (in rect :top) distance)
+         :bottom (- (in rect :bottom) distance)}
+
+        (errorf "unknown direction: %n" parent-dir)))
+
+    (put parent :rect new-rect)
+    (:transform parent (in parent :viewport))
+    (:frames-resized wm [parent])
+    (:retile wm parent)))
 
 
 (defn cmd-close-frame [wm &opt cur-frame]
@@ -934,16 +1009,28 @@
      are 0.1, 0.3 and 0.6 of the original frame height, respectively.
      ```)
   (:add-command command-man :insert-frame
-     (fn [location &opt after-insertion-fn]
-       (cmd-insert-frame wm location after-insertion-fn))
+     (fn [location &opt after-insertion-fn direction depth]
+       (cmd-insert-frame wm location after-insertion-fn direction depth))
      ```
-     (:insert-frame location &opt after-insertion-fn)
+     (:insert-frame location &opt after-insertion-fn direction depth)
 
-     Inserts a new frame and adjusts its sibling frames' sizes as needed.
-     Location is relative to the current frame, can be :before or :after.
+     Inserts a new frame and adjusts its sibling or parent frames' sizes
+     as needed.
+
+     Location is relative to the current frame in the level specified by
+     depth, can be :before or :after.
+
      After-insertion-fn is a function accepting the new inserted frame
-     object as its sole argument, and it will be called after the insertion.
-     If the current frame is a top-level frame, this command does nothing.
+     object as its sole argument, and it will be called after the
+     insertion.
+
+     Direction is the direction to insert the new frame in. Can be
+     :horizontal or :vertical. Uses the parent frame's current direction
+     if not provided.
+
+     Depth specifies in which level the new frame should be inserted, and
+     1 means to insert a child frame to the current top-level frame.
+     Defaults to the depth of the current frame.
      ```)
   (:add-command command-man :flatten-parent
      (fn [] (cmd-flatten-parent wm))
@@ -1034,6 +1121,35 @@
      1 means to toggle top-level frames, 2 means to toggle children of
      top-level frames, etc. Defaults to the parent of the current active
      leaf frame.
+     ```)
+  (:add-command command-man :toggle-parent-viewport
+     (fn [&opt depth] (cmd-toggle-parent-viewport wm depth))
+     ```
+     (:toggle-parent-viewport &opt depth)
+
+     Enables or disables viewport for a parent frame. The parent frame
+     becomes unconstrained when its viewport is enabled.
+
+     Depth specifies which level of frame's viewport should be toggled.
+     1 means to toggle top-level frames, 2 means to toggle children of
+     top-level frames, etc. Defaults to the parent of the current active
+     leaf frame.
+     ```)
+  (:add-command command-man :scroll-parent
+     (fn [distance &opt depth] (cmd-scroll-parent wm distance depth))
+     ```
+     (:scroll-parent distance &opt depth)
+
+     Scrolls an unconstained parent frame by the amount specified by
+     distance (in pixels). Use a positive distance to scroll forward,
+     or a negative distance to scroll backward.
+
+     Depth specifies which level of frames should be affected. 1 means
+     to scroll top-level frames, and 2 means to scroll children of
+     top-level frames, etc. Defaults to the parent of the current active
+     leaf frame.
+
+     Does nothing if the parent frame is constrained.
      ```)
   (:add-command command-man :zoom-in
      (fn [ratio] (cmd-zoom-in wm ratio))

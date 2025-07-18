@@ -1,0 +1,25 @@
+{:title ":scroll-parent"
+ :template "main.html"
+ :back-to ["Built-In Commands" "index.html"]
+ :order 27
+ :generated true}
+---
+
+### Synopsis
+
+@codeblock[janet]```
+(:scroll-parent distance &opt depth)
+```
+
+### Description
+
+Scrolls an unconstained parent frame by the amount specified by
+distance (in pixels). Use a positive distance to scroll forward,
+or a negative distance to scroll backward.
+
+Depth specifies which level of frames should be affected. 1 means
+to scroll top-level frames, and 2 means to scroll children of
+top-level frames, etc. Defaults to the parent of the current active
+leaf frame.
+
+Does nothing if the parent frame is constrained.

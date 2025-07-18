@@ -1,22 +1,22 @@
-{:title ":toggle-parent-direction"
+{:title ":toggle-parent-viewport"
  :template "main.html"
  :back-to ["Built-In Commands" "index.html"]
- :order 30
+ :order 31
  :generated true}
 ---
 
 ### Synopsis
 
 @codeblock[janet]```
-(:toggle-parent-direction &opt recursive depth)
+(:toggle-parent-viewport &opt depth)
 ```
 
 ### Description
 
-Changes the direction of the parent frame. If the direction was
-:horizontal, it becomes :vertical, and vice versa.
+Enables or disables viewport for a parent frame. The parent frame
+becomes unconstrained when its viewport is enabled.
 
-Depth specifies which level of frame's direction should be toggled.
+Depth specifies which level of frame's viewport should be toggled.
 1 means to toggle top-level frames, 2 means to toggle children of
 top-level frames, etc. Defaults to the parent of the current active
 leaf frame.
