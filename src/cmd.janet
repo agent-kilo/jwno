@@ -360,10 +360,10 @@
 
   (def parent-rect
     (when parent-frame
-      (:get-padded-rect parent-frame)))
+      (:get-padded-viewport parent-frame)))
   (def ortho-rect
     (when ortho-frame
-      (:get-padded-rect ortho-frame)))
+      (:get-padded-viewport ortho-frame)))
 
   (def old-rect (in cur-frame :rect))
   (def [cur-width cur-height] (rect-size old-rect))
