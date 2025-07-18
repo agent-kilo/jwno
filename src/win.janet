@@ -1629,14 +1629,18 @@
   (get-hwnd-rect (in self :hwnd) no-frame?))
 
 
-(defn window-set-focus [self &opt wm]
+(defn window-set-focus [self &opt wm activate?]
   (default wm (:get-window-manager self))
+  (default activate? (if (dyn :sync-focus) true false))
+
   (def old-v-state (:reset-visual-state self true false wm))
   (def parent (in self :parent))
   (when (and parent
              (= old-v-state WindowVisualState_Minimized))
     (:transform self (:get-padded-rect parent) nil wm))
-  (:set-focus-to-hwnd wm (in self :hwnd)))
+  (:set-focus-to-hwnd wm (in self :hwnd))
+  (when activate?
+    (:activate self)))
 
 
 (defn window-dump [self]
