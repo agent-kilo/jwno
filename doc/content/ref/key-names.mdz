@@ -393,6 +393,9 @@ To use a key in a @link[../defining-key-bindings/key-specs.html]{key spec}, writ
     @td```=``` @td{VK_OEM_PLUS} @td{@code```=+``` key}
   }
   @tr{
+    @td```-``` @td{VK_OEM_MINUS} @td{@code```-_``` key}
+  }
+  @tr{
     @td```;``` @td{VK_OEM_1} @td{@code```;:``` key}
   }
   @tr{

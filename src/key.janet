@@ -184,6 +184,7 @@
    "," VK_OEM_COMMA
    "." VK_OEM_PERIOD
    "=" VK_OEM_PLUS
+   "-" VK_OEM_MINUS
    ";" VK_OEM_1
    "/" VK_OEM_2
    "`" VK_OEM_3
