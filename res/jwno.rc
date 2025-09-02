@@ -44,7 +44,7 @@ BEGIN
             VALUE "FileDescription", "Jwno Tiling Window Manager"
 
             VALUE "CompanyName", "Chibidou"
-            VALUE "LegalCopyright", "Copyright 2024-2025 Chibidou"
+            VALUE "LegalCopyright", "Copyright 2024-2025 Chibidou and contributors"
         END
     END
     BLOCK "VarFileInfo"
