@@ -10,6 +10,8 @@
 
 Jwno is a tiling window manager for Windows 10/11, built with [Janet](https://janet-lang.org/) and ❤️.
 
+The development of Jwno has been moved to its Github repo since commit 91b1490e. Instead of the old Fossil repo, please follow the Github repo for updates.
+
 ## Quick Links ##
 
 * 📖 [Documentation (🚧WIP🚧)](https://agent-kilo.github.io/jwno/)
