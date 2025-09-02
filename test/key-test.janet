@@ -180,6 +180,8 @@
                  @[(key VK_OEM_PERIOD [:win])]))
   (assert (deep= (:parse-key keymap "Win+=")
                  @[(key VK_OEM_PLUS [:win])]))
+  (assert (deep= (:parse-key keymap "Win+-")
+                 @[(key VK_OEM_MINUS [:win])]))
   (assert (deep= (:parse-key keymap "Win+;")
                  @[(key VK_OEM_1 [:win])]))
   (assert (deep= (:parse-key keymap "Win+/")
