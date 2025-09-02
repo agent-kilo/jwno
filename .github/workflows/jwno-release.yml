@@ -13,7 +13,7 @@ env:
 
   WIN_SDK_VERSION: "10.0.26100.0"
 
-  JANET_VERSION: "1.38.0"
+  JANET_VERSION: "1.39.1"
   JANET_DIR: "${{ github.workspace }}\\janet"
   JANET_PATH: "${{ github.workspace }}\\janet\\Library"
   JANET_SOURCE_PATH: "${{ github.workspace }}\\janet_src"
