@@ -333,6 +333,25 @@
 
     keymap))
 
+
+#
+# A transient keymap for scrolling through an unconstrained
+# parent frame. See the definition for `${MOD} + Q  S` key
+# binding below.
+#
+(def scroll-mode-keymap
+  (let [keymap (:new-keymap key-man)]
+    (k (in dir-keys :down)  [:scroll-parent 200])
+    (k (in dir-keys :up)    [:scroll-parent -200])
+    (k (in dir-keys :right) [:scroll-parent 200])
+    (k (in dir-keys :left)  [:scroll-parent -200])
+
+    (k "Enter" :pop-keymap)
+    (k "Esc"   :pop-keymap)
+
+    keymap))
+
+
 #
 # Jwno commands can accept closures/functions as arguments.
 # For example, the :split-frame command accepts a function
@@ -470,6 +489,8 @@
        "Toggle monitor direction (flip layout)")
     (k "${MOD} + Q  P"         :toggle-parent-viewport
        "Toggle parent viewport")
+    (k "${MOD} + Q  S"         [:push-keymap scroll-mode-keymap]
+       "Scroll parent frame")
 
     #----------------------------#
     #  Launching External Tools  #
