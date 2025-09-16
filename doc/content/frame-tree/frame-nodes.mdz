@@ -4,12 +4,13 @@
  :order 5}
 ---
 
-Frame nodes are container nodes that accommodate either window nodes or other frame nodes (not both). There are currently three frame-specific properties, and one container-specific property, in a frame object.
+Frame nodes are container nodes that accommodate either window nodes or other frame nodes (not both). There are currently four frame-specific properties, and one container-specific property, in a frame object.
 
-Frame-specific properties: @code{:monitor}, @code{:rect} and @code{:tags}.
+Frame-specific properties: @code{:monitor}, @code{:rect}, @code{:viewport} and @code{:tags}.
 
 Container-specific property: @code{:current-child}.
 
+@hr
 
 ### @code{:monitor} Property
 
@@ -38,6 +39,7 @@ And something like this should come out (I changed the formatting to make it mor
 
 The @code{:monitor-updated} hook will fire after the @code{:monitor} property of a frame gets updated.
 
+@hr
 
 ### @code{:rect} Property
 
@@ -75,6 +77,28 @@ And to make the top frame "fullscreen" again:
 (:retile (in jwno/context :window-manager) fr)
 ```
 
+@hr
+
+### @code{:viewport} Property
+
+@p{@em{This optional property is only meaningful in non-leaf frames.}}
+
+It designates the actual visible portion of the frame @code{:rect}. When a frame has a @code{:viewport}, it's called an @em{unconstrained} frame, and it's @code{:rect} can grow beyond the viewport area, like a long web page shown inside a small browser window. Active child frames will be scrolled into the viewport automatically, and some layout commands operate differently.
+
+For example, if a parent frame has a @code{:viewport} (thus @em{unconstrained}), the @code{:resize-frame} command invoked on a child frame will try to resize the parent frame, instead of resizing sibling frames to make all child frames fit inside the @code{:rect}. These commands are also affected by the viewport setting, in similar ways:
+
+@ul{
+  @li{@code{:insert-frame}}
+  @li{@code{:close-frame}}
+  @li{@code{:zoom-in}}
+  @li{@code{:frame-to-window-size}}
+}
+
+To enable or disable the @code{:viewport} property, call the @code{:set-viewport} or @code{:remove-viewport} methods of a frame object, respectively, as they will do necessary adjustments to keep the frame tree consistent.
+
+See also the @link[../ref/built-in-commands/scroll-parent.html]{@code{:scroll-parent}} and @link[../ref/built-in-commands/toggle-parent-viewport.html]{@code{:toggle-parent-viewport}} commands.
+
+@hr
 
 ### @code{:tags} Property
 
@@ -93,6 +117,7 @@ There're again reserved tag names, which Jwno uses to layout frames and windows.
 
 All these tags take effect when retiling or transforming/resizing a frame.
 
+@hr
 
 ### @code{:current-child} Property
 

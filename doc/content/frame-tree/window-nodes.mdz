@@ -6,6 +6,8 @@
 
 Only @em{managed} windows have corresponding window nodes. Besides the generic tree node properties (i.e. @code{:type}, @code{:parent} and @code{:children}), a window object currently only have two extra properties: @code{:hwnd} and @code{:tags}.
 
+@hr
+
 ### @code{:hwnd} Property
 
 The @code{:hwnd} property is the window's native Win32 @link[https://learn.microsoft.com/en-us/windows/win32/winmsg/about-windows#window-handle]{window handle}, which can be passed to low-level Win32 functions. For example, we can call @link[https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-showwindow]{@code{ShowWindow}} to hide/show a window in the REPL:
@@ -29,6 +31,8 @@ Welcome to Jwno REPL!
 ```
 
 The @code{ev/sleep} trick is something I use when debugging Jwno itself. Given the power of the REPL, you can certainly find other ways to retrieve a window node.
+
+@hr
 
 ### @code{:tags} Property
 

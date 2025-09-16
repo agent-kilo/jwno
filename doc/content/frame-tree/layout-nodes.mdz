@@ -16,6 +16,7 @@ Layout-specific properties: @code{:id} and @code{:name}.
 
 Container-specific property: @code{:current-child}.
 
+@hr
 
 ### @code{:id} Property
 
@@ -26,6 +27,7 @@ This is the unique ID of the underlying virtual desktop. For example, to print t
 (pp (in lo :id))
 ```
 
+@hr
 
 ### @code{:name} Property
 
@@ -38,6 +40,7 @@ This is the name of the underlying virtual desktop. For example, to print the na
 
 @p{@em{Jwno expects all virtual desktops to have unique names. It gets confused if multiple virtual desktops share the same name.}}
 
+@hr
 
 ### @code{:current-child} Property
 
