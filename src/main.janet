@@ -9,6 +9,7 @@
 (use ./key)
 (use ./cmd)
 (use ./win)
+(use ./vd)
 (use ./hook)
 (use ./ui)
 (use ./uia)
@@ -290,6 +291,8 @@
 
   (def key-man (key-manager ui-man hook-man))
 
+  (def vd-man (virtual-desktop-manager))
+
   (def window-man
     (try
       (window-manager uia-man ui-man hook-man)
@@ -308,6 +311,7 @@
   (put context :uia-manager uia-man)
   (put context :event-sources [(in uia-man :chan) (in ui-man :chan)])
   (put context :key-manager key-man)
+  (put context :virtual-desktop-manager vd-man)
   (put context :window-manager window-man)
   (put context :module-manager module-man)
   (put context :repl-manager repl-man)
@@ -364,6 +368,7 @@
   (:stop-all-servers repl-man)
   (:unregister-loader module-man)
   (:destroy window-man)
+  (:destroy vd-man)
   (:destroy uia-man)
   (CoUninitialize)
   (log/deinit))
