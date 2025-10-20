@@ -33,17 +33,25 @@
     ret
 
     [false err]
-    # All errors are assumed to be recoverable, and we attempt retries on them.
-    (if (>= retry-count max-retries)
+    (case [method err]
+      [:GetWindowDesktopId -2147319765] # 0x8002802B, TYPE_E_ELEMENTNOTFOUND
+      # This special combo means the window is not managed by virtual desktops (e.g. the start menu window)
+      # no retry needed in this case
       (do
-        (log/debug "Virtual desktop method call failed after %n retries" retry-count)
+        (log/debug "GetWindowDesktopId returned %n for window %n" err args)
         ret)
-      (do
-        (def wait-time (* init-wait (math/pow backoff retry-count)))
-        (log/debug "Virtual desktop method call failed (%n), retrying in %n seconds"
-                   err wait-time)
-        (ev/sleep wait-time)
-        (vdm-worker-try-method method com args (+ 1 retry-count) max-retries init-wait backoff)))))
+
+      # All other errors are assumed to be recoverable, and we attempt retries on them.
+      (if (>= retry-count max-retries)
+        (do
+          (log/debug "Virtual desktop method %n failed after %n retries (%n)" method retry-count err)
+          ret)
+        (do
+          (def wait-time (* init-wait (math/pow backoff retry-count)))
+          (log/debug "Virtual desktop method %n failed (%n), retrying in %n seconds"
+                     method err wait-time)
+          (ev/sleep wait-time)
+          (vdm-worker-try-method method com args (+ 1 retry-count) max-retries init-wait backoff))))))
 
 
 (defn vdm-worker [[com in-chan]]

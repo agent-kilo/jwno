@@ -295,7 +295,7 @@
 
   (def window-man
     (try
-      (window-manager uia-man ui-man hook-man)
+      (window-manager uia-man ui-man hook-man vd-man)
       ((err fib)
        (show-error-and-exit (string err) 1 (get-stack-trace fib)))))
 

@@ -425,21 +425,16 @@
       [hwnd? uia-win?])))
 
 
-(defn- try-to-get-window-desktop-id [vdm-com hwnd]
-  (try
-    (:GetWindowDesktopId vdm-com hwnd)
-    ((err fib)
-     (log/debug "GetWindowDesktopId failed for %n: %n\n%s"
-                hwnd
-                err
-                (get-stack-trace fib))
-     nil)))
+(defn- try-to-get-window-desktop-id [vd-man hwnd]
+  (match (:call-method vd-man :GetWindowDesktopId [hwnd])
+    [true did]   did
+    [false _err] nil))
 
 
-(defn- get-hwnd-virtual-desktop-id [hwnd vdm-com]
+(defn- get-hwnd-virtual-desktop-id [hwnd vd-man]
   # Only top-level windows can be managed by virtual desktops
   (var cur-hwnd (GetAncestor hwnd GA_ROOT))
-  (var desktop-id? (try-to-get-window-desktop-id vdm-com cur-hwnd))
+  (var desktop-id? (try-to-get-window-desktop-id vd-man cur-hwnd))
 
   (while (or # GetWindowDesktopId failed
              (nil? desktop-id?)
@@ -451,7 +446,7 @@
       (break))
 
     (set cur-hwnd owner)
-    (set desktop-id? (try-to-get-window-desktop-id vdm-com cur-hwnd)))
+    (set desktop-id? (try-to-get-window-desktop-id vd-man cur-hwnd)))
 
   desktop-id?)
 
@@ -466,7 +461,7 @@
       nil)))
 
 
-(defn- get-hwnd-virtual-desktop [hwnd? uia-man vdm-com &opt uia-win?]
+(defn- get-hwnd-virtual-desktop [hwnd? uia-man vd-man &opt uia-win?]
   (def [hwnd uia-win]
     (normalize-hwnd-and-uia-element hwnd?
                                     uia-win?
@@ -482,11 +477,13 @@
       nil
 
       true
-      (let [desktop-id (get-hwnd-virtual-desktop-id hwnd vdm-com)
+      (let [desktop-id (get-hwnd-virtual-desktop-id hwnd vd-man)
+            [stat on-cur-vd?] (:call-method vd-man :IsWindowOnCurrentVirtualDesktop [hwnd])
             # XXX: The name of the HWND's virtual desktop can only be
             # retrieved when that virtual desktop is active. Find a way
             # around this?
-            desktop-name (if (= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+            desktop-name (if (or (not stat) # IsWindowOnCurrentVirtualDesktop failed
+                                 (= FALSE on-cur-vd?))
                            nil
                            (get-current-virtual-desktop-name uia-win uia-man))]
         (if (and (nil? desktop-id)
@@ -506,7 +503,7 @@
               (:Release (in self :uia-element)))})
 
 
-(defn- get-hwnd-info [hwnd? uia-man vdm-com &opt uia-win?]
+(defn- get-hwnd-info [hwnd? uia-man vd-man &opt uia-win?]
   (def [hwnd uia-win]
     (normalize-hwnd-and-uia-element hwnd?
                                     uia-win?
@@ -524,7 +521,7 @@
         (get-hwnd-path hwnd)))
     (def desktop-info
       (unless (nil? hwnd)
-        (get-hwnd-virtual-desktop hwnd uia-man vdm-com uia-win)))
+        (get-hwnd-virtual-desktop hwnd uia-man vd-man uia-win)))
 
     (cond
       (nil? uia-win)
@@ -556,7 +553,7 @@
   (def hwnd (in win :hwnd))
   (or (not (:alive? win))
       (not= (in layout :id)
-            (get-hwnd-virtual-desktop-id hwnd (in wm :vdm-com)))))
+            (get-hwnd-virtual-desktop-id hwnd (in wm :vd-manager)))))
 
 
 (defn dump-tag-value [x]
@@ -1550,10 +1547,13 @@
 
 (defn window-on-current-virtual-desktop? [self &opt wm]
   (default wm (:get-window-manager self))
-  (not= FALSE
-        (:IsWindowOnCurrentVirtualDesktop
-           (in wm :vdm-com)
-           (in self :hwnd))))
+  (def [stat ret]
+    (:call-method (in wm :vd-manager)
+                  :IsWindowOnCurrentVirtualDesktop
+                  [(in self :hwnd)]))
+  (unless stat
+    (errorf "failed to get virtual desktop info for window %n" (in self :hwnd)))
+  (not= FALSE ret))
 
 
 (defn window-transform [self rect &opt tags wm]
@@ -3220,18 +3220,18 @@
 
 
 (defn wm-get-hwnd-virtual-desktop-id [self hwnd]
-  (get-hwnd-virtual-desktop-id hwnd (in self :vdm-com)))
+  (get-hwnd-virtual-desktop-id hwnd (in self :vd-manager)))
 
 
 (defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
   (get-hwnd-virtual-desktop hwnd?
                             (in self :uia-manager)
-                            (in self :vdm-com)
+                            (in self :vd-manager)
                             uia-win?))
 
 
 (defn wm-get-hwnd-info [self hwnd? &opt uia-win?]
-  (get-hwnd-info hwnd? (in self :uia-manager) (in self :vdm-com) uia-win?))
+  (get-hwnd-info hwnd? (in self :uia-manager) (in self :vd-manager) uia-win?))
 
 
 (defn wm-get-hwnd-rect [self hwnd &opt no-frame?]
@@ -3494,7 +3494,7 @@
 
     (with-uia [hwnd-info (get-hwnd-info hwnd
                                         (in self :uia-manager)
-                                        (in self :vdm-com)
+                                        (in self :vd-manager)
                                         uia-win)]
       (when hwnd-info
         (def manage-state (:should-manage-hwnd? self hwnd-info))
@@ -3517,7 +3517,7 @@
 
   (with-uia [hwnd-info (get-hwnd-info hwnd
                                       (in self :uia-manager)
-                                      (in self :vdm-com))]
+                                      (in self :vd-manager))]
     (when hwnd-info
       (def manage-state (:should-manage-hwnd? self hwnd-info))
       (log/debug "manage-state = %n" manage-state)
@@ -3709,8 +3709,7 @@
 
 
 (defn wm-destroy [self]
-  (def {:vdm-com vdm-com} self)
-  (:Release vdm-com))
+  :nop)
 
 
 (def- window-manager-proto
@@ -3759,15 +3758,10 @@
     :destroy wm-destroy})
 
 
-(defn window-manager [uia-man ui-man hook-man]
-  (def vdm-com
-    (CoCreateInstance CLSID_VirtualDesktopManager
-                      nil
-                      CLSCTX_INPROC_SERVER
-                      IVirtualDesktopManager))
+(defn window-manager [uia-man ui-man hook-man vd-man]
   (def wm-obj
     (table/setproto
-     @{:vdm-com vdm-com
+     @{:vd-manager vd-man
        :uia-manager uia-man
        :ui-man ui-man
        :hook-manager hook-man

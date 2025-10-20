@@ -82,6 +82,13 @@
   new-list)
 
 
+(defn- get-win-vd-stat [wm hwnd]
+  (match (:call-method (in wm :vd-manager) :IsWindowOnCurrentVirtualDesktop [hwnd])
+    [true  ret] ret
+    [false err] (errorf "scratch pad: failed to get virtual desktop info for window %n (%n)"
+                        hwnd err)))
+
+
 (defn scratch-pad-show-window-on-current-vd [self hwnd]
   (def {:window-manager wm
         :show-window-timeout timeout
@@ -95,7 +102,7 @@
 
   (def start-time (os/clock :monotonic))
   (var cur-time (os/clock :monotonic))
-  (var win-vd-stat (:IsWindowOnCurrentVirtualDesktop (in wm :vdm-com) hwnd))
+  (var win-vd-stat (get-win-vd-stat wm hwnd))
   (log/debug "---- scratch pad: start-time = %n, cur-time = %n, win-vd-stat = %n"
              start-time cur-time win-vd-stat)
   (while (and (< (- cur-time start-time) timeout)
@@ -106,7 +113,7 @@
     (ShowWindow hwnd SW_SHOW)
     (+= wait-time time-incr)
     (set cur-time (os/clock :monotonic))
-    (set win-vd-stat (:IsWindowOnCurrentVirtualDesktop (in wm :vdm-com) hwnd))
+    (set win-vd-stat (get-win-vd-stat wm hwnd))
     (log/debug "---- scratch pad: start-time = %n, cur-time = %n, win-vd-stat = %n"
                start-time cur-time win-vd-stat))
 
@@ -283,7 +290,7 @@
     (with-uia [uia-win (:get-hwnd-uia-element wm cur-hwnd)]
       (and (= FALSE (:get_CurrentIsOffscreen uia-win))
            (not= FALSE (IsWindowVisible cur-hwnd))
-           (not= FALSE (:IsWindowOnCurrentVirtualDesktop (in wm :vdm-com) cur-hwnd))
+           (not= FALSE (get-win-vd-stat wm cur-hwnd))
            (uia-win-visible? uia-win uia-man)))
     # else, there's no window in the list
     false))
