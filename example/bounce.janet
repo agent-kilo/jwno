@@ -309,27 +309,31 @@
     state)
   (def {:window-manager window-man} context)
 
+  (def hwnd-list @[])
   (def obj-list @[])
 
-  (EnumChildWindows
-   nil
-   (fn [hwnd]
-     (unless (has-key? bouncers hwnd)
-       (def filter-result
-         (try
-           (:filter-hwnd window-man hwnd)
-           ((err)
-            [false [:error err]])))
-       (match filter-result
-         [false reason]
-         (log/debug "not handling hwnd %n: %n" hwnd reason)
+  #
+  # XXX: Waiting for channels inside EnumChildWindows crashed the whole
+  # process, and I don't yet know the exact reason. Here we work around
+  # the problem by gathering all the hwnds first.
+  #
+  (EnumChildWindows nil (fn [hwnd] (array/push hwnd-list hwnd) 1))
+  (each hwnd hwnd-list
+    (unless (has-key? bouncers hwnd)
+      (def filter-result
+        (try
+          (do
+            (:filter-hwnd window-man hwnd))
+          ((err)
+           [false [:error err]])))
+      (match filter-result
+        [false reason]
+        (log/debug "not handling hwnd %n: %n" hwnd reason)
 
-         true
-         (when-let [rand-v [(rand-range INIT-VX-RANGE) (rand-range INIT-VY-RANGE)]
-                    obj    (hwnd-to-bouncy-obj hwnd rand-v)]
-           (array/push obj-list obj))))
-     1 # !!! IMPORTANT
-     ))
+        true
+        (when-let [rand-v [(rand-range INIT-VX-RANGE) (rand-range INIT-VY-RANGE)]
+                   obj    (hwnd-to-bouncy-obj hwnd rand-v)]
+          (array/push obj-list obj)))))
 
   (each obj obj-list
     (put bouncers (first obj) (spawn-bouncer obj sup paused spawn-mode))))
@@ -344,12 +348,15 @@
         :context context}
     state)
   (def {:window-manager window-man} context)
-  (def {:vdm-com vdm-com} window-man)
+  (def {:vd-manager vd-man} window-man)
 
   (def to-pause @[])
   (def to-unpause @[])
   (eachp [hwnd chan] bouncers
-    (if (= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+    (def [stat ret]
+      (:call-method vd-man :IsWindowOnCurrentVirtualDesktop [hwnd]))
+    (if (or (not stat)
+            (= FALSE ret))
       (array/push to-pause [hwnd chan])
       # else
       (array/push to-unpause [hwnd chan])))
@@ -466,9 +473,12 @@
     (do
       (def {:context context} state)
       (def {:window-manager window-man} context)
-      (def {:vdm-com vdm-com} window-man)
+      (def {:vd-manager vd-man} window-man)
       (eachp [hwnd chan] (in state :bouncers)
-        (when (not= FALSE (:IsWindowOnCurrentVirtualDesktop vdm-com hwnd))
+        (def [stat ret]
+          (:call-method vd-man :IsWindowOnCurrentVirtualDesktop [hwnd]))
+        (when (and stat
+                   (not= FALSE ret))
           (try-to-give hwnd chan :unpause))))))
 
 
