@@ -85,9 +85,25 @@
     self)
 
   (when (and (not refresh)
-             cached)
+             cached
+             # The SHELLDLL_DefView window vanishes if explorer restarted,
+             # we need to do a quick check on its existence. And somehow the
+             # :get_Current* methods won't fail for vanished SHELLDLL_DefView
+             # windows, so an extra IsWindow call is needed.
+             (not= FALSE (IsWindow (:get_CachedNativeWindowHandle cached)))
+             (= "SHELLDLL_DefView"
+                (try
+                  (:get_CurrentClassName cached)
+                  ((err fib)
+                   (log/debug "get_CurrentClassName failed for cached SHELLDLL_DefView window %n (%n)"
+                              (:get_CachedNativeWindowHandle cached) err)
+                   nil))))
     (:AddRef cached)
     (break cached))
+
+  (when (not refresh)
+    (log/debug "Cached SHELLDLL_DefView element is invalid"))
+  (log/debug "Retrieving new SHELLDLL_DefView element")
 
   (var defview nil)
 
