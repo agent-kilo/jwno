@@ -253,7 +253,8 @@
 
   (cond
     (not= (in lo :name)
-          (:get_CurrentName (in uia-man :root)))
+          (with-uia [root (:get-root uia-man)]
+            (:get_CurrentName root)))
     # The frame is on a virtual desktop that's different from our active one,
     # The area window should have been closed in the :virtual-desktop-changed
     # hook, no need to do anything here.

@@ -280,7 +280,9 @@
         :hook-manager hook-man}
     context)
 
-  (def session-ts (get-session-timestamp (in uia-man :root)))
+  (def session-ts
+    (with-uia [root (:get-root uia-man)]
+      (get-session-timestamp root)))
   # Clear and re-init history stacks every time
   (put self :layout-states @{})
   (def bfile-loaded (:load-from-backing-file self))

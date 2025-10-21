@@ -42,48 +42,15 @@
   S_OK)
 
 
-(defn uia-manager-get-root [self uia-elem]
-  (def {:root root
-        :focus-cr focus-cr
-        :control-view-walker walker}
-    self)
-  (def root-hwnd (:get_CachedNativeWindowHandle root))
-
-  (:AddRef uia-elem)
-
-  (def get-parent
-    (fn [elem]
-      (try
-        (:GetParentElementBuildCache walker elem focus-cr)
-        ((err fib)
-         (log/debug "GetParentElementBuildCache failed: %n\n%s"
-                    err
-                    (get-stack-trace fib))
-         nil))))
-
-  (var cur-elem uia-elem)
-  (var parent (get-parent cur-elem))
-
-  (while (and (not= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
-              (not (nil? parent)))
-    (:Release cur-elem)
-    (set cur-elem parent)
-    (set parent (get-parent cur-elem)))
-
-  (if (= root-hwnd (:get_CachedNativeWindowHandle cur-elem))
-    cur-elem
-    (do
-      (:Release cur-elem)
-      nil)))
+(defn uia-manager-get-root [self &opt cr]
+  (default cr (in self :focus-cr))
+  (:GetRootElementBuildCache (in self :com) cr))
 
 
 (defn uia-manager-get-defview-window [self &opt refresh]
   (default refresh false)
 
-  (def {:root root
-        :def-view cached}
-    self)
-
+  (def {:def-view cached} self)
   (when (and (not refresh)
              cached
              # The SHELLDLL_DefView window vanishes if explorer restarted,
@@ -107,11 +74,12 @@
 
   (var defview nil)
 
-  (with-uia [walker (:create-raw-view-walker self)]
-    (with-uia [cr (:create-cache-request self
-                                         [UIA_NativeWindowHandlePropertyId
-                                          UIA_ClassNamePropertyId])]
-      (:enumerate-children
+  (with-uia [root (:get-root self)]
+    (with-uia [walker (:create-raw-view-walker self)]
+      (with-uia [cr (:create-cache-request self
+                                           [UIA_NativeWindowHandlePropertyId
+                                            UIA_ClassNamePropertyId])]
+        (:enumerate-children
          self
          root
          (fn [elem]
@@ -132,22 +100,22 @@
              true
              (do
                (:enumerate-children
-                  self
-                  elem
-                  (fn [elem-child]
-                    (def class-name (:get_CachedClassName elem-child))
-                    (if (= class-name "SHELLDLL_DefView")
-                      (do
-                        (:AddRef elem-child)
-                        (set defview elem-child)
-                        false)
-                      # else
-                      true))
-                  walker
-                  cr)
+                self
+                elem
+                (fn [elem-child]
+                  (def class-name (:get_CachedClassName elem-child))
+                  (if (= class-name "SHELLDLL_DefView")
+                    (do
+                      (:AddRef elem-child)
+                      (set defview elem-child)
+                      false)
+                    # else
+                    true))
+                walker
+                cr)
                (not defview))))
          walker
-         cr)))
+         cr))))
 
   (when (nil? defview)
     (error "failed to get SHELLDLL_DefView window"))
@@ -175,10 +143,10 @@
   (default top-level? true)
   (default cr (in self :focus-cr))
 
-  (def {:root root
-        :control-view-walker walker}
-    self)
-  (def root-hwnd (:get_CachedNativeWindowHandle root))
+  (def {:control-view-walker walker} self)
+  (def root-hwnd
+    (with-uia [root (:get-root self)]
+      (:get_CachedNativeWindowHandle root)))
 
   (:AddRef uia-elem)
 
@@ -510,20 +478,20 @@
          (handle-desktop-name-changed-event sender prop-id prop-val chan))
        [UIA_NamePropertyId]))
 
-  [(fn []
+  [(fn [elem]
      (:RemoveAutomationEventHandler
         uia-com
         UIA_Window_WindowOpenedEventId
-        element
+        elem
         window-opened-handler))
-   (fn []
+   (fn [_elem]
      (:RemoveFocusChangedEventHandler
         uia-com
         focus-changed-handler))
-   (fn []
+   (fn [elem]
      (:RemovePropertyChangedEventHandler
         uia-com
-        element
+        elem
         desktop-name-changed-handler))])
 
 
@@ -532,17 +500,16 @@
     (error "uiautomation event handlers already initialized"))
 
   (def {:com uia-com
-        :root root
         :chan chan}
     self)
   (def deinit-fns
-    (init-event-handlers uia-com root chan))
+    (with-uia [root (:get-root self)]
+      (init-event-handlers uia-com root chan)))
   (put self :deinit-fns deinit-fns))
 
 
 (defn uia-manager-destroy [self]
   (def {:com uia-com
-        :root root
         :def-view defview
         :deinit-fns deinit-fns
         :focus-cr focus-cr
@@ -550,14 +517,14 @@
         :control-view-walker control-view-walker}
     self)
   (when deinit-fns
-    (each df deinit-fns
-      (df)))
+    (with-uia [root (:get-root self)]
+      (each df deinit-fns
+        (df root))))
   (:Release control-view-walker)
   (:Release focus-cr)
   (:Release transform-cr)
   (when defview
     (:Release defview))
-  (:Release root)
   (:Release uia-com))
 
 
@@ -589,11 +556,6 @@
     (CoCreateInstance CLSID_CUIAutomation8 nil CLSCTX_INPROC_SERVER IUIAutomation6))
   (:put_AutoSetFocus uia-com false) # To reduce flicker
 
-  (def root
-    (with-uia [cr (:CreateCacheRequest uia-com)]
-      (:AddProperty cr UIA_NativeWindowHandlePropertyId)
-      (:GetRootElementBuildCache uia-com cr)))
-
   (def focus-cr
     (let [cr (:CreateCacheRequest uia-com)]
       (:AddProperty cr UIA_NativeWindowHandlePropertyId)
@@ -622,7 +584,6 @@
 
   (table/setproto
    @{:com uia-com
-     :root root
      :def-view nil # Initialized in uia-manager-get-defview-window
      :deinit-fns nil # Initialized in uia-manager-init-event-handlers
      :focus-cr focus-cr

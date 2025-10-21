@@ -451,11 +451,11 @@
   desktop-id?)
 
 
-(defn- get-current-virtual-desktop-name [uia-win uia-man]
+(defn- get-current-virtual-desktop-name [uia-man]
   # XXX: The returned root element will always have the name of
   # the current virtual desktop, but this is not documented at
   # all.
-  (with-uia [root-elem (:get-root uia-man uia-win)]
+  (with-uia [root-elem (:get-root uia-man)]
     (if root-elem
       (:get_CachedName root-elem)
       nil)))
@@ -485,7 +485,7 @@
             desktop-name (if (or (not stat) # IsWindowOnCurrentVirtualDesktop failed
                                  (= FALSE on-cur-vd?))
                            nil
-                           (get-current-virtual-desktop-name uia-win uia-man))]
+                           (get-current-virtual-desktop-name uia-man))]
         (if (and (nil? desktop-id)
                  (nil? desktop-name))
           nil
@@ -3766,7 +3766,8 @@
        :ui-man ui-man
        :hook-manager hook-man
        :ignored-hwnds @{}
-       :last-vd-name (:get_CurrentName (in uia-man :root))}
+       :last-vd-name (with-uia [root (:get-root uia-man)]
+                       (:get_CurrentName root))}
      window-manager-proto))
   (put wm-obj :root (virtual-desktop-container wm-obj))
 
