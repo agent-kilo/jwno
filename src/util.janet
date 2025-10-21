@@ -389,9 +389,13 @@
             (:Release x)))))
 
 (defmacro with-uia [[binding ctor dtor] & body]
-  ~(do
-     (def ,binding ,ctor)
-     ,(apply defer [(or dtor with-uia-dtor-fn) binding] body)))
+  (apply with [binding ctor (or dtor with-uia-dtor-fn)] body))
+
+(defmacro when-with-uia [[binding ctor dtor] & body]
+  (apply when-with [binding ctor (or dtor with-uia-dtor-fn)] body))
+
+(defmacro if-with-uia [[binding ctor dtor] truthy &opt falsey]
+  (apply if-with [binding ctor (or dtor with-uia-dtor-fn)] [truthy falsey]))
 
 
 ################## REPL Helpers ##################

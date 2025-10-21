@@ -16,24 +16,26 @@
 (defn dummy-elem [hwnd ctype &opt parent sibling]
   (table/setproto @{:_ref 0 :_hwnd hwnd :_ctype ctype :_parent parent :_sibling sibling} dummy-elem-proto))
 
+(var ctor-returned nil)
+(var release-called-with nil)
+
+(defn dummy-uia-ctor [op]
+  (set ctor-returned
+       (case op
+         :fail
+         nil
+
+         :succeed
+         @{:Release (fn [x] (set release-called-with x))}
+
+         :error
+         (error "dummy error")))
+  ctor-returned)
 
 (defn test-with-uia []
-  (var release-called-with nil)
   (var body-called-with nil)
-  (var ctor-returned nil)
-  (def dummy-uia-ctor
-    (fn [op]
-      (set ctor-returned
-           (case op
-             :fail
-             nil
-
-             :succeed
-             @{:Release (fn [x] (set release-called-with x))}
-
-             :error
-             (error "dummy error")))
-      ctor-returned))
+  (set ctor-returned nil)
+  (set release-called-with nil)
 
   (with-uia [dummy-uia (dummy-uia-ctor :succeed)]
     (set body-called-with dummy-uia))
@@ -71,6 +73,54 @@
 
   (assert (= release-called-with ctor-returned))
   (assert (= body-called-with ctor-returned)))
+
+
+(defn test-when-with-uia []
+  (var body-called-with nil)
+  (set ctor-returned nil)
+  (set release-called-with nil)
+
+  (when-with-uia [dummy-uia (dummy-uia-ctor :succeed)]
+    (set body-called-with dummy-uia))
+
+  (assert (= release-called-with ctor-returned))
+  (assert (= body-called-with ctor-returned))
+
+  (set release-called-with 'place-holder)
+  (set body-called-with 'place-holder)
+
+  (when-with-uia [dummy-uia (dummy-uia-ctor :fail)]
+    (set body-called-with dummy-uia))
+
+  (assert (nil? ctor-returned))
+  (assert (= release-called-with 'place-holder))
+  (assert (= body-called-with 'place-holder)))
+
+
+(defn test-if-with-uia []
+  (var body-called-with nil)
+  (set ctor-returned nil)
+  (set release-called-with nil)
+
+  (if-with-uia [dummy-uia (dummy-uia-ctor :succeed)]
+    (set body-called-with [:truthy dummy-uia])
+    # else
+    (set body-called-with [:falsey dummy-uia]))
+
+  (assert (= release-called-with ctor-returned))
+  (assert (= body-called-with [:truthy ctor-returned]))
+
+  (set release-called-with 'place-holder)
+  (set body-called-with 'place-holder)
+
+  (if-with-uia [dummy-uia (dummy-uia-ctor :fail)]
+    (set body-called-with [:truthy dummy-uia])
+    # else
+    (set body-called-with [:falsey dummy-uia]))
+
+  (assert (nil? ctor-returned))
+  (assert (= release-called-with 'place-holder))
+  (assert (= body-called-with [:falsey nil])))
 
 
 (defn test-uia-manager-get-parent-window []
@@ -251,6 +301,8 @@
 
 (defn main [&]
   (test-with-uia)
+  (test-when-with-uia)
+  (test-if-with-uia)
   (test-uia-manager-get-parent-window)
   (test-uia-manager-enumerate-children)
   (test-uia-manager-walk-tree))
