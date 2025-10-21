@@ -110,8 +110,11 @@
   (CoInitializeEx nil COINIT_MULTITHREADED)
   (def uia-man (uia-manager))
 
-  (:Release (in uia-man :root))
-  (put uia-man :root dummy-root)
+  (put uia-man
+       :get-root
+       (fn [_self]
+         (:AddRef dummy-root)
+         dummy-root))
   (:Release (in uia-man :control-view-walker))
   (put uia-man :control-view-walker dummy-walker)
 
