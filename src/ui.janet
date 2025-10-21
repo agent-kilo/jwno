@@ -841,6 +841,16 @@
    WM_DESTROY msg-wnd-handle-wm-destroy})
 
 
+(defn- handle-sys-msg-taskbar-created [msg-hwnd hInstance argv0]
+  (log/debug "---- TaskbarCreated ----")
+  (try
+    (create-notify-icon hInstance msg-hwnd argv0)
+    ((err fib)
+     (log/warning "Failed to create notify icon in response to TaskbarCreated: %n\n%s"
+                  err (get-stack-trace fib))))
+  0)
+
+
 (defn- msg-wndproc [hwnd msg wparam lparam hook-handler state]
   (log/debug "################## msg-wndproc ##################")
   (log/debug "hwnd = %p" hwnd)
@@ -851,17 +861,23 @@
   (def handler-ret
     (if-let [handler (in msg-wnd-handlers msg)]
       (handler hwnd msg wparam lparam hook-handler state)
-      (if-let [custom-msgs (in state :custom-messages)
-               custom-handler (in custom-msgs msg)]
-        (try
-          (custom-handler hwnd msg wparam lparam hook-handler state)
-          ((err fib)
-           (log/warning "Custom message handler failed: %n\n%s"
-                        err
-                        (get-stack-trace fib))
-           0 # !!! IMPORTANT
-           ))
-        (DefWindowProc hwnd msg wparam lparam))))
+      # else
+      (if-let [sys-msgs (in state :system-messages)
+               sys-handler (in sys-msgs msg)]
+        (sys-handler hwnd msg wparam lparam hook-handler state)
+        # else
+        (if-let [custom-msgs (in state :custom-messages)
+                 custom-handler (in custom-msgs msg)]
+          (try
+            (custom-handler hwnd msg wparam lparam hook-handler state)
+            ((err fib)
+             (log/warning "Custom message handler failed: %n\n%s"
+                          err
+                          (get-stack-trace fib))
+             0 # !!! IMPORTANT
+             ))
+          # else
+          (DefWindowProc hwnd msg wparam lparam)))))
 
   (if (or (int? handler-ret)
           (= :core/s64 (type handler-ret)))
@@ -880,6 +896,7 @@
                   :keymap @{:timeout const/DEFAULT-KEYMAP-TOOLTIP-TIMEOUT}}
       :tooltip-uid-generator (tooltip-uid-generator 0)
       :custom-messages @{}
+      :system-messages @{}
       :last-custom-message CUSTOM-MSG})
   (def wc
     (WNDCLASSEX
@@ -905,7 +922,7 @@
                     ))
   (when (null? hwnd)
     (error (string/format "Window creation failed: 0x%x" (GetLastError))))
-  hwnd)
+  [hwnd msg-wndproc-state])
 
 
 (defn- init-timer []
@@ -938,7 +955,7 @@
     (show-error-and-exit (string/format "Failed to enable windows hook: 0x%x" (GetLastError)) 1))
   (put hook-handler :hook-id hook-id)
 
-  (def msg-hwnd
+  (def [msg-hwnd msg-wndproc-state]
     (try
       (create-msg-window hInstance hook-handler)
       ((err fib)
@@ -947,6 +964,18 @@
     (create-notify-icon hInstance msg-hwnd argv0)
     ((err fib)
      (show-error-and-exit err 1 (get-stack-trace fib))))
+
+  # Listen to the TaskbarCreated message, so that we know when to recreate our tray icon
+  (def taskbar-created-msg
+    (RegisterWindowMessage "TaskbarCreated"))
+  (log/debug "taskbar-created-msg = %n" taskbar-created-msg)
+  (if (= (int/u64 0) taskbar-created-msg)
+    (log/warning "Failed to register TaskbarCreated message: %n" (GetLastError))
+    # else
+    (put (in msg-wndproc-state :system-messages)
+         taskbar-created-msg
+         (fn [&]
+           (handle-sys-msg-taskbar-created msg-hwnd hInstance argv0))))
 
   (def gc-timer-id (init-timer))
 
