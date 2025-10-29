@@ -120,6 +120,17 @@
   (DestroyMenu hMenu))
 
 
+(defn- check-notify-icon [hwnd]
+  # A no-op NIM_MODIFY call, to check if the icon exists
+  (def nid
+    (NOTIFYICONDATA
+     :hWnd   hwnd
+     :uID    NOTIFY-ICON-ID
+     :uFlags NIF_TIP
+     :szTip "Jwno"))
+  (not= FALSE (Shell_NotifyIcon NIM_MODIFY nid)))
+
+
 (defn- create-notify-icon [hinst hwnd argv0]
   (def hIcon
     (try
@@ -843,11 +854,25 @@
 
 (defn- handle-sys-msg-taskbar-created [msg-hwnd hInstance argv0]
   (log/debug "---- TaskbarCreated ----")
-  (try
-    (create-notify-icon hInstance msg-hwnd argv0)
-    ((err fib)
-     (log/warning "Failed to create notify icon in response to TaskbarCreated: %n\n%s"
-                  err (get-stack-trace fib))))
+  #
+  # This is an extra sanity check:
+  #
+  # NIM_MODIFY    NIM_ADD    meaning
+  # --------------------------------------------------------------------------
+  #   TRUE          -        The icon already exists
+  #   FALSE         TRUE     The icon just got added to the tray
+  #   FALSE         FALSE    Explorer probably crashed (again), log a warning
+  #
+  (if (check-notify-icon msg-hwnd)
+    (log/debug "NIM_MODIFY message succeeded, skipping notify icon creation")
+    # else
+    (do
+      (log/debug "NIM_MODIFY message failed, creating notify icon...")
+      (try
+        (create-notify-icon hInstance msg-hwnd argv0)
+        ((err fib)
+         (log/warning "Failed to create notify icon in response to TaskbarCreated: %n\n%s"
+                      err (get-stack-trace fib))))))
   0)
 
 
