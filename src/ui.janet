@@ -126,7 +126,7 @@
     (NOTIFYICONDATA
      :hWnd   hwnd
      :uID    NOTIFY-ICON-ID
-     :uFlags NIF_TIP
+     :uFlags (bor NIF_TIP NIF_SHOWTIP)
      :szTip "Jwno"))
   (not= FALSE (Shell_NotifyIcon NIM_MODIFY nid)))
 
