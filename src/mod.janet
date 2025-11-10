@@ -23,6 +23,7 @@
       "jw32/_dwmapi"
       "jw32/_errhandlingapi"
       "jw32/_handleapi"
+      "jw32/_heapapi"
       "jw32/_libloaderapi"
       "jw32/_oaidl"
       "jw32/_processthreadsapi"
@@ -34,6 +35,7 @@
       "jw32/_winbase"
       "jw32/_winnt"
       "jw32/_wingdi"
+      "jw32/_winreg"
       "jw32/_winuser"])
 
     # Jwno modules
