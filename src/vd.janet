@@ -76,7 +76,6 @@
         (errorf "RegGetValue failed for %n: %n" reg-vd-value-name stat))
 
       (set cache @[])
-      (put self :vd-cache cache)
 
       (def guid-size 16)
       (def vd-count (/ (length id-data) guid-size))
@@ -101,13 +100,52 @@
         (log/debug "Found desktop: %n, %n" guid-str name)
         (array/push cache [(+ 1 i) guid-str name]))
 
+      (put self :vd-cache cache)
       cache)))
+
+
+(defn vdm-get-default-desktop-name [self idx]
+  (string/format (in self :default-desktop-name) idx))
+
+
+(defn vdm-get-desktop-name [self guid &opt refresh]
+  (default refresh false)
+
+  (def dlist (:get-all-desktops self refresh))
+  (when-let [dinfo (find |(= guid (in $ 1)) dlist)]
+    (def [idx _guid name] dinfo)
+    (if name
+      name
+      # else
+      (:get-default-desktop-name self idx)))
+  # nil for all unknown desktops
+  )
+
+
+(defn vdm-get-desktop-guid-from-name [self name &opt refresh]
+  (default refresh false)
+
+  (def dlist (:get-all-desktops self refresh))
+  (def filter-fn
+    (fn [[i g n]]
+      (if n
+        (= n name)
+        # else
+        (= name (:get-default-desktop-name self i)))))
+  (def filtered (filter filter-fn dlist))
+  (when (< 1 (length filtered))
+    (log/warning "There are more than one virtual desktop with the name %n, falling back to the first one"))
+  (when-let [dinfo (first filtered)]
+    (in dinfo 1)))
 
 
 (def virtual-desktop-manager-proto
   @{:call-method vdm-call-method
     :destroy     vdm-destroy
-    :get-all-desktops vdm-get-all-desktops})
+    :get-default-desktop-name vdm-get-default-desktop-name
+    :get-all-desktops vdm-get-all-desktops
+    :get-desktop-name vdm-get-desktop-name
+    :get-desktop-guid-from-name vdm-get-desktop-guid-from-name})
 
 
 (defn vdm-worker-try-method [method com args &opt retry-count max-retries init-wait backoff]
@@ -174,5 +212,5 @@
      :sup    worker-sup
      :in     worker-in-chan
      :vd-cache nil  # Cached VD GUIDs and names, initialized in vdm-get-all-desktops
-    }
+     :default-desktop-name "Desktop %d"}
    virtual-desktop-manager-proto))
