@@ -52,8 +52,11 @@
   (when (and (not refresh)
              cache
              (not (empty? cache)))
+    (log/debug "Reusing vd-cache")
     # Early return
     (break cache))
+
+  (log/debug "Refreshing vd-cache")
 
   (def [stat hk-cu] (RegOpenCurrentUser KEY_READ))
   (unless (= 0 stat)

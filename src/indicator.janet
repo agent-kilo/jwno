@@ -247,14 +247,18 @@
 (defn current-frame-area-on-frame-activated [self frame]
   (def {:ui-manager ui-man
         :uia-manager uia-man
+        :vd-manager vd-man
         :hide-msg hide-msg}
     self)
   (def lo (:get-layout frame))
+  (def cur-vd-name
+    (with-uia [root (:get-root uia-man)]
+      (:get_CurrentName root)))
+  (def cur-vd-guid
+    (:get-desktop-guid-from-name vd-man cur-vd-name))
 
   (cond
-    (not= (in lo :name)
-          (with-uia [root (:get-root uia-man)]
-            (:get_CurrentName root)))
+    (not= (in lo :id) cur-vd-guid)
     # The frame is on a virtual desktop that's different from our active one,
     # The area window should have been closed in the :virtual-desktop-changed
     # hook, no need to do anything here.
@@ -271,7 +275,7 @@
     (:maybe-show-area self frame)))
 
 
-(defn current-frame-area-on-virtual-desktop-changed [self _vd-name _layout]
+(defn current-frame-area-on-virtual-desktop-changed [self _vd-guid _vd-name _layout]
   (def {:ui-manager ui-man
         :hide-msg hide-msg}
     self)
@@ -288,7 +292,7 @@
   (when (or (nil? frame)
             (= frame
                (:get-current-frame-on-desktop (in window-man :root)
-                                              desktop-info)))
+                                              (in desktop-info :id))))
     # A window is created in our current frame, hide the area
     (:post-message ui-man hide-msg 0 0)))
 
@@ -401,13 +405,16 @@
   (def {:hook-manager hook-man
         :ui-manager ui-man
         :uia-manager uia-man
-        :window-manager window-man} context)
+        :window-manager window-man
+        :virtual-desktop-manager vd-man}
+    context)
 
   (table/setproto
    @{:hook-manager hook-man
      :ui-manager ui-man
      :uia-manager uia-man
      :window-manager window-man
+     :vd-manager vd-man
 
      # Default settings
      :margin 0

@@ -478,14 +478,7 @@
 
       true
       (let [desktop-id (get-hwnd-virtual-desktop-id hwnd vd-man)
-            [stat on-cur-vd?] (:call-method vd-man :IsWindowOnCurrentVirtualDesktop [hwnd])
-            # XXX: The name of the HWND's virtual desktop can only be
-            # retrieved when that virtual desktop is active. Find a way
-            # around this?
-            desktop-name (if (or (not stat) # IsWindowOnCurrentVirtualDesktop failed
-                                 (= FALSE on-cur-vd?))
-                           nil
-                           (get-current-virtual-desktop-name uia-man))]
+            desktop-name (:get-desktop-name vd-man desktop-id)]
         (if (and (nil? desktop-id)
                  (nil? desktop-name))
           nil
@@ -1382,6 +1375,8 @@
   (default indent-char const/DEFAULT-FRAME-TREE-DUMP-INDENT-CHAR)
   (default wm (:get-window-manager self))
 
+  (def vd-man (in wm :vd-manager))
+
   (def indent
     (buffer/new-filled (* level indent-width) indent-char))
 
@@ -1392,7 +1387,7 @@
     :layout
     (printf "%sVirtual Desktop (name=%n, id=%n)"
             indent
-            (in self :name)
+            (:get-desktop-name vd-man (in self :id))
             (in self :id))
 
     :frame
@@ -2968,7 +2963,6 @@
 (defn layout-dump [self]
   [:layout
    (in self :id)
-   (in self :name)
    (tuple/slice (map |(:dump $) (in self :children)))])
 
 
@@ -2993,7 +2987,7 @@
 
 
 (defn layout-load [self dumped &opt hwnd-list]
-  (def [dump-type lo-id lo-name children] dumped)
+  (def [dump-type lo-id children] dumped)
   (unless (= :layout dump-type)
     (errorf "can not restore dump type to a layout: %n" dump-type))
 
@@ -3045,49 +3039,50 @@
    tree-node-proto))
 
 
-(defn layout [id &opt name parent children]
+(defn layout [id &opt parent children]
   (default children @[])
   (def layout-obj (tree-node :layout parent children
-                             :id id
-                             :name name))
+                             :id id))
   (table/setproto layout-obj layout-proto))
 
 
 ######### Virtual desktop container object #########
 
-(defn vdc-get-current-frame-on-desktop [self desktop-info]
-  (def {:id desktop-id
-        :name desktop-name}
-    desktop-info)
+(defn vdc-get-current-frame-on-desktop [self desktop-id &opt create]
+  (default create true)
 
-  (def lo (:get-layout-on-desktop self desktop-info))
-  (:get-current-frame lo))
+  (def lo (:get-layout-on-desktop self desktop-id create))
+  (when lo
+    (:get-current-frame lo)))
 
 
-(defn vdc-get-layout-on-desktop [self desktop-info]
-  (def {:id desktop-id
-        :name desktop-name}
-    desktop-info)
-
+(defn vdc-get-layout-on-desktop [self desktop-id &opt create]
   (var layout-found nil)
   (each lo (in self :children)
     (when (= (in lo :id) desktop-id)
       (set layout-found lo)
       (break)))
-  (if layout-found
+
+  (cond
     layout-found
-    (let [new-layout (:new-layout self desktop-info)]
+    layout-found
+
+    create
+    (let [new-layout (:new-layout self desktop-id)]
       (:add-child self new-layout)
       (:layout-created (in self :window-manager) new-layout)
-      new-layout)))
+      new-layout)
+
+    # layout not found, and don't create it
+    true
+    nil))
 
 
-(defn vdc-new-layout [self desktop-info]
+(defn vdc-new-layout [self desktop-id]
   (def wm (in self :window-manager))
   (def [monitors main-idx] (:enumerate-monitors wm))
-  (def {:id id :name name} desktop-info)
   (def new-layout
-    (layout id name nil
+    (layout desktop-id nil
             (map (fn [mon]
                    (def new-fr (frame (in mon :work-area)))
                    (put new-fr :monitor mon)
@@ -3125,9 +3120,8 @@
   (:clear-children self)
 
   (each c children
-    (def [_ lo-id lo-name _] c)
-    (def vd-info {:id lo-id :name lo-name})
-    (def lo (:new-layout self vd-info))
+    (def [_ lo-id _] c)
+    (def lo (:new-layout self lo-id))
     (:add-child self lo)
     (log/debug "restoring layout, id = %n" lo-id)
     (:load lo c hwnd-map))
@@ -3297,7 +3291,7 @@
           (do 
             (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
             (:get-current-frame override-frame))
-          (:get-current-frame-on-desktop (in self :root) desktop-info)))
+          (:get-current-frame-on-desktop (in self :root) (in desktop-info :id))))
 
       (:add-child frame-found new-win)
       (:layouts-changed self [(:get-layout frame-found)])
@@ -3330,8 +3324,9 @@
       desktop-info?
       (:get-hwnd-virtual-desktop self hwnd uia-win)))
 
-  (def desktop-id
-    (get-in desktop-info [:id]))
+  (def {:id   desktop-id
+        :name desktop-name}
+    desktop-info)
 
   (with-uia [_uia-win uia-win]
     (cond
@@ -3341,6 +3336,13 @@
       (or (nil? desktop-id)
           (= "{00000000-0000-0000-0000-000000000000}" desktop-id))
       [false [:invalid-virtual-desktop desktop-id]]
+
+      (nil? desktop-name)
+      # a nil name means this virtual desktop does not exist in the registry,
+      # which in turn means the VD is an ad-hoc "always shown" one. The
+      # always-shown VDs overlayed with normal layouts are quite confusing,
+      # so we ignore them by default.
+      [false :window-on-multiple-virtual-desktops]
 
       (not (find |(= $ (:GetCachedPropertyValue uia-win UIA_ControlTypePropertyId))
                  [UIA_WindowControlTypeId
@@ -3541,14 +3543,20 @@
 (defn wm-desktop-name-changed [self vd-name]
   (def root (in self :root))
   (def layouts (in root :children))
+  (def vd-man (in self :vd-manager))
 
-  (def last-vd-name (in self :last-vd-name))
-  (unless (= vd-name last-vd-name)
-    # XXX: lo may be nil. The desktop names should be unique, and
-    # they should not be changed while Jwno is running.
-    (def lo (find |(= (in $ :name) vd-name) layouts))
-    (:call-hook (in self :hook-manager) :virtual-desktop-changed vd-name lo)
-    (put self :last-vd-name vd-name)
+  (def vd-guid (:get-desktop-guid-from-name vd-man vd-name true))
+  (log/debug "wm-desktop-name-changed: vd-name = %n, vd-guid = %n" vd-name vd-guid)
+  (when (nil? vd-guid)
+    (log/warning "Virtual desktop name not found: %n" vd-name)
+    # Early return
+    (break))
+
+  (def last-vd (in self :last-vd))
+  (unless (= vd-guid last-vd)
+    (def lo (:get-layout-on-desktop root vd-guid false))
+    (:call-hook (in self :hook-manager) :virtual-desktop-changed vd-guid vd-name lo)
+    (put self :last-vd vd-guid)
     (when lo
       (with-activation-hooks self
         (:set-focus self lo)))))
@@ -3759,6 +3767,12 @@
 
 
 (defn window-manager [uia-man ui-man hook-man vd-man]
+  (def cur-vd-name
+    (with-uia [root (:get-root uia-man)]
+      (:get_CurrentName root)))
+  (def cur-vd-guid
+    (:get-desktop-guid-from-name vd-man cur-vd-name true))
+
   (def wm-obj
     (table/setproto
      @{:vd-manager vd-man
@@ -3766,8 +3780,7 @@
        :ui-man ui-man
        :hook-manager hook-man
        :ignored-hwnds @{}
-       :last-vd-name (with-uia [root (:get-root uia-man)]
-                       (:get_CurrentName root))}
+       :last-vd cur-vd-guid}
      window-manager-proto))
   (put wm-obj :root (virtual-desktop-container wm-obj))
 

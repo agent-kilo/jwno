@@ -694,16 +694,12 @@
                                             "Filter Result: %n"]
                                            "\n")
                                           hwnd
-                                          (if exe-path
-                                            exe-path
-                                            "n/a")
-                                          (:get_CachedName uia-win)
-                                          (:get_CachedClassName uia-win)
+                                          (or exe-path "n/a")
+                                          (or (:get_CachedName uia-win) "n/a")
+                                          (or (:get_CachedClassName uia-win) "n/a")
                                           (:get_CachedControlType uia-win)
-                                          (in desktop-info :name)
-                                          (if-let [desktop-id (in desktop-info :id)]
-                                            desktop-id
-                                            "n/a")
+                                          (or (in desktop-info :name) "n/a")
+                                          (or (in desktop-info :id)   "n/a")
                                           rect
                                           (if efb-rect
                                             (string/format "%n" efb-rect)

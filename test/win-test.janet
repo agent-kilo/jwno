@@ -1784,7 +1784,7 @@
      dummy-monitor))
   (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
   (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
-  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+  (def dummy-layout (layout :dummy-id nil [dummy-frame]))
 
   (put dummy-frame :viewport dummy-vp-rect)
 
@@ -1832,7 +1832,7 @@
      dummy-monitor))
   (def dummy-sub-frame1 (get-in dummy-frame [:children 0]))
   (def dummy-sub-frame2 (get-in dummy-frame [:children 1]))
-  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+  (def dummy-layout (layout :dummy-id nil [dummy-frame]))
 
   (put dummy-frame :viewport dummy-vp-rect)
 
@@ -1891,7 +1891,7 @@
   (def dummy-sub-frame21 (get-in dummy-sub-frame2 [:children 0]))
   (def dummy-sub-frame22 (get-in dummy-sub-frame2 [:children 1]))
 
-  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+  (def dummy-layout (layout :dummy-id nil [dummy-frame]))
 
   (put dummy-sub-frame2 :viewport dummy-vp-rect2)
 
@@ -2213,7 +2213,7 @@
   (def dummy-monitor {:dpi [const/USER-DEFAULT-SCREEN-DPI const/USER-DEFAULT-SCREEN-DPI]})
   (var dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (put dummy-frame :monitor dummy-monitor)
-  (var dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+  (var dummy-layout (layout :dummy-id nil [dummy-frame]))
   (:split dummy-frame :horizontal 3 [0.3 0.4 0.3])
 
   (assert (= 3 (length (in dummy-frame :children))))
@@ -2230,7 +2230,7 @@
 
   (set dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (var dummy-frame2 (frame {:top 10 :left -90 :bottom 110 :right 10}))
-  (set dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame dummy-frame2]))
+  (set dummy-layout (layout :dummy-id nil [dummy-frame dummy-frame2]))
 
   (assert (= (:get-adjacent-frame dummy-frame :left)
              dummy-frame2))
@@ -2241,7 +2241,7 @@
   (set dummy-frame (frame {:top 0 :left 0 :bottom 100 :right 100}))
   (var dummy-frame3 (frame {:top 0 :left 100 :bottom 100 :right 200}))
   (set dummy-frame2 (frame {:top 0 :left 200 :bottom 100 :right 300}))
-  (set dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame dummy-frame2 dummy-frame3]))
+  (set dummy-layout (layout :dummy-id nil [dummy-frame dummy-frame2 dummy-frame3]))
 
   (assert (= (:get-adjacent-frame dummy-frame :right)
              dummy-frame3))
@@ -2255,7 +2255,7 @@
   (def dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
   (assert (= false (:attached? dummy-frame)))
 
-  (def dummy-layout (layout :dummy-id "dummy-name" nil [dummy-frame]))
+  (def dummy-layout (layout :dummy-id nil [dummy-frame]))
   (assert (= false (:attached? dummy-layout)))
   (assert (= false (:attached? dummy-frame)))
 

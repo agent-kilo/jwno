@@ -254,9 +254,8 @@
       (when dump
         (def [ts dump-data] dump)
         (when (> ts session-ts)
-          (def [_ lo-id lo-name _] dump-data)
-          (def vd-info {:id lo-id :name lo-name})
-          (def lo (:new-layout root vd-info))
+          (def [_ lo-id _] dump-data)
+          (def lo (:new-layout root lo-id))
           (:add-child root lo)
           (:load lo dump-data))))
 
