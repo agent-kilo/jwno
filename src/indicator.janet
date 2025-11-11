@@ -258,7 +258,10 @@
     (:get-desktop-guid-from-name vd-man cur-vd-name))
 
   (cond
-    (not= (in lo :id) cur-vd-guid)
+    # A nil cur-vd-guid probably means a mis-configured :default-desktop-name
+    # option in virtual-desktop-manager.
+    (and (not (nil? cur-vd-guid))
+         (not= (in lo :id) cur-vd-guid))
     # The frame is on a virtual desktop that's different from our active one,
     # The area window should have been closed in the :virtual-desktop-changed
     # hook, no need to do anything here.
