@@ -183,6 +183,7 @@
 (def {:key-manager key-man
       :command-manager command-man
       :window-manager window-man
+      :virtual-desktop-manager vd-man
       :ui-manager ui-man
       :hook-manager hook-man
       :repl-manager repl-man}
