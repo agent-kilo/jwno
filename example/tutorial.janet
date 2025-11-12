@@ -424,25 +424,32 @@ But I'll try to minimize all your windows first, to make us a clean desktop. You
 
   (set-slide-keymap keymap)
 
+  # (:filter-hwnd window-man ...) would trap into the event loop,
+  # so it can't be called directly in the EnumChildWindows callback.
+  # Work around that by gathering all the HWNDs first.
+  (def hwnd-list @[])
   (EnumChildWindows
    nil
    (fn [hwnd]
-     (try
-       (do
-         (with-uia [uia-win (:get-hwnd-uia-element window-man hwnd)]
-           (with-uia [win-pat (:GetCurrentPatternAs uia-win
-                                                    UIA_WindowPatternId
-                                                    IUIAutomationWindowPattern)]
-             (when (and (= true (:filter-hwnd window-man hwnd uia-win))
-                        (not= 0 (:get_CurrentCanMinimize win-pat)))
-               (:SetWindowVisualState win-pat WindowVisualState_Minimized)
-               (log/info "Minimized window %n" hwnd)))))
-       ((err fib)
-        (log/info "Failed to minimize window %n: %n\n%s"
-                  hwnd
-                  err
-                  (get-stack-trace fib))))
+     (array/push hwnd-list hwnd)
      TRUE))
+
+  (each hwnd hwnd-list
+    (try
+      (do
+        (with-uia [uia-win (:get-hwnd-uia-element window-man hwnd)]
+          (with-uia [win-pat (:GetCurrentPatternAs uia-win
+                                                   UIA_WindowPatternId
+                                                   IUIAutomationWindowPattern)]
+            (when (and (= true (:filter-hwnd window-man hwnd uia-win))
+                       (not= 0 (:get_CurrentCanMinimize win-pat)))
+              (:SetWindowVisualState win-pat WindowVisualState_Minimized)
+              (log/info "Minimized window %n" hwnd)))))
+      ((err fib)
+       (log/info "Failed to minimize window %n: %n\n%s"
+                 hwnd
+                 err
+                 (get-stack-trace fib)))))
 
   (:show-tooltip
      ui-man
