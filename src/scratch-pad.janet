@@ -167,7 +167,7 @@
 
   (def should-manage
     (with-uia [uia-win (:get-hwnd-uia-element wm hwnd)]
-      (def vd-info (:get-hwnd-virtual-desktop wm hwnd uia-win))
+      (def vd-info (:get-hwnd-virtual-desktop wm hwnd))
       (def exe-path (:get-hwnd-path wm hwnd))
       (:call-filter-hook hook-man :and :filter-scratch-pad-window
          hwnd uia-win exe-path vd-info)))

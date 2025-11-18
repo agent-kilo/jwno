@@ -461,28 +461,13 @@
       nil)))
 
 
-(defn- get-hwnd-virtual-desktop [hwnd? uia-man vd-man &opt uia-win?]
-  (def [hwnd uia-win]
-    (normalize-hwnd-and-uia-element hwnd?
-                                    uia-win?
-                                    (in uia-man :com)
-                                    (in uia-man :focus-cr)))
-
-  (with-uia [_uia-win uia-win]
-    (cond
-      (nil? uia-win)
+(defn- get-hwnd-virtual-desktop [hwnd vd-man]
+  (let [desktop-id (get-hwnd-virtual-desktop-id hwnd vd-man)
+        desktop-name (:get-desktop-name vd-man desktop-id)]
+    (if (and (nil? desktop-id)
+             (nil? desktop-name))
       nil
-
-      (nil? hwnd)
-      nil
-
-      true
-      (let [desktop-id (get-hwnd-virtual-desktop-id hwnd vd-man)
-            desktop-name (:get-desktop-name vd-man desktop-id)]
-        (if (and (nil? desktop-id)
-                 (nil? desktop-name))
-          nil
-          {:id desktop-id :name desktop-name})))))
+      {:id desktop-id :name desktop-name})))
 
 
 #
@@ -514,7 +499,7 @@
         (get-hwnd-path hwnd)))
     (def desktop-info
       (unless (nil? hwnd)
-        (get-hwnd-virtual-desktop hwnd uia-man vd-man uia-win)))
+        (get-hwnd-virtual-desktop hwnd vd-man)))
 
     (cond
       (nil? uia-win)
@@ -1589,9 +1574,9 @@
   (:get-hwnd-uia-element wm (in self :hwnd) cr))
 
 
-(defn window-get-virtual-desktop [self &opt uia-win wm]
+(defn window-get-virtual-desktop [self &opt wm]
   (default wm (:get-window-manager self))
-  (:get-hwnd-virtual-desktop wm (in self :hwnd) uia-win))
+  (:get-hwnd-virtual-desktop wm (in self :hwnd)))
 
 
 (defn window-get-info [self &opt wm]
@@ -3217,11 +3202,8 @@
   (get-hwnd-virtual-desktop-id hwnd (in self :vd-manager)))
 
 
-(defn wm-get-hwnd-virtual-desktop [self hwnd? &opt uia-win?]
-  (get-hwnd-virtual-desktop hwnd?
-                            (in self :uia-manager)
-                            (in self :vd-manager)
-                            uia-win?))
+(defn wm-get-hwnd-virtual-desktop [self hwnd]
+  (get-hwnd-virtual-desktop hwnd (in self :vd-manager)))
 
 
 (defn wm-get-hwnd-info [self hwnd? &opt uia-win?]
@@ -3322,7 +3304,7 @@
   (def desktop-info
     (if desktop-info?
       desktop-info?
-      (:get-hwnd-virtual-desktop self hwnd uia-win)))
+      (:get-hwnd-virtual-desktop self hwnd)))
 
   (def {:id   desktop-id
         :name desktop-name}

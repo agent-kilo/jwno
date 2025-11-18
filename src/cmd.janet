@@ -827,7 +827,7 @@
       (when pull?
         (def cur-frame (:get-current-frame (in wm :root)))
         (def cur-vd (in (:get-layout cur-frame) :id))
-        (def win-vd (in (:get-virtual-desktop win-found nil wm) :id))
+        (def win-vd (:get-hwnd-virtual-desktop-id wm (in win-found :hwnd)))
         # Only pull the window when it's in the same virtual desktop,
         # since the Windows API doesn't support moving windows across
         # virtual desktops.
