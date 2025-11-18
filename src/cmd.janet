@@ -678,6 +678,8 @@
                  nil)))
             (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
             (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
+            (def desktop-name (in desktop-info :name))
+            (def desktop-id (in desktop-info :id))
             (:show-tooltip ui-man
                            :describe-window
                            (string/format (string/join
@@ -698,8 +700,11 @@
                                           (or (:get_CachedName uia-win) "n/a")
                                           (or (:get_CachedClassName uia-win) "n/a")
                                           (:get_CachedControlType uia-win)
-                                          (or (in desktop-info :name) "n/a")
-                                          (or (in desktop-info :id)   "n/a")
+                                          (cond
+                                            (nil? desktop-name)    "n/a"
+                                            (tuple? desktop-name)  (string/format "%n" desktop-name)
+                                            (string? desktop-name) desktop-name)
+                                          (or desktop-id   "n/a")
                                           rect
                                           (if efb-rect
                                             (string/format "%n" efb-rect)

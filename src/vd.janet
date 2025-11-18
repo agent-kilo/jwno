@@ -107,45 +107,65 @@
       cache)))
 
 
-(defn vdm-get-default-desktop-name [self idx]
-  (string/format (in self :default-desktop-name) idx))
-
-
 (defn vdm-get-desktop-name [self guid &opt refresh]
   (default refresh false)
 
   (def dlist (:get-all-desktops self refresh))
-  (when-let [dinfo (find |(= guid (in $ 1)) dlist)]
-    (def [idx _guid name] dinfo)
+  (def filter-fn (fn [[_i g _n]] (= g guid)))
+  (when-let [dinfo (find filter-fn dlist)
+             [idx _guid name] dinfo]
     (if name
       name
-      # else
-      (:get-default-desktop-name self idx)))
+      # else, the desktop has no user-defined name
+      [:default idx]))
   # nil for all unknown desktops
   )
 
 
+(def default-desktop-name-peg
+  (peg/compile ~(thru (sequence :s (replace (capture :d+) ,scan-number) -1))))
+
+# XXX: This method assumes that, the default desktop names always end
+# with a whitespace character and a number (see the peg pattern above)
 (defn vdm-get-desktop-guid-from-name [self name &opt refresh]
   (default refresh false)
 
   (def dlist (:get-all-desktops self refresh))
   (def filter-fn
-    (fn [[i g n]]
-      (if n
-        (= n name)
-        # else
-        (= name (:get-default-desktop-name self i)))))
-  (def filtered (filter filter-fn dlist))
-  (when (< 1 (length filtered))
+    (fn [[_i _g n]]
+      (and (not (nil? n))
+           (= n name))))
+  (def user-defined (filter filter-fn dlist))
+  (when (< 1 (length user-defined))
     (log/warning "There are more than one virtual desktop with the name %n, falling back to the first one"))
-  (when-let [dinfo (first filtered)]
-    (in dinfo 1)))
+  (if-let [dinfo (first user-defined)
+           [_idx guid _name] dinfo]
+    guid
+    # else, the name is not defined by the user, and should
+    # contain the desktop index
+    (if-let [matched (peg/match default-desktop-name-peg name)
+             [matched-idx] matched]
+      (do
+        (def filter-fn (fn [[i _g _n]] (= i matched-idx)))
+        (def indexed (filter filter-fn dlist))
+        (if-let [dinfo (first indexed)
+                 [_idx guid _name] dinfo]
+          guid
+          # else
+          (do
+            (log/warning "There is no virtual desktop with the index %n (%n)"
+                         matched-idx name)
+            nil)))
+      # else, the system-provided name doesn't match the peg pattern,
+      # something's seriously wrong
+      (do
+        (log/warning "Cannot extract index from default desktop name: %n" name)
+        nil))))
 
 
 (def virtual-desktop-manager-proto
   @{:call-method vdm-call-method
     :destroy     vdm-destroy
-    :get-default-desktop-name vdm-get-default-desktop-name
     :get-all-desktops vdm-get-all-desktops
     :get-desktop-name vdm-get-desktop-name
     :get-desktop-guid-from-name vdm-get-desktop-guid-from-name})
@@ -215,5 +235,5 @@
      :sup    worker-sup
      :in     worker-in-chan
      :vd-cache nil  # Cached VD GUIDs and names, initialized in vdm-get-all-desktops
-     :default-desktop-name "Desktop %d"}
+     }
    virtual-desktop-manager-proto))

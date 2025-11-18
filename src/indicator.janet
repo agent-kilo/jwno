@@ -258,8 +258,6 @@
     (:get-desktop-guid-from-name vd-man cur-vd-name))
 
   (cond
-    # A nil cur-vd-guid probably means a mis-configured :default-desktop-name
-    # option in virtual-desktop-manager.
     (and (not (nil? cur-vd-guid))
          (not= (in lo :id) cur-vd-guid))
     # The frame is on a virtual desktop that's different from our active one,
