@@ -3537,7 +3537,10 @@
   (def last-vd (in self :last-vd))
   (unless (= vd-guid last-vd)
     (def lo (:get-layout-on-desktop root vd-guid false))
-    (:call-hook (in self :hook-manager) :virtual-desktop-changed vd-guid vd-name lo)
+    # Convert default localized desktop names to tuple names
+    # (e.g. something like `[:default 2]` for the second desktop)
+    (def norm-vd-name (:get-desktop-name vd-man vd-guid))
+    (:call-hook (in self :hook-manager) :virtual-desktop-changed vd-guid norm-vd-name lo)
     (put self :last-vd vd-guid)
     (when lo
       (with-activation-hooks self
