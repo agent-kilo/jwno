@@ -844,8 +844,10 @@
      (not (or
             # This means ALL windows on (virtual) Desktop 2 will be ignored,
             # essentially creating a "floating desktop" that Jwno will NOT
-            # manage.
-            (= "Desktop 2" desktop-name)
+            # manage. `[:default 2]` means the default name for the second
+            # desktop. You can also use a plain string here, if you have
+            # renamed the desktop to something else.
+            (= [:default 2] desktop-name)
             # Add your own rules here
             ))))
 
