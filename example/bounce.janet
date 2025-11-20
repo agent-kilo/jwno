@@ -339,7 +339,7 @@
     (put bouncers (first obj) (spawn-bouncer obj sup paused spawn-mode))))
 
 
-(defn on-vd-changed [_name _lo]
+(defn on-vd-changed [_id _name _lo]
   (unless (check-started)
     (break))
 
