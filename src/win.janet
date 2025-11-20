@@ -451,16 +451,6 @@
   desktop-id?)
 
 
-(defn- get-current-virtual-desktop-name [uia-man]
-  # XXX: The returned root element will always have the name of
-  # the current virtual desktop, but this is not documented at
-  # all.
-  (with-uia [root-elem (:get-root uia-man)]
-    (if root-elem
-      (:get_CachedName root-elem)
-      nil)))
-
-
 (defn- get-hwnd-virtual-desktop [hwnd vd-man]
   (let [desktop-id (get-hwnd-virtual-desktop-id hwnd vd-man)
         desktop-name (:get-desktop-name vd-man desktop-id)]
