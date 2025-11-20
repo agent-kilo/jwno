@@ -132,35 +132,52 @@
 
   (def dlist (:get-all-desktops self refresh))
   (def filter-fn
-    (fn [[_i _g n]]
-      (and (not (nil? n))
-           (= n name))))
-  (def user-defined (filter filter-fn dlist))
-  (when (< 1 (length user-defined))
+    (fn [[i _g n]]
+      (if (nil? n)
+        (= name [:default i])
+        (= name n))))
+  (def found (filter filter-fn dlist))
+  (when (< 1 (length found))
     (log/warning "There are more than one virtual desktop with the name %n, falling back to the first one"))
-  (if-let [dinfo (first user-defined)
-           [_idx guid _name] dinfo]
+
+  (if-let [dinfo (first found)
+           [_idx guid _found-name] dinfo]
     guid
-    # else, the name is not defined by the user, and should
-    # contain the desktop index
-    (if-let [matched (peg/match default-desktop-name-peg name)
-             [matched-idx] matched]
+
+    # else
+    (match name
+      [:default idx]
       (do
-        (def filter-fn (fn [[i _g _n]] (= i matched-idx)))
-        (def indexed (filter filter-fn dlist))
-        (if-let [dinfo (first indexed)
-                 [_idx guid _name] dinfo]
-          guid
-          # else
-          (do
-            (log/warning "There is no virtual desktop with the index %n (%n)"
-                         matched-idx name)
-            nil)))
-      # else, the system-provided name doesn't match the peg pattern,
-      # something's seriously wrong
-      (do
-        (log/warning "Cannot extract index from default desktop name: %n" name)
-        nil))))
+        (log/warning "There is no virtual desktop with the index %n (%n)"
+                     idx name)
+        nil)
+
+      # name should be a string otherwise, and it should contain the
+      # desktop index at the end
+      (if-let [matched (peg/match default-desktop-name-peg name)
+               [matched-idx] matched]
+        (do
+          (def filter-fn (fn [[i _g _n]] (= i matched-idx)))
+          (def indexed (filter filter-fn dlist))
+          (if-let [dinfo (first indexed)
+                   [_idx guid found-name] dinfo]
+            (cond
+              (nil? found-name)   guid
+              (= name found-name) guid
+              true (do
+                     (log/warning "Desktop has a different user-defined name (%n / %n)"
+                                  name found-name)
+                     nil))
+            # else
+            (do
+              (log/warning "There is no virtual desktop with the index %n (%n)"
+                           matched-idx name)
+              nil)))
+        # else, the system-provided name doesn't match the peg pattern,
+        # something's seriously wrong
+        (do
+          (log/warning "Cannot extract index from default desktop name: %n" name)
+          nil)))))
 
 
 (def virtual-desktop-manager-proto
