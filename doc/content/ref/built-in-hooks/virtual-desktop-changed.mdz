@@ -12,11 +12,13 @@
 ### Function Signature
 
 @codeblock[janet]```
-(hook-fn vd-name lo)
+(hook-fn vd-guid norm-vd-name lo)
 ```
 
 ### Description
 
-Gets triggered after the user has switched to another virtual desktop. @code{vd-name} is the name of the virtual desktop, and @code{lo} is the layout object for that virtual desktop.
+Gets triggered after the user has switched to another virtual desktop. @code{vd-guid} is the GUID for the virtual desktop, @code{norm-vd-name} is the name of the virtual desktop, and @code{lo} is the layout object for that virtual desktop.
 
-Note that Jwno creates layout objects lazily. When switching to a virtual desktop that never had any windows opened on it, @code{lo} can be @code{nil}. And the window manager uses their names to uniquely identify virtual desktops. Jwno's behavior is undefined, if you had more than one virtual desktop with the same name, or changed the name of a virtual desktop while Jwno is running.
+Note that Jwno creates layout objects lazily. When switching to a virtual desktop that never had any windows opened on it, @code{lo} can be @code{nil}. And the window manager uses desktop names to uniquely identify them. Jwno's behavior is undefined, if you had more than one virtual desktop with the same name.
+
+Windows uses localized (translated) strings as @em{default} names for virtual desktops. For example, your second virtual desktop will be called @code{Desktop 2} in an English locale, or @code{デスクトプ 2} in a Japanese locale. To make handling different languages easier, Jwno converts any @em{default} desktop name to a tuple @code{[:default <idx>]}. E.g. if the user switched to the second desktop, and never renamed it, @code{norm-vd-name} will equal to @code{[:default 2]}.
