@@ -113,8 +113,10 @@
 
   (def {:window-manager window-man} self)
   (def cur-frame
-    (:get-current-frame-on-desktop (in window-man :root) (in desktop-info :id)))
-  (unless (empty? (in cur-frame :children))
+    (and desktop-info
+         (:get-current-frame-on-desktop (in window-man :root) (in desktop-info :id))))
+  (unless (or (nil? cur-frame)
+              (empty? (in cur-frame :children)))
     (def rect (in cur-frame :rect))
     (def [width height] (rect-size rect))
     (if (> height width)
@@ -233,8 +235,10 @@
 
   (def {:window-manager window-man} self)
   (def cur-frame
-    (:get-current-frame-on-desktop (in window-man :root) (in desktop-info :id)))
-  (unless (empty? (in cur-frame :children))
+    (and desktop-info
+         (:get-current-frame-on-desktop (in window-man :root) (in desktop-info :id))))
+  (unless (or (nil? cur-frame)
+              (empty? (in cur-frame :children)))
     (def cur-top-frame (:get-top-frame cur-frame))
     (def top-dir (:get-direction cur-top-frame))
     (def rows-dir (in self :direction))

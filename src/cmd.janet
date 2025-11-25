@@ -678,8 +678,8 @@
                  nil)))
             (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
             (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
-            (def desktop-name (in desktop-info :name))
-            (def desktop-id (in desktop-info :id))
+            (def desktop-name (and desktop-info (in desktop-info :name)))
+            (def desktop-id (and desktop-info (in desktop-info :id)))
             (:show-tooltip ui-man
                            :describe-window
                            (string/format (string/join
@@ -736,11 +736,22 @@
       (:show-tooltip ui-man :manage-window
          (string/format "Window \"%s\" is already managed."
                         (:get_CachedName uia-win)))
-      (when-let [info (:get-hwnd-info wm hwnd uia-win)]
-        (with-uia [_uia-win (in info :uia-element)]
+      # else
+      (if-with-uia [info (:get-hwnd-info wm hwnd uia-win)]
+        (do
           (:show-tooltip ui-man :manage-window
-             (string/format "Adding \"%s\" to managed windows." (:get_CachedName uia-win)))
-          (:add-hwnd wm info :forced))))))
+             (string/format "Adding \"%s\" to managed windows."
+                            (:get_CachedName uia-win)))
+          (if-let [new-win (:add-hwnd wm info :forced)]
+            (with-activation-hooks wm
+              (:activate new-win))
+            # else
+            (:show-tooltip ui-man :manage-window
+               (string/format "Failed to manage window \"%s\""
+                              (:get_CachedName uia-win)))))
+        # else
+        (:show-tooltip ui-man :manage-window
+           (string/format "Failed to get window info for %n." hwnd))))))
 
 
 (var wm-pause-hook-fn nil)

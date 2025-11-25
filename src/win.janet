@@ -500,9 +500,9 @@
       # normalize-hwnd-and-uia-element failed
       nil
 
-      (nil? desktop-info)
-      # get-hwnd-virtual-desktop failed
-      nil
+      # Some windows are not managed by virtual desktops, but
+      # that should not prevent us from returning other info,
+      # so we don't check for nil desktop-info here any more.
 
       true
       (do
@@ -1392,8 +1392,8 @@
                 ;(unwrap-rect rect))))
 
     :window
-    (if-let [win-info (:get-info self wm)]
-      (with-uia [_uia-win (in win-info :uia-element)]
+    (if-with-uia [win-info (:get-info self wm)]
+      (do
         (def more-indent
           (string indent (buffer/new-filled indent-width indent-char)))
         (def hwnd (in self :hwnd))
@@ -1416,10 +1416,12 @@
         (def dpia-ctx (GetWindowDpiAwarenessContext hwnd))
         (def dpi-awareness (GetAwarenessFromDpiAwarenessContext dpia-ctx))
         (printf "%sDPI Awareness: %n" more-indent dpi-awareness)
+        (def desktop-info (in win-info :virtual-desktop))
+        (def desktop-id (and desktop-info (in desktop-info :id)))
         (printf "%sVirtual Desktop ID: %s"
                 more-indent
-                (get-in win-info [:virtual-desktop :id])))
-
+                (or desktop-id "n/a")))
+      # else
       (printf "%sWindow (hwnd=%n,failed to get info)" indent))
 
     (printf "%sUnknown (%n)" indent self))
@@ -3228,48 +3230,53 @@
   (default manage-state :normal)
   (default no-check false)
 
-  (with-uia [hwnd-info (if (= :pointer (type hwnd-or-info))
-                         # It's an hwnd
-                         (:get-hwnd-info self hwnd-or-info)
-                         # else, assume it's an hwnd-info object
-                         (do
-                           (:AddRef hwnd-or-info)
-                           hwnd-or-info))]
-    (when hwnd-info
-      (def {:hwnd hwnd
-            :uia-element uia-win
-            :exe-path exe-path
-            :virtual-desktop desktop-info}
-        hwnd-info)
+  (when-with-uia [hwnd-info (if (= :pointer (type hwnd-or-info))
+                              # It's an hwnd
+                              (:get-hwnd-info self hwnd-or-info)
+                              # else, assume it's an hwnd-info object
+                              (do
+                                (:AddRef hwnd-or-info)
+                                hwnd-or-info))]
+    (def {:hwnd hwnd
+          :uia-element uia-win
+          :exe-path exe-path
+          :virtual-desktop desktop-info}
+      hwnd-info)
 
-      (unless no-check
-        (when-let [w (:find-hwnd (in self :root) hwnd)]
-          # out of with-uia
-          (break w)))
+    (unless no-check
+      (when-let [w (:find-hwnd (in self :root) hwnd)]
+        # out of when-with-uia
+        (break w)))
 
-      (log/debug "new window: %n" hwnd)
+    (log/debug "new window: %n" hwnd)
 
-      (def new-win (window hwnd))
-      (when (= :forced manage-state)
-        (put (in new-win :tags) :forced true))
+    (def new-win (window hwnd))
+    (when (= :forced manage-state)
+      (put (in new-win :tags) :forced true))
 
-      (:call-hook (in self :hook-manager) :window-created
-         new-win uia-win exe-path desktop-info)
+    (:call-hook (in self :hook-manager) :window-created
+       new-win uia-win exe-path desktop-info)
 
-      (def tags (in new-win :tags))
+    (def tags (in new-win :tags))
 
-      (def frame-found
-        (if-let [override-frame (in tags :frame)]
-          (do 
-            (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
-            (:get-current-frame override-frame))
-          (:get-current-frame-on-desktop (in self :root) (in desktop-info :id))))
+    (def frame-found
+      (if-let [override-frame (in tags :frame)]
+        (do
+          (put tags :frame nil) # Clear the tag, in case the frame got invalidated later
+          (:get-current-frame override-frame))
+        # else
+        (when desktop-info
+          (:get-current-frame-on-desktop (in self :root) (in desktop-info :id)))))
 
-      (:add-child frame-found new-win)
-      (:layouts-changed self [(:get-layout frame-found)])
-      (:transform new-win (:get-padded-rect frame-found) nil self)
-
-      new-win)))
+    (if frame-found
+      (do
+        (:add-child frame-found new-win)
+        (:layouts-changed self [(:get-layout frame-found)])
+        (:transform new-win (:get-padded-rect frame-found) nil self)
+        new-win)
+      (do
+        (log/debug "No frame found for window %n" hwnd)
+        nil))))
 
 
 (defn wm-remove-hwnd [self hwnd]
@@ -3285,20 +3292,27 @@
 
 
 (defn wm-filter-hwnd [self hwnd &opt uia-win? _exe-path? desktop-info?]
+  # Nil desktop-info means that the window is not managed by
+  # virtual desktops, so a different default value is needed
+  # here.
+  (default desktop-info? :not-provided)
+
   (def uia-win
     (if uia-win?
       (do
         (:AddRef uia-win?)
         uia-win?)
       (:get-hwnd-uia-element self hwnd (get-in self [:uia-manager :focus-cr]))))
-  (def desktop-info
-    (if desktop-info?
-      desktop-info?
-      (:get-hwnd-virtual-desktop self hwnd)))
 
-  (def {:id   desktop-id
-        :name desktop-name}
-    desktop-info)
+  (def desktop-info
+    (if (= desktop-info? :not-provided)
+      (:get-hwnd-virtual-desktop self hwnd)
+      desktop-info?))
+
+  (def [desktop-id desktop-name]
+    (if (nil? desktop-info)
+      [nil nil]
+      [(in desktop-info :id) (in desktop-info :name)]))
 
   (with-uia [_uia-win uia-win]
     (cond
@@ -3310,10 +3324,10 @@
       [false [:invalid-virtual-desktop desktop-id]]
 
       (nil? desktop-name)
-      # a nil name means this virtual desktop does not exist in the registry,
-      # which in turn means the VD is an ad-hoc "always shown" one. The
-      # always-shown VDs overlayed with normal layouts are quite confusing,
-      # so we ignore them by default.
+      # a nil name (with non-nil desktop-id) means this virtual desktop does
+      # not exist in the registry, which in turn means the VD is an ad-hoc
+      # "always shown" one. The always-shown VDs overlayed with normal layouts
+      # are quite confusing, so we ignore them by default.
       [false :window-on-multiple-virtual-desktops]
 
       (not (find |(= $ (:GetCachedPropertyValue uia-win UIA_ControlTypePropertyId))
@@ -3466,22 +3480,21 @@
         (:activate win))
       (break))
 
-    (with-uia [hwnd-info (get-hwnd-info hwnd
-                                        (in self :uia-manager)
-                                        (in self :vd-manager)
-                                        uia-win)]
-      (when hwnd-info
-        (def manage-state (:should-manage-hwnd? self hwnd-info))
-        (log/debug "manage-state = %n" manage-state)
+    (when-with-uia [hwnd-info (get-hwnd-info hwnd
+                                             (in self :uia-manager)
+                                             (in self :vd-manager)
+                                             uia-win)]
+      (def manage-state (:should-manage-hwnd? self hwnd-info))
+      (log/debug "manage-state = %n" manage-state)
 
-        (when (= :ignored manage-state)
-          (log/debug "Ignoring window: %n" hwnd)
-          # out of with-uia
-          (break))
+      (when (= :ignored manage-state)
+        (log/debug "Ignoring window: %n" hwnd)
+        # out of when-with-uia
+        (break))
 
-        (if-let [new-win (:add-hwnd self hwnd-info manage-state true)]
-          (with-activation-hooks self
-            (:activate new-win)))))))
+      (if-let [new-win (:add-hwnd self hwnd-info manage-state true)]
+        (with-activation-hooks self
+          (:activate new-win))))))
 
 
 (defn wm-window-opened [self hwnd]
@@ -3489,27 +3502,26 @@
     (log/debug "window-opened event for managed window: %n" hwnd)
     (break))
 
-  (with-uia [hwnd-info (get-hwnd-info hwnd
-                                      (in self :uia-manager)
-                                      (in self :vd-manager))]
-    (when hwnd-info
-      (def manage-state (:should-manage-hwnd? self hwnd-info))
-      (log/debug "manage-state = %n" manage-state)
+  (when-with-uia [hwnd-info (get-hwnd-info hwnd
+                                           (in self :uia-manager)
+                                           (in self :vd-manager))]
+    (def manage-state (:should-manage-hwnd? self hwnd-info))
+    (log/debug "manage-state = %n" manage-state)
 
-      (when (= :ignored manage-state)
-        (log/debug "Ignoring window: %n" hwnd)
-        # out of with-uia
-        (break))
+    (when (= :ignored manage-state)
+      (log/debug "Ignoring window: %n" hwnd)
+      # out of with-uia
+      (break))
 
-      (if-let [new-win (:add-hwnd self hwnd-info manage-state true)
-               fg-hwnd (GetForegroundWindow)]
-        # Some windows only send one window-opened event, but no focus-changed
-        # event, when they firt appear, even though they have input focus
-        # (e.g. Windows Terminal). We need to explicitly activate their nodes
-        # here if they're opened in the foreground.
-        (when (= hwnd fg-hwnd)
-          (with-activation-hooks self
-            (:activate new-win)))))))
+    (if-let [new-win (:add-hwnd self hwnd-info manage-state true)
+             fg-hwnd (GetForegroundWindow)]
+      # Some windows only send one window-opened event, but no focus-changed
+      # event, when they firt appear, even though they have input focus
+      # (e.g. Windows Terminal). We need to explicitly activate their nodes
+      # here if they're opened in the foreground.
+      (when (= hwnd fg-hwnd)
+        (with-activation-hooks self
+          (:activate new-win))))))
 
 
 (defn wm-desktop-name-changed [self vd-name]

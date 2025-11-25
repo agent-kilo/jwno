@@ -291,6 +291,7 @@
     self)
   (def frame (get-in win [:tags :frame]))
   (when (or (nil? frame)
+            (nil? desktop-info)
             (= frame
                (:get-current-frame-on-desktop (in window-man :root)
                                               (in desktop-info :id))))
