@@ -144,14 +144,10 @@
     (if (= spcp-ret FALSE)
       (log/debug "mouse-grid-hinter: SetPhysicalCursorPos failed: %n" (GetLastError))
       # else
-      (ev/spawn
-       # XXX: The mouse would click on the hint window, if we sent these
-       # events immediately. Should set WS_EX_TRANSPARENT on the hint window.
-       (ev/sleep 0.2)
-       (SendInput [(INPUT :type INPUT_MOUSE
-                          :mi.dwFlags MOUSEEVENTF_LEFTDOWN)
-                   (INPUT :type INPUT_MOUSE
-                          :mi.dwFlags MOUSEEVENTF_LEFTUP)]))))
+      (SendInput [(INPUT :type INPUT_MOUSE
+                         :mi.dwFlags MOUSEEVENTF_LEFTDOWN)
+                  (INPUT :type INPUT_MOUSE
+                         :mi.dwFlags MOUSEEVENTF_LEFTUP)])))
   nil)
 
 
