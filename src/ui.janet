@@ -914,7 +914,7 @@
 
 
 (defn- create-msg-window [hInstance hook-handler]
-  (def class-name "JwnoMsgWinClass")
+  (def class-name const/MESSAGE-WINDOW-CLASS)
   (def msg-wndproc-state
     @{:tooltips @{:current-frame @{:timeout const/DEFAULT-CURRENT-FRAME-TOOLTIP-TIMEOUT
                                    :anchor const/DEFAULT-CURRENT-FRAME-TOOLTIP-ANCHOR}
@@ -934,7 +934,7 @@
   (def hwnd
     (CreateWindowEx 0                      # dwExStyle
                     class-name             # lpClassName
-                    "Jwno Message Window"  # lpWindowName
+                    const/MESSAGE-WINDOW-NAME  # lpWindowName
                     0                      # dwStyle
                     0                      # x
                     0                      # y

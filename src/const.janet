@@ -26,3 +26,6 @@
 (def KEYMAP-COMMAND-DESC-MAX-LENGTH 100) # XXX: Arbitrary value
 
 (def GLOBAL-NAMESPACE-PREFIX "jwno/")
+
+(def MESSAGE-WINDOW-CLASS "JwnoMsgWinClass")
+(def MESSAGE-WINDOW-NAME  "Jwno Message Window")

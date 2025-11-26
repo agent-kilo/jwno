@@ -251,6 +251,15 @@
      (show-error-and-exit err 1 (get-stack-trace fib)))))
 
 
+(defn check-single-instance []
+  (if-let [hwnd (FindWindowEx nil nil const/MESSAGE-WINDOW-CLASS const/MESSAGE-WINDOW-NAME)]
+    (do
+      (log/debug "Jwno already running with hwnd = %n" hwnd)
+      false)
+    # else
+    true))
+
+
 (defn main [& args]
   (def cli-args (parse-args))
 
@@ -271,6 +280,11 @@
 
   (when-let [cmd-list (in cli-args "execute")]
     (run-repl-command cmd-list cli-args)
+    (os/exit 0))
+
+  (unless (check-single-instance)
+    (def msg "Jwno is already running.")
+    (MessageBox nil msg "Error" (bor MB_ICONEXCLAMATION MB_OK))
     (os/exit 0))
 
   (init-com)
