@@ -13,7 +13,7 @@ env:
 
   WIN_SDK_VERSION: "10.0.26100.0"
 
-  JANET_VERSION: "1.39.1"
+  JANET_VERSION: "1.40.1"
   JANET_DIR: "${{ github.workspace }}\\janet"
   JANET_PATH: "${{ github.workspace }}\\janet\\Library"
   JANET_SOURCE_PATH: "${{ github.workspace }}\\janet_src"
@@ -22,7 +22,7 @@ env:
   JANET_LIBPATH: "${{ github.workspace }}\\janet\\C"
   JANET_MANPATH: "${{ github.workspace }}\\janet\\docs"
 
-  JPM_VERSION: "d93b7c243645d31410a81fb9ab8f7a5e5608f0d0"
+  JPM_VERSION: "207ebf3d47bbb6dbe5dcd26d5bb37ca5b8e1ed5a"
   JPM_DIR: "${{ github.workspace }}\\jpm"
   JPM_CMD: "${{ github.workspace }}\\janet\\bin\\janet.exe ${{ github.workspace }}\\janet\\bin\\jpm"
 
