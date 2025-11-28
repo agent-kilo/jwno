@@ -1601,9 +1601,9 @@
   (get-hwnd-rect (in self :hwnd) no-frame?))
 
 
-(defn window-set-focus [self &opt wm activate?]
+(defn window-set-focus [self &opt wm sync-focus]
   (default wm (:get-window-manager self))
-  (default activate? (if (dyn :sync-focus) true false))
+  (default sync-focus (if (dyn :sync-focus) true false))
 
   (def old-v-state (:reset-visual-state self true false wm))
   (def parent (in self :parent))
@@ -1611,8 +1611,8 @@
              (= old-v-state WindowVisualState_Minimized))
     (:transform self (:get-padded-rect parent) nil wm))
   (:set-focus-to-hwnd wm (in self :hwnd))
-  (when activate?
-    (:activate self)))
+  (when sync-focus
+    (:focus-changed wm (in self :hwnd))))
 
 
 (defn window-dump [self]
@@ -3427,12 +3427,18 @@
       (:call-hook hook-man :window-removed dw))))
 
 
-(defn wm-focus-changed [self]
+(defn wm-focus-changed [self &opt focused-hwnd]
   (def {:uia-manager uia-man
         :hook-manager hook-man}
     self)
 
-  (with-uia [uia-win (:get-focused-window uia-man)]
+  (with-uia [uia-win (if (nil? focused-hwnd)
+                       (:get-focused-window uia-man)
+                       # else
+                       (when-with-uia [focused-elem (:get-hwnd-uia-element self
+                                                                           focused-hwnd
+                                                                           (in uia-man :focus-cr))]
+                         (:get-parent-window uia-man focused-elem)))]
     (def hwnd
       (when uia-win
         (:get_CachedNativeWindowHandle uia-win)))
@@ -3682,25 +3688,34 @@
 
 
 (defn wm-with-activation-hooks [self op-fn]
-  (def root (in self :root))
-  (def old-frame (:get-current-frame root))
-  (def old-win
-    (when old-frame
-      (:get-current-window old-frame)))
+  (def level (dyn :__with-activation-hooks-level 0))
+  (log/debug "__with-activation-hooks-level = %n" level)
+  (setdyn :__with-activation-hooks-level (+ 1 level))
 
-  (def ret (op-fn))
+  (defer (setdyn :__with-activation-hooks-level level)
+    (if (< 0 level)
+      (op-fn)
+      # else
+      (do
+        (def root (in self :root))
+        (def old-frame (:get-current-frame root))
+        (def old-win
+          (when old-frame
+            (:get-current-window old-frame)))
 
-  (def new-frame (:get-current-frame root))
-  (def new-win (:get-current-window new-frame))
+        (def ret (op-fn))
 
-  (def hook-man (in self :hook-manager))
-  (unless (= new-frame old-frame)
-    (:call-hook hook-man :frame-activated new-frame))
-  (unless (or (nil? new-win)
-              (= new-win old-win))
-    (:call-hook hook-man :window-activated new-win))
+        (def new-frame (:get-current-frame root))
+        (def new-win (:get-current-window new-frame))
 
-  ret)
+        (def hook-man (in self :hook-manager))
+        (unless (= new-frame old-frame)
+          (:call-hook hook-man :frame-activated new-frame))
+        (unless (or (nil? new-win)
+                    (= new-win old-win))
+          (:call-hook hook-man :window-activated new-win))
+
+        ret))))
 
 
 (defn wm-destroy [self]
