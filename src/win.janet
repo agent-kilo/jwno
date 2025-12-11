@@ -3706,10 +3706,13 @@
         (def ret (op-fn))
 
         (def new-frame (:get-current-frame root))
-        (def new-win (:get-current-window new-frame))
+        (def new-win
+          (when new-frame
+            (:get-current-window new-frame)))
 
         (def hook-man (in self :hook-manager))
-        (unless (= new-frame old-frame)
+        (unless (or (nil? new-frame)
+                    (= new-frame old-frame))
           (:call-hook hook-man :frame-activated new-frame))
         (unless (or (nil? new-win)
                     (= new-win old-win))
