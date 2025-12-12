@@ -259,6 +259,30 @@
   (log/debug "vdm-worker stopping"))
 
 
+#
+# The VD manager is mostly used to query VD info. It handles some... special cases.
+#
+# Special Case #1:
+#   A user may have NEVER created another virtual desktop. In this case the
+#   `VirtualDesktopIDs` value would not exist in the registry, and it would be
+#   impossible (and meaningless) for us to match the actual GUID and desktop
+#   name, so the VD manager will behave as if virtual desktops are all "disabled":
+#     * :get-all-desktops always returns an empty list;
+#     * :get-desktop-name always returns :default, instead of the actual name;
+#     * :get-desktop-guid-from-name always returns :default, instead of the actual GUID.
+#
+# Special Case #2:
+#   Windows does not write the default desktop names to the registry, if the user
+#   have NEVER changed them. Yet the default desktop names are LOCALIZED strings,
+#   e.g. they look like "Desktop 1", "Desktop 2" in an English locale, but turn
+#   into "デスクトプ 1", "デスクトプ 2" in a Japanese locale. To avoid hard-coding
+#   these localized strings in the code, the VD manager handles names like this,
+#   for desktops with default names:
+#     * The corresponding name components returned by :get-all-desktops will be nil;
+#     * :get-desktop-name will return tuples like [:default 1],[:default 2], etc.,
+#       instead of string names.
+#     * :get-desktop-guid-from-name can accept these tuple names.
+#
 (defn virtual-desktop-manager []
   (def com
     (CoCreateInstance CLSID_VirtualDesktopManager
