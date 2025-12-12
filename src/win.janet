@@ -520,8 +520,12 @@
 (defn- window-purge-pred [win wm layout]
   (def hwnd (in win :hwnd))
   (or (not (:alive? win))
-      (not= (in layout :id)
-            (get-hwnd-virtual-desktop-id hwnd (in wm :vd-manager)))))
+      (and
+        # If it's not the only available layout (desktop),
+        (not= :default (in layout :id))
+        # also check whether the window has bean moved to another desktop.
+        (not= (in layout :id)
+              (get-hwnd-virtual-desktop-id hwnd (in wm :vd-manager))))))
 
 
 (defn dump-tag-value [x]
@@ -1360,9 +1364,13 @@
     (printf "%sRoot Container" indent)
 
     :layout
-    (printf "%sVirtual Desktop (name=%n, id=%n)"
+    (printf "%sVirtual Desktop (name=%s, id=%n)"
             indent
-            (:get-desktop-name vd-man (in self :id))
+            (let [name (:get-desktop-name vd-man (in self :id))]
+              (case name
+                nil      "n/a"
+                :default ":default"
+                (string/format "\"%s\"" name)))
             (in self :id))
 
     :frame
@@ -1420,7 +1428,10 @@
         (def desktop-id (and desktop-info (in desktop-info :id)))
         (printf "%sVirtual Desktop ID: %s"
                 more-indent
-                (or desktop-id "n/a")))
+                (case desktop-id
+                  nil      "n/a"
+                  :default ":default"
+                  desktop-id)))
       # else
       (printf "%sWindow (hwnd=%n,failed to get info)" indent))
 
@@ -2709,7 +2720,8 @@
           # attached frame, need to check its virtual desktop
           (fn [hwnd-num hwnd c]
             (when-let [vd-id (:get-hwnd-virtual-desktop-id wm hwnd)]
-              (when (= vd-id (in lo :id))
+              (when (or (= vd-id (in lo :id))
+                        (= :default (in lo :id)))
                 (put hwnd-map hwnd-num nil)
                 (def win (window hwnd))
                 (:load win c)
@@ -3034,8 +3046,10 @@
 
 
 (defn vdc-get-layout-on-desktop [self desktop-id &opt create]
+  (def children (in self :children))
+
   (var layout-found nil)
-  (each lo (in self :children)
+  (each lo children
     (when (= (in lo :id) desktop-id)
       (set layout-found lo)
       (break)))
@@ -3043,6 +3057,11 @@
   (cond
     layout-found
     layout-found
+
+    (and (= 1 (length children))
+         (= :default (in (first children) :id)))
+    # VDs are disabled, and it's the only available layout
+    (first children)
 
     create
     (let [new-layout (:new-layout self desktop-id)]

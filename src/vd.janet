@@ -75,13 +75,19 @@
       (log/debug "VD IDs read from registry (%n bytes): %n"
                  (if (nil? id-data) 0 (length id-data))
                  id-data)
-      (unless (= 0 stat)
+      (unless (or (= 0 stat)  # ERROR_SUCCESS
+                  (= 2 stat)) # ERROR_FILE_NOT_FOUND, means the value storing VD IDs does not exist.
+                              # A non-existent value in turn means the user never created another VD,
+                              # we should consider the VD feature "disabled", instead of panicking.
         (errorf "RegGetValue failed for %n: %n" reg-vd-value-name stat))
 
       (set cache @[])
 
       (def guid-size 16)
-      (def vd-count (/ (length id-data) guid-size))
+      (def vd-count
+        (if-not (= 0 stat)
+          0  # We didn't get anything from the registry
+          (/ (length id-data) guid-size)))
       (for i 0 vd-count
         (def s (* i guid-size))
         (def e (+ s guid-size))
@@ -111,15 +117,24 @@
   (default refresh false)
 
   (def dlist (:get-all-desktops self refresh))
-  (def filter-fn (fn [[_i g _n]] (= g guid)))
-  (when-let [dinfo (find filter-fn dlist)
-             [idx _guid name] dinfo]
-    (if name
-      name
-      # else, the desktop has no user-defined name
-      [:default idx]))
-  # nil for all unknown desktops
-  )
+
+  (if (empty? dlist)
+    # Virtual desktops are disabled
+    (do
+      (log/debug "No active virtual desktop, using placeholder for desktop name")
+      :default)
+
+    # else, VDs are enabled
+    (do
+      (def filter-fn (fn [[_i g _n]] (= g guid)))
+      (when-let [dinfo (find filter-fn dlist)
+                 [idx _guid name] dinfo]
+        (if name
+          name
+          # else, the desktop has no user-defined name
+          [:default idx]))
+      # nil for all unknown desktops
+      )))
 
 
 (def default-desktop-name-peg
@@ -131,6 +146,12 @@
   (default refresh false)
 
   (def dlist (:get-all-desktops self refresh))
+
+  (when (empty? dlist)
+    # Early return
+    (log/debug "No active virtual desktop, using placeholder for desktop GUID")
+    (break :default))
+
   (def filter-fn
     (fn [[i _g n]]
       (if (nil? n)

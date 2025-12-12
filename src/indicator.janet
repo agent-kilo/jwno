@@ -259,6 +259,7 @@
 
   (cond
     (and (not (nil? cur-vd-guid))
+         (not= :default cur-vd-guid)
          (not= (in lo :id) cur-vd-guid))
     # The frame is on a virtual desktop that's different from our active one,
     # The area window should have been closed in the :virtual-desktop-changed

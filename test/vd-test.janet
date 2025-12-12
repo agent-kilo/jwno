@@ -82,7 +82,20 @@
     (assert (nil? (:get-desktop-guid-from-name vdm "Name Five")))
     (assert (nil? (:get-desktop-guid-from-name vdm [:default 5])))
     (assert (nil? (:get-desktop-guid-from-name vdm "Desktop 5")))
-    (assert (nil? (:get-desktop-guid-from-name vdm "デスクトプ 5")))))
+    (assert (nil? (:get-desktop-guid-from-name vdm "デスクトプ 5"))))
+
+  # Virtual desktops disabled
+  (set vdm (make-dummy-vdm []))
+
+  (defer (:destroy vdm)
+    (assert (empty? (:get-all-desktops vdm)))
+    (assert (= :default (:get-desktop-name vdm (dummy-guids 0))))
+    (assert (= :default (:get-desktop-name vdm (dummy-guids 1))))
+    (assert (= :default (:get-desktop-name vdm :default)))
+    (assert (= :default (:get-desktop-guid-from-name vdm "Desktop 1")))
+    (assert (= :default (:get-desktop-guid-from-name vdm "Desktop 2")))
+    (assert (= :default (:get-desktop-guid-from-name vdm "デスクトプ 1")))
+    (assert (= :default (:get-desktop-guid-from-name vdm "Dummy Name")))))
 
 
 (defn main [&]

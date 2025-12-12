@@ -702,9 +702,12 @@
                                           (:get_CachedControlType uia-win)
                                           (cond
                                             (nil? desktop-name)    "n/a"
-                                            (tuple? desktop-name)  (string/format "%n" desktop-name)
-                                            (string? desktop-name) desktop-name)
-                                          (or desktop-id   "n/a")
+                                            (string? desktop-name) desktop-name
+                                            true                   (string/format "%n" desktop-name))
+                                          (cond
+                                            (nil? desktop-id)    "n/a"
+                                            (string? desktop-id) desktop-id
+                                            true                 (string/format "%n" desktop-id))
                                           rect
                                           (if efb-rect
                                             (string/format "%n" efb-rect)
