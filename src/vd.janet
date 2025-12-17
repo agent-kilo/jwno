@@ -50,8 +50,7 @@
 
   (var cache (in self :vd-cache))
   (when (and (not refresh)
-             cache
-             (not (empty? cache)))
+             (not (nil? cache)))
     (log/debug "Reusing vd-cache")
     # Early return
     (break cache))
