@@ -1367,9 +1367,10 @@
     (printf "%sVirtual Desktop (name=%s, id=%n)"
             indent
             (let [name (:get-desktop-name vd-man (in self :id))]
-              (case name
-                nil      "n/a"
-                :default ":default"
+              (match name
+                nil          "n/a"
+                :default     ":default"
+                [:default _] (string/format "%n" name)
                 (string/format "\"%s\"" name)))
             (in self :id))
 
