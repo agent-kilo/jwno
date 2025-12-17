@@ -733,12 +733,11 @@
         (remove-notify-icon hwnd)
         ((err fib)
          (show-error-and-exit err 1 (get-stack-trace fib))))
-      (when-let [tooltip (in state :cur-frame-tooltip)]
-        (def [tt-hwnd _tt-info] tooltip)
-        (DestroyWindow tt-hwnd))
-      (when-let [tooltip (in state :tooltip)]
-        (def [tt-hwnd _tt-info] tooltip)
-        (DestroyWindow tt-hwnd))
+      (eachp [tt-id {:hwnd tt-hwnd :info tt-info}] (in state :tooltips)
+        (log/debug "Destroying tooltip %n, hwnd = %n, uId = %n"
+                   tt-id tt-hwnd (and tt-info (in tt-info :uId)))
+        (when tt-hwnd
+          (DestroyWindow tt-hwnd)))
       (DestroyWindow hwnd))
 
     ID_MENU_RESET_KBD_HOOKS
