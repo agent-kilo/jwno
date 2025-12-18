@@ -2265,6 +2265,32 @@
   (assert (= true (:attached? dummy-frame))))
 
 
+(defn test-vdc-update-layout-ids []
+  (def dummy-guids
+    ["{4BD7A195-CA18-4FE6-963E-E64EF5E91A82}"
+     "{4D2376AD-1F5D-4F13-82D8-11E295C36B25}"
+     "{CCDFE45E-A948-460B-A150-997EEF14575F}"])
+
+  (def dummy-frame (frame {:top 10 :left 10 :bottom 110 :right 110}))
+  (var dummy-layout (layout :default nil [dummy-frame]))
+  (var dummy-vdc (virtual-desktop-container :dummy-wm [dummy-layout]))
+
+  (:update-layout-ids dummy-vdc @[[1 (dummy-guids 0) nil]])
+  (assert (= (in dummy-layout :id) (dummy-guids 0)))
+
+  (set dummy-layout (layout :default nil [dummy-frame]))
+  (set dummy-vdc (virtual-desktop-container :dummy-wm [dummy-layout]))
+
+  (:update-layout-ids dummy-vdc @[[1 (dummy-guids 1) nil] [2 (dummy-guids 0) nil]])
+  (assert (= (in dummy-layout :id) (dummy-guids 1)))
+
+  (set dummy-layout (layout (dummy-guids 2) nil [dummy-frame]))
+  (set dummy-vdc (virtual-desktop-container :dummy-wm [dummy-layout]))
+
+  (:update-layout-ids dummy-vdc @[[1 (dummy-guids 0) nil]])
+  (assert (= (in dummy-layout :id) (dummy-guids 2))))
+
+
 (defn main [&]
   (test-tree-node-activate)
   (test-frame-constructor)
@@ -2292,4 +2318,5 @@
   (test-frame-dump-and-load-with-viewport)
   (test-frame-move-into-viewport)
   (test-layout-get-adjacent-frame)
-  (test-tree-node-attached?))
+  (test-tree-node-attached?)
+  (test-vdc-update-layout-ids))

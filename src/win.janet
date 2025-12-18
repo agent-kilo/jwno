@@ -3101,6 +3101,26 @@
   dead-arr)
 
 
+#
+# This is for syncing layout IDs with virtual desktop GUIDs
+# saved in the OS registry.
+#
+# Currently the only case where the syncing is needed, is when
+# VDs were previously disabled, and the user just created a
+# new VD. In this case we just need to replace the sole :default
+# placeholder with the first VD's GUID.
+#
+(defn vdc-update-layout-ids [self vd-list]
+  (def layouts (in self :children))
+  (when (and (= 1 (length layouts))
+             (= :default (in (first layouts) :id))
+             (not (empty? vd-list)))
+    # XXX: This assumes new VDs are always added at the end of the list
+    (def [_idx guid _name] (first vd-list))
+    (log/debug "Updating placeholder layout ID to %n" guid)
+    (put (first layouts) :id guid)))
+
+
 (defn vdc-dump [self]
   [:vdc
    (tuple/slice (map |(:dump $) (in self :children)))])
@@ -3132,6 +3152,7 @@
      :get-layout-on-desktop vdc-get-layout-on-desktop
      :get-current-frame-on-desktop vdc-get-current-frame-on-desktop
      :purge-windows vdc-purge-windows
+     :update-layout-ids vdc-update-layout-ids
      :dump vdc-dump
      :load vdc-load}
    tree-node-proto))
@@ -3555,7 +3576,11 @@
   (def layouts (in root :children))
   (def vd-man (in self :vd-manager))
 
-  (def vd-guid (:get-desktop-guid-from-name vd-man vd-name true))
+  # Refresh the cache
+  (def new-vds (:get-all-desktops vd-man true))
+  (:update-layout-ids root new-vds)
+
+  (def vd-guid (:get-desktop-guid-from-name vd-man vd-name))
   (log/debug "wm-desktop-name-changed: vd-name = %n, vd-guid = %n" vd-name vd-guid)
   (when (nil? vd-guid)
     (log/warning "Virtual desktop name not found: %n" vd-name)
